@@ -159,7 +159,11 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
         ["view", "[view]", "mode_view"],
         ["edit", "[edit]", "mode_edit"]
     ].map(([value, icon_value, key]) =>
-        list_item(ctx, icon_value, t(ctx, key), value === mode, { "data-mode": value })
+        <button class="desk_wbox_head_tool" type="button" role="radio"
+            data-mode={value} aria-checked={String(value === mode)}
+            tabindex={value === mode ? 0 : -1} title={t(ctx, key)} aria-label={t(ctx, key)}>
+            {glyph(ctx, icon_value)}
+        </button>
     )
     const moves = [
         ["[move_right]", "move_right"],
@@ -173,15 +177,15 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
         <span class="desk_wbox_head_icon" aria-hidden="true">
             {icon(ctx, info.icon)}
         </span>,
-        head_list(
-            ctx,
-            "desk_wbox_head_mime",
-            t(ctx, "mime_type"),
-            mime || t(ctx, "no_mime"),
-            mimes,
-            t(ctx, "filter_mimes")
-        ),
-        <>
+        <div class="desk_wbox_head_source">
+            {head_list(
+                ctx,
+                "desk_wbox_head_mime",
+                t(ctx, "mime_type"),
+                mime || t(ctx, "no_mime"),
+                mimes,
+                t(ctx, "filter_mimes")
+            )}
             <input
                 class={"desk_wbox_head_path"}
                 type={"text"}
@@ -190,8 +194,8 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
                 spellcheck={"false"}
                 value={attrs.path ?? ""}
             />
-        </>,
-        head_list(ctx, "desk_wbox_head_mode", t(ctx, "view_mode"), mode, modes, undefined, true),
+            <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
+        </div>,
         attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
         attrs.flow !== "false" &&
             head_button(ctx, "desk_wbox_head_split", t(ctx, "split_window"), "[split]", false),

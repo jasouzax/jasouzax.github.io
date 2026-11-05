@@ -1354,9 +1354,7 @@
         background: #ffd24a;
     }
 
-    & .desk_wbox_head_path,
-    & .desk_wbox_head_mime>summary,
-    & .desk_wbox_head_mode>summary {
+    & .desk_wbox_head_source {
         background: #fff;
         color: #0a1a52;
         border: 1px solid #7f9db9;
@@ -2928,9 +2926,7 @@
         text-shadow: 1px 1px #222;
     }
 
-    & .desk_wbox_head_path,
-    & .desk_wbox_head_mime>summary,
-    & .desk_wbox_head_mode>summary {
+    & .desk_wbox_head_source {
         background: #1e1e1e;
         color: #ececec;
         border-color: #777;

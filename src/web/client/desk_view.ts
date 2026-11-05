@@ -105,6 +105,7 @@ export function set_mime(item: desk_window, mime: string): void {
 }
 
 export function set_mode(item: desk_window, mode: string): void {
+    if (item.mode === mode) return
     item.mode = mode
     render_window(item)
 }
@@ -447,11 +448,10 @@ export function render_window(item: desk_window): void {
     if (path) path.value = item.path || item.name
     const summary = head_part(item, ".desk_wbox_head_mime > summary")
     if (summary) summary.textContent = item.mime || text("no_mime")
-    const mode = head_part(item, ".desk_wbox_head_mode > summary")
-    if (mode) mode.textContent = text(`mode_${item.mode}`)
     for (const button of item.el.querySelectorAll<HTMLElement>(".desk_wbox_head_mode button[data-mode]")) {
-        if (button.dataset.mode === item.mode) button.setAttribute("aria-current", "true")
-        else button.removeAttribute("aria-current")
+        const active = button.dataset.mode === item.mode
+        button.setAttribute("aria-checked", String(active))
+        button.tabIndex = active ? 0 : -1
     }
     fill_mime_list(item)
     // a new body starts with nothing to save; an editor claims the save button when it is made
@@ -479,6 +479,14 @@ export async function load_file(item: desk_window, file: Blob, name: string, pat
 
 // the lists' clicks, the search and Enter
 function wire_head(item: desk_window): void {
+    item.el.addEventListener("keydown", event => {
+        const target = (event.target as Element).closest<HTMLElement>(".desk_wbox_head_mode button[data-mode]")
+        if (!target || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return
+        event.preventDefault()
+        const buttons = [...item.el.querySelectorAll<HTMLButtonElement>(".desk_wbox_head_mode button[data-mode]")]
+        const next = event.key === "Home" ? buttons[0] : event.key === "End" ? buttons[buttons.length - 1] : buttons.find(button => button !== target)
+        if (next) { set_mode(item, next.dataset.mode ?? "view"); next.focus() }
+    })
     item.el.addEventListener("click", event => {
         const target = event.target as HTMLElement
         if (target.closest(".desk_wbox_head_save")) {
@@ -492,7 +500,6 @@ function wire_head(item: desk_window): void {
             pick.closest("details")?.removeAttribute("open")
         } else if (mode) {
             set_mode(item, mode.dataset.mode ?? "view")
-            mode.closest("details")?.removeAttribute("open")
         }
     })
     // typing in the editor marks the change; Ctrl+S in the window saves it
