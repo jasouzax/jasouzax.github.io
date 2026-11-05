@@ -1,0 +1,7 @@
+<blog lang="en" name="Chaos theory, drawn" icon="[blog]" info="A short tour of the logistic map with a live simulation window." id="chaos-theory">
+        <window path="chaos_theory/index.md" type="text/markdown" mode="view" />
+    </blog>
+
+<blog lang="ja" name="カオス理論を描く" icon="[blog]" info="ライブシミュレーションウィンドウ付きの、ロジスティック写像のミニツアー。" id="chaos-theory">
+        <window path="chaos_theory/index.ja.md" type="text/markdown" mode="view" />
+    </blog>

@@ -1,0 +1,9 @@
+{
+  "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-assets" }],
+  "kv_namespaces": [{ "binding": "REGISTRY", "id": "REPLACE_WITH_KV_ID" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "jazu", "database_id": "REPLACE_WITH_D1_ID", "migrations_dir": "migrations" }],
+  "routes": [
+    { "pattern": "jasouza.com/*", "zone_name": "jasouza.com" },
+    { "pattern": "*.jasouza.com/*", "zone_name": "jasouza.com" }
+  ]
+}

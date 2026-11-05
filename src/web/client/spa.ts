@@ -1,0 +1,160 @@
+import { init_reveal, update_tab_spy } from "./scroll.ts"
+import { sync_theme_radios } from "./menus.ts"
+import { deserialize, to_dom, type serialized_node } from "../vnode.tsx"
+
+type page_payload = {
+    path: string
+    lang?: string
+    loading?: string
+    title: string
+    header: serialized_node
+    main: serialized_node
+    body_class: string
+    styles?: { href: string, media: string }[]
+    dir?: string
+    head?: serialized_node
+}
+
+export function should_intercept(event: MouseEvent, link: HTMLAnchorElement): boolean {
+    if (event.defaultPrevented) return false
+    if (event.button !== 0) return false
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
+    if (link.target && link.target !== "_self") return false
+    if (link.hasAttribute("download")) return false
+    if (link.origin !== location.origin) return false
+    // files (pdf, images, the .json payloads themselves) are real downloads, not pages
+    if (/\.[a-z0-9]{2,5}$/i.test(link.pathname) && !link.pathname.endsWith(".html")) return false
+    if (link.pathname.startsWith("/api/") || link.pathname.startsWith("/work")) return false
+    return !(link.pathname === location.pathname && link.hash)
+}
+
+function json_url(url: URL): string {
+    const path = url.pathname.replace(/\/$/, "")
+    return `${path}/index.json`
+}
+
+async function fetch_payload(url: URL): Promise<page_payload | null> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3000)
+    try {
+        const response = await fetch(json_url(url), { signal: controller.signal })
+        return response.ok ? ((await response.json()) as page_payload) : null
+    } catch {
+        return null
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+function announce(title: string): void {
+    let region = document.getElementById("spa_live")
+    if (!region) {
+        region = document.createElement("div")
+        region.id = "spa_live"
+        region.className = "visually_hidden"
+        region.setAttribute("aria-live", "polite")
+        document.body.append(region)
+    }
+    region.textContent = title
+}
+
+function swap_page_styles(styles: { href: string, media: string }[]): void {
+    const current = [...document.head.querySelectorAll<HTMLLinkElement>("link[data-page-css]")]
+    for (const link of current) {
+        if (!styles.some(style => link.getAttribute("href") === style.href)) link.remove()
+    }
+    for (const style of styles) {
+        if (current.some(link => link.getAttribute("href") === style.href)) continue
+        const link = document.createElement("link")
+        link.rel = "stylesheet"
+        link.href = style.href
+        if (style.media) link.media = style.media
+        link.dataset.pageCss = ""
+        document.head.append(link)
+    }
+}
+
+function swap_page(payload: page_payload): void {
+    document.title = payload.title
+    // switching language swaps the page without a reload: keep <html lang> (fonts, hyphenation, screen readers) and the spinner label in step
+    if (payload.loading) document.documentElement.dataset.loading = payload.loading
+    if (payload.lang) document.documentElement.lang = payload.lang
+    if (payload.dir) document.documentElement.dir = payload.dir
+    // description, canonical, hreflang, Open Graph, Twitter and JSON-LD carry data-seo: swap exactly those so a shared or bookmarked URL stays accurate
+    if (payload.head !== undefined) {
+        for (const node of document.head.querySelectorAll("[data-seo]")) node.remove()
+        document.head.append(to_dom(deserialize(payload.head)))
+    }
+    document.body.className = payload.body_class
+    swap_page_styles(payload.styles ?? [])
+    document.getElementById("head")!.replaceWith(to_dom(deserialize(payload.header)))
+    document.getElementById("main-content")!.replaceChildren(to_dom(deserialize(payload.main)))
+    sync_theme_radios()
+    document.dispatchEvent(new Event("jazu:page"))
+}
+
+let current_path = location.pathname
+
+function scroll_to_hash(hash: string): void {
+    const id = hash.length > 1 ? decodeURIComponent(hash.slice(1)) : ""
+    const target = id ? document.getElementById(id) : null
+    if (target) target.scrollIntoView()
+    else scrollTo(0, 0)
+}
+
+// While the next page loads the current one fades to nothing and a spinner (a div with a round border) turns in the middle; both go away
+// once the new page is in. The look is in default.scss (.spa_loading, .spa_spinner).
+function show_loading(): void {
+    document.documentElement.classList.add("spa_loading")
+    if (document.getElementById("spa_spinner")) return
+    const spinner = document.createElement("div")
+    spinner.id = "spa_spinner"
+    spinner.className = "spa_spinner"
+    spinner.setAttribute("role", "progressbar")
+    spinner.setAttribute("aria-label", document.documentElement.dataset.loading ?? "Loading")
+    document.body.append(spinner)
+}
+
+function hide_loading(): void {
+    document.documentElement.classList.remove("spa_loading")
+    document.getElementById("spa_spinner")?.remove()
+}
+
+let navigation = 0
+
+export async function navigate(url: URL, push: boolean): Promise<void> {
+    const mine = ++navigation
+    show_loading()
+    const payload = await fetch_payload(url)
+    // a newer click superseded this one
+    if (mine !== navigation) return
+    if (!payload) {
+        location.assign(url.href)
+        return
+    }
+    swap_page(payload)
+    hide_loading()
+    current_path = url.pathname
+    if (push) history.pushState({}, "", url)
+    announce(payload.title)
+    const main = document.getElementById("main-content")!
+    main.focus({ preventScroll: true })
+    scroll_to_hash(url.hash)
+    init_reveal()
+    update_tab_spy()
+}
+
+export function init_spa(): void {
+    document.addEventListener("click", event => {
+        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]")
+        if (!link || !should_intercept(event, link)) return
+        event.preventDefault()
+        void navigate(new URL(link.href), true)
+    })
+    // A same-page fragment link (#expertise, #featured/x ...) also fires popstate. The browser has already scrolled / set :target,
+    // so re-rendering the page here would reload it and throw the reader back to the top. Only a different path needs a swap.
+    addEventListener("popstate", () => {
+        if (location.pathname === current_path) return
+        void navigate(new URL(location.href), false)
+    })
+}

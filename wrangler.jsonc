@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jazu_router",
+  "main": "src/node/worker.ts",
+  "compatibility_date": "2026-11-04",
+  "workers_dev": true,
+  "vars": {
+    "DOMAIN": "jasouza.com",
+    "PAGES_ORIGIN": "https://jazu.pages.dev",
+    "PUBLIC_PROJECTS": "[]"
+  }
+}

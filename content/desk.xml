@@ -1,0 +1,73 @@
+<page lang="en" path="/desk" name="Desktop" icon="[desk]" rank="90" info="Free browser tools: a desktop of windows for text, images, video and vector editing.">
+        <desk name="Desktop" icon="[desk]" info="Files and tools" auto="true">
+            <menu name="Files" icon="[folder]" path="file:///">
+                <entry type="Folder" id="fs_top" name="/" info="Root of the file system" open="true">
+                    <entry type="Folder" id="fs_bin" name="bin" info="Essential commands" />
+                    <entry type="Folder" id="fs_boot" name="boot" info="Boot loader files" />
+                    <entry type="Folder" id="fs_dev" name="dev" info="Devices" />
+                    <entry type="Folder" id="fs_etc" name="etc" info="System configuration" />
+                    <entry type="Folder" id="fs_home" name="home" info="User home folders" open="true">
+                        <entry type="Folder" id="fs_home_user" name="user" info="Kept in this browser" />
+                    </entry>
+                    <entry type="Folder" id="fs_lib" name="lib" info="Shared libraries" />
+                    <entry type="Folder" id="fs_media" name="media" info="Removable media" />
+                    <entry type="Folder" id="fs_mnt" name="mnt" info="Mounted file systems" />
+                    <entry type="Folder" id="fs_opt" name="opt" info="Optional software" />
+                    <entry type="Folder" id="fs_proc" name="proc" info="Processes" />
+                    <entry type="Folder" id="fs_root" name="root" info="Administrator home" />
+                    <entry type="Folder" id="fs_run" name="run" info="Runtime data" />
+                    <entry type="Folder" id="fs_sbin" name="sbin" info="System commands" />
+                    <entry type="Folder" id="fs_srv" name="srv" info="Served data" />
+                    <entry type="Folder" id="fs_sys" name="sys" info="Kernel and devices" />
+                    <entry type="Folder" id="fs_tmp" name="tmp" info="Temporary files" />
+                    <entry type="Folder" id="fs_usr" name="usr" info="User programs" />
+                    <entry type="Folder" id="fs_var" name="var" info="Variable data" />
+                </entry>
+            </menu>
+        </desk>
+    </page>
+
+<page lang="en" path="/desk/png-to-jpeg" name="PNG to JPEG" icon="[image]" info="Convert PNG images to JPEG in your browser.">
+        <desk name="PNG to JPEG" icon="[image]" info="Drop a PNG on the left window and get a JPEG on the right." auto="true">
+            <menu name="Options" icon="[edit]" path="window:2:/options" />
+            <window />
+            <window type="image/jpeg" path="window:0" mode="view" />
+        </desk>
+    </page>
+
+<page path="/desk" lang="ja" name="デスクトップ" icon="[desk]" rank="90" info="ブラウザで使える無料ツール：テキスト、画像、動画、ベクター編集のためのウィンドウ型デスクトップ。">
+        <desk name="デスクトップ" icon="[desk]" info="ファイルとツール" auto="true">
+            <menu name="ファイル" icon="[folder]" path="file:///">
+                <entry type="Folder" id="fs_top" name="/" info="ファイルシステムのルート" open="true">
+                    <entry type="Folder" id="fs_bin" name="bin" info="基本コマンド" />
+                    <entry type="Folder" id="fs_boot" name="boot" info="ブートローダーのファイル" />
+                    <entry type="Folder" id="fs_dev" name="dev" info="デバイス" />
+                    <entry type="Folder" id="fs_etc" name="etc" info="システム設定" />
+                    <entry type="Folder" id="fs_home" name="home" info="ユーザーのホームフォルダ" open="true">
+                        <entry type="Folder" id="fs_home_user" name="user" info="このブラウザ内に保存されます" />
+                    </entry>
+                    <entry type="Folder" id="fs_lib" name="lib" info="共有ライブラリ" />
+                    <entry type="Folder" id="fs_media" name="media" info="リムーバブルメディア" />
+                    <entry type="Folder" id="fs_mnt" name="mnt" info="マウントされたファイルシステム" />
+                    <entry type="Folder" id="fs_opt" name="opt" info="追加ソフトウェア" />
+                    <entry type="Folder" id="fs_proc" name="proc" info="プロセス" />
+                    <entry type="Folder" id="fs_root" name="root" info="管理者のホーム" />
+                    <entry type="Folder" id="fs_run" name="run" info="実行時データ" />
+                    <entry type="Folder" id="fs_sbin" name="sbin" info="システムコマンド" />
+                    <entry type="Folder" id="fs_srv" name="srv" info="提供用データ" />
+                    <entry type="Folder" id="fs_sys" name="sys" info="カーネルとデバイス" />
+                    <entry type="Folder" id="fs_tmp" name="tmp" info="一時ファイル" />
+                    <entry type="Folder" id="fs_usr" name="usr" info="ユーザープログラム" />
+                    <entry type="Folder" id="fs_var" name="var" info="可変データ" />
+                </entry>
+            </menu>
+        </desk>
+    </page>
+
+<page path="/desk/png-to-jpeg" lang="ja" name="PNGからJPEGへ" icon="[image]" info="ブラウザ上でPNG画像をJPEGに変換します。">
+        <desk name="PNGからJPEGへ" icon="[image]" info="左のウィンドウにPNGをドロップすると、右のウィンドウにJPEGが表示されます。" auto="true">
+            <menu name="オプション" icon="[edit]" path="window:2:/options" />
+            <window />
+            <window type="image/jpeg" path="window:0" mode="view" />
+        </desk>
+    </page>

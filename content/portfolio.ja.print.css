@@ -1,0 +1,171 @@
+/* ポートフォリオ（/ja）を印刷すると履歴書になります。media="print" で読み込まれ（portfolio.xml を参照）、このページにだけ適用されます。
+   Printing the Japanese portfolio produces a 履歴書 (rirekisho) on two A4 sheets in the layout of rirekisho.online's form:
+   sheet 1 = personal details, photo box and the first 17 rows of 学歴・職歴; sheet 2 = the rest of 学歴・職歴, 免許・資格, 志望動機、特技、好きな学科など,
+   通勤時間 / 扶養家族 / 配偶者 and 本人希望記入欄.
+   Each sheet is one inline SVG (src/rireki_form.ts) whose viewBox is the form's own 595 x 842 pt page, so every line and text anchor sits at the
+   coordinate the form uses; this stylesheet only hides the rest of the page, sizes the sheets to A4 and sets the line and text style.
+   Selectors start with the page's body class so nothing leaks to other pages. The page's own rules are beaten with !important. The markup
+   (.expertise_resume.rireki) is emitted hidden by src/html_rirekisho.ts and exists only for this stylesheet. The English page has its own,
+   different print stylesheet. */
+
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+/* ---- page: no backgrounds, no theme layout ---------------------------------------------------------------------------------------- */
+html:has(> body.page_portfolio) {
+    background: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+}
+
+body.page_portfolio {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    color: #000 !important;
+    font: 10pt/1.4 "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "Noto Serif CJK JP", serif !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+body.page_portfolio::before,
+body.page_portfolio::after {
+    content: none !important;
+    display: none !important;
+}
+
+body.page_portfolio > :not(main) {
+    display: none !important;
+}
+
+body.page_portfolio > main {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+}
+
+/* Only the landing and expertise articles take part */
+body.page_portfolio > main > :not(.landing):not(.expertise) {
+    display: none !important;
+}
+
+body.page_portfolio > main > .article {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+    scroll-snap-align: none !important;
+    scroll-snap-stop: normal !important;
+}
+
+body.page_portfolio > main > .article::before,
+body.page_portfolio > main > .article::after {
+    content: none !important;
+    display: none !important;
+}
+
+body.page_portfolio .landing > :not(.landing_resume),
+body.page_portfolio .expertise > :not(.expertise_resume) {
+    display: none !important;
+}
+
+/* ---- the form: two sheets of inline SVG --------------------------------------------------------------------------------------------- */
+body.page_portfolio .rireki {
+    all: revert;
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+}
+
+/* A sheet is a little shorter than A4 (the SVG is clipped) so rounding never pushes an empty third page out of the printer. */
+body.page_portfolio .rireki_sheet {
+    all: revert;
+    display: block;
+    width: 210mm;
+    height: 296.5mm;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #fff;
+    break-after: page;
+    break-inside: avoid;
+}
+
+body.page_portfolio .rireki_sheet:last-child {
+    break-after: auto;
+}
+
+body.page_portfolio .rireki_svg {
+    display: block !important;
+    position: static !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+/* Text: the form's Mincho face (KozMinPro there), anchored by baseline, so the font that is installed only changes the letter shapes. */
+body.page_portfolio .rireki_svg text {
+    fill: #000 !important;
+    stroke: none !important;
+    font-family: "Kozuka Mincho Pro", "Kozuka Mincho Pr6N", "Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", "YuMincho", "MS PMincho", "MS Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Source Han Serif JP", "IPAexMincho", "IPAMincho", serif !important;
+    font-weight: 400 !important;
+    font-style: normal !important;
+    font-variant: normal !important;
+    letter-spacing: 0 !important;
+    word-spacing: 0 !important;
+    text-transform: none !important;
+    text-shadow: none !important;
+    text-decoration: none !important;
+}
+
+/* Lines: 1.5 pt boxes, 1 pt rules, 3 pt dashes, exactly as in the form */
+body.page_portfolio .rireki_svg .rf_box,
+body.page_portfolio .rireki_svg .rf_line,
+body.page_portfolio .rireki_svg .rf_dash,
+body.page_portfolio .rireki_svg .rf_dots {
+    fill: none !important;
+    stroke: #000 !important;
+}
+
+body.page_portfolio .rireki_svg .rf_box { stroke-width: 1.5 !important; }
+body.page_portfolio .rireki_svg .rf_line { stroke-width: 1 !important; }
+body.page_portfolio .rireki_svg .rf_dash { stroke-width: 1 !important; stroke-dasharray: 3 3 !important; }
+body.page_portfolio .rireki_svg .rf_dots { stroke-width: 1.4 !important; stroke-dasharray: 0.8 1.1 !important; }

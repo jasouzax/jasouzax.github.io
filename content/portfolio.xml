@@ -1,0 +1,171 @@
+<page lang="en" path="/" name="Portfolio" icon="[briefcase]" rank="100" info="Jason D'Souza, computer engineer in Iloilo, Philippines: firmware, circuit boards, graphics and the web." print="resume">
+        <hero tab="Home" name="Jason Catalan D'Souza" status="Available for new projects" info="I build across the stack, from firmware and circuit boards to shaders and the web, and I like writing about the math and physics underneath." tags="Computer Engineer, Embedded Systems, Graphics Programmer, Math &amp; Physics Nerd">
+            <item icon="[github]" name="GitHub" text="jasouzax" print="github" link="https://github.com/jasouzax" />
+            <item icon="[contact]" name="E-Mail" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="email" />
+            <item icon="[location]" name="Location" text="Iloilo, Philippines" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
+            <action text="Let's work together" link="#contact" icon="[arrow_right]" primary="true" />
+            <action text="View projects" link="#expertise" icon="[arrow_down]" />
+        </hero>
+        <expertise>
+            <skill id="web-app" name="Web/App" icon="[web]" group="Software" />
+            <skill id="cloud" name="Cloud" icon="[cloud]" group="Software" />
+            <skill id="ai-ml" name="AI/ML" icon="[ai]" group="Software" />
+            <skill id="iot" name="IoT" icon="[iot]" group="Cross-layer" />
+            <skill id="systems" name="Systems" icon="[systems]" group="Cross-layer" />
+            <skill id="security" name="Security" icon="[security]" group="Cross-layer" />
+            <skill id="electronics" name="Electronics" icon="[electronics]" group="Hardware" />
+            <skill id="embedded" name="Embedded" icon="[embedded]" group="Hardware" />
+            <stack id="python" name="Python" link="https://en.wikipedia.org/wiki/Python_(programming_language)" />
+            <stack id="c" name="C" link="https://en.wikipedia.org/wiki/C_(programming_language)" />
+            <stack id="js" name="JavaScript" link="https://developer.mozilla.org/en-US/docs/Web/JavaScript" />
+            <stack id="ts" name="TypeScript" link="https://www.typescriptlang.org" />
+            <stack id="kotlin" name="Kotlin" link="https://kotlinlang.org" />
+            <stack id="nodejs" name="NodeJS" link="https://nodejs.org/en" />
+            <stack id="php" name="PHP" link="https://www.php.net" />
+            <stack id="sass" name="SASS" link="https://sass-lang.com" />
+            <stack id="vanilla" name="Vanilla HTML/CSS/JS" link="https://plainvanillaweb.com/index.html" tag="VanillaWeb" />
+            <stack id="nuxt" name="NuxtJS" link="https://nuxt.com" />
+            <stack id="vue" name="VueJS" link="https://vuejs.org" />
+            <stack id="tailwind" name="TailwindCSS" link="https://tailwindcss.com" />
+            <stack id="vuetify" name="Vuetify" link="https://vuetifyjs.com" />
+            <stack id="electron" name="ElectronJS" link="https://www.electronjs.org" />
+            <stack id="pptr" name="PuppeteerJS" link="https://pptr.dev" />
+            <stack id="pyautogui" name="PyAutoGUI" link="https://pyautogui.readthedocs.io/en/latest" />
+            <stack id="websockets" name="WebSockets" link="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API" />
+            <stack id="firebase" name="Firebase" link="https://firebase.google.com" />
+            <stack id="mysql" name="MySQL" link="https://www.mysql.com" />
+            <stack id="apache" name="Apache" link="https://httpd.apache.org" />
+            <stack id="composer" name="Composer" link="https://getcomposer.org" />
+            <stack id="indexeddb" name="IndexedDB" link="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API" />
+            <stack id="jszip" name="JSZip &amp; Pako" link="https://stuk.github.io/jszip/" tag="JSZip" />
+            <stack id="printcss" name="CSS Print Media" link="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries_for_print" />
+            <stack id="wrangling" name="Data Wrangling" link="https://en.wikipedia.org/wiki/Data_wrangling" />
+            <stack id="yolo11" name="Yolo11" link="https://docs.ultralytics.com/models/yolo11" />
+            <stack id="opencv" name="OpenCV" link="https://en.wikipedia.org/wiki/OpenCV" />
+            <stack id="mediapipe" name="MediaPipe" link="https://en.wikipedia.org/wiki/MediaPipe" />
+            <stack id="stereo" name="Stereo Vision" link="https://en.wikipedia.org/wiki/Computer_stereo_vision" />
+            <stack id="ollama" name="Ollama" link="https://ollama.com" />
+            <stack id="llama3" name="Llama 3" link="https://ai.meta.com/llama/" />
+            <stack id="llmapi" name="LLM APIs" link="https://www.ibm.com/think/insights/llm-apis" />
+            <stack id="prompt" name="Prompt Engineering" link="https://en.wikipedia.org/wiki/Prompt_engineering" />
+            <stack id="nlp" name="NLP" link="https://en.wikipedia.org/wiki/Natural_language_processing" />
+            <stack id="scraping" name="Web Scraping" link="https://en.wikipedia.org/wiki/Web_scraping" />
+            <stack id="rpi" name="Raspberry PI" link="https://www.raspberrypi.com/products/raspberry-pi-4-model-b" />
+            <stack id="aiot" name="AIoT" link="https://en.wikipedia.org/wiki/Artificial_intelligence_of_things" />
+            <stack id="sensory" name="Sensory Substitution" link="https://en.wikipedia.org/wiki/Sensory_substitution" />
+            <stack id="sumo" name="SUMO" link="https://eclipse.dev/sumo" />
+            <stack id="engine" name="Custom Game Engine" link="https://en.wikipedia.org/wiki/Game_engine" />
+            <stack id="tycoon" name="Tycoon" link="https://en.wikipedia.org/wiki/Business_simulation_game" />
+            <stack id="platformer" name="Platformer" link="https://en.wikipedia.org/wiki/Platformer" />
+            <stack id="ide" name="IDE Architecture" link="https://en.wikipedia.org/wiki/Integrated_development_environment" />
+            <stack id="compiler" name="Compiler Design" link="https://en.wikipedia.org/wiki/Compiler" />
+            <stack id="cybersec" name="Cybersecurity" link="https://en.wikipedia.org/wiki/Computer_security" />
+            <stack id="iotconf" name="IoT" link="https://en.wikipedia.org/wiki/Internet_of_things" />
+            <stack id="competitive" name="Competitive Programming" link="https://en.wikipedia.org/wiki/Competitive_programming" />
+            <stack id="itfund" name="IT Fundamentals" link="https://itpec.org" />
+        </expertise>
+        <hero name="Contact" info="Tell me what you want to build. Available for systems engineering, firmware architecture, cloud systems, and AI edge deployments.">
+            <item icon="[contact]" name="E-Mail" text="jason@jasouza.com" link="mailto:jason@jasouza.com" />
+            <item icon="[github]" name="GitHub" text="jasouzax" link="https://github.com/jasouzax" />
+            <item icon="[location]" name="Location" text="Iloilo, Philippines" />
+            <action text="Let's work together" link="/work" icon="[arrow_right]" />
+        </hero>
+    </page>
+
+<event id="usa" name="University of San Agustin" sub="BS in Computer Engineering" date="Aug 2022 - Jun 2026" note="1st-4th year" skill="web-app, embedded, iot, systems" info="Graduated with a 1.79 GWA (90%) from a curriculum bridging low-level hardware and high-level software: embedded systems, IoT, edge computing, operating systems, databases and web architectures." image="/media/sanag.png" lang="en" type="education" />
+
+<event id="freelance" name="Student Freelancing" sub="Software &amp; Embedded Developer" date="Aug 2022 - Jun 2025" note="1st - 3rd year" skill="web-app, embedded, iot, ai-ml" info="Contracted hardware-software projects: a vision-based traffic telemetry edge node, a full-stack quarry management system, parking trackers and AIoT air monitoring." lang="en" type="experience" />
+
+<event id="gdsc" name="GDSC USA" sub="Project Manager" date="Aug 2024 - Jun 2025" note="3rd year" skill="web-app, cloud" info="Directed engineering and event logistics for the chapter: architectural lead of its official website, local game jams and technology exhibition booths." image="/media/gdsc.png" lang="en" type="experience" />
+
+<event id="rnd" name="Lead R&amp;D Engineer" sub="First Author, IEEE" date="Oct 2025 - Apr 2026" note="4th year" skill="ai-ml, iot, embedded, cloud" info="Led R&amp;D of an AIoT visual sensory substitution prototype for the visually impaired and first-authored the peer-reviewed IEEE paper." image="/media/stesis_logo.svg" lang="en" type="experience" />
+
+<print name="resume" lang="en" layout="resume">
+        <style src="portfolio.print.css" media="print" />
+    </print>
+
+<page path="/" lang="ja" name="ポートフォリオ" icon="[briefcase]" rank="100" info="ジェイソン・ディスーザ（Jason D'Souza）。フィリピン・イロイロ在住のコンピュータエンジニア。ファームウェア、回路基板、グラフィックス、Webを手がけています。" print="rirekisho">
+        <hero tab="ホーム" name="Jason Catalan D'Souza" status="新しいプロジェクトのご相談を受付中" info="ファームウェアや回路基板からシェーダー、Webまで、スタック全体にわたって開発しています。その土台にある数学や物理について書くのも好きです。" tags="コンピュータエンジニア, 組込みシステム, グラフィックスプログラマー, 数学・物理オタク">
+            <item icon="[github]" name="GitHub" text="jasouzax" print="github" link="https://github.com/jasouzax" />
+            <item icon="[contact]" name="メール" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="email" />
+            <item icon="[location]" name="所在地" text="フィリピン、イロイロ" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
+            <action text="一緒に仕事をしましょう" link="#contact" icon="[arrow_right]" primary="true" />
+            <action text="プロジェクトを見る" link="#expertise" icon="[arrow_down]" />
+        </hero>
+        <expertise>
+            <skill id="web-app" name="Web/アプリ" icon="" group="ソフトウェア" />
+            <skill id="cloud" name="クラウド" icon="" group="ソフトウェア" />
+            <skill id="ai-ml" name="AI/機械学習" icon="" group="ソフトウェア" />
+            <skill id="iot" name="IoT" icon="" group="クロスレイヤー" />
+            <skill id="systems" name="システム" icon="" group="クロスレイヤー" />
+            <skill id="security" name="セキュリティ" icon="" group="クロスレイヤー" />
+            <skill id="electronics" name="電子工学" icon="" group="ハードウェア" />
+            <skill id="embedded" name="組込み" icon="" group="ハードウェア" />
+            <stack id="python" name="Python" link="https://en.wikipedia.org/wiki/Python_(programming_language)" />
+            <stack id="c" name="C" link="https://en.wikipedia.org/wiki/C_(programming_language)" />
+            <stack id="js" name="JavaScript" link="https://developer.mozilla.org/en-US/docs/Web/JavaScript" />
+            <stack id="ts" name="TypeScript" link="https://www.typescriptlang.org" />
+            <stack id="kotlin" name="Kotlin" link="https://kotlinlang.org" />
+            <stack id="nodejs" name="NodeJS" link="https://nodejs.org/en" />
+            <stack id="php" name="PHP" link="https://www.php.net" />
+            <stack id="sass" name="SASS" link="https://sass-lang.com" />
+            <stack id="vanilla" name="Vanilla HTML/CSS/JS" link="https://plainvanillaweb.com/index.html" tag="VanillaWeb" />
+            <stack id="nuxt" name="NuxtJS" link="https://nuxt.com" />
+            <stack id="vue" name="VueJS" link="https://vuejs.org" />
+            <stack id="tailwind" name="TailwindCSS" link="https://tailwindcss.com" />
+            <stack id="vuetify" name="Vuetify" link="https://vuetifyjs.com" />
+            <stack id="electron" name="ElectronJS" link="https://www.electronjs.org" />
+            <stack id="pptr" name="PuppeteerJS" link="https://pptr.dev" />
+            <stack id="pyautogui" name="PyAutoGUI" link="https://pyautogui.readthedocs.io/en/latest" />
+            <stack id="websockets" name="WebSockets" link="https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API" />
+            <stack id="firebase" name="Firebase" link="https://firebase.google.com" />
+            <stack id="mysql" name="MySQL" link="https://www.mysql.com" />
+            <stack id="apache" name="Apache" link="https://httpd.apache.org" />
+            <stack id="composer" name="Composer" link="https://getcomposer.org" />
+            <stack id="indexeddb" name="IndexedDB" link="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API" />
+            <stack id="jszip" name="JSZip &amp; Pako" link="https://stuk.github.io/jszip/" tag="JSZip" />
+            <stack id="printcss" name="CSS印刷メディア" link="https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries_for_print" />
+            <stack id="wrangling" name="データ整形" link="https://en.wikipedia.org/wiki/Data_wrangling" />
+            <stack id="yolo11" name="Yolo11" link="https://docs.ultralytics.com/models/yolo11" />
+            <stack id="opencv" name="OpenCV" link="https://en.wikipedia.org/wiki/OpenCV" />
+            <stack id="mediapipe" name="MediaPipe" link="https://en.wikipedia.org/wiki/MediaPipe" />
+            <stack id="stereo" name="ステレオビジョン" link="https://en.wikipedia.org/wiki/Computer_stereo_vision" />
+            <stack id="ollama" name="Ollama" link="https://ollama.com" />
+            <stack id="llama3" name="Llama 3" link="https://ai.meta.com/llama/" />
+            <stack id="llmapi" name="LLM API" link="https://www.ibm.com/think/insights/llm-apis" />
+            <stack id="prompt" name="プロンプトエンジニアリング" link="https://en.wikipedia.org/wiki/Prompt_engineering" />
+            <stack id="nlp" name="自然言語処理" link="https://en.wikipedia.org/wiki/Natural_language_processing" />
+            <stack id="scraping" name="Webスクレイピング" link="https://en.wikipedia.org/wiki/Web_scraping" />
+            <stack id="rpi" name="Raspberry Pi" link="https://www.raspberrypi.com/products/raspberry-pi-4-model-b" />
+            <stack id="aiot" name="AIoT" link="https://en.wikipedia.org/wiki/Artificial_intelligence_of_things" />
+            <stack id="sensory" name="感覚代行" link="https://en.wikipedia.org/wiki/Sensory_substitution" />
+            <stack id="sumo" name="SUMO" link="https://eclipse.dev/sumo" />
+            <stack id="engine" name="自作ゲームエンジン" link="https://en.wikipedia.org/wiki/Game_engine" />
+            <stack id="tycoon" name="経営シミュレーション" link="https://en.wikipedia.org/wiki/Business_simulation_game" />
+            <stack id="platformer" name="プラットフォーマー" link="https://en.wikipedia.org/wiki/Platformer" />
+            <stack id="ide" name="IDEアーキテクチャ" link="https://en.wikipedia.org/wiki/Integrated_development_environment" />
+            <stack id="compiler" name="コンパイラ設計" link="https://en.wikipedia.org/wiki/Compiler" />
+            <stack id="cybersec" name="サイバーセキュリティ" link="https://en.wikipedia.org/wiki/Computer_security" />
+            <stack id="iotconf" name="IoT" link="https://en.wikipedia.org/wiki/Internet_of_things" />
+            <stack id="competitive" name="競技プログラミング" link="https://en.wikipedia.org/wiki/Competitive_programming" />
+            <stack id="itfund" name="IT基礎" link="https://itpec.org" />
+        </expertise>
+        <hero name="お問い合わせ" info="作りたいものをお聞かせください。システムエンジニアリング、ファームウェア設計、クラウドシステム、AIエッジ導入のご依頼をお受けしています。">
+            <item icon="[contact]" name="メール" text="jason@jasouza.com" link="mailto:jason@jasouza.com" />
+            <item icon="[github]" name="GitHub" text="jasouzax" link="https://github.com/jasouzax" />
+            <item icon="[location]" name="所在地" text="フィリピン、イロイロ" />
+            <action text="一緒に仕事をしましょう" link="/work" icon="[arrow_right]" />
+        </hero>
+    </page>
+
+<event id="usa" name="サン・アグスティン大学" sub="コンピュータ工学 学士課程" date="Aug 2022 - Jun 2026" note="1〜4年次" skill="web-app, embedded, iot, systems" resume_start="サン・アグスティン大学（フィリピン） コンピュータ工学課程 入学" resume_end="サン・アグスティン大学 コンピュータ工学課程 卒業（学士）" info="コンピュータ工学の課程を平均成績（GWA）1.79（90%）で修了。低レイヤのハードウェアと高レイヤのソフトウェアの両方を扱うカリキュラムで、組込みシステム、IoT、エッジコンピューティング、オペレーティングシステム、データベース、Webアーキテクチャを学びました。" image="/media/sanag.png" lang="ja" type="education" />
+
+<event id="freelance" name="学生フリーランス" sub="ソフトウェア・組込み開発者" date="Aug 2022 - Jun 2025" note="1〜3年次" skill="web-app, embedded, iot, ai-ml" resume_start="学生フリーランスとして活動開始（ソフトウェア・組込み開発）" resume_end="学生フリーランスとしての活動を終了" info="ハードウェアとソフトウェアにまたがる案件を受託。映像ベースの交通テレメトリ用エッジノード、フルスタックの採石場管理システム、駐車場トラッカー、AIoT大気モニタリングなどを開発しました。" lang="ja" type="experience" />
+
+<event id="gdsc" name="GDSC USA" sub="プロジェクトマネージャー" date="Aug 2024 - Jun 2025" note="3年次" skill="web-app, cloud" resume_start="GDSC USA（サン・アグスティン大学） プロジェクトマネージャー 就任" resume_end="GDSC USA プロジェクトマネージャー 退任" info="チャプターのエンジニアリングとイベント運営を統括。公式Webサイトのアーキテクチャ責任者を務め、ローカルのゲームジャムや技術展示ブースも運営しました。" image="/media/gdsc.png" lang="ja" type="experience" />
+
+<event id="rnd" name="研究開発リード" sub="IEEE筆頭著者" date="Oct 2025 - Apr 2026" note="4年次" skill="ai-ml, iot, embedded, cloud" resume_start="研究開発リードエンジニア（視覚障がい者向けAIoT機器） 従事" resume_end="同研究開発を完了（IEEE査読付き論文を筆頭著者として執筆）" info="視覚障がい者向けAIoT視覚感覚代行プロトタイプの研究開発を主導し、査読付きIEEE論文を筆頭著者として執筆しました。" image="/media/stesis_logo.svg" lang="ja" type="experience" />
+
+<print name="rirekisho" lang="ja" layout="rirekisho">
+        <style src="portfolio.ja.print.css" media="print" />
+    </print>

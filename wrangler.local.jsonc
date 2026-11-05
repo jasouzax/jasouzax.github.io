@@ -1,0 +1,9 @@
+{
+  "name": "jazu-local",
+  "main": "src/node/worker.ts",
+  "compatibility_date": "2026-11-04",
+  "vars": { "DOMAIN": "localhost", "PAGES_ORIGIN": "http://127.0.0.1:8080", "PUBLIC_PROJECTS": "[]" },
+  "d1_databases": [{ "binding": "DB", "database_name": "jazu-local", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-local-assets" }],
+  "kv_namespaces": [{ "binding": "REGISTRY", "id": "00000000000000000000000000000000" }]
+}

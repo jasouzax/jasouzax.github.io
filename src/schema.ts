@@ -1,0 +1,105 @@
+import type { xml_node } from "./xml.ts"
+import { walk_nodes, where_of } from "./xml.ts"
+import type { diagnostics } from "./diag.ts"
+import { report_error } from "./diag.ts"
+
+type rule = {
+    attrs: string[]
+    required: string[]
+    children: string[]
+    bools?: string[]
+}
+
+const page_attrs = [
+    "path", "lang", "name", "info", "rank", "featured", "date", "icon", "skill", "image", "noindex",
+    "menu", "short", "note", "role", "sub", "media", "poster", "alt", "stack", "tags", "feature_stack", "website", "paper", "event", "source",
+    "keywords", "canonical", "robots", "lastmod", "cover", "print",
+]
+
+export const rules: Record<string, rule> = {
+    page: { attrs: page_attrs, required: ["path", "name"], children: ["hero", "expertise", "desk", "style"], bools: ["featured", "noindex", "menu"] },
+    landing: { attrs: ["greet", "name", "family", "role", "info", "status", "tab", "icon"], required: [], children: ["action", "contact"] },
+    action: { attrs: ["icon", "text", "link", "primary"], required: ["text", "link"], children: [], bools: ["primary"] },
+    contact: { attrs: ["name", "info", "icon", "text", "link", "tab", "button", "act", "tz", "print"], required: [], children: ["contact", "action"] },
+    expertise: { attrs: ["tab", "icon", "name", "info", "featured_chips"], required: [], children: ["skill", "stack"] },
+    skill: { attrs: ["id", "name", "icon", "info", "stack", "group"], required: ["name"], children: ["stack"] },
+    stack: { attrs: ["id", "name", "link", "tag", "icon"], required: ["name"], children: [] },
+    event: { attrs: ["id", "name", "sub", "date", "icon", "type", "skill", "featured", "info", "note", "image", "resume", "resume_start", "resume_end"], required: ["name", "date"], children: [], bools: ["featured"] },
+    error: { attrs: ["code", "name", "info", "home", "maybe"], required: ["name"], children: [] },
+    desk: { attrs: ["icon", "name", "date", "info", "auto", "server"], required: [], children: ["menu", "window"], bools: ["auto", "server"] },
+    menu: { attrs: ["name", "icon", "path"], required: [], children: ["entry", "foot", "map"] },
+    entry: { attrs: ["id", "type", "name", "from", "data", "info", "icon", "date", "acts", "image", "open", "link"], required: [], children: ["entry"], bools: ["open"] },
+    window: { attrs: ["icon", "type", "mode", "path", "full", "data", "save", "flow"], required: [], children: [], bools: ["full", "save", "flow"] },
+    theme: { attrs: ["name", "label", "icon", "color", "js", "background", "preload"], required: [], children: ["font", "style"] },
+    font: { attrs: ["name", "author", "size", "role", "src", "weight"], required: ["name"], children: ["palette", "sym"] },
+    palette: { attrs: ["mode", "colors"], required: ["mode", "colors"], children: [] },
+    sym: { attrs: ["char", "name", "path", "img", "width", "variant"], required: ["char"], children: ["layer"] },
+    layer: { attrs: ["path", "color", "paint"], required: ["path"], children: [] },
+    style: { attrs: ["src", "scope", "media"], required: [], children: [] },
+    // Personal details for a printed resume in a fixed national form (format="rirekisho" is the Japanese 履歴書). Anything left out prints as an empty box.
+    resume: {
+        attrs: [
+            "format", "photo", "name", "kana", "birth", "gender", "postal", "address", "address_kana", "phone", "mobile", "email",
+            "contact_postal", "contact_address", "contact_kana", "contact_phone", "appeal", "motivation", "wishes",
+            "commute_hours", "commute_minutes", "dependents", "spouse", "spouse_support",
+        ],
+        required: [], children: ["license"], bools: ["spouse", "spouse_support"],
+    },
+    license: { attrs: ["date", "text"], required: ["text"], children: [] },
+}
+
+Object.assign(rules, {
+    hero: { attrs: ["status", "name", "tab", "tags", "info", "profile"], required: [], children: ["item", "action"] },
+    item: { attrs: ["icon", "name", "text", "link", "print"], required: [], children: [] },
+    project: { attrs: [...page_attrs, "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window"], bools: ["featured", "private"] },
+    slide: { attrs: ["media", "poster", "alt", "description", "skill", "stack", "hashtags", "tags", "featured", "private", "website", "paper", "source"], required: [], children: ["action"], bools: ["featured", "private"] },
+    event: { attrs: [...page_attrs, "id", "type", "lang", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
+    blog: { attrs: ["id", "name", "date", "icon", "info", "lang"], required: ["id", "name"], children: ["menu", "window"] },
+    print: { attrs: ["name", "lang", "size", "layout"], required: ["name"], children: ["style", "font"] },
+    map: { attrs: ["layout"], required: [], children: ["node", "edge"] },
+    node: { attrs: ["id", "name", "icon", "info", "link", "x", "y"], required: ["id"], children: ["node"] },
+    edge: { attrs: ["from", "to", "text"], required: ["from", "to"], children: [] },
+    foot: { attrs: [], required: [], children: ["action"] },
+    plugins: { attrs: ["lang"], required: [], children: ["plugin"] },
+    plugin: { attrs: ["id", "name", "icon", "version", "mime", "path", "mode", "from", "to", "flow", "wasm", "sha256", "script", "options"], required: ["id", "version"], children: [] },
+} satisfies Record<string, rule>)
+export const root_tags = ["page", "theme", "project", "event", "blog", "print", "plugins"]
+
+function check_node(node: xml_node, diag: diagnostics): void {
+    const rule = rules[node.tag]
+    if (!rule) {
+        report_error(diag, where_of(node), `unknown element <${node.tag}>`)
+        return
+    }
+    if (node.tag === "page" && (!node.attrs.path?.startsWith("/") || /[\\?#%]/.test(node.attrs.path) || node.attrs.path.split("/").some(part => part === "." || part === ".."))) report_error(diag, where_of(node), "page path must be an absolute URL path without traversal, query or fragment")
+    for (const [name, value] of Object.entries(node.attrs)) {
+        if (["link", "href", "media", "profile", "image", "cover", "poster"].includes(name) && /^\s*(?:javascript|vbscript|data):/i.test(value)) report_error(diag, where_of(node), `unsafe URI in ${name}`)
+    }
+    for (const name of Object.keys(node.attrs)) {
+        if (!rule.attrs.includes(name)) report_error(diag, where_of(node), `unknown attribute "${name}"`)
+    }
+    for (const name of rule.required) {
+        if (!(name in node.attrs)) report_error(diag, where_of(node), `missing required attribute "${name}"`)
+    }
+    if (node.tag === "window" && node.attrs.mode && !["view", "edit"].includes(node.attrs.mode)) report_error(diag, where_of(node), "window mode must be view or edit")
+    if (node.tag === "plugin" && node.attrs.wasm && !/^[a-f0-9]{64}$/i.test(node.attrs.sha256 ?? "")) report_error(diag, where_of(node), "WASM requires a SHA-256 integrity hash")
+    for (const name of rule.bools ?? []) {
+        const value = node.attrs[name]
+        if (value !== undefined && value !== "true" && value !== "false") report_error(diag, where_of(node), `attribute "${name}" must be true or false`)
+    }
+    for (const child of node.children) {
+        if (!rule.children.includes(child.tag) && rules[child.tag]) report_error(diag, where_of(child), `<${child.tag}> is not allowed inside <${node.tag}>`)
+    }
+}
+
+export function validate_roots(roots: xml_node[], diag: diagnostics): void {
+    for (const root of roots) {
+        if (!root_tags.includes(root.tag)) report_error(diag, where_of(root), `root element must be one of ${root_tags.join(", ")}`)
+        walk_nodes(root, node => check_node(node, diag))
+    }
+}
+
+export function is_true(value: string | undefined, fallback: boolean = false): boolean {
+    if (value === undefined) return fallback
+    return value === "true"
+}

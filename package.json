@@ -1,0 +1,49 @@
+{
+  "name": "jazu",
+  "version": "0.12.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "jazu": "./src/main.ts"
+  },
+  "scripts": {
+    "build": "node src/main.ts build",
+    "check": "node src/main.ts check",
+    "serve": "node src/main.ts serve",
+    "pack": "node src/main.ts pack",
+    "icons": "node src/main.ts icons",
+    "types": "tsc --noEmit",
+    "compare": "node src/compare_css.ts",
+    "watch": "node src/main.ts watch",
+    "clean": "node src/main.ts clean",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "deploy:dry": "node src/main.ts deploy --dry_run",
+    "cloud:dev": "wrangler dev --config wrangler.local.jsonc",
+    "db:local": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
+    "node": "node --env-file=.env src/main.ts node"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "esbuild": "^0.28.2",
+    "markdown-it": "^15.0.3",
+    "parse5": "^8.1.0",
+    "postcss": "^8.5.31",
+    "sass": "^1.106.1",
+    "saxes": "^6.0.0",
+    "svgpath": "^2.6.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/fontkit": "^2.0.9",
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^26.6.5",
+    "fontkit": "^2.0.4",
+    "linkedom": "^0.18.15",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.157.0"
+  }
+}

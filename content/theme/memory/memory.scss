@@ -1,0 +1,3195 @@
+/* =====================================================================
+   MEMORY THEME   (weirdcore / dreamcore / Windows XP / liminal / surreal)
+   Techniques: ransom notes, glitch, checkerboard.
+
+   Loads after style.css and only does anything while the Memory radio
+   (#theme_name_memory) is checked: the same CSS-only :has() switch the
+   Light / Dark radios use. It redefines the theme tokens, then restyles
+   the existing components. The background is drawn by memory.js.
+
+   Uses native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+),
+   the same baseline as the :has() / color-mix() the site already needs.
+   The build compiles every theme style through Sass (see the @use / @function
+   block below), and the dark mode uses one small @mixin (m_dark) so the Dark
+   radio and the OS preference share a single copy of the rules.
+   ===================================================================== */
+
+@use "sass:list";
+@use "sass:map";
+@use "sass:string";
+@use "jazu:api" as *;
+
+// Fragment ids contain "/", which must be escaped in selectors (#cloud\/gdsc). Same rules as default.scss.
+@function m_esc($s) {
+    $i: string.index($s, "/");
+    @if $i {
+        @return string.slice($s, 1, $i - 1) + "\\/" + m_esc(string.slice($s, $i + 1));
+    }
+    @return $s;
+}
+
+// Every :target id that makes state $s current: itself, each slide pinned under it, and its fullscreen timeline.
+@function m_ids($s) {
+    $out: ("##{m_esc($s)}:target");
+    @each $k, $m in $slides {
+        @if list.index(map.get($m, states), $s) {
+            $out: list.append($out, "##{m_esc($s + "/" + $k)}:target", comma);
+        }
+    }
+    $tl: if($s == $default, "timeline", $s + "/timeline");
+    @return list.append($out, "##{m_esc($tl)}:target", comma);
+}
+
+// Every fullscreen timeline id (#timeline, #skill/timeline).
+@function m_all_tl_ids() {
+    $out: ("#timeline:target");
+    @each $s in list.join($skills, $exps, comma) {
+        $out: list.append($out, "##{m_esc($s + "/timeline")}:target", comma);
+    }
+    @return $out;
+}
+
+@function m_nondefault_ids() {
+    $out: ();
+    @each $s in list.join($skills, $exps, comma) {
+        @each $id in m_ids($s) {
+            $out: list.append($out, $id, comma);
+        }
+    }
+    @return $out;
+}
+
+// The Explorer "toggled button" face shared by every current tab.
+@mixin m_tab_current {
+    background: var(--xe-tog);
+    border: 1px solid var(--xe-togb);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px var(--xe-togi);
+    color: var(--xe-ink);
+    outline: 0;
+}
+
+@font-face {
+    font-family: 'FontAwesome';
+    src: url('fa-regular-400.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'FontAwesomeBrands';
+    src: url('fa-brands-400.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+#head_tray {
+    display: contents;
+}
+
+.memory_bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+    display: block;
+}
+
+/* ---------- 1. tokens: light = the daydream ---------- */
+:root[data-theme="memory"] {
+    --xp-blue: #245edb;
+    --xp-title: linear-gradient(180deg, #0997ff, #0053ee 8%, #0050ee 40%, #0066ff 88%, #0066ff 93%, #005bff 95%, #003dd7 96%, #003dd7);
+    --xp-task: linear-gradient(#2c6ee8 0, #4a95f7 5%, #2a6ae0 12%, #245edb 50%, #2160d8 86%, #1941a5 100%);
+    --xp-btn: linear-gradient(#5b9cff, #2f78ea 55%, #1d5cd0);
+    --xp-face: linear-gradient(#fbfcff, #e4ecfb 55%, #cddbf6);
+    --xp-line: #0a3a9e;
+    --xe-hov: linear-gradient(#fff, #f1efe2);
+    --xe-hov2: linear-gradient(rgba(255, 255, 255, .5), rgba(241, 239, 226, .5));
+    --xe-act: linear-gradient(#e3e1d2, #f2f0e5 40%, #f7f6ee);
+    --xe-actsh: rgba(70, 68, 50, .35);
+    --xe-hb: #8d8b7c;
+    --xe-sbl: rgba(255, 255, 255, .75);
+    --xe-sbr: rgba(208, 206, 191, .75);
+    --xe-tog: #fff;
+    --xe-togb: #8aa4c6;
+    --xe-togi: rgba(190, 208, 236, .9);
+    --xe-tab: linear-gradient(180deg, #fff, #fafaf9 26%, #f0f0ea 95%, #ecebe5);
+    --xe-face: #ece9d8;
+    --xe-bar: linear-gradient(#fdfdfb, #f1efe2 45%, #e0dccb);
+    --xe-edge: #aca899;
+    --xe-in: #7f9db9;
+    --xe-pane: linear-gradient(#7ba2e7, #6375d6);
+    --xe-ph: linear-gradient(90deg, #fff, #c6d3f7);
+    --xe-pt: #215dc6;
+    --xe-pb: #d6dff7;
+    --xe-content: #fff;
+    --xe-sel: #c1d2ee;
+    --xe-selb: #316ac5;
+    --xe-ink: #0a1a52;
+    --xe-label: #6d6d6d;
+
+    --bg: #8aa5fb;
+    --bg-valley: #8aa5fb;
+    --bg-mid: #a79df0;
+    --bg-hill: #6b60d6;
+    --bg-primary: #245edb;
+    --text: #0a1a52;
+    --text-dim: #3a4a8a;
+    --accent: #0a4fd6;
+    --accent-2: #d63ec0;
+    --focus: #ff2bd6;
+    --solid: #0a4fd6;
+    --on-solid: #fff;
+    --panel: #e3ecfd;
+    --panel-2: #cfdffa;
+    --surface: rgba(227, 236, 253, .82);
+    --surface-strong: rgba(232, 240, 254, .96);
+    --edge: #6d8fe4;
+    --line: #6d8fe4;
+    --line-soft: rgba(80, 110, 210, .35);
+    --tint-1: rgba(10, 60, 200, .07);
+    --tint-2: rgba(10, 60, 200, .14);
+    --tint-3: rgba(10, 60, 200, .22);
+    --shadow: 3px 4px 0 rgba(8, 20, 110, .28);
+    --glow: 0 0 0 1px #ff9be8, 0 0 14px rgba(255, 120, 230, .7);
+    --r-sm: 2px;
+    --r: 4px;
+    --r-lg: 8px;
+    --halo: 0 1px 1px rgba(5, 15, 100, .95), 0 0 4px rgba(10, 30, 170, .9), 0 0 12px rgba(30, 70, 230, .8);
+    --code-kw: #8a2fd0;
+    --code-fn: #0a4fd6;
+    --code-str: #0f7a45;
+    --code-num: #b04a00;
+    --code-pp: #c0268a;
+    --m-ink: #fff;
+    --m-cap: radial-gradient(circle at 90% 90%, #0054e9 0, #2263d5 55%, #4479e4 70%, #a3bbec 100%);
+    /* text drawn straight on the dream */
+    --m-ink-dim: #e6eaff;
+    background: linear-gradient(#3563e8, #8aa5fb 50%, #cfc8f8);
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='30' viewBox='0 0 22 30'%3E%3Cpath d='M2 1v22l5.5-5 4 9.5 3.5-1.6-4-9.2H19z' fill='%23fff' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") 2 1, auto;
+}
+
+/* ---------- dark = Windows XP "dark" (charcoal Luna, orange task-pane headers) ----------
+   Specificity: the default theme switches its dark palette with
+   :root:has(#theme_state_dark:checked), and that ID gives it (1,2,0), more than
+   a plain [data-mode] selector. The :not(#m_dark) below adds an ID's worth of
+   specificity so Memory's dark tokens and overrides always win over it.
+   Both entry points (Dark radio, OS preference while Auto) share the mixin. */
+@mixin m_dark($root: ":root") {
+    @media (prefers-color-scheme: dark) {
+        #{$root}[data-theme="memory"]:not([data-mode="light"]):not(#m_dark) {
+            @content;
+        }
+    }
+
+    #{$root}[data-theme="memory"][data-mode="dark"]:not(#m_dark) {
+        @content;
+    }
+}
+
+@include m_dark {
+    color-scheme: dark;
+    --bg: #2a2a9a;
+    --bg-valley: #2a2a9a;
+    --bg-mid: #5d49c8;
+    --bg-hill: #251a78;
+    --bg-primary: #7fd3ff;
+    --text: #ececec;
+    --text-dim: #b4b4b4;
+    --accent: var(--m-orange);
+    --accent-2: #ff7be4;
+    --focus: #ff7be4;
+    --solid: #3a6ff0;
+    --on-solid: #fff;
+    --panel: #2b2b2b;
+    --panel-2: #353535;
+    --surface: rgba(30, 30, 30, .85);
+    --surface-strong: rgba(26, 26, 26, .96);
+    --edge: #6a6a6a;
+    --line: #7a7a7a;
+    --line-soft: rgba(200, 200, 200, .28);
+    --tint-1: rgba(255, 255, 255, .07);
+    --tint-2: rgba(255, 255, 255, .13);
+    --tint-3: rgba(255, 255, 255, .2);
+    --shadow: 3px 4px 0 rgba(0, 0, 0, .55);
+    --glow: 0 0 0 1px #ff7be4, 0 0 16px rgba(255, 90, 220, .7);
+    --halo: 0 1px 1px rgba(0, 0, 0, .95), 0 0 4px rgba(0, 0, 0, .9), 0 0 12px rgba(0, 0, 0, .8);
+    --code-kw: #d9a0ff;
+    --code-fn: #86d6ff;
+    --code-str: #8be8ae;
+    --code-num: #ffc080;
+    --code-pp: #ff9bd6;
+    --m-orange: #f5a54a;
+    --m-dot-bg: #1e1e1e;
+    --m-cap: radial-gradient(circle at 90% 90%, #1c1c1c 0, #353535 55%, #5c5c5c 70%, #b0b0b0 100%);
+    --xp-title: linear-gradient(180deg, #5c5c5c, #3d3d3d 8%, #2e2e2e 40%, #292929 88%, #242424 93%, #1d1d1d 95%, #171717 96%, #171717);
+    --xp-task: linear-gradient(#444 0, #505050 5%, #353535 12%, #2b2b2b 50%, #282828 86%, #161616 100%);
+    --xp-btn: linear-gradient(#6a6a6a, #4a4a4a 55%, #383838);
+    --xp-face: linear-gradient(#4a4a4a, #363636 55%, #2b2b2b);
+    --xp-line: #0d0d0d;
+    --xp-btn-bg: linear-gradient(180deg, #666, #474747 86%, #383838);
+    --xp-btn-down: linear-gradient(180deg, #262626, #333 8%, #383838 94%, #464646);
+    --xp-default: inset -1px 1px #ffe2b8, inset 1px 2px #f7b866, inset -2px 2px #f2a444, inset 1px -1px #c8741a, inset 2px -2px #c8741a;
+    --xp-frame: inset -1px -1px #000, inset 1px 1px #666, inset -2px -2px #1a1a1a, inset 2px 2px #4a4a4a, inset -3px -3px #2b2b2b, inset 3px 3px #383838;
+    --xe-hov: linear-gradient(#5e5e5e, #484848);
+    --xe-hov2: rgba(90, 90, 90, .5);
+    --xe-act: linear-gradient(#262626, #333 40%, #3a3a3a);
+    --xe-actsh: rgba(0, 0, 0, .6);
+    --xe-hb: #8c8c8c;
+    --xe-sbl: rgba(255, 255, 255, .12);
+    --xe-sbr: rgba(0, 0, 0, .55);
+    --xe-tog: #3e3e3e;
+    --xe-togb: #8c8c8c;
+    --xe-togi: rgba(255, 255, 255, .18);
+    --xe-tab: linear-gradient(180deg, #555, #3f3f3f 30%, #333);
+    --xe-face: #2b2b2b;
+    --xe-bar: linear-gradient(#464646, #3a3a3a 45%, #303030);
+    --xe-edge: #111;
+    --xe-in: #707070;
+    --xe-pane: linear-gradient(#5a5a5a, #3d3d3d);
+    --xe-ph: linear-gradient(90deg, #f7b050, #dc7418);
+    --xe-pt: #fff;
+    --xe-pb: #474747;
+    --xe-content: #232323;
+    --xe-sel: #6a4a22;
+    --xe-selb: #f0a040;
+    --xe-ink: #ececec;
+    --xe-label: #a8a8a8;
+    background: linear-gradient(#101a66, #3b34b3 50%, #8d6ae0);
+}
+
+
+/* ---------- 2. everything else ---------- */
+:root[data-theme="memory"] {
+
+    /* the old contour map steps aside */
+    & .background,
+    & .background_globe {
+        display: none;
+    }
+
+    /* cursors: XP arrow, grab hand over the floaters */
+    &.m-grab {
+        cursor: grab;
+    }
+
+    &.m-dragging,
+    &.m-dragging * {
+        cursor: grabbing !important;
+        user-select: none;
+    }
+
+    /* film grain stays; add scanlines + a slow flicker */
+    & body::after {
+        opacity: .5;
+        mix-blend-mode: soft-light;
+    }
+
+    & body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 98;
+        pointer-events: none;
+        background: repeating-linear-gradient(0deg, rgba(10, 0, 70, .1) 0 1px, transparent 1px 3px);
+        opacity: calc(.35 + var(--m-p, 0) * .5);
+    }
+
+    /* ----- the page is an XP window: title bar on top, taskbar below ----- */
+    /* Title bar and taskbar heights are fixed px (2.5em / 2.75em of the 14px body). They used to be em, which resolves differently on <html> (16px)
+       than on <body> (14px): the scroll padding and the article heights disagreed by a few px, so the scroll snap drifted and neighbouring
+       articles peeked in or hid behind the title bar. Every consumer now reads the same two values. */
+    --m-top: 35px;
+    --m-task: 38.5px;
+    /* taskbar height */
+    --m-startw: 9.9em;
+    /* room for the Start button */
+    --m-trayw: 8.6em;
+    /* room for the tray */
+    --xp-start: linear-gradient(#7bd87b, #3fa23f 16%, #2f8a2f 58%, #24711f);
+
+    & #head>* {
+        animation: none;
+    }
+
+    & #head {
+        color: #fff;
+        text-shadow: 0 1px 0 rgba(0, 0, 70, .6);
+    }
+
+    & #head::before {
+        opacity: 1;
+        background: var(--xp-title);
+        border-bottom: 1px solid var(--xp-line);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 8px rgba(0, 20, 110, .35);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    & #head a:hover,
+    & #head summary:hover {
+        color: #fff;
+    }
+
+    /* footer = the title bar again at 75%, short, with its border towards the page above; room is left for the taskbar underneath */
+    & .site_foot {
+        margin-bottom: 3em;
+        color: #fff;
+        text-shadow: 0 1px 0 rgba(0, 0, 70, .6);
+    }
+
+    & .site_foot::before {
+        opacity: .75;
+        background: var(--xp-title);
+        border-top: 1px solid var(--xp-line);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    & .site_foot a:hover {
+        color: #fff;
+    }
+
+    & #head_bord {
+        display: none;
+    }
+
+    /* title bar (browser-style): only the path on the left, caption buttons on the right */
+    & #head_path {
+        padding-left: .8em;
+        font-weight: bold;
+    }
+
+    & #head_path>a:last-child {
+        text-shadow: 0 1px 0 rgba(0, 0, 70, .7);
+    }
+
+    & #head_window {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 2.5em;
+        display: flex;
+        align-items: center;
+        padding-right: .4em;
+        z-index: 6;
+    }
+
+    & #head_window>.list_summ {
+        height: 1.9em;
+        width: 2em;
+        color: #fff;
+        border: 1px solid #fff;
+        border-radius: 3px;
+        background: linear-gradient(#5b9cff, #2a6ae0 55%, #1d55c8);
+    }
+
+    & #head_window>.list_drop {
+        background: none;
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        gap: 3px;
+    }
+
+    & #head_window .list_drop_li>button {
+        width: 1.9em;
+        height: 1.9em;
+        padding: 0;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        border: 1px solid #fff;
+        border-radius: 3px;
+        background: linear-gradient(#5b9cff, #2a6ae0 55%, #1d55c8);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45);
+        text-shadow: 0 1px 0 rgba(0, 0, 70, .5);
+    }
+
+    & #head_window .list_drop_li>button:hover {
+        background: linear-gradient(#8ac0ff, #4f93f4 55%, #3a7ae0);
+        color: #fff;
+    }
+
+    & #head_window .list_drop_li>#head_exit {
+        background: linear-gradient(#f4967a, #dc4a24 55%, #b8300f);
+    }
+
+    & #head_window .list_drop_li>#head_exit:hover {
+        background: linear-gradient(#ffb59d, #ee6238 55%, #c8421c);
+    }
+
+    /* taskbar: the page tabs are the open windows */
+    & #head_tabs {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        width: auto;
+        height: calc(var(--m-task) + var(--safe_bottom));
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        box-sizing: border-box;
+        /* no start button (pages without a side menu): tabs begin where the logo card begins */
+        padding: 0 var(--m-trayw) var(--safe_bottom) calc(var(--m-startw) - 2.97em);
+        overflow-x: auto;
+        background: var(--xp-task);
+        border-top: 1px solid #5da2f7;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 -3px 10px rgba(0, 20, 110, .3);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    & #head_tabs>a {
+        flex: 0 0 auto;
+        align-self: center;
+        margin: 0;
+        padding: 0 .8em;
+        line-height: 1.95em;
+        text-align: left;
+        color: #fff;
+        border: 1px solid rgba(8, 40, 150, .8);
+        border-radius: 3px;
+        background: linear-gradient(#5a9bff, #3c82f0 50%, #2f72e0);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 1px 0 rgba(0, 0, 60, .25);
+    }
+
+    & #head_tabs>a>span:not(.head_tab_name) {
+        display: inline;
+        font-size: inherit;
+        line-height: inherit;
+        margin-right: .35em;
+    }
+
+    /* a long window name is cut with an ellipsis, as on a taskbar button */
+    & #head_tabs>a {
+        white-space: nowrap;
+    }
+
+    & #head_tabs>a>.head_tab_name {
+        display: inline-block;
+        max-width: 11em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: top;
+    }
+
+    & #head_tabs>a+a::before {
+        display: none;
+    }
+
+    & #head_tabs>a:hover {
+        background: linear-gradient(#78b0ff, #5496f6 50%, #4585ec);
+    }
+
+    & #head_tabs>a[aria-current] {
+        color: #fff;
+        background: linear-gradient(#1a50c2, #2260d4);
+        box-shadow: inset 1px 1px 4px rgba(0, 0, 50, .65);
+    }
+
+    & #head_tabs>a[aria-current]>span {
+        text-shadow: none;
+    }
+
+    /* Start button = side menu + logo */
+    & #head_menu {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        height: calc(var(--m-task) + var(--safe_bottom));
+        z-index: 7;
+        display: block;
+    }
+
+    & #head_menu>.list_summ {
+        height: 100%;
+        width: 2.7em;
+        padding-bottom: var(--safe_bottom);
+        box-sizing: border-box;
+        color: #fff;
+        font-size: 1.1em;
+        background: var(--xp-start);
+        border-right: 1px solid rgba(0, 60, 0, .35);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45);
+        text-shadow: 0 1px 1px rgba(0, 50, 0, .7);
+    }
+
+    & #head_menu[open]>.list_summ {
+        background: linear-gradient(#24711f, #2f8a2f 50%, #3fa23f);
+        box-shadow: inset 1px 1px 4px rgba(0, 40, 0, .6);
+    }
+
+    & #head_menu~#head_tabs {
+        padding-left: var(--m-startw);
+    }
+
+    /* the logo card sits right of the start button; with no side menu there is no button, so it hugs the left edge */
+    & #head_path>a:first-child {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        height: calc(var(--m-task) + var(--safe_bottom));
+        z-index: 7;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        padding: 0 1.4em var(--safe_bottom) .5em;
+        border-radius: 0 1.6em 1.6em 0;
+        background: var(--xp-start);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 2px 0 3px rgba(0, 40, 0, .35);
+    }
+
+    & #head_menu~#head_path>a:first-child {
+        left: 2.97em;
+    }
+
+    & #head_path_logo {
+        height: 1.5em;
+        color: #fff;
+        filter: drop-shadow(0 1px 1px rgba(0, 50, 0, .75));
+    }
+
+    /* tray: account, language, theme */
+    & #head_tray {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        height: calc(var(--m-task) + var(--safe_bottom));
+        z-index: 7;
+        box-sizing: border-box;
+        display: flex;
+        align-items: stretch;
+        padding: 0 .4em var(--safe_bottom) .5em;
+        background: linear-gradient(#27a0f0, #1290e8 14%, #0e7bd9 80%, #0a60b8);
+        border-left: 1px solid #0a3f9a;
+        box-shadow: inset 1px 0 0 rgba(255, 255, 255, .3), inset 0 1px 0 rgba(255, 255, 255, .35);
+    }
+
+    & #head_tray>.list:not(#head_window) {
+        height: 100%;
+    }
+
+    & #head_tray>.list:not(#head_window)>.list_summ {
+        color: #fff;
+        border-radius: 2px;
+    }
+
+    & #head_tray .list_summ:hover {
+        background: rgba(255, 255, 255, .22);
+    }
+
+    & #head_tray>.list:not(#head_window) .list_drop {
+        top: auto;
+        bottom: 100%;
+        border-top-width: 1px;
+        border-bottom-width: 1px;
+    }
+
+    @media (max-width: 48em) {
+        & {
+            --m-startw: 3em;
+            --m-trayw: 6.6em;
+        }
+
+        & #head_path>a:first-child {
+            display: none;
+        }
+
+        & #head_tabs>a {
+            padding: 0 .6em;
+        }
+    }
+
+    /* make room for the taskbar */
+    & body {
+        margin-bottom: calc(var(--m-task) + var(--safe_bottom));
+    }
+
+    & .article {
+        min-height: calc(100dvh - var(--m-top) - var(--m-task) - var(--safe_bottom));
+    }
+
+    & .desk {
+        height: calc(100dvh - var(--m-top) - var(--m-task) - var(--safe_bottom));
+    }
+
+    /* the snap port is exactly the area between the title bar and the taskbar, i.e. the size of one article */
+    & {
+        scroll-padding-top: var(--m-top);
+        scroll-padding-bottom: calc(var(--m-task) + var(--safe_bottom));
+    }
+
+    /* ----- XP menus ----- */
+    & .list_drop {
+        background: #f7faff;
+        color: #0a1a52;
+        border: 1px solid #1a47b8;
+        border-radius: 0;
+        padding: 2px;
+        box-shadow: 3px 4px 0 rgba(0, 10, 90, .35);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        text-shadow: none;
+    }
+
+    & .list_drop_li> :is(a, button, label) {
+        border-radius: 0;
+        color: #0a1a52;
+    }
+
+    & .list_drop_li> :is(a, button, label):hover {
+        background: #316ac5;
+        color: #fff;
+    }
+
+    & .list_drop_li>input:checked+label,
+    & .list_drop_li>[aria-current] {
+        color: #0a4fd6;
+    }
+
+    & .list_drop_li>input:checked+label:hover,
+    & .list_drop_li>[aria-current]:hover {
+        color: #fff;
+    }
+
+    & .list_drop_li_div {
+        border-bottom-color: #aebfe8;
+    }
+
+    & .list_drop_search>label {
+        background: #fff;
+        border-color: #7f9db9;
+        border-radius: 0;
+        color: #3a4a8a;
+    }
+
+    & .list_drop_search input {
+        color: #0a1a52;
+    }
+
+    /* ----- landing ----- */
+    & .landing_panel::before,
+    & .error_panel::before {
+        display: none;
+    }
+
+    & .landing_dot {
+        display: none;
+    }
+
+    /* the status chip becomes the title bar of a little XP window, the greeting its body */
+    & .landing_status {
+        position: relative;
+        width: min(100%, 19rem);
+        margin: 0;
+        padding: .32em 2.4em .32em .7em;
+        gap: 0;
+        border: 1px solid var(--xp-line);
+        border-bottom: 0;
+        border-radius: 7px 7px 0 0;
+        font-size: .8em;
+        letter-spacing: .06em;
+        background: var(--xp-title);
+        color: #fff;
+        text-shadow: 1px 1px 0 rgba(0, 0, 60, .65);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    & .landing_status::after {
+        content: "\00d7";
+        position: absolute;
+        right: .35em;
+        top: 50%;
+        translate: 0 -50%;
+        width: 1.6em;
+        height: 1.6em;
+        display: grid;
+        place-items: center;
+        font-size: 1.2em;
+        line-height: 1;
+        color: #fff;
+        background: linear-gradient(#f08a6a, #d9441f);
+        border: 1px solid #fff;
+        border-radius: 3px;
+        pointer-events: none;
+        text-shadow: none;
+    }
+
+    & .landing_greet {
+        display: flex;
+        align-items: center;
+        gap: .6em;
+        width: min(100%, 19rem);
+        margin: -1em 0 -.5em;
+        padding: .6em .8em;
+        box-sizing: border-box;
+        background: var(--xp-face);
+        color: var(--text);
+        text-shadow: none;
+        letter-spacing: .06em;
+        border: 1px solid var(--xp-line);
+        border-top: 0;
+        border-radius: 0 0 4px 4px;
+        box-shadow: var(--shadow);
+    }
+
+    & .landing_greet::before {
+        content: "";
+        flex: none;
+        width: 1.7em;
+        height: 1.7em;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-20 -20 40 40'%3E%3Ccircle r='18' fill='%23ffd21a' stroke='%23b88a00' stroke-width='1.5'/%3E%3Cellipse cx='-6' cy='-10' rx='8' ry='4' fill='%23fff' opacity='.4' transform='rotate(-30)'/%3E%3Cellipse cx='-6' cy='-4' rx='2' ry='3.4' fill='%232b1b00'/%3E%3Cellipse cx='6' cy='-4' rx='2' ry='3.4' fill='%232b1b00'/%3E%3Cpath d='M-9 5Q0 14 9 5' stroke='%232b1b00' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+    }
+
+    & .landing_greet::after {
+        content: "";
+        width: .55em;
+        height: 1.1em;
+        border-bottom: 2px solid currentColor;
+        margin-left: -.35em;
+        animation: m_caret 1.1s steps(1) infinite;
+    }
+
+    /* the name: a ransom note */
+    & .landing_name {
+        position: relative;
+        font-size: clamp(2.2em, 5.2vw, 4.3em);
+        line-height: 1.3;
+        letter-spacing: 0;
+        color: #111;
+        background: none;
+        -webkit-text-fill-color: currentColor;
+        filter: drop-shadow(2px 3px 0 rgba(6, 14, 100, .42));
+    }
+
+    & .landing_name::before {
+        /* glitch smear off the first letter */
+        content: "";
+        position: absolute;
+        left: -1.4rem;
+        top: .1em;
+        width: 2.6rem;
+        height: 1.1em;
+        pointer-events: none;
+        background:
+            linear-gradient(90deg, transparent, #fff) 0 8% / 100% 2px no-repeat,
+            linear-gradient(90deg, transparent, #2ff3ff) 10% 24% / 90% 3px no-repeat,
+            linear-gradient(90deg, transparent, #ff2bd6) 0 40% / 100% 2px no-repeat,
+            linear-gradient(90deg, transparent, #fff) 30% 55% / 70% 4px no-repeat,
+            linear-gradient(90deg, transparent, #fff35c) 5% 72% / 95% 2px no-repeat,
+            linear-gradient(90deg, transparent, #fff) 0 90% / 100% 3px no-repeat;
+        animation: m_smear 2.6s steps(1) infinite;
+    }
+
+    & .m-rn {
+        display: inline;
+    }
+
+    & .m-w {
+        display: inline-block;
+        white-space: nowrap;
+    }
+
+    & .m-sp {
+        display: inline-block;
+        width: .32em;
+    }
+
+    & .m-l {
+        display: inline-block;
+        margin: 0 .025em;
+        padding: .06em .11em .02em;
+        line-height: 1.05;
+        text-transform: uppercase;
+        font-family: var(--ff), ui-monospace, monospace;
+        font-weight: var(--fw);
+        font-size: calc(var(--sz) * 1em);
+        background-color: var(--paper);
+        color: var(--ink);
+        -webkit-text-fill-color: var(--ink);
+        background-image: linear-gradient(115deg, rgba(255, 255, 255, .42), transparent 38%, rgba(0, 0, 40, .14));
+        clip-path: var(--cp);
+        translate: 0 var(--dy);
+        rotate: var(--rot);
+        text-shadow: none;
+    }
+
+    & .landing_name:hover .m-l {
+        animation: m_jit .36s steps(2) infinite;
+        animation-delay: calc(var(--i) * -41ms);
+    }
+
+    & .landing_job,
+    & .landing_lead,
+    & .landing_scroll {
+        color: var(--m-ink);
+        text-shadow: var(--halo);
+    }
+
+    & .landing_prompt {
+        color: #fff;
+        text-shadow: var(--halo);
+    }
+
+    & .landing_role::after {
+        background: #fff;
+    }
+
+    & .landing_lead {
+        color: var(--m-ink);
+        padding: .4em .8em;
+        margin-left: -.8em;
+        border-radius: 3px;
+        background: linear-gradient(90deg, rgba(10, 36, 160, .5), rgba(10, 36, 160, .22));
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, .12);
+    }
+
+    /* chips + buttons: XP dialog furniture */
+    & .landing_chip,
+    & .contact_btn,
+    & .contact_time {
+        background: var(--xp-face);
+        border: 1px solid #fff;
+        outline: 1px solid #6d8fe4;
+        outline-offset: 0;
+        border-radius: 3px;
+        box-shadow: 2px 3px 0 rgba(6, 18, 110, .3);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        color: var(--text);
+    }
+
+    & .landing_chip:hover,
+    & .contact_btn:hover {
+        outline-color: #ff2bd6;
+        border-color: #fff;
+        color: var(--accent);
+        box-shadow: var(--glow);
+    }
+
+    & .landing_chip_icon {
+        color: #1f5ce0;
+    }
+
+    & .landing_btn,
+    & .contact_work,
+    & .error_home {
+        border-radius: 3px;
+        font-size: inherit;
+        letter-spacing: .04em;
+        box-shadow: 2px 3px 0 rgba(6, 18, 110, .35);
+        border: 1px solid #0a2f8a;
+        background: var(--xp-face);
+        color: var(--text);
+        text-shadow: none;
+    }
+
+    & .landing_btn::after {
+        display: none;
+    }
+
+    & .landing_btn:hover {
+        border-color: #ff2bd6;
+        box-shadow: var(--glow);
+        color: var(--text);
+    }
+
+    & .landing_btn.primary,
+    & .contact_work,
+    & .error_home {
+        background: var(--xp-btn);
+        color: #fff;
+        border-color: #0a2f8a;
+        text-shadow: 0 1px 0 rgba(0, 0, 70, .6);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 2px 3px 0 rgba(6, 18, 110, .35);
+    }
+
+    & .landing_btn.primary::before {
+        content: "\25B6";
+        font-size: .7em;
+    }
+
+    & .landing_btn.primary:hover,
+    & .contact_work:hover,
+    & .error_home:hover {
+        background: linear-gradient(#ff9ee8, #e25ac4 55%, #b932a0);
+        border-color: #6b1a62;
+        color: #fff;
+    }
+
+    /* ----- sections ----- */
+    & .expertise_title,
+    & .contact_title,
+    & .error_title,
+    & .contact_lead,
+    & .error_sub {
+        color: var(--m-ink);
+        text-shadow: var(--halo);
+    }
+
+    & .expertise_title::after,
+    & .contact_title::after,
+    & .error_title::after {
+        width: 5.5em;
+        height: 10px;
+        bottom: -.15em;
+        background: repeating-conic-gradient(#150f2e 0 25%, #f6f2ff 0 50%) 0 0 / 10px 10px;
+        box-shadow: 2px 2px 0 rgba(6, 14, 100, .4);
+    }
+
+    & .expertise .tl_tick>span {
+        color: var(--m-ink);
+        text-shadow: var(--halo);
+    }
+
+    & .contact_list,
+    & .error_maybe {
+        border: 1px solid var(--xp-line);
+        border-radius: 4px;
+        background: var(--panel);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7), var(--shadow);
+    }
+
+    & .landing_scroll:hover {
+        color: #fff;
+    }
+
+    /* ----- expertise = XP file explorer ----- */
+    & .expertise {
+        --accent: var(--xe-selb);
+        --tlw: 23em;
+        height: calc(100dvh - var(--m-top) - var(--m-task) - var(--safe_bottom));
+        padding: 0;
+        background: var(--xe-face);
+        color: var(--xe-ink);
+        border: 1px solid var(--xp-line);
+        border-top: 0;
+        border-bottom: 0;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .6);
+    }
+
+    /* portrait: the article grows with its content (the default theme does this too). A fixed height here let the explorer's
+       rows spill over the Contact article that follows it. overflow stays visible/clip so the sticky skill bar keeps working. */
+    @media (orientation: portrait) {
+        & .expertise {
+            height: auto;
+            min-height: calc(100dvh - var(--m-top) - var(--m-task) - var(--safe_bottom));
+            overflow: visible;
+            overflow-x: clip;
+        }
+    }
+
+    & .expertise_head {
+        margin: 0;
+        background: var(--xe-bar);
+        border-bottom: 1px solid var(--xe-edge);
+        box-shadow: inset 0 1px 0 #fff;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    & .expertise .tab_expertise {
+        background: none;
+        border-right: 1px solid var(--xe-edge);
+        box-shadow: 1px 0 0 #fff;
+    }
+
+    & .expertise .tab {
+        border-left: 1px solid var(--xe-edge);
+        box-shadow: -1px 0 0 #fff;
+    }
+
+    & .expertise .tab:first-child {
+        box-shadow: none;
+    }
+
+    & .expertise .tab a {
+        color: var(--xe-ink);
+        border: 1px solid transparent;
+        border-radius: 3px;
+        margin: 2px 1px;
+        text-shadow: none;
+    }
+
+    & .expertise .tab a:hover {
+        border-color: var(--xe-selb);
+        background: var(--xe-sel);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+    }
+
+    & .expertise .tabgroup {
+        border-left-color: var(--xe-edge);
+    }
+
+    & .expertise .tabgroup_name {
+        color: var(--xe-selb);
+    }
+
+    & .expertise .tabgroup_name::before,
+    & .expertise .tabgroup_name::after {
+        border-top-color: var(--xe-edge);
+    }
+
+    & .expertise_search_input {
+        background: var(--xe-content);
+        color: var(--xe-ink);
+        border: 1px solid var(--xe-in);
+        border-radius: 0;
+        box-shadow: inset 1px 1px 0 rgba(0, 0, 0, .12);
+    }
+
+    & .expertise_search_btn,
+    & .expertise_search_go {
+        color: var(--xe-ink);
+        text-shadow: none;
+    }
+
+    /* body: blue task pane on the left, white sunken list on the right */
+    & .expertise_box {
+        margin: 0;
+        padding: 0;
+        column-gap: 0;
+        row-gap: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        background: linear-gradient(var(--xe-content), var(--xe-content)) right / calc(100% - var(--tlw)) 100% no-repeat;
+    }
+
+    & .expertise_box::before {
+        border: 0;
+        border-radius: 0;
+        background: var(--xe-pane);
+        box-shadow: 1px 0 0 var(--xe-in), inset -1px 0 0 rgba(255, 255, 255, .35);
+    }
+
+    & .expertise .expertise_tlhead {
+        margin: .7em .6em 0;
+        padding: 0;
+        z-index: 1;
+        background: var(--xe-ph);
+        border-radius: 5px 5px 0 0;
+    }
+
+    & .expertise .expertise_tlhead .panel_title {
+        flex: 1;
+        padding: .3em .6em;
+        font-size: .95em;
+        font-weight: bold;
+        letter-spacing: 0;
+        text-shadow: none;
+        text-transform: none;
+        color: var(--xe-pt);
+    }
+
+    & .expertise .tlhead_btns>.btn {
+        color: var(--xe-pt);
+    }
+
+    & .expertise .expertise_tl {
+        margin: 0 .6em .7em;
+        background: var(--xe-pb);
+        border-radius: 0 0 4px 4px;
+        box-shadow: inset 0 0 0 1px #fff;
+    }
+
+    /* fullscreen timeline: the header and the blue task pane cover the whole width (not just the left column), so the close button is at the
+       right edge and the white list column disappears behind the pane */
+    & body:has(#{m_all_tl_ids()}) .expertise .expertise_box {
+        background: none;
+    }
+
+    & body:has(#{m_all_tl_ids()}) .expertise .expertise_box::before {
+        grid-area: 1 / 1 / 4 / 3;
+        background: var(--xe-pane);
+        box-shadow: none;
+    }
+
+    & body:has(#{m_all_tl_ids()}) .expertise .expertise_tlhead {
+        grid-area: 1 / 1 / 2 / 3;
+    }
+
+    & .expertise .tl_tick>span {
+        color: var(--xe-ink);
+        text-shadow: none;
+    }
+
+    & .expertise .tl_card {
+        background: var(--xe-content);
+        border: 1px solid var(--xe-in);
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    & .expertise .expertise_prjhead {
+        padding: .5em 1em 0;
+    }
+
+    & .expertise .expertise_prjhead .panel_title {
+        color: var(--xe-ink);
+        text-shadow: none;
+        font-size: 1.05em;
+    }
+
+    & .expertise .expertise_stacks,
+    & .expertise .expertise_slider {
+        margin-inline: 1em;
+    }
+
+    & .expertise .slide_card {
+        background: var(--xe-content);
+        border: 1px solid var(--xe-in);
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    & .expertise .chip {
+        border-radius: 3px;
+        border: 1px solid var(--xe-in);
+        background: var(--xe-face);
+        color: var(--xe-ink);
+    }
+
+    & .expertise .chip:hover {
+        background: var(--xe-sel);
+        border-color: var(--xe-selb);
+    }
+
+    /* pager dots = XP radio buttons (13px disc, blue ring, green centre when current) */
+    & .expertise {
+        --ctl_h: 28px;
+    }
+
+    & .expertise .dot_a {
+        /* the state rules fill the current dot with --accent: it shows through the hole below */
+        --accent: #36c234;
+        box-sizing: border-box;
+        width: 13px;
+        height: 13px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--m-dot-bg, #fff);
+        box-shadow: none !important;
+        scale: none;
+    }
+
+    & .expertise .dot_a::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        box-sizing: border-box;
+        border: 1px solid #1d5281;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #dcdcd7, #fff);
+        -webkit-mask: radial-gradient(circle closest-side, transparent 0 36%, #000 42%);
+        mask: radial-gradient(circle closest-side, transparent 0 36%, #000 42%);
+    }
+
+    & .expertise .dot_a:hover {
+        scale: none;
+    }
+
+    & .expertise .dot_a:hover::before {
+        border-color: #1d5281;
+        box-shadow: inset 0 0 0 2px #fdd889, inset 0 0 0 3px #fff0cf;
+    }
+
+    & .expertise .expertise_dots {
+        gap: 6px;
+        align-items: center;
+    }
+
+    /* Next / Previous = XP green round Back / Forward buttons (the label stays for screen readers) */
+    & .expertise .arrow {
+        width: var(--ctl_h);
+        height: var(--ctl_h);
+        padding: 0;
+        gap: 0;
+        display: block;
+        overflow: hidden;
+        font-size: 0;
+        line-height: 0;
+        color: transparent;
+        text-shadow: none;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        box-sizing: border-box;
+        box-shadow: 0 0 0 1px #3d7d2e, 0 1px 3px rgba(0, 40, 0, .45);
+        background-repeat: no-repeat;
+        background-position: center, 0 0, 0 0;
+        background-size: 18px 18px, 100% 100%, 100% 100%;
+    }
+
+    & .expertise .arrow_next {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M17 10l-7-7v4H3v6h7v4z' fill='%23fff'/%3E%3C/svg%3E"),
+            radial-gradient(ellipse 70% 42% at 50% 24%, rgba(255, 255, 255, .7), rgba(255, 255, 255, 0)), radial-gradient(circle at 50% 115%, #7be274 0, #34b52e 45%, #1f8a1b 100%);
+    }
+
+    & .expertise .arrow_prev {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M3 10l7-7v4h7v6h-7v4z' fill='%23fff'/%3E%3C/svg%3E"),
+            radial-gradient(ellipse 70% 42% at 50% 24%, rgba(255, 255, 255, .7), rgba(255, 255, 255, 0)), radial-gradient(circle at 50% 115%, #7be274 0, #34b52e 45%, #1f8a1b 100%);
+    }
+
+    & .expertise .arrow:hover {
+        border-color: #fff;
+        color: transparent;
+        filter: brightness(1.12);
+        box-shadow: 0 0 0 1px #3d7d2e, 0 0 6px 2px rgba(255, 214, 120, .9);
+    }
+
+    & .expertise .arrow:active {
+        filter: brightness(.88);
+    }
+
+    /* ----- file windows (hello.c, eva_showcase.mp4, README.md, diagram.svg) ----- */
+    & .desk_wbox {
+        border: 1px solid var(--xp-line);
+        border-radius: 8px 8px 0 0;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+    }
+
+    /* dragging a window by its move button: it dims, the window it would trade places with (or dock beside) is outlined */
+    & .desk_wbox.is_moving {
+        opacity: .6;
+    }
+
+    & .desk_wbox.is_swap,
+    & .desk_wbox[data-drop] {
+        outline: 2px dashed var(--accent);
+        outline-offset: -2px;
+    }
+
+    & .desk_wbox[data-drop="top"] { box-shadow: var(--shadow), inset 0 2.4em 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
+    & .desk_wbox[data-drop="bottom"] { box-shadow: var(--shadow), inset 0 -2.4em 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
+    & .desk_wbox[data-drop="left"] { box-shadow: var(--shadow), inset 2.4em 0 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
+    & .desk_wbox[data-drop="right"] { box-shadow: var(--shadow), inset -2.4em 0 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
+
+    // a process window (pid:N): the terminal of a shell. History above, the line in progress (the prompt) and the input on the last row.
+    .desk_wbox_body_term {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: .5em .75em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: .9em;
+        line-height: 1.35;
+        cursor: text;
+    }
+
+    .desk_wbox_body_term_out {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+
+        .term_err {
+            color: var(--danger, #d64545);
+        }
+    }
+
+    .desk_wbox_body_term_row {
+        display: flex;
+        align-items: baseline;
+        gap: 0;
+    }
+
+    .desk_wbox_body_term_prompt {
+        flex: 0 0 auto;
+        white-space: pre;
+        color: var(--accent);
+    }
+
+    .desk_wbox_body_term_input {
+        flex: 1 1 auto;
+        min-width: 4em;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        caret-color: var(--accent);
+    }
+
+
+    & .desk_wbox_head {
+        background: var(--xp-title);
+        color: #fff;
+        border-bottom: 1px solid var(--xp-line);
+        text-shadow: 1px 1px 0 rgba(0, 0, 60, .55);
+    }
+
+    & .desk_wbox_head .list_summ:hover {
+        background: rgba(255, 255, 255, .22);
+        color: #fff;
+    }
+
+    & .desk_wbox_head_save {
+        position: relative;
+    }
+
+    & .desk_wbox_head_save:disabled {
+        opacity: .45;
+    }
+
+    & .desk_wbox_head_save.is_dirty::after {
+        content: "";
+        position: absolute;
+        top: .15em;
+        right: .15em;
+        width: .45em;
+        height: .45em;
+        border-radius: 50%;
+        background: #ffd24a;
+    }
+
+    & .desk_wbox_head_path,
+    & .desk_wbox_head_mime>summary,
+    & .desk_wbox_head_mode>summary {
+        background: #fff;
+        color: #0a1a52;
+        border: 1px solid #7f9db9;
+        text-shadow: none;
+        border-radius: 0;
+    }
+
+    & .desk_side,
+    & .desk_side_head,
+    & .desk_side_page {
+        background: var(--panel);
+    }
+
+    /* =====================================================================
+     XP.css pass: bevelled window frames, Luna caption buttons, XP buttons,
+     inputs, tabs, menus, scrollbars (values taken from XP.css v0.2.6)
+     ===================================================================== */
+    --xp-ui: Tahoma,
+    "Trebuchet MS",
+    Verdana,
+    sans-serif,
+    "FontAwesome",
+    "FontAwesomeBrands";
+    --xp-frame: inset -1px -1px #00138c,
+    inset 1px 1px #0831d9,
+    inset -2px -2px #001ea0,
+    inset 2px 2px #166aee,
+    inset -3px -3px #003bda,
+    inset 3px 3px #0855dd;
+    --xp-btn-bg: linear-gradient(180deg, #fff, #ecebe5 86%, #d8d0c4);
+    --xp-btn-down: linear-gradient(180deg, #cdcac3, #e3e3db 8%, #e5e5de 94%, #f2f2f1);
+    --xp-hot: inset -1px 1px #fff0cf,
+    inset 1px 2px #fdd889,
+    inset -2px 2px #fbc761,
+    inset 2px -2px #e5a01a;
+    --xp-default: inset -1px 1px #cee7ff,
+    inset 1px 2px #98b8ea,
+    inset -2px 2px #bcd4f6,
+    inset 1px -1px #89ade4,
+    inset 2px -2px #89ade4;
+
+    & ::selection {
+        background: #2267cb;
+        color: #fff;
+        text-shadow: none;
+    }
+
+    /* title bar */
+    & #head::before {
+        background: var(--xp-title);
+        border-bottom: 1px solid #003dd7;
+        box-shadow: inset 0 1px 0 #0831d9, 0 2px 4px rgba(0, 0, 0, .3);
+    }
+
+    & #head_path {
+        font-family: var(--xp-ui);
+        font-size: 13px;
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & #head_path>a:last-child {
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    /* caption buttons (XP.css .title-bar-controls) */
+    & #head_window>.list_summ {
+        width: 21px;
+        height: 21px;
+        border-radius: 3px;
+        border: 1px solid #fff;
+        box-shadow: none;
+        background: var(--m-cap);
+    }
+
+    & #head_window .list_drop_li>button {
+        position: relative;
+        width: 21px;
+        height: 21px;
+        border: 1px solid #fff;
+        border-radius: 3px;
+        box-shadow: none;
+        transition: filter .1s;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Cpath d='M8 5h8v8H8z' fill='none' stroke='%23fff' stroke-width='1.4'/%3E%3Cpath d='M8 5h8v2H8z' fill='%23fff'/%3E%3Cpath d='M5 8h8v8H5z' fill='%230053ee' stroke='%23fff' stroke-width='1.4'/%3E%3Cpath d='M5 8h8v2H5z' fill='%23fff'/%3E%3C/svg%3E") center / 21px 21px no-repeat, var(--m-cap);
+    }
+
+    & #head_window .list_drop_li>button .list_drop_icon {
+        opacity: 0;
+    }
+
+    & #head_window .list_drop_li>#head_mini {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Crect x='5' y='13' width='8' height='3' fill='%23fff'/%3E%3C/svg%3E"), var(--m-cap);
+    }
+
+    & #head_window .list_drop_li>#head_full {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Cpath d='M5 5h11v11H5z' fill='none' stroke='%23fff' stroke-width='1.6'/%3E%3Cpath d='M5 5h11v3H5z' fill='%23fff'/%3E%3C/svg%3E"), var(--m-cap);
+    }
+
+    & #head_window .list_drop_li>#head_exit {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Cpath d='M6 6l9 9M15 6l-9 9' stroke='%23fff' stroke-width='2.2' stroke-linecap='square'/%3E%3C/svg%3E"), radial-gradient(circle at 90% 90%, #cc4600 0, #dc5c2c 55%, #e68660 70%, #ffccb2 100%);
+    }
+
+    & #head_window .list_drop_li>button:hover {
+        filter: brightness(1.15);
+    }
+
+    & #head_window .list_drop_li>button:active {
+        filter: brightness(.85);
+    }
+
+    /* taskbar buttons (Luna) */
+    & #head_tabs>a {
+        font-family: var(--xp-ui);
+        border: 1px solid #1c4fb8;
+        border-radius: 3px;
+        background: linear-gradient(#3c81f3, #3b7bea 50%, #3a76e0);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & #head_tabs>a:hover {
+        background: linear-gradient(#5b97fa, #4c8af2 50%, #4883ea);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25);
+    }
+
+    & #head_tabs>a[aria-current] {
+        background: #1e52b7;
+        border-color: #0f2f86;
+        box-shadow: inset 1px 1px 3px rgba(0, 0, 60, .7), inset 0 0 0 1px rgba(0, 0, 40, .25);
+    }
+
+    /* windows: XP.css .window frame */
+    & .desk_wbox {
+        border: 0;
+        border-radius: 8px 8px 0 0;
+        background: #ece9d8;
+        box-shadow: var(--xp-frame), 2px 4px 8px rgba(0, 0, 0, .35);
+        padding: 0 3px 3px;
+    }
+
+    & .desk_wbox_head {
+        margin: 0 -3px;
+        border-radius: 8px 8px 0 0;
+        border-top: 1px solid #0831d9;
+        border-bottom: 0;
+        font-family: var(--xp-ui);
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    /* unfocused window: XP inactive title bar + lighter frame */
+    & .desk_wbox:not(:focus-within) {
+        box-shadow: inset -1px -1px #6a7fd0, inset 1px 1px #7d96e0, inset -2px -2px #7b8fd6, inset 2px 2px #9fb4ee, inset -3px -3px #7f93d9, inset 3px 3px #8ea6e8, 2px 4px 8px rgba(0, 0, 0, .25);
+    }
+
+    & .desk_wbox:not(:focus-within)>.desk_wbox_head {
+        border-top-color: #7d96e0;
+        background: linear-gradient(180deg, #7697e7, #7e9ee3 3%, #94afe8 6%, #97b4e9 8%, #82a5e4 14%, #7c9fe2 17%, #7996de 25%, #7b99e1 56%, #82a9e9 81%, #80a5e7 89%, #7b96e1 94%, #7a93df 97%, #abb9e8 100%);
+        color: #e8eefc;
+        text-shadow: 1px 1px #5a6fb8;
+    }
+
+    & .desk_wbox:not(:focus-within)>.desk_wbox_head :is(button, summary, .list_summ) {
+        opacity: .85;
+    }
+
+    & .expertise {
+        padding: 0 3px 3px;
+        border: 0;
+        box-shadow: var(--xp-frame);
+    }
+
+    & .landing_status {
+        border: 0;
+        border-top: 1px solid #0831d9;
+        border-left: 1px solid #0831d9;
+        border-right: 1px solid #001ea0;
+        border-radius: 8px 8px 0 0;
+        font-family: var(--xp-ui);
+        letter-spacing: 0;
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & .landing_status::after {
+        width: 21px;
+        height: 21px;
+        border-radius: 3px;
+        border: 1px solid #fff;
+        right: 4px;
+        font-size: 0;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Cpath d='M6 6l9 9M15 6l-9 9' stroke='%23fff' stroke-width='2.2' stroke-linecap='square'/%3E%3C/svg%3E") center / 21px 21px no-repeat, radial-gradient(circle at 90% 90%, #cc4600 0, #dc5c2c 55%, #e68660 70%, #ffccb2 100%);
+    }
+
+    & .landing_greet {
+        font-family: var(--xp-ui);
+        letter-spacing: 0;
+        background: #ece9d8;
+        border: 0;
+        border-left: 3px solid #0855dd;
+        border-right: 3px solid #003bda;
+        border-bottom: 3px solid #0831d9;
+        border-radius: 0;
+        box-shadow: 2px 4px 8px rgba(0, 0, 0, .3);
+    }
+
+    /* buttons (XP.css button) */
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .contact_time, .expertise .chip, .expertise_all) {
+        font-family: var(--xp-ui);
+        border: 1px solid #003c74;
+        border-radius: 3px;
+        outline: 0;
+        background: var(--xp-btn-bg);
+        color: #000;
+        box-shadow: none;
+        text-shadow: none;
+        letter-spacing: 0;
+        transition: none;
+    }
+
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .expertise .chip, .expertise_all):hover {
+        background: var(--xp-btn-bg);
+        color: #000;
+        border-color: #003c74;
+        box-shadow: var(--xp-hot);
+        outline: 0;
+    }
+
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .expertise .chip, .expertise_all):active {
+        background: var(--xp-btn-down);
+        box-shadow: none;
+    }
+
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .contact_btn):focus-visible {
+        box-shadow: var(--xp-default);
+        outline: 1px dotted #000;
+        outline-offset: -4px;
+    }
+
+    & :is(.btn.primary, .landing_btn.primary, .contact_work, .error_home) {
+        background: var(--xp-btn-bg);
+        color: #000;
+        box-shadow: var(--xp-default);
+    }
+
+    & :is(.btn.primary, .landing_btn.primary, .contact_work, .error_home):hover {
+        box-shadow: var(--xp-hot);
+    }
+
+    & :is(.landing_chip_icon, .contact_btn_icon, .landing_btn_icon) {
+        color: #1f5ce0;
+    }
+
+    /* the "All" filter chip: the default theme paints it as a rounded accent pill (its :not(:has(.chk:not(:checked))) state rule has a higher
+       specificity than the shared chip rule above), so it is restated here with the same structure to make it an XP button like its neighbours */
+    & .expertise .stackset:is(:has(.chk:not(:checked)), :not(:has(.chk:not(:checked)))) .chip_all {
+        border: 1px solid #003c74;
+        border-radius: 3px;
+        background: var(--xp-btn-bg);
+    }
+
+    & .expertise .stackset:is(:has(.chk:not(:checked)), :not(:has(.chk:not(:checked)))) .chip_all:active {
+        background: var(--xp-btn-down);
+    }
+
+    & .expertise .tlhead_btns>.btn {
+        border-color: transparent;
+        background: none;
+    }
+
+    & .expertise .tlhead_btns>.btn:hover {
+        border-color: #003c74;
+        background: var(--xp-btn-bg);
+    }
+
+    /* inputs (XP.css text input) */
+    & :is(input[type=search], input[type=text], input[type=email], .expertise_search_input) {
+        font-family: var(--xp-ui);
+        border: 1px solid #7f9db9;
+        border-radius: 0;
+        background: #fff;
+        color: #000;
+        box-shadow: none;
+    }
+
+    & .list_drop_search>label {
+        border-color: #7f9db9;
+    }
+
+    /* tabs (XP.css menu[role=tablist]) */
+    & .expertise .tabgroup_name {
+        font-family: var(--xp-ui);
+    }
+
+    & .expertise_box {
+        border: 1px solid #919b9c;
+        box-shadow: inset 1px 1px #fcfcfe, inset -1px -1px #fcfcfe;
+    }
+
+    & .expertise_box::before {
+        box-shadow: 1px 0 0 #7f9db9;
+    }
+
+    /* menus (Luna context menu) */
+    & .list_drop {
+        background: #fff;
+        border: 1px solid #aca899;
+        box-shadow: 2px 2px 3px rgba(0, 0, 0, .45);
+        font-family: var(--xp-ui);
+    }
+
+    & .list_drop_li> :is(a, button, label):hover {
+        background: #316ac5;
+        color: #fff;
+    }
+
+    & .list_drop_li_div {
+        border-bottom-color: #aca899;
+    }
+
+    & :is(#head_path, #head_tabs > a, .expertise .tab > a, .expertise .tabgroup_name, .desk_wbox_head, .landing_status, .list_drop, .landing_greet, .btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .contact_time, .expertise .chip, .expertise_all) {
+        text-transform: none;
+    }
+
+    & .expertise .tabgroup_name {
+        text-transform: uppercase;
+    }
+
+
+    /* ----- expertise: explorer toolbar + always-visible address/search row ----- */
+    & .expertise {
+        --accent: #316ac5;
+        --glow: inset 0 0 0 100px #ffffe1;
+    }
+
+    & .expertise_head {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        background: var(--xe-bar);
+        border-bottom: 1px solid var(--xe-edge);
+        box-shadow: inset 0 1px #fff;
+    }
+
+    & .expertise_tabs,
+    & .expertise_heads {
+        grid-area: 1 / 1;
+    }
+
+    & .expertise_tabs_ul {
+        width: auto;
+        min-width: 0;
+        padding: 2px 4px;
+        align-items: stretch;
+    }
+
+    & .expertise .tab {
+        flex: 0 0 auto;
+        border: 0;
+        box-shadow: none;
+    }
+
+    & .expertise .tab_expertise {
+        position: static;
+        flex: 0 0 auto;
+        padding-right: 3px;
+        background: none;
+        border: 0;
+        box-shadow: none;
+    }
+
+    /* experience / education head: takes the place of the tabs in the tab row only (never over the address row), drawn like the current tab */
+    & .expertise_heads {
+        position: static;
+        grid-area: 1 / 1;
+        align-self: stretch;
+        margin: 2px 4px 2px calc(var(--feat-w) + 6px);
+    }
+
+    & .expertise .th {
+        display: flex;
+        align-items: center;
+        gap: .5em;
+        padding: 0 .7em;
+        color: var(--xe-ink);
+        font-family: var(--xp-ui);
+        text-shadow: none;
+        border: 1px solid var(--xe-togb);
+        border-radius: 4px;
+        background: var(--xe-tog);
+        box-shadow: inset 0 0 0 1px var(--xe-togi);
+    }
+
+    & .expertise .th_icon {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+    }
+
+    & .expertise .th_name {
+        font-weight: bold;
+    }
+
+    & .expertise .th_sub {
+        opacity: .7;
+        font-size: .9em;
+    }
+
+    & .expertise .tabgroup {
+        flex: 0 0 auto;
+        margin-left: 3px;
+        padding-left: 3px;
+        border-left: 1px solid var(--xe-edge);
+        box-shadow: inset 1px 0 #fff;
+    }
+
+    & .expertise .tabgroup_name {
+        padding: 0 .4em;
+        font-size: .62em;
+        color: var(--xe-ink);
+        opacity: .6;
+    }
+
+    & .expertise .tabgroup_name::before,
+    & .expertise .tabgroup_name::after {
+        display: none;
+    }
+
+    & .expertise .tab>a {
+        flex: 0 0 auto;
+        color: var(--xe-ink);
+        font-family: var(--xp-ui);
+        text-shadow: none;
+        margin: 1px;
+        padding: .3em .7em;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        background: none;
+    }
+
+    /* hover / focus: Explorer toolbar button hover (white bevel, grey edge). Text colour never changes. */
+    & .expertise .tab>a:is(:hover, :focus-visible) {
+        background: var(--xe-hov);
+        border-color: var(--xe-hb);
+        border-radius: 3px;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8), 1px 1px 1px rgba(0, 0, 0, .12);
+        color: var(--xe-ink);
+        outline: 0;
+    }
+
+    /* current tab: Explorer toggled 'Folders' button (white face, pale blue rounded edge). Featured is current while no skill or experience is the target. */
+    & .expertise .tab>a:active {
+        background: var(--xe-act);
+        border: 1px solid var(--xe-hb);
+        border-radius: 3px;
+        box-shadow: inset 1px 1px 2px var(--xe-actsh), inset 0 0 0 1px rgba(255, 255, 255, .35);
+        color: var(--xe-ink);
+        outline: 0;
+    }
+
+    /* Current skill tab: generated from the page data ($default / $skills / $exps / $slides) so no slide or skill id is hard-coded.
+       A tab is current on its own id, on any of its slides (#skill/slide) and on its fullscreen timeline (#skill/timeline).
+       Featured is current while nothing else is the target. */
+    & body:not(:has(#{m_nondefault_ids()})) .expertise .tab_#{$default}>a {
+        @include m_tab_current;
+    }
+
+    @each $s in $skills {
+        & body:has(#{m_ids($s)}) .expertise .tab_#{$s}>a {
+            @include m_tab_current;
+        }
+    }
+
+    /* the mouse press stays the sunken look, also on the current tab */
+    & body .expertise .tab>a:active {
+        background: var(--xe-act);
+        border-color: var(--xe-hb);
+        box-shadow: inset 1px 1px 2px var(--xe-actsh), inset 0 0 0 1px rgba(255, 255, 255, .35);
+    }
+
+    /* address row: always visible input + Go */
+    & .expertise_search {
+        grid-area: 2 / 1;
+        position: static;
+        display: flex;
+        align-items: center;
+        justify-content: stretch;
+        gap: 4px;
+        padding: 3px 6px;
+        pointer-events: auto;
+        border-top: 1px solid var(--xe-edge);
+        box-shadow: inset 0 1px #fff;
+    }
+
+    /* XP Explorer "Address" label: grey Tahoma text to the left of the field. Memory only, so it is drawn here and the shared markup is
+       untouched. The second `content` adds an empty alt text so screen readers skip it (the input has its own aria-label); browsers that
+       do not know the alt syntax ignore that line and keep the first. It comes before the input (order 0, DOM order) and never shrinks. */
+    & .expertise_search::before {
+        content: "Search";
+        content: "Search" / "";
+        flex: none;
+        padding: 0 3px 0 2px;
+        font: 11px/23px var(--xp-ui);
+        color: var(--xe-label);
+        white-space: nowrap;
+        user-select: none;
+    }
+
+    /* clear button: the x sits inside the right edge of the field and is there only while the field has text (the click is handled in
+       client_search.ts: in this theme it empties the field instead of closing the search) */
+    & .expertise .expertise_search .expertise_search_tog~.expertise_search_btn.expertise_search_btn {
+        order: 0;
+        position: static;
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        margin: 0 0 0 -26px;
+        padding: 0;
+        z-index: 1;
+        cursor: pointer;
+        font-size: 11px;
+        color: var(--xe-ink);
+        text-shadow: none;
+    }
+
+    & .expertise .expertise_search_btn .expertise_search_o {
+        display: none;
+    }
+
+    & .expertise .expertise_search_btn .expertise_search_x {
+        display: block;
+        font-size: 1.1em;
+    }
+
+    & .expertise .expertise_search_btn:hover {
+        color: #c0392b;
+    }
+
+    & .expertise .expertise_search_input:placeholder-shown~.expertise_search_btn.expertise_search_btn {
+        display: none !important;
+    }
+
+    & .expertise .expertise_search_input:not(:placeholder-shown) {
+        padding-right: 26px;
+    }
+
+    /* The default theme swaps the skill bar and the filter row out while its search toggle is checked. Memory has no such mode (the search row is
+       always there), so a toggle left checked in the default theme must not take the tabs and filters away here. */
+    & .expertise_head:has(.expertise_search_tog:checked) :is(.expertise_tabs, .expertise_heads) {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    & .expertise:has(.expertise_search_tog:checked) .expertise_stacks {
+        display: block;
+    }
+
+    @media (orientation: portrait) {
+        & .expertise:has(.expertise_search_tog:checked) .expertise_stacks {
+            display: grid;
+        }
+    }
+
+    & .expertise .expertise_search_input {
+        order: 0;
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+        height: 23px;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 2px 6px;
+        opacity: 1;
+        visibility: visible;
+        border: 1px solid var(--xe-in);
+        background: var(--xe-content);
+        color: var(--xe-ink);
+        font-size: 11px;
+        transition: none;
+    }
+
+    & .expertise .expertise_search_input:focus {
+        outline: 0;
+        box-shadow: inset 0 0 0 1px var(--xe-selb);
+    }
+
+    & .expertise .expertise_search_go {
+        order: 1;
+        position: static;
+        display: block;
+        flex: none;
+        width: 23px;
+        height: 23px;
+        padding: 0;
+        font-size: 0;
+        color: transparent;
+        border: 1px solid #1b5f1b;
+        border-radius: 3px;
+        cursor: pointer;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21 21'%3E%3Cpath d='M4 8.5h7V5l6 5.5-6 5.5v-3.5H4z' fill='%23fff' stroke='%23155a15' stroke-width='.8' stroke-linejoin='round'/%3E%3C/svg%3E") center / 19px no-repeat,
+            linear-gradient(#8fe08f, #3fb43f 45%, #2a9a2a 55%, #55c755);
+    }
+
+    & .expertise .expertise_search_go:hover {
+        filter: brightness(1.12);
+        box-shadow: var(--xp-hot);
+    }
+
+    & .expertise .expertise_search_go:active {
+        filter: brightness(.88);
+        box-shadow: none;
+    }
+
+    /* timeline entries = XP tooltips: pale until focused, then #ffffe1 */
+    & .expertise .tl_card,
+    & .expertise .tl_bar .tl_card,
+    & .expertise .tl_pin .tl_card {
+        --accent: #000;
+        background: #fffffc;
+        color: #000;
+        border: 1px solid #767676;
+        border-radius: 4px;
+        text-shadow: none;
+        box-shadow: 1px 1px 2px rgba(0, 0, 0, .3);
+        font-family: var(--xp-ui);
+    }
+
+    & .expertise .tl_bar .tl_card {
+        background-color: #fffffc !important;
+    }
+
+    & .expertise .tl_card :is(.tl_name, .tl_sub) {
+        color: #000;
+    }
+
+    & .expertise .tl_card .tl_sub {
+        color: #555;
+    }
+
+    & .expertise .tl_card:is(:hover, :focus-within) {
+        background: #fffffc;
+        border-color: #000;
+        color: #000;
+        box-shadow: var(--glow), 1px 1px 2px rgba(0, 0, 0, .3);
+    }
+
+
+    /* ----- contact + error: XP.css status bar ----- */
+    & :is(.contact_title, .error_title) {
+        font-family: "Trebuchet MS", var(--xp-ui);
+        font-weight: bold;
+        letter-spacing: 0;
+        text-transform: none;
+        color: #fff;
+        text-shadow: 2px 2px 0 #0f1089, 0 0 14px rgba(255, 255, 255, .5);
+    }
+
+    & :is(.contact_lead, .error_sub, .error_maybe_title) {
+        font-family: var(--xp-ui);
+        font-size: 1.05em;
+        font-weight: normal;
+        letter-spacing: 0;
+        text-transform: none;
+        color: #fff;
+        text-shadow: 1px 1px #0f1089;
+        background: none;
+        box-shadow: none;
+        padding: 0;
+        margin-left: 0;
+        border: 0;
+    }
+
+    & .error_maybe_title {
+        font-weight: bold;
+        margin-bottom: .4em;
+    }
+
+    & .error_maybe {
+        background: none;
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    & :is(.contact_list, .error_maybe_list) {
+        display: flex;
+        flex-wrap: wrap;
+        width: min(60em, calc(100vw - 3rem));
+        max-width: none;
+        margin: 0;
+        padding: 2px 1px;
+        list-style: none;
+        box-sizing: border-box;
+        background: var(--xe-face);
+        color: var(--xe-ink);
+        border: 1px solid var(--xp-line);
+        border-radius: 0;
+        box-shadow: inset 0 1px 2px grey, 2px 3px 6px rgba(0, 0, 0, .3);
+        font-family: var(--xp-ui);
+        font-size: 11px;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background-image: none;
+    }
+
+    & :is(.contact_row, .error_maybe_item) {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: max-content;
+        margin: 0;
+        padding: 2px 6px;
+        border: 0;
+        border-left: 1px solid var(--xe-sbl);
+        border-right: 1px solid var(--xe-sbr);
+        animation: none;
+    }
+
+    & :is(.contact_row, .error_maybe_item):first-child {
+        border-left: 0;
+    }
+
+    & :is(.contact_row, .error_maybe_item):last-child {
+        border-right: 0;
+    }
+
+    & .error_maybe_link {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0;
+        color: var(--xe-ink);
+    }
+
+    & .error_maybe_item:hover {
+        background: #316ac5;
+    }
+
+    & .error_maybe_item:hover :is(.error_maybe_link, .error_maybe_path, .error_maybe_icon, .error_maybe_go) {
+        color: #fff;
+    }
+
+    & :is(.contact_icon, .error_maybe_icon) {
+        font-size: 1.4em;
+        width: 1.4em;
+        color: #1f5ce0;
+        flex: none;
+    }
+
+    & :is(.contact_info, .error_maybe_info) {
+        flex: 1;
+        display: grid;
+        min-width: 0;
+    }
+
+    & .contact_type {
+        font-size: 10px;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--xe-ink);
+        opacity: .65;
+    }
+
+    & :is(.contact_value, .error_maybe_name) {
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: bold;
+        color: var(--xe-ink);
+    }
+
+    & .error_maybe_path {
+        font-size: 10px;
+        letter-spacing: 0;
+        color: var(--xe-ink);
+        opacity: .65;
+    }
+
+    & .error_maybe_go {
+        color: var(--xe-ink);
+        flex: none;
+    }
+
+    & .contact_time {
+        border: 0;
+        background: none;
+        box-shadow: none;
+        padding: 0;
+        font-family: var(--xp-ui);
+        font-size: 11px;
+        color: var(--xe-ink);
+    }
+
+    & .contact_btn {
+        font-size: 11px;
+        padding: 2px 10px;
+        min-height: 23px;
+    }
+
+    & .contact_btn>span:first-child,
+    & .contact_work>span:first-child {
+        text-transform: none;
+    }
+
+    /* ----- contact = one XP dialog window -----
+       The contact area used to be white text with a glow straight on the background and a status bar wrapped over several lines. It is now a
+       window: title bar, the sentence in plain ink on the window face, then one tidy row per way of reaching me (icon, text, button).
+       No glow, no halo: the same tokens as the other windows, so it follows the light and dark modes. */
+    & .contact .contact_panel {
+        gap: 0;
+        width: 100%;
+        max-width: 34em;
+        box-sizing: border-box;
+        overflow: hidden;
+        border: 1px solid var(--xp-line);
+        border-radius: 8px 8px 0 0;
+        background: var(--xe-face);
+        color: var(--xe-ink);
+        box-shadow: 3px 4px 0 rgba(0, 0, 0, .35);
+    }
+
+    & .contact .contact_panel::before {
+        display: none;
+    }
+
+    & .contact .contact_head {
+        padding: 5px 10px;
+        background: var(--xp-title);
+    }
+
+    & .contact .contact_head .contact_title {
+        margin: 0;
+        font: bold 13px/1.5 "Trebuchet MS", var(--xp-ui);
+        letter-spacing: 0;
+        color: #fff;
+        text-shadow: 1px 1px 0 rgba(0, 0, 40, .6);
+    }
+
+    & .contact .contact_head .contact_title::after {
+        display: none;
+    }
+
+    & .contact .contact_body {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        width: 100%;
+        padding: 14px;
+    }
+
+    & .contact .contact_body .contact_lead {
+        margin: 0;
+        font: 12px/1.55 var(--xp-ui);
+        color: var(--xe-ink);
+        text-shadow: none;
+    }
+
+    & .contact .contact_list {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        width: auto;
+        max-width: none;
+        padding: 0;
+        background: var(--xe-content);
+        border: 1px solid var(--xe-in);
+        box-shadow: inset 1px 1px 0 rgba(0, 0, 0, .12);
+    }
+
+    & .contact .contact_row {
+        display: grid;
+        grid-template-columns: 1.6em minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        padding: 8px 10px;
+        border: 0;
+        border-top: 1px solid var(--xe-sbr);
+    }
+
+    & .contact .contact_row:first-child {
+        border-top: 0;
+    }
+
+    & .contact .contact_value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    & .contact .contact_time {
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 2px 6px;
+        white-space: nowrap;
+    }
+
+    & .contact .contact_btn:hover {
+        outline-color: var(--xe-selb);
+        box-shadow: 2px 3px 0 rgba(6, 18, 110, .3);
+    }
+
+    & .contact .contact_work {
+        align-self: flex-end;
+        font: 12px/1.2 var(--xp-ui);
+        padding: 4px 14px;
+    }
+
+    /* ----- project side panel = XP Start menu (left column only) ----- */
+    & .desk_side {
+        position: relative;
+        box-sizing: border-box;
+        padding-bottom: 2.9em;
+        border: 0;
+        border-radius: 8px 8px 0 0;
+        background: #1f5fd6;
+        font-family: var(--xp-ui);
+        box-shadow: 3px 0 8px rgba(0, 0, 0, .4), inset 0 0 0 1px #0831d9;
+    }
+
+    & .desk_side_head {
+        grid-template: 1.7em 1.7em / 3.6em 1fr;
+        height: 4.8em;
+        padding: .55em .6em;
+        border: 0;
+        color: #fff;
+        background: linear-gradient(90deg, rgba(242, 168, 64, .95), rgba(242, 168, 64, 0)) bottom / 100% 2px no-repeat,
+            linear-gradient(180deg, #1c5ed3 0, #4b93f7 10%, #2a77e8 45%, #1f62d8 100%);
+    }
+
+    & .desk_side_icon {
+        align-self: center;
+        display: grid;
+        place-items: center;
+        width: 1.8em;
+        height: 1.8em;
+        font-size: 1.5em;
+        line-height: 1;
+        border: 2px solid #fff;
+        border-radius: 4px;
+        background: linear-gradient(#fff, #c6d3f7);
+        color: #1647b0;
+        box-shadow: 1px 2px 3px rgba(0, 0, 60, .5);
+    }
+
+    & .desk_side_name {
+        align-self: end;
+        font-size: 1.15em;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & .desk_side_info {
+        align-self: start;
+        font-size: .85em;
+        color: #d7e4ff;
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & .desk_side_page {
+        min-width: calc(20em - 4px);
+        margin: 0 2px;
+        background: var(--xe-content);
+        color: var(--xe-ink);
+    }
+
+    & .desk_side_item_head {
+        background: var(--xe-content);
+        color: var(--xe-ink);
+        font-size: 11px;
+    }
+
+    & .desk_side_item_head:hover,
+    & .desk_side_item_head:hover * {
+        background: #316ac5;
+        color: #fff;
+    }
+
+    /* the tabs become the bottom bar of the menu */
+    & .desk_side_tabs {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 2.9em;
+        margin: 0;
+        padding: .35em .4em;
+        box-sizing: border-box;
+        background: linear-gradient(180deg, #3b82e8, #1f5fd6 50%, #1347b0);
+        border-top: 1px solid #0b3a9e;
+        overflow: hidden;
+    }
+
+    & .desk_side_tabs_ul {
+        gap: 2px;
+        width: 100%;
+    }
+
+    & .desk_side_tabs_ul>li {
+        flex: 1 1 0;
+    }
+
+    & .desk_side_tabs_drop>summary {
+        padding: 0 .3em;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        box-shadow: none;
+        color: #fff;
+        font-size: 11px;
+        text-shadow: 1px 1px #0f1089;
+    }
+
+    & .desk_side_tabs_drop>summary:hover {
+        background: rgba(255, 255, 255, .22);
+        border-color: rgba(255, 255, 255, .35);
+    }
+
+    & .desk_side_tabs_drop[open]>summary {
+        color: #fff;
+        background: rgba(0, 0, 60, .25);
+        border-color: rgba(255, 255, 255, .55);
+        box-shadow: inset 1px 1px 2px rgba(0, 0, 60, .5);
+    }
+
+    /* ----- side panel tree = XP Explorer "Folders": dotted guides, [+]/[-] box on the left ----- */
+    --m-dot: var(--xe-hb);
+    --m-ex: 9px;
+    /* expander box size */
+
+    /* room on the left of every head for the expander; its centre (.75em) sits on the guide line */
+    & .desk_side_item_head {
+        padding-left: calc(.75em - 2px);
+    }
+
+    & .desk_side_item_sub {
+        border-left: 0;
+    }
+
+    /* [+] / [-] box (was the caret at the top right) */
+    & .desk_side_item_head::after {
+        content: "";
+        right: auto;
+        width: var(--m-ex);
+        height: var(--m-ex);
+        box-sizing: border-box;
+        rotate: none;
+        transition: none;
+        left: calc(.75em - 2px - var(--m-ex) / 2);
+        top: calc(1.25em - 2px - var(--m-ex) / 2);
+        border: 1px solid var(--xe-hb);
+        border-radius: 0;
+        background: linear-gradient(var(--xe-ink), var(--xe-ink)) center / 5px 1px no-repeat, var(--xe-content);
+    }
+
+    & .desk_side_item_box:not([open])>.desk_side_item_head::after {
+        background:
+            linear-gradient(var(--xe-ink), var(--xe-ink)) center / 1px 5px no-repeat,
+            linear-gradient(var(--xe-ink), var(--xe-ink)) center / 5px 1px no-repeat,
+            var(--xe-content);
+    }
+
+    & .desk_side_item_box:not(:has(> summary > :nth-child(3)))>.desk_side_item_head::after {
+        top: calc(.625em - 2px - var(--m-ex) / 2);
+    }
+
+    /* dotted guides: --m-y = height of the connector line inside the head (slim heads are half as tall) */
+    & .desk_side_item_sub>li>.desk_side_item>.desk_side_item_box {
+        position: relative;
+        --m-y: 1.25em;
+        --m-hl: .2em;
+        --m-v: 100%;
+    }
+
+    & .desk_side_item_sub>li>.desk_side_item>.desk_side_item_box:not(:has(> summary > :nth-child(3))) {
+        --m-y: .625em;
+        --m-hl: .4em;
+    }
+
+    & .desk_side_item_sub>li:last-child>.desk_side_item>.desk_side_item_box {
+        --m-v: calc(var(--m-y) + 1px);
+    }
+
+    /* vertical guide beside the children, behind the sticky head (the head draws its own piece) */
+    & .desk_side_item_sub>li:not(:last-child)>.desk_side_item>.desk_side_item_box::before {
+        content: "";
+        position: absolute;
+        left: .75em;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        z-index: 1;
+        pointer-events: none;
+        background: repeating-linear-gradient(180deg, var(--m-dot) 0 1px, transparent 1px 2px);
+    }
+
+    /* the head's piece: vertical stub + horizontal connector (replaces the old round dot) */
+    & .desk_side_item_sub>li>.desk_side_item>.desk_side_item_box>.desk_side_item_head::before {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        width: auto;
+        height: auto;
+        margin: 0;
+        border-radius: 0;
+        z-index: auto;
+        pointer-events: none;
+        background:
+            repeating-linear-gradient(180deg, var(--m-dot) 0 1px, transparent 1px 2px) .75em 0 / 1px var(--m-v) no-repeat,
+            repeating-linear-gradient(90deg, var(--m-dot) 0 1px, transparent 1px 2px) .75em var(--m-y) / calc(var(--m-hl) + 1px) 1px no-repeat;
+    }
+
+    /* default.scss sets html { scrollbar-color } and .expertise .stackset { scrollbar-width: thin }. Since Chrome 121 either
+       property turns every ::-webkit-scrollbar rule off for that element, so reset them to auto for Memory. */
+    scrollbar-color: auto;
+
+    & .expertise .stackset {
+        scrollbar-width: auto;
+    }
+
+    /* WHY `html[...]` AND NOT `:root[...]` BELOW: in Chrome, a selector containing :root never matches the ::-webkit-scrollbar:vertical /
+       :horizontal states (page scrollbar or any inner scroller), so the background with the arrow images was silently dropped.
+       Plain ::-webkit-scrollbar rules still matched, which is why removing :vertical "fixed" it. `html` has the same meaning here and
+       keeps the :vertical / :horizontal states working. Keep :root out of every ::-webkit-scrollbar selector in this file. */
+    @at-root html[data-theme="memory"] {
+        /* scrollbars: Windows XP Luna, measured from a real XP list view.
+           The arrow buttons are drawn as images on the scrollbar itself; the (transparent) buttons only reserve their cell.
+           That needs no ::-webkit-scrollbar-button pseudo-classes (:start, :increment ...), which some Chrome builds ignore. */
+        &::-webkit-scrollbar,
+        & ::-webkit-scrollbar {
+            width: 17px;
+            height: 17px;
+        }
+
+        /* The browser lays out two buttons at each end (as the build showed). Each is half a cell (8.5px), transparent,
+           so together they reserve the 17px cell where the arrow image drawn on the scrollbar shows through. */
+        &::-webkit-scrollbar-button,
+        & ::-webkit-scrollbar-button {
+            display: block;
+            width: 8.5px;
+            height: 8.5px;
+            background: none;
+        }
+
+        &::-webkit-scrollbar,
+        & ::-webkit-scrollbar:vertical {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23ffffff' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%239fb5d2' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%237c9fd3' d='M1 16h15v1H1z'/%3E%3Cpath fill='%234d6185' d='M8 5h1v1h-1zM7 6h3v1h-3zM6 7h2v1h-2zM9 7h2v1h-2zM5 8h2v1h-2zM10 8h2v1h-2zM4 9h2v1h-2zM11 9h2v1h-2zM5 10h1v1h-1zM11 10h1v1h-1z'/%3E%3C/svg%3E") left top / 17px 17px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23ffffff' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%239fb5d2' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%237c9fd3' d='M1 16h15v1H1z'/%3E%3Cpath fill='%234d6185' d='M5 6h1v1h-1zM11 6h1v1h-1zM4 7h2v1h-2zM11 7h2v1h-2zM5 8h2v1h-2zM10 8h2v1h-2zM6 9h2v1h-2zM9 9h2v1h-2zM7 10h3v1h-3zM8 11h1v1h-1z'/%3E%3C/svg%3E") left bottom / 17px 17px no-repeat, linear-gradient(135deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc) left 1px top 1px / 14px 14px no-repeat, linear-gradient(135deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc) left 1px bottom 2px / 14px 14px no-repeat;
+        }
+
+        & ::-webkit-scrollbar:horizontal {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23ffffff' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%239fb5d2' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%237c9fd3' d='M1 16h15v1H1z'/%3E%3Cpath fill='%234d6185' d='M9 4h1v1h-1zM8 5h3v1h-3zM7 6h2v1h-2zM6 7h2v1h-2zM5 8h2v1h-2zM6 9h2v1h-2zM7 10h2v1h-2zM8 11h3v1h-3zM9 12h1v1h-1z'/%3E%3C/svg%3E") left top / 17px 17px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23ffffff' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%239fb5d2' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%237c9fd3' d='M1 16h15v1H1z'/%3E%3Cpath fill='%234d6185' d='M7 4h1v1h-1zM6 5h3v1h-3zM8 6h2v1h-2zM9 7h2v1h-2zM10 8h2v1h-2zM9 9h2v1h-2zM8 10h2v1h-2zM6 11h3v1h-3zM7 12h1v1h-1z'/%3E%3C/svg%3E") right top / 17px 17px no-repeat, linear-gradient(135deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc) left 1px top 1px / 14px 14px no-repeat, linear-gradient(135deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc) right 2px top 1px / 14px 14px no-repeat;
+        }
+
+        &::-webkit-scrollbar-corner,
+        & ::-webkit-scrollbar-corner {
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Crect x='13' y='5' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='9' y='9' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='13' y='9' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='5' y='13' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='9' y='13' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='13' y='13' width='2' height='2' fill='%23ffffff'/%3E%3Crect x='12' y='4' width='2' height='2' fill='%23b8b4a3'/%3E%3Crect x='8' y='8' width='2' height='2' fill='%23b8b4a3'/%3E%3Crect x='12' y='8' width='2' height='2' fill='%23b8b4a3'/%3E%3Crect x='4' y='12' width='2' height='2' fill='%23b8b4a3'/%3E%3Crect x='8' y='12' width='2' height='2' fill='%23b8b4a3'/%3E%3Crect x='12' y='12' width='2' height='2' fill='%23b8b4a3'/%3E%3C/svg%3E") 0 0 / 17px 17px no-repeat, #ece9d8;
+        }
+
+        &::-webkit-scrollbar-track,
+        & ::-webkit-scrollbar-track {
+            background: linear-gradient(90deg, #f4f1ec, #f4f3ee 20%, #f9f8f4 50%, #fefefb);
+            box-shadow: inset 1px 0 #eeede5, inset -1px 0 #eeede5;
+        }
+
+        &::-webkit-scrollbar-track:horizontal,
+        & ::-webkit-scrollbar-track:horizontal {
+            background: linear-gradient(180deg, #f4f1ec, #f4f3ee 20%, #f9f8f4 50%, #fefefb);
+            box-shadow: inset 0 1px #eeede5, inset 0 -1px #eeede5;
+        }
+
+        &::-webkit-scrollbar-thumb,
+        & ::-webkit-scrollbar-thumb {
+            box-sizing: border-box;
+            border: 1px solid;
+            border-color: #ffffff #9fb5d2 #7c9fd3 #ffffff;
+            border-radius: 2px;
+            box-shadow: inset -1px -1px #ffffff;
+            background: repeating-linear-gradient(180deg, #eef4fe 0 1px, #8cb0f8 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc);
+        }
+
+        &::-webkit-scrollbar-thumb:horizontal,
+        & ::-webkit-scrollbar-thumb:horizontal {
+            background: repeating-linear-gradient(180deg, #eef4fe 0 1px, #8cb0f8 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #c8d6fb, #c5d5fc 35%, #bad3fc 75%, #b3cffc);
+        }
+
+        /* hover: lighter face */
+        &::-webkit-scrollbar-thumb:hover,
+        & ::-webkit-scrollbar-thumb:hover {
+            background: repeating-linear-gradient(180deg, #eef4fe 0 1px, #8cb0f8 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #d6e2fe, #d2e0fe 35%, #c8dcfe 75%, #c0dafe);
+        }
+
+        &::-webkit-scrollbar-thumb:horizontal:hover,
+        & ::-webkit-scrollbar-thumb:horizontal:hover {
+            background: repeating-linear-gradient(180deg, #eef4fe 0 1px, #8cb0f8 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #d6e2fe, #d2e0fe 35%, #c8dcfe 75%, #c0dafe);
+        }
+
+        /* pressed (matches the XP screenshot): darker, more saturated face, dark lip on top/left, grip drops to light ridges */
+        &::-webkit-scrollbar-thumb:active,
+        & ::-webkit-scrollbar-thumb:active {
+            background: repeating-linear-gradient(180deg, #cfddfd 0 1px, #a0bcfa 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #a1b6ed, #abc1fa 20%, #a0bcfa 55%, #93b4fa 85%, #98b0ee);
+            box-shadow: inset 0 1px #7f95cb, inset 0 2px #99b1ed, inset 1px 0 #849bd5, inset -1px -1px #ffffff;
+        }
+
+        &::-webkit-scrollbar-thumb:horizontal:active,
+        & ::-webkit-scrollbar-thumb:horizontal:active {
+            background: repeating-linear-gradient(180deg, #cfddfd 0 1px, #a0bcfa 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #a1b6ed, #abc1fa 20%, #a0bcfa 55%, #93b4fa 85%, #98b0ee);
+            box-shadow: inset 1px 0 #7f95cb, inset 2px 0 #99b1ed, inset 0 1px #849bd5, inset -1px -1px #ffffff;
+        }
+    }
+}
+
+/* Firefox has no ::-webkit-scrollbar: closest match is a coloured thumb and track */
+@supports not selector(::-webkit-scrollbar) {
+
+    :root[data-theme="memory"],
+    :root[data-theme="memory"] * {
+        scrollbar-color: #b5cdfa #f4f3ee;
+    }
+}
+
+@keyframes m_caret {
+    50% {
+        opacity: 0;
+    }
+}
+
+@keyframes m_smear {
+
+    0%,
+    100% {
+        translate: 0 0;
+        opacity: .95;
+    }
+
+    20% {
+        translate: -5px 1px;
+        opacity: .5;
+    }
+
+    40% {
+        translate: 4px -2px;
+        opacity: 1;
+    }
+
+    60% {
+        translate: -9px 0;
+        opacity: .3;
+    }
+
+    80% {
+        translate: 2px 2px;
+        opacity: .8;
+    }
+}
+
+@keyframes m_jit {
+    0% {
+        translate: 0 var(--dy);
+    }
+
+    50% {
+        translate: .02em calc(var(--dy) - .03em);
+        rotate: calc(var(--rot) + 3deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-theme="memory"] :is(.landing_name::before, .landing_greet::after, .m-l) {
+        animation: none !important;
+    }
+}
+
+:root[data-theme="memory"]:has(#motion_pause:checked) :is(.landing_name::before, .landing_greet::after, .m-l) {
+    animation: none !important;
+}
+
+@media print {
+    :root[data-theme="memory"] body::before {
+        display: none;
+    }
+}
+
+/* ── Background: WebGPU canvas → interactive SVG → static SVG (no JS) ── */
+#memory_gl {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    display: block;
+}
+
+:root[data-theme="memory"]:not(.m-on) {
+    background: #8aa5fb url("memory-bg.svg") center bottom / cover no-repeat fixed;
+}
+
+@media (prefers-reduced-data: reduce) {
+    :root[data-theme="memory"]:not(.m-on) {
+        background-image: none;
+    }
+}
+
+/* =====================================================================
+   DARK UI: everything above that is hardcoded light or XP-blue gets its
+   charcoal "Windows XP dark" counterpart here (title bars, taskbar and tray,
+   menus, buttons, inputs, explorer, tooltips, Start-menu panel, scrollbars).
+   ===================================================================== */
+@include m_dark {
+
+    /* title bar, taskbar, tray */
+    & #head {
+        text-shadow: 0 1px 0 rgba(0, 0, 0, .7);
+    }
+
+    & #head::before {
+        border-bottom: 1px solid #000;
+        box-shadow: inset 0 1px 0 #6a6a6a, 0 2px 4px rgba(0, 0, 0, .5);
+    }
+
+    & :is(#head_path, #head_path>a:last-child) {
+        text-shadow: 1px 1px #000;
+    }
+
+    & #head_tray {
+        background: linear-gradient(#323232, #232323 14%, #1b1b1b 80%, #101010);
+        border-left-color: #000;
+        box-shadow: inset 1px 0 0 rgba(255, 255, 255, .15), inset 0 1px 0 rgba(255, 255, 255, .22);
+    }
+
+    & #head_tabs {
+        border-top-color: #707070;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 -3px 10px rgba(0, 0, 0, .45);
+    }
+
+    & #head_tabs>a {
+        border-color: #0d0d0d;
+        background: linear-gradient(#636363, #4b4b4b 50%, #3d3d3d);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+        text-shadow: 1px 1px #000;
+    }
+
+    & #head_tabs>a:hover {
+        background: linear-gradient(#7a7a7a, #5f5f5f 50%, #505050);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22);
+    }
+
+    & #head_tabs>a[aria-current] {
+        background: #1c1c1c;
+        border-color: #000;
+        box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .85), inset 0 0 0 1px rgba(0, 0, 0, .3);
+    }
+
+    /* footer (title bar at 75%): same charcoal bar, black text shadow */
+    & .site_foot {
+        text-shadow: 0 1px 0 rgba(0, 0, 0, .7);
+    }
+
+    & .site_foot::before {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22);
+    }
+
+    /* menus */
+    & .list_drop {
+        background: #2d2d2d;
+        color: #ececec;
+        border-color: #6a6a6a;
+        box-shadow: 2px 2px 3px rgba(0, 0, 0, .6);
+    }
+
+    & .list_drop_li> :is(a, button, label) {
+        color: #ececec;
+    }
+
+    & .list_drop_li> :is(a, button, label):hover {
+        background: #316ac5;
+        color: #fff;
+    }
+
+    & .list_drop_li>input:checked+label,
+    & .list_drop_li>[aria-current] {
+        color: #7fc0ff;
+    }
+
+    & .list_drop_li>input:checked+label:hover,
+    & .list_drop_li>[aria-current]:hover {
+        color: #fff;
+    }
+
+    & .list_drop_li_div {
+        border-bottom-color: #555;
+    }
+
+    & .list_drop_search>label {
+        background: #1e1e1e;
+        border-color: #777;
+        color: #b4b4b4;
+    }
+
+    & .list_drop_search input {
+        color: #ececec;
+    }
+
+    /* landing */
+    & .landing_status {
+        border-top-color: #5a5a5a;
+        border-left-color: #333;
+        border-right-color: #000;
+        text-shadow: 1px 1px #000;
+    }
+
+    & .landing_greet {
+        background: #2f2f2f;
+        border-left-color: #3a3a3a;
+        border-right-color: #1a1a1a;
+        border-bottom-color: #262626;
+        box-shadow: 2px 4px 8px rgba(0, 0, 0, .55);
+    }
+
+    & .landing_lead {
+        background: linear-gradient(90deg, rgba(20, 20, 20, .62), rgba(20, 20, 20, .28));
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, .14);
+    }
+
+    & .landing_name {
+        filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, .55));
+    }
+
+    & :is(.contact_title, .error_title) {
+        text-shadow: 2px 2px 0 #000, 0 0 14px rgba(255, 255, 255, .25);
+    }
+
+    & :is(.contact_lead, .error_sub, .error_maybe_title) {
+        text-shadow: 1px 1px #000;
+    }
+
+    /* buttons and chips */
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .expertise .chip, .expertise_all) {
+        border-color: #8c8c8c;
+        color: #f0f0f0;
+    }
+
+    & :is(.btn, .landing_btn, .contact_work, .error_home, .landing_chip, .contact_btn, .expertise .chip, .expertise_all):hover {
+        border-color: #8c8c8c;
+        color: #fff;
+    }
+
+    & :is(.btn.primary, .landing_btn.primary, .contact_work, .error_home) {
+        color: #fff;
+    }
+
+    & .expertise .stackset:is(:has(.chk:not(:checked)), :not(:has(.chk:not(:checked)))) .chip_all {
+        border-color: #8c8c8c;
+        color: #f0f0f0;
+    }
+
+    & .expertise .tlhead_btns>.btn {
+        border-color: transparent;
+        background: none;
+    }
+
+    & .expertise .tlhead_btns>.btn:hover {
+        border-color: #8c8c8c;
+        background: var(--xp-btn-bg);
+    }
+
+    & :is(.landing_chip_icon, .contact_btn_icon, .landing_btn_icon, .contact_icon, .error_maybe_icon) {
+        color: var(--m-orange);
+    }
+
+    /* inputs */
+    & :is(input[type=search], input[type=text], input[type=email], .expertise_search_input) {
+        background: #1e1e1e;
+        color: #ececec;
+        border-color: #777;
+    }
+
+    /* explorer (Expertise) */
+    & .expertise_box {
+        border-color: #6b6b6b;
+        box-shadow: inset 1px 1px #3a3a3a, inset -1px -1px #3a3a3a;
+    }
+
+    & .expertise_box::before {
+        box-shadow: 1px 0 0 var(--xe-in), inset -1px 0 0 rgba(255, 255, 255, .12);
+    }
+
+    & .expertise_head,
+    & .expertise_search {
+        box-shadow: inset 0 1px rgba(255, 255, 255, .12);
+    }
+
+    & .expertise .tabgroup {
+        box-shadow: inset 1px 0 rgba(255, 255, 255, .12);
+    }
+
+    & .expertise .tab>a:is(:hover, :focus-visible) {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14), 1px 1px 1px rgba(0, 0, 0, .35);
+    }
+
+    & .expertise .expertise_tl {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+    }
+
+    & .expertise {
+        --accent: var(--m-orange);
+        --glow: inset 0 0 0 100px #54543a;
+    }
+
+    & .expertise .tl_card,
+    & .expertise .tl_bar .tl_card,
+    & .expertise .tl_pin .tl_card {
+        --accent: #fff;
+        background: #3a3a3a;
+        color: #f0f0f0;
+        border-color: #8a8a8a;
+        box-shadow: 1px 1px 2px rgba(0, 0, 0, .5);
+    }
+
+    & .expertise .tl_bar .tl_card {
+        background-color: #3a3a3a !important;
+    }
+
+    & .expertise .tl_card :is(.tl_name, .tl_sub) {
+        color: #f0f0f0;
+    }
+
+    & .expertise .tl_card .tl_sub {
+        color: #b8b8b8;
+    }
+
+    & .expertise .tl_card:is(:hover, :focus-within) {
+        background: #3a3a3a;
+        border-color: #fff;
+        color: #fff;
+        box-shadow: var(--glow), 1px 1px 2px rgba(0, 0, 0, .5);
+    }
+
+    /* pager dots (XP radio buttons) */
+    & .expertise .dot_a::before {
+        border-color: #9a9a9a;
+        background: linear-gradient(135deg, #666, #2a2a2a);
+    }
+
+    & .expertise .dot_a:hover::before {
+        border-color: #9a9a9a;
+    }
+
+    /* project / file windows */
+    & .desk_wbox {
+        background: #2b2b2b;
+    }
+
+    & .desk_wbox_head {
+        border-top-color: #5a5a5a;
+        text-shadow: 1px 1px #000;
+    }
+
+    & .desk_wbox:not(:focus-within) {
+        box-shadow: inset -1px -1px #1a1a1a, inset 1px 1px #666, inset -2px -2px #333, inset 2px 2px #555, inset -3px -3px #3a3a3a, inset 3px 3px #484848, 2px 4px 8px rgba(0, 0, 0, .4);
+    }
+
+    & .desk_wbox:not(:focus-within)>.desk_wbox_head {
+        border-top-color: #666;
+        background: linear-gradient(180deg, #6a6a6a, #5c5c5c 6%, #4f4f4f 17%, #484848 56%, #434343 89%, #3a3a3a 100%);
+        color: #cfcfcf;
+        text-shadow: 1px 1px #222;
+    }
+
+    & .desk_wbox_head_path,
+    & .desk_wbox_head_mime>summary,
+    & .desk_wbox_head_mode>summary {
+        background: #1e1e1e;
+        color: #ececec;
+        border-color: #777;
+    }
+
+    /* side panel = XP Start menu */
+    & .desk_side {
+        background: #2b2b2b;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, .55), inset 0 0 0 1px #0d0d0d;
+    }
+
+    & .desk_side_head {
+        background: linear-gradient(90deg, rgba(242, 168, 64, .95), rgba(242, 168, 64, 0)) bottom / 100% 2px no-repeat,
+            linear-gradient(180deg, #2c2c2c 0, #5a5a5a 10%, #3e3e3e 45%, #2e2e2e 100%);
+    }
+
+    & .desk_side_icon {
+        background: linear-gradient(#f2f2f2, #9c9c9c);
+        color: #222;
+        box-shadow: 1px 2px 3px rgba(0, 0, 0, .6);
+    }
+
+    & :is(.desk_side_name, .desk_side_info, .desk_side_tabs_drop>summary) {
+        text-shadow: 1px 1px #000;
+    }
+
+    & .desk_side_info {
+        color: #cfcfcf;
+    }
+
+    & .desk_side_tabs {
+        background: linear-gradient(180deg, #4a4a4a, #2e2e2e 50%, #1c1c1c);
+        border-top-color: #000;
+    }
+
+    & .desk_side_tabs_drop[open]>summary {
+        background: rgba(0, 0, 0, .4);
+        box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .7);
+    }
+}
+
+/* Dark scrollbars: same `html` (not `:root`) rule as the light ones above, see the note there. */
+@include m_dark("html") {
+
+    /* scrollbars: Windows XP Luna (charcoal), measured from a real XP list view.
+       The arrow buttons are drawn as images on the scrollbar itself; the (transparent) buttons only reserve their cell.
+       That needs no ::-webkit-scrollbar-button pseudo-classes (:start, :increment ...), which some Chrome builds ignore. */
+    &::-webkit-scrollbar,
+    & ::-webkit-scrollbar:vertical {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23b4b4b4' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%233c3c3c' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%232e2e2e' d='M1 16h15v1H1z'/%3E%3Cpath fill='%23e0e0e0' d='M8 5h1v1h-1zM7 6h3v1h-3zM6 7h2v1h-2zM9 7h2v1h-2zM5 8h2v1h-2zM10 8h2v1h-2zM4 9h2v1h-2zM11 9h2v1h-2zM5 10h1v1h-1zM11 10h1v1h-1z'/%3E%3C/svg%3E") left top / 17px 17px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23b4b4b4' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%233c3c3c' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%232e2e2e' d='M1 16h15v1H1z'/%3E%3Cpath fill='%23e0e0e0' d='M5 6h1v1h-1zM11 6h1v1h-1zM4 7h2v1h-2zM11 7h2v1h-2zM5 8h2v1h-2zM10 8h2v1h-2zM6 9h2v1h-2zM9 9h2v1h-2zM7 10h3v1h-3zM8 11h1v1h-1z'/%3E%3C/svg%3E") left bottom / 17px 17px no-repeat, linear-gradient(135deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a) left 1px top 1px / 14px 14px no-repeat, linear-gradient(135deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a) left 1px bottom 2px / 14px 14px no-repeat;
+    }
+
+    & ::-webkit-scrollbar:horizontal {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23b4b4b4' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%233c3c3c' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%232e2e2e' d='M1 16h15v1H1z'/%3E%3Cpath fill='%23e0e0e0' d='M9 4h1v1h-1zM8 5h3v1h-3zM7 6h2v1h-2zM6 7h2v1h-2zM5 8h2v1h-2zM6 9h2v1h-2zM7 10h2v1h-2zM8 11h3v1h-3zM9 12h1v1h-1z'/%3E%3C/svg%3E") left top / 17px 17px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Cpath fill-rule='evenodd' fill='%23b4b4b4' d='M1 0h15v1h1v15h-1v1H1v-1H0V1h1z M1 1h14v14H1z'/%3E%3Cpath fill='%233c3c3c' d='M16 1h1v15h-1z'/%3E%3Cpath fill='%232e2e2e' d='M1 16h15v1H1z'/%3E%3Cpath fill='%23e0e0e0' d='M7 4h1v1h-1zM6 5h3v1h-3zM8 6h2v1h-2zM9 7h2v1h-2zM10 8h2v1h-2zM9 9h2v1h-2zM8 10h2v1h-2zM6 11h3v1h-3zM7 12h1v1h-1z'/%3E%3C/svg%3E") right top / 17px 17px no-repeat, linear-gradient(135deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a) left 1px top 1px / 14px 14px no-repeat, linear-gradient(135deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a) right 2px top 1px / 14px 14px no-repeat;
+    }
+
+    &::-webkit-scrollbar-corner,
+    & ::-webkit-scrollbar-corner {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' shape-rendering='crispEdges'%3E%3Crect x='13' y='5' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='9' y='9' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='13' y='9' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='5' y='13' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='9' y='13' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='13' y='13' width='2' height='2' fill='%231a1a1a'/%3E%3Crect x='12' y='4' width='2' height='2' fill='%238a8a8a'/%3E%3Crect x='8' y='8' width='2' height='2' fill='%238a8a8a'/%3E%3Crect x='12' y='8' width='2' height='2' fill='%238a8a8a'/%3E%3Crect x='4' y='12' width='2' height='2' fill='%238a8a8a'/%3E%3Crect x='8' y='12' width='2' height='2' fill='%238a8a8a'/%3E%3Crect x='12' y='12' width='2' height='2' fill='%238a8a8a'/%3E%3C/svg%3E") 0 0 / 17px 17px no-repeat, #2b2b2b;
+    }
+
+    &::-webkit-scrollbar-track,
+    & ::-webkit-scrollbar-track {
+        background: linear-gradient(90deg, #232323, #282828 20%, #2e2e2e 50%, #363636);
+        box-shadow: inset 1px 0 #1c1c1c, inset -1px 0 #1c1c1c;
+    }
+
+    &::-webkit-scrollbar-track:horizontal,
+    & ::-webkit-scrollbar-track:horizontal {
+        background: linear-gradient(180deg, #232323, #282828 20%, #2e2e2e 50%, #363636);
+        box-shadow: inset 0 1px #1c1c1c, inset 0 -1px #1c1c1c;
+    }
+
+    &::-webkit-scrollbar-thumb,
+    & ::-webkit-scrollbar-thumb {
+        box-sizing: border-box;
+        border: 1px solid;
+        border-color: #b4b4b4 #3c3c3c #2e2e2e #b4b4b4;
+        border-radius: 2px;
+        box-shadow: inset -1px -1px #b4b4b4;
+        background: repeating-linear-gradient(180deg, #c4c4c4 0 1px, #4a4a4a 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a);
+    }
+
+    &::-webkit-scrollbar-thumb:horizontal,
+    & ::-webkit-scrollbar-thumb:horizontal {
+        background: repeating-linear-gradient(180deg, #c4c4c4 0 1px, #4a4a4a 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #808080, #7a7a7a 35%, #686868 75%, #5a5a5a);
+    }
+
+    /* hover: lighter face */
+    &::-webkit-scrollbar-thumb:hover,
+    & ::-webkit-scrollbar-thumb:hover {
+        background: repeating-linear-gradient(180deg, #c4c4c4 0 1px, #4a4a4a 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #939393, #8d8d8d 35%, #7b7b7b 75%, #6d6d6d);
+    }
+
+    &::-webkit-scrollbar-thumb:horizontal:hover,
+    & ::-webkit-scrollbar-thumb:horizontal:hover {
+        background: repeating-linear-gradient(180deg, #c4c4c4 0 1px, #4a4a4a 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #939393, #8d8d8d 35%, #7b7b7b 75%, #6d6d6d);
+    }
+
+    /* pressed (matches the XP screenshot): darker, more saturated face, dark lip on top/left, grip drops to light ridges */
+    &::-webkit-scrollbar-thumb:active,
+    & ::-webkit-scrollbar-thumb:active {
+        background: repeating-linear-gradient(180deg, #9c9c9c 0 1px, #585858 1px 2px) center / 7px 10px no-repeat, linear-gradient(90deg, #585858, #626262 20%, #585858 55%, #4e4e4e 85%, #4a4a4a);
+        box-shadow: inset 0 1px #262626, inset 0 2px #3a3a3a, inset 1px 0 #323232, inset -1px -1px #b4b4b4;
+    }
+
+    &::-webkit-scrollbar-thumb:horizontal:active,
+    & ::-webkit-scrollbar-thumb:horizontal:active {
+        background: repeating-linear-gradient(180deg, #9c9c9c 0 1px, #585858 1px 2px) center / 7px 10px no-repeat, linear-gradient(180deg, #585858, #626262 20%, #585858 55%, #4e4e4e 85%, #4a4a4a);
+        box-shadow: inset 1px 0 #262626, inset 2px 0 #3a3a3a, inset 0 1px #323232, inset -1px -1px #b4b4b4;
+    }
+}
+
+/* Firefox (no ::-webkit-scrollbar): charcoal thumb and track in dark */
+@supports not selector(::-webkit-scrollbar) {
+    @include m_dark {
+
+        &,
+        & * {
+            scrollbar-color: #6a6a6a #2b2b2b;
+        }
+    }
+}
+
+/* ---- colour coding (text view and editor) --------------------------------------------------------------------------------------- */
+/* Token colours are hues mixed with the text colour, so they stay readable on the light and the dark theme alike. */
+.desk_wbox_body_text,
+.desk_wbox_body_edit_code {
+    --tok-comment: color-mix(in srgb, #6a9955 55%, currentColor);
+    --tok-string: color-mix(in srgb, #d9822b 65%, currentColor);
+    --tok-number: color-mix(in srgb, #3aa6a0 65%, currentColor);
+    --tok-keyword: color-mix(in srgb, #b455d8 65%, currentColor);
+    --tok-type: color-mix(in srgb, #2f8ee0 65%, currentColor);
+    --tok-func: color-mix(in srgb, #d8b13a 65%, currentColor);
+    --tok-var: color-mix(in srgb, #4fb0e8 60%, currentColor);
+    --tok-meta: color-mix(in srgb, #c5568a 65%, currentColor);
+    --tok-key: color-mix(in srgb, #5aa0e0 65%, currentColor);
+    --tok-tag: color-mix(in srgb, #e0584f 65%, currentColor);
+    --tok-punct: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+.tok_comment { color: var(--tok-comment); font-style: italic; }
+.tok_string { color: var(--tok-string); }
+.tok_number { color: var(--tok-number); }
+.tok_keyword { color: var(--tok-keyword); }
+.tok_type { color: var(--tok-type); }
+.tok_func { color: var(--tok-func); }
+.tok_var { color: var(--tok-var); }
+.tok_meta { color: var(--tok-meta); }
+.tok_key { color: var(--tok-key); }
+.tok_tag { color: var(--tok-tag); }
+.tok_punct { color: var(--tok-punct); }
+
+/* The editor: a coloured layer under a see-through textarea. Both must lay the text out identically (same font, padding and no wrapping). */
+.desk_wbox_body_edit_code {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.desk_wbox_body_edit_colour,
+.desk_wbox_body_edit_code>.desk_wbox_body_edit_text {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: .5em;
+    border: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .9em;
+    line-height: 1.5;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+    scrollbar-width: none;
+}
+
+.desk_wbox_body_edit_colour {
+    pointer-events: none;
+    color: currentColor;
+}
+
+.desk_wbox_body_edit_code>.desk_wbox_body_edit_text {
+    background: transparent;
+    resize: none;
+    scrollbar-width: auto;
+}
+
+/* the textarea's own glyphs hide only while the layer under it is showing the same text */
+.desk_wbox_body_edit_code>.desk_wbox_body_edit_text.is_coloured {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--text, currentColor);
+}
+
+.desk_wbox_body_edit_code>.desk_wbox_body_edit_text.is_coloured::selection {
+    background: color-mix(in srgb, var(--accent, #3b82f6) 35%, transparent);
+    -webkit-text-fill-color: transparent;
+}
+
+// Text mode is editable: the layer (in the flow, so it sizes the editor) holds a coloured copy of the text and the see-through textarea is
+// laid over it, with the same font and no wrapping. The window box is what scrolls, so the textarea never does.
+.desk_wbox_body_edit>.desk_wbox_body_text {
+    overflow: auto;
+    min-height: 0;
+}
+
+.desk_wbox_body_text_body_plain:has(> .desk_wbox_body_text_edit) {
+    flex: 1 0 auto;
+}
+
+.desk_wbox_body_text_edit {
+    position: relative;
+    min-height: 100%;
+}
+
+.desk_wbox_body_text_colour {
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    tab-size: 4;
+    white-space: pre;
+    color: currentColor;
+    pointer-events: none;
+}
+
+.desk_wbox_body_text_edit:not(.is_coloured)>.desk_wbox_body_text_colour {
+    visibility: hidden;
+}
+
+.desk_wbox_body_text_input {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    tab-size: 4;
+    white-space: pre;
+    resize: none;
+    overflow: hidden;
+    outline: none;
+}
+
+.desk_wbox_body_text_edit.is_coloured>.desk_wbox_body_text_input {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--text, currentColor);
+}
+
+.desk_wbox_body_text_edit.is_coloured>.desk_wbox_body_text_input::selection {
+    background: color-mix(in srgb, var(--accent, #3b82f6) 35%, transparent);
+    -webkit-text-fill-color: transparent;
+}

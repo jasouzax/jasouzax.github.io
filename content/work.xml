@@ -1,0 +1,8 @@
+<page path="/work" name="Workspace" icon="[work]" rank="60" noindex="true" info="Client workspace: messages, files and receipts.">
+        <desk name="Workspace" icon="[work]" info="Messages, files and receipts for your project." server="true">
+            <menu name="Messages" icon="[contact]" path="/api/v1/messages" />
+            <menu name="Files" icon="[folder]" path="/api/v1/files" />
+            <window path="/api/v1/messages" type="text/plain" mode="view" />
+        </desk>
+    </page>
+

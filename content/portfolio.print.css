@@ -1,0 +1,205 @@
+/* Portfolio (/) printed = a resume. Loaded with media="print" (see portfolio.xml).
+   Selectors start with the page's body class so nothing leaks to other pages. Theme styles are beaten with !important where a theme
+   could plausibly set the same property (backgrounds, sizes, positions, animation). The resume markup (.landing_resume and
+   .expertise_resume) is hidden on screen with [hidden] and only exists for this stylesheet. */
+
+@page {
+    size: letter;
+    margin: 0.5in;
+}
+
+/* ---- page: no backgrounds, no theme layout ---------------------------------------------------------------------------------------- */
+html:has(> body.page_portfolio) {
+    background: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+}
+
+body.page_portfolio {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    color: #000 !important;
+    font: 11pt/1.15 "Times New Roman", Times, serif !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+}
+
+body.page_portfolio::before,
+body.page_portfolio::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* Everything that is not <main> (header, background art, footer, notices, theme widgets) */
+body.page_portfolio > :not(main) {
+    display: none !important;
+}
+
+body.page_portfolio > main {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+}
+
+/* Only the landing and expertise articles take part; the contact article is not on a resume */
+body.page_portfolio > main > :not(.landing):not(.expertise) {
+    display: none !important;
+}
+
+body.page_portfolio > main > .article {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+    scroll-snap-align: none !important;
+    scroll-snap-stop: normal !important;
+}
+
+body.page_portfolio > main > .article::before,
+body.page_portfolio > main > .article::after {
+    content: none !important;
+    display: none !important;
+}
+
+/* ---- landing = resume head -------------------------------------------------------------------------------------------------------- */
+body.page_portfolio .landing > :not(.landing_resume) {
+    display: none !important;
+}
+
+body.page_portfolio .landing_resume,
+body.page_portfolio .expertise_resume {
+    all: initial;
+    display: block;
+    color: #000;
+    font: 11pt/1.15 "Times New Roman", Times, serif;
+    text-align: left;
+}
+
+body.page_portfolio .landing_resume {
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+body.page_portfolio .resume_name {
+    display: block;
+    margin: 0 0 4px;
+    font-size: 24pt;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+body.page_portfolio .resume_contacts {
+    display: block;
+    margin: 0;
+}
+
+body.page_portfolio .resume_contact + .resume_contact::before {
+    content: " | ";
+}
+
+/* ---- expertise = education, experience, projects, skills -------------------------------------------------------------------------- */
+body.page_portfolio .expertise > :not(.expertise_resume) {
+    display: none !important;
+}
+
+body.page_portfolio .resume_section {
+    display: block;
+    margin: 0 0 10px;
+}
+
+body.page_portfolio .resume_title {
+    display: block;
+    margin: 0 0 4px;
+    padding: 0 0 2px;
+    border-bottom: 1px solid #000;
+    font-size: 12pt;
+    font-weight: bold;
+}
+
+body.page_portfolio .resume_item {
+    display: block;
+    margin: 0 0 8px;
+    break-inside: avoid;
+}
+
+body.page_portfolio .resume_item_head,
+body.page_portfolio .resume_item_sub {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+}
+
+body.page_portfolio .resume_item_head {
+    font-weight: bold;
+}
+
+body.page_portfolio .resume_item_sub {
+    margin: 1px 0 2px;
+    font-style: italic;
+}
+
+body.page_portfolio .resume_item_aside {
+    flex: none;
+    text-align: right;
+}
+
+body.page_portfolio .resume_item_sub > :last-child {
+    flex: none;
+    text-align: right;
+}
+
+body.page_portfolio .resume_text {
+    display: block;
+    margin: 0;
+}
+
+body.page_portfolio .resume_points {
+    display: block;
+    margin: 0;
+    padding: 0 0 0 24px;
+    list-style: disc;
+}
+
+body.page_portfolio .resume_points li {
+    display: list-item;
+    margin: 0 0 2px;
+}
+
+body.page_portfolio .resume_skill {
+    display: block;
+    margin: 0 0 2px;
+    break-inside: avoid;
+}
+
+body.page_portfolio .resume_skill_name {
+    font-weight: bold;
+}
