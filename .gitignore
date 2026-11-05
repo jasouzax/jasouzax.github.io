@@ -1,0 +1,5 @@
+.cache
+.wrangler
+content/media
+dist
+node_modules
