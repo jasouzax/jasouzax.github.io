@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/utsname.h>
 
 EM_JS(int, desk_getpid, (void), { return Module.jazu.pid; });
 EM_JS(int, desk_getppid, (void), { return Module.jazu.ppid; });
@@ -69,3 +70,21 @@ int nanosleep(const struct timespec *requested, struct timespec *remaining) {
 }
 unsigned int sleep(unsigned int seconds) { desk_sleep(seconds * 1000.0); return 0; }
 int usleep(useconds_t microseconds) { return desk_sleep(microseconds / 1000.0); }
+EM_JS(int, desk_hostname, (char *name, int length), {
+    const hostname = 'jasouza';
+    if (length <= hostname.length) return -1;
+    stringToUTF8(hostname, name, length);
+    return 0;
+});
+int gethostname(char *name, size_t length) {
+    int result = desk_hostname(name, length);
+    if (result < 0) errno = ENAMETOOLONG;
+    return result;
+}
+/* Preserve Emscripten's system identity while setting the kernel host name. */
+extern int __syscall_uname(struct utsname *name);
+int uname(struct utsname *name) {
+    int result = __syscall_uname(name);
+    if (result < 0) { errno = -result; return -1; }
+    return gethostname(name->nodename, sizeof(name->nodename));
+}

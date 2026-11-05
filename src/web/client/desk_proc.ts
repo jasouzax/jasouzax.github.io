@@ -88,7 +88,7 @@ function detach(item: desk_window): void {
 function new_shell(): proc {
     const stdin = make_stream()
     kernel.terminals.add(stdin)
-    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: "/home/user", env: { HOME: "/home/user", USER: "user", LOGNAME: "user", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "user@jazu:$PWD$ " }, interactive: true })
+    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: "/home/user", env: { HOME: "/home/user", USER: "user", LOGNAME: "user", HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "\\[\\033[1;32m\\]user@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ " }, interactive: true })
 }
 
 async function open_pid(item: desk_window, uri: string): Promise<boolean> {
@@ -136,7 +136,7 @@ function terminal_body(item: desk_window): HTMLElement {
     const box = document.createElement("div")
     box.className = "desk_wbox_body_term"
     box.style.cssText = "position:relative;display:block;min-height:120px;height:100%;overflow:hidden;padding:8px"
-    const terminal = new Terminal({ cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000, theme: { background: "#101318", foreground: "#e4e8ef" } })
+    const terminal = new Terminal({ allowTransparency: true, cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000, theme: { background: "#00000000", foreground: getComputedStyle(item.el).color } })
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     const append = (chunk: string): void => { terminal.write(chunk) }
