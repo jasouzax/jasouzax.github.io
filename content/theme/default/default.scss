@@ -1477,7 +1477,7 @@ a {
     }
 
     &_side {
-        grid-row: 1 / span 2; // portrait puts it back on grid-area 1 / 1 further down
+        grid-row: 1 / -1; // span every window row; portrait restores grid-area 1 / 1 below
         display: flex;
         width: 0em;
         flex-direction: column;
@@ -1634,7 +1634,8 @@ a {
                 display: grid; // also removes the default disclosure marker
                 grid-area: 1 / 1 / span 2 / span 3;
                 grid-template: 1em 1em / 2em auto;
-                background: var(--panel);
+                --row-fill: var(--panel);
+                background: transparent;
                 // The global summary rule adds a 2px (focus) border, so take it off the padding to keep the old size.
                 padding: calc(0.25em - 2px);
                 list-style: none;
@@ -1645,6 +1646,18 @@ a {
                 min-block-size: 0;
                 min-inline-size: 0;
                 margin-left: -0.25em;
+
+                // Expose the parent guide beside the opaque label background.
+                &::before {
+                    content: '';
+                    position: absolute;
+                    // Include the summary's transparent 2px border, otherwise
+                    // scrolled labels leak through at the top and bottom edges.
+                    inset: -2px -2px -2px calc(.5em - 2px);
+                    background: var(--row-fill);
+                    z-index: -1;
+                    pointer-events: none;
+                }
 
                 &::-webkit-details-marker {
                     display: none;
@@ -1862,30 +1875,20 @@ a {
                 text-align: right;
             }
 
-            &_sub>li>&>&_box>&_head::before {
+            &_sub>li>&>&_box>&_head>&_icon {
+                position: relative;
+            }
+
+            &_sub>li>&>&_box>&_head>&_icon::before {
                 content: '';
                 position: absolute;
                 width: 0.25em;
                 height: 0.25em;
                 background: var(--line);
-                margin-top: 1em;
-                margin-left: -0.125em;
                 border-radius: 50%;
-                z-index: 4;
-                left: .25em;
-                top: 0;
-            }
-
-            // Continue the parent's guide across each opaque child heading.
-            &_sub>li>&>&_box>&_head {
-                background-image: repeating-linear-gradient(to bottom, var(--line) 0 2px, transparent 2px 4px);
-                background-size: 1px 100%;
-                background-position: .25em 0;
-                background-repeat: no-repeat;
-            }
-
-            &_sub>li>&>&_box#{$slim}>&_head::before {
-                margin-top: 0.35em;
+                left: -.125em;
+                top: calc(50% - .125em);
+                pointer-events: none;
             }
 
             /*
@@ -6413,20 +6416,13 @@ body::after {
     opacity: .6;
 }
 
-.desk_wbox.is_swap {
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
-}
-
-// the edge of a window the dragged window would dock on (data-drop = top | bottom | left | right): a tinted band along that edge
-.desk_wbox[data-drop] {
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
-
-    &[data-drop="top"] { box-shadow: var(--shadow), inset 0 2.4em 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
-    &[data-drop="bottom"] { box-shadow: var(--shadow), inset 0 -2.4em 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
-    &[data-drop="left"] { box-shadow: var(--shadow), inset 2.4em 0 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
-    &[data-drop="right"] { box-shadow: var(--shadow), inset -2.4em 0 0 -1px color-mix(in srgb, var(--accent) 28%, transparent); }
+.desk_dock_preview {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+    border: 2px dashed var(--accent);
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    box-shadow: inset 0 0 0 1px var(--panel);
 }
 
 // a process window (pid:N): the terminal of a shell. History above, the line in progress (the prompt) and the input on the last row.
@@ -6626,30 +6622,44 @@ html.desk_dragging {
 .desk_side_item_head[data-drop] {
     outline: 2px dashed var(--accent);
     outline-offset: -2px;
-    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+    --row-fill: color-mix(in srgb, var(--accent) 14%, var(--panel));
 }
 
 .desk_side_item_head[data-selected] {
-    background-color: color-mix(in srgb, var(--text) 12%, var(--panel));
+    --row-fill: color-mix(in srgb, var(--text) 12%, var(--panel));
     color: var(--accent);
 }
 
-.desk_side_item_head[data-focused] {
+.desk_side_item_head[data-focused]::before {
     box-shadow: inset 2px 0 var(--accent);
 }
 
 // Sticky tree rows must cover the children scrolling under them, including on hover.
 .desk_side_item_head:hover {
-    background-color: color-mix(in srgb, var(--text) 6%, var(--panel));
+    --row-fill: color-mix(in srgb, var(--text) 6%, var(--panel));
 }
 .desk_side_item_head[data-selected]:hover {
-    background-color: color-mix(in srgb, var(--text) 12%, var(--panel));
+    --row-fill: color-mix(in srgb, var(--text) 12%, var(--panel));
 }
 
 // The editor draws one focus ring around its line numbers, text and hex columns.
-.desk_wbox_body_text:focus-within {
-    outline: 2px solid var(--focus);
-    outline-offset: -2px;
+.desk_wbox_body_editor {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 8em;
+
+    &:focus-within::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        border: 2px solid var(--focus);
+        pointer-events: none;
+    }
 }
 .desk_wbox_body_text :is(textarea, input):focus-visible {
     border: 0 !important;
@@ -6976,7 +6986,21 @@ html.desk_dragging {
     border-radius: var(--r);
     color: var(--text-dim);
     text-align: center;
-    cursor: pointer;
+    gap: .75em;
+    align-content: center;
+
+    &_upload { cursor: pointer; }
+
+    &_terminal {
+        position: relative;
+        z-index: 1;
+        padding: .4em .75em;
+        border: 1px solid var(--edge);
+        border-radius: var(--r-sm);
+        color: var(--text);
+        background: var(--panel);
+        &:hover { background: var(--panel-2); }
+    }
 
     @media (prefers-reduced-motion: no-preference) {
         transition: border-color .2s, color .2s, background-color .2s;
@@ -7833,7 +7857,7 @@ html.spa_loading #main-content {
 
 // Shared code/hex editor: all columns use exactly the same row height.
 .desk_wbox_body_text {
-    font-family: monospace;
+    font-family: Jasouza, ui-monospace, monospace;
     line-height: 1.5;
     overflow: auto;
     min-height: 0;

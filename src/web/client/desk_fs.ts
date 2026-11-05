@@ -9,6 +9,7 @@ import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory } from "./memory_fs.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk_files_util.ts"
 import { can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
+import { selection_click, type file_selection } from "./desk_selection.ts"
 
 export type fs_node = {
     name: string
@@ -28,12 +29,11 @@ export type fs_node = {
     mount?: boolean
 }
 
-type tree_state = {
+type tree_state = file_selection & {
     root: fs_node
     page: HTMLElement
     open: Set<string>
     selected: fs_node | null
-    selection: Set<string>
     tools_visible: boolean
     message: HTMLElement | null
     // a new file or folder that has no name yet: its row sits first in the folder, with the name field active (nothing exists until it is named)
@@ -255,6 +255,7 @@ export function redraw(): void {
     if (!tree) return
     if (tree.selected) tree.selected = find_node(tree.selected.path)
     tree.selection = new Set([...tree.selection].filter(path => find_node(path)))
+    if (tree.anchor && !find_node(tree.anchor)) { tree.anchor = tree.selected?.path ?? null; tree.range_base = null }
     const holder = tree.page
     holder.replaceChildren(render_node(tree.root, tree))
     sync_buttons()
@@ -356,12 +357,11 @@ function node_of(element: Element): fs_node | null {
     return article?.dataset.path ? find_node(article.dataset.path) : null
 }
 
-function select(node: fs_node | null, append = false, tools_visible = true): void {
+function select(node: fs_node | null, selection: Set<string>, tools_visible = true): void {
     if (!tree) return
     tree.selected = node
     tree.tools_visible = tools_visible
-    if (!append) tree.selection.clear()
-    if (node) tree.selection.add(node.path)
+    tree.selection = selection
     for (const head of tree.page.querySelectorAll<HTMLElement>(".desk_side_item_head")) {
         head.toggleAttribute("data-selected", tree.selection.has(node_of(head)?.path ?? ""))
         head.removeAttribute("data-focused")
@@ -397,7 +397,8 @@ function on_click(event: MouseEvent): void {
     // native second-click count and original position even if it now hits a tool.
     const previous = first_click
     first_click = null
-    if (event.detail === 2 && previous && Math.abs(previous.x - event.clientX) <= 4 && Math.abs(previous.y - event.clientY) <= 4) {
+    const modified = event.ctrlKey || event.metaKey || event.shiftKey
+    if (!modified && event.detail === 2 && previous && Math.abs(previous.x - event.clientX) <= 4 && Math.abs(previous.y - event.clientY) <= 4) {
         const node = find_node(previous.path)
         if (node?.kind === "file") {
             event.preventDefault()
@@ -415,8 +416,8 @@ function on_click(event: MouseEvent): void {
     if (!head || !tree.page.contains(head)) return
     const node = node_of(head)
     if (!node) return
-    if (node.kind === "file" && event.detail === 1) first_click = { path: node.path, x: event.clientX, y: event.clientY }
-    if (node.kind === "dir" && event.detail > 1) { event.preventDefault(); return }
+    if (!modified && node.kind === "file" && event.detail === 1) first_click = { path: node.path, x: event.clientX, y: event.clientY }
+    if (!modified && node.kind === "dir" && event.detail > 1) { event.preventDefault(); return }
     const rect = head.getBoundingClientRect()
     const box = head.parentElement as HTMLDetailsElement
     const was_open = box.open
@@ -426,10 +427,17 @@ function on_click(event: MouseEvent): void {
         tree.draft = null
         redraw()
     }
-    select(node, event.shiftKey, !(chevron && was_open))
+    const visible = [...tree.page.querySelectorAll<HTMLElement>(".desk_side_item_head")]
+        .filter(head => head.getClientRects().length > 0)
+        .map(head => node_of(head)?.path).filter((path): path is string => !!path)
+    const next = selection_click(tree, visible, node.path, event.ctrlKey || event.metaKey, event.shiftKey)
+    tree.anchor = next.anchor
+    tree.range_base = next.range_base
+    const focused = next.selection.has(node.path) ? node : find_node([...next.selection].at(-1) ?? "")
+    select(focused, next.selection, !(chevron && was_open && !modified))
     note(node.path === "/home" ? text("files_open_folder") : "")
-    if (node.kind === "dir" && event.detail < 2 && (!was_open || chevron || event.detail === 0)) activate(node)
-    else if (node.kind === "file" && event.detail === 0) activate(node)
+    if (!modified && node.kind === "dir" && event.detail < 2 && (!was_open || chevron || event.detail === 0)) activate(node)
+    else if (!modified && node.kind === "file" && event.detail === 0) activate(node)
 }
 
 function on_double_click(event: MouseEvent): void {
@@ -713,6 +721,8 @@ async function reload(dir: fs_node, select_path: string | null = null): Promise<
     if (select_path) {
         tree.selected = find_node(select_path)
         tree.selection = new Set([select_path])
+        tree.anchor = select_path
+        tree.range_base = null
         tree.tools_visible = true
     }
     redraw()
@@ -891,6 +901,8 @@ async function rename_entries(nodes: fs_node[], pattern: string): Promise<void> 
     if (tree) {
         tree.selection = new Set(paths)
         tree.selected = find_node(paths.at(-1) ?? "")
+        tree.anchor = tree.selected?.path ?? null
+        tree.range_base = null
         tree.tools_visible = true
         redraw()
     }
@@ -927,6 +939,8 @@ async function paste_entries(dir: fs_node): Promise<void> {
     if (tree) {
         tree.selection = new Set(paths)
         tree.selected = find_node(paths.at(-1) ?? "")
+        tree.anchor = tree.selected?.path ?? null
+        tree.range_base = null
         tree.tools_visible = true
         redraw()
     }
@@ -1202,7 +1216,7 @@ export function init_fs(desk: HTMLElement): void {
     const root = shared_root ?? read_markup(root_box, null)
     shared_root = root
     const initial = find_node("/home/user", root)
-    tree = { root, page, open: new Set(["/", "/home", "/home/user"]), selected: initial, selection: new Set(initial ? [initial.path] : []), tools_visible: true, message: null, draft: null }
+    tree = { root, page, open: new Set(["/", "/home", "/home/user"]), selected: initial, selection: new Set(initial ? [initial.path] : []), anchor: initial?.path ?? null, range_base: null, tools_visible: true, message: null, draft: null }
     upload_hooks.store = store_upload
     mount_opfs(root)
     void mount_executables(executable_names)

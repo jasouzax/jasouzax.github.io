@@ -241,15 +241,18 @@ function render_window_body(ctx: render_ctx, info: window_info): html {
     if (!mime && !path)
         return (
             <>
-                <label class={"desk_wbox_body_empty"}>
-                    <span class={"desk_wbox_body_empty_text"}>{t(ctx, "drop_file_or_upload")}</span>
-                    <input
-                        class={"desk_wbox_body_empty_input"}
-                        type={"file"}
-                        multiple={""}
-                        aria-label={t(ctx, "choose_file")}
-                    />
-                </label>
+                <div class={"desk_wbox_body_empty"}>
+                    <label class={"desk_wbox_body_empty_upload"}>
+                        <span class={"desk_wbox_body_empty_text"}>{t(ctx, "drop_file_or_upload")}</span>
+                        <input
+                            class={"desk_wbox_body_empty_input"}
+                            type={"file"}
+                            multiple={""}
+                            aria-label={t(ctx, "choose_file")}
+                        />
+                    </label>
+                    <button type="button" class="desk_wbox_body_empty_terminal">{t(ctx, "open_terminal")}</button>
+                </div>
             </>
         )
     if (/^(window|shell|pid):/.test(path)) return note(ctx, "needs_js", path)
@@ -505,6 +508,7 @@ const runtime_keys = [
     "drop_file",
     "drop_file_or_upload",
     "choose_file",
+    "open_terminal",
     "mime_type",
     "view_mode",
     "process_gone",

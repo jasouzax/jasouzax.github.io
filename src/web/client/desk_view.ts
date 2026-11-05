@@ -239,8 +239,12 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
         draw()
         sync_save(item)
     }).catch(() => valid(text("files_failed")))
-    if (!editable) return box
-    return edit_shell(item, box, async () => ready && !item.problem ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null)
+    const viewport = editable
+        ? edit_shell(item, box, async () => ready && !item.problem ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null)
+        : document.createElement("div")
+    viewport.classList.add("desk_wbox_body_editor")
+    if (!editable) viewport.append(box)
+    return viewport
 }
 
 // ---- editors ------------------------------------------------------------------------------------------------------------------
@@ -351,8 +355,10 @@ function fallback_body(item: desk_window): HTMLElement {
         return note
     }
     if (!item.file && !item.path && item.pid === null) {
+        const empty = document.createElement("div")
+        empty.className = "desk_wbox_body_empty"
         const label = document.createElement("label")
-        label.className = "desk_wbox_body_empty"
+        label.className = "desk_wbox_body_empty_upload"
         const message = document.createElement("span")
         message.className = "desk_wbox_body_empty_text"
         message.textContent = text("drop_file_or_upload")
@@ -362,7 +368,12 @@ function fallback_body(item: desk_window): HTMLElement {
         input.multiple = true
         input.setAttribute("aria-label", text("choose_file"))
         label.append(message, input)
-        return label
+        const terminal = document.createElement("button")
+        terminal.type = "button"
+        terminal.className = "desk_wbox_body_empty_terminal"
+        terminal.textContent = text("open_terminal")
+        empty.append(label, terminal)
+        return empty
     }
     const note = unknown_body(item)
     note.firstElementChild!.textContent = `${text(`unsupported_${item.mode}`)} ${item.mime}`
@@ -565,6 +576,9 @@ function take_files(item: desk_window, files: File[], open_window: () => desk_wi
 
 function wire(item: desk_window, open_window: () => desk_window | null): void {
     const box = item.el
+    box.addEventListener("click", event => {
+        if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, "pid:")
+    })
     let depth = 0
     box.addEventListener("dragenter", event => {
         if (!has_files(event)) return

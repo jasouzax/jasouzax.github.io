@@ -60,6 +60,7 @@ let row_weights: number[] = []
 // the layout custom, and then windows that come and go are only taken out of or appended to it.
 let rows: desk_window[][] = []
 let custom = false
+let cancel_drag: (() => void) | null = null
 
 const portrait = matchMedia("(orientation: portrait)")
 
@@ -312,6 +313,7 @@ export const window_hooks = {
 }
 
 function dispose(): void {
+    cancel_drag?.()
     for (const item of state.windows) { window_hooks.closed(item); item.tab.remove() }
     state.windows = []
     state.focused = null
@@ -487,23 +489,29 @@ function start_drag(event: PointerEvent): void {
     const summary = (event.target as Element).closest<HTMLElement>(".desk_wbox_head_drop > summary")
     const item = summary ? window_of(summary) : null
     if (!summary || !item || event.button !== 0 || portrait.matches) return
+    cancel_drag?.()
     const from_x = event.clientX
     const from_y = event.clientY
     let dragging = false
     let over: desk_window | null = null
     let zone: drop_zone = ""
+    const preview = document.createElement("div")
+    preview.className = "desk_dock_preview"
+    preview.setAttribute("aria-hidden", "true")
+    preview.hidden = true
     const mark = (next: desk_window | null, next_zone: drop_zone): void => {
-        if (over === next && zone === next_zone) return
-        if (over) {
-            over.el.classList.remove("is_swap")
-            over.el.removeAttribute("data-drop")
-        }
         over = next
         zone = next_zone
-        if (!over || !zone) return
-        // the window itself is only a target at its edges
-        if (zone === "swap" && over !== item) over.el.classList.add("is_swap")
-        else if (zone !== "swap") over.el.dataset.drop = zone
+        preview.hidden = !over || !zone || (zone === "swap" && over === item)
+        if (preview.hidden || !over) return
+        const rect = over.el.getBoundingClientRect()
+        let { left, top, width, height } = rect
+        if (zone === "left" || zone === "right") width /= 2
+        if (zone === "top" || zone === "bottom") height /= 2
+        if (zone === "right") left += width
+        if (zone === "bottom") top += height
+        preview.dataset.drop = zone
+        Object.assign(preview.style, { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` })
     }
     const move = (at: PointerEvent): void => {
         if (!dragging && Math.hypot(at.clientX - from_x, at.clientY - from_y) < 6) return
@@ -511,6 +519,7 @@ function start_drag(event: PointerEvent): void {
             dragging = true
             item.el.classList.add("is_moving")
             document.documentElement.classList.add("desk_dragging")
+            document.body.append(preview)
         }
         const under = document.elementsFromPoint(at.clientX, at.clientY).map(element => window_of(element)).find(found => found) ?? null
         mark(under, under ? zone_of(under.el, at.clientX, at.clientY) : "")
@@ -519,6 +528,11 @@ function start_drag(event: PointerEvent): void {
         removeEventListener("pointermove", move)
         removeEventListener("pointerup", end)
         removeEventListener("pointercancel", end)
+        removeEventListener("keydown", key)
+        removeEventListener("resize", reposition)
+        document.removeEventListener("scroll", reposition, true)
+        cancel_drag = null
+        preview.remove()
         if (!dragging) return
         item.el.classList.remove("is_moving")
         document.documentElement.classList.remove("desk_dragging")
@@ -526,16 +540,22 @@ function start_drag(event: PointerEvent): void {
         const at = zone
         mark(null, "")
         // the release would also toggle the menu
-        addEventListener("click", click => click.preventDefault(), { capture: true, once: true })
+        if (stop.type === "pointerup") addEventListener("click", click => click.preventDefault(), { capture: true, once: true })
         if (!target || !at || stop.type === "pointercancel") return
         if (target === item) {
             if (at !== "swap") move_window(item, at)
         } else if (at === "swap") swap_windows(item, target)
         else dock_window(item, target, at)
     }
+    const key = (event: KeyboardEvent): void => { if (event.key === "Escape") end(new Event("pointercancel")) }
+    const reposition = (): void => mark(over, zone)
+    cancel_drag = () => end(new Event("pointercancel"))
     addEventListener("pointermove", move)
     addEventListener("pointerup", end)
     addEventListener("pointercancel", end)
+    addEventListener("keydown", key)
+    addEventListener("resize", reposition)
+    document.addEventListener("scroll", reposition, true)
 }
 
 // ---- resizing -------------------------------------------------------------------------------------------------------------------

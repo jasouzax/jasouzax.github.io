@@ -1,11 +1,96 @@
 import { test, expect } from "@playwright/test"
 import { execFileSync } from "node:child_process"
 
+test("Ctrl selects individual entries and repeated Shift clicks replace anchored ranges", async ({ page }) => {
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const folder = await root.getDirectoryHandle("selection", { create: true })
+        for (const name of "abcdefgh") await folder.getFileHandle(name, { create: true })
+    })
+    await page.reload()
+    await page.locator("#head_menu > summary").click()
+    const tree = page.locator('.desk_side_page[data-path="file:///"]')
+    await expect(tree.locator('[data-path="/bin/cat"]')).toBeAttached()
+    await tree.locator('[data-path="/home/user/selection"] > details > summary').click({ position: { x: 60, y: 8 } })
+    const click = (name: string, modifier?: "Control" | "Shift") => tree.locator(`[data-path="/home/user/selection/${name}"] > details > summary`).click({ position: { x: 60, y: 8 }, modifiers: modifier ? [modifier] : [] })
+    const selected = () => tree.locator("summary[data-selected]").evaluateAll(heads => heads.map(head => head.parentElement!.parentElement!.getAttribute("data-path")!.split("/").pop()).sort())
+    await click("a")
+    await click("h", "Control")
+    await click("c", "Control")
+    await click("e", "Shift")
+    expect(await selected()).toEqual(["a", "c", "d", "e", "h"])
+    await click("g", "Shift")
+    expect(await selected()).toEqual(["a", "c", "d", "e", "f", "g", "h"])
+    await click("d", "Shift")
+    expect(await selected()).toEqual(["a", "c", "d", "h"])
+    await click("b", "Control")
+    await click("f", "Shift")
+    expect(await selected()).toEqual(["a", "b", "c", "d", "e", "f", "h"])
+    await click("c", "Shift")
+    expect(await selected()).toEqual(["a", "b", "c", "d", "h"])
+    await click("h", "Control")
+    expect(await selected()).toEqual(["a", "b", "c", "d"])
+    await expect(tree.locator("[data-focused]")).toHaveCount(1)
+    await expect(tree.locator(".desk_side_item_tool")).toHaveCount(1)
+    await expect(page.locator(".desk_wbox")).toHaveCount(1)
+})
+
+test("window moves preserve the full sidebar and docking previews float above window headers", async ({ page }) => {
+    await page.goto("/desk")
+    await page.locator("#head_menu > summary").click()
+    await page.locator("#head_new").click()
+    const first = page.locator(".desk_wbox").first()
+    const second = page.locator(".desk_wbox").nth(1)
+    const fullSidebar = async () => {
+        const desk = await page.locator("#desk").boundingBox()
+        const side = await page.locator("#desk_side").boundingBox()
+        expect(Math.abs(side!.y - desk!.y)).toBeLessThanOrEqual(1)
+        expect(Math.abs(side!.height - desk!.height)).toBeLessThanOrEqual(1)
+    }
+    await second.locator(".desk_wbox_head_drop > summary").click()
+    await second.locator('[data-move="top"]').click()
+    expect((await second.boundingBox())!.y).toBeLessThan((await first.boundingBox())!.y)
+    await fullSidebar()
+    for (const zone of ["top", "right", "bottom", "left", "swap"] as const) {
+        const handle = (await first.locator(".desk_wbox_head_drop > summary").boundingBox())!
+        const target = (await second.boundingBox())!
+        const x = zone === "left" ? target.x + 10 : zone === "right" ? target.x + target.width - 10 : target.x + target.width / 2
+        const y = zone === "top" ? target.y + 10 : zone === "bottom" ? target.y + target.height - 10 : target.y + target.height / 2
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(x, y, { steps: 8 })
+        const preview = page.locator("body > .desk_dock_preview")
+        await expect(preview).toBeVisible()
+        await expect(preview).toHaveAttribute("data-drop", zone)
+        await expect(preview).toHaveCSS("pointer-events", "none")
+        await expect(preview).toHaveCSS("position", "fixed")
+        expect(Number(await preview.evaluate(element => getComputedStyle(element).zIndex))).toBeGreaterThan(Number(await second.locator(".desk_wbox_head").evaluate(element => getComputedStyle(element).zIndex)))
+        expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".desk_wbox")?.id, { x, y })).toBe(await second.getAttribute("id"))
+        const bounds = (await preview.boundingBox())!
+        expect(Math.abs(bounds.width - target.width * (["left", "right"].includes(zone) ? .5 : 1))).toBeLessThanOrEqual(1)
+        expect(Math.abs(bounds.height - target.height * (["top", "bottom"].includes(zone) ? .5 : 1))).toBeLessThanOrEqual(1)
+        if (zone === "top") await page.screenshot({ path: ".cache/desk-browser-results/dock-top.png" })
+        await page.mouse.up()
+        await expect(preview).toHaveCount(0)
+        await fullSidebar()
+    }
+    const handle = (await first.locator(".desk_wbox_head_drop > summary").boundingBox())!
+    const target = (await second.boundingBox())!
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 })
+    await expect(page.locator(".desk_dock_preview")).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(page.locator(".desk_dock_preview")).toHaveCount(0)
+    await page.mouse.up()
+    await fullSidebar()
+})
+
 test("terminal colors follow light, dark and operating-system theme changes", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" })
     await page.goto("/desk")
-    await page.locator(".desk_wbox_head_path").fill("pid:")
-    await page.locator(".desk_wbox_head_path").press("Enter")
+    await page.getByRole("button", { name: "Open terminal", exact: true }).click()
     await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:")
     const input = page.locator(".xterm-helper-textarea")
     await input.pressSequentially("printf 'PLAIN_TEXT\\n'")
@@ -49,7 +134,7 @@ test("ordered multi-selection renames, copies, pastes, archives and deletes the 
     const tree = page.locator('.desk_side_page[data-path="file:///"]')
     const row = (path: string) => tree.locator(`.desk_side_item[data-path="${path}"]`)
     await expect(row("/bin/cat")).toBeAttached()
-    const pick = (path: string, shift = false) => row(path).locator(":scope > details > summary").click({ position: { x: 60, y: 8 }, modifiers: shift ? ["Shift"] : [] })
+    const pick = (path: string, ctrl = false) => row(path).locator(":scope > details > summary").click({ position: { x: 60, y: 8 }, modifiers: ctrl ? ["Control"] : [] })
     await pick("/home/user")
     await expect(row("/home/user/bulk")).toBeVisible()
     await pick("/home/user/bulk")
@@ -182,10 +267,13 @@ test("Files selects before opening and keeps tree controls and sticky rows align
     expect(await head.evaluate(element => {
         const canvas = document.createElement("canvas")
         const context = canvas.getContext("2d")!
-        context.fillStyle = getComputedStyle(element).backgroundColor
+        context.fillStyle = getComputedStyle(element, "::before").backgroundColor
         context.fillRect(0, 0, 1, 1)
         return context.getImageData(0, 0, 1, 1).data[3]
     })).toBe(255)
+    await expect(head).toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+    expect(await head.evaluate(element => parseFloat(getComputedStyle(element, "::before").left))).toBeGreaterThan(0)
+    expect(await head.evaluate(element => parseFloat(getComputedStyle(element, "::before").height) >= element.getBoundingClientRect().height)).toBe(true)
     await page.screenshot({ path: ".cache/desk-browser-results/files-sticky.png" })
     const file = tree.locator('[data-path="/bin/cat"] > details > summary')
     await file.click()
@@ -245,13 +333,22 @@ test("desk plugins show code lines, toggle hex, preserve binary edits and report
     await window.locator(".desk_wbox_body_text_input").focus()
     await expect(window.locator(".desk_wbox_body_text_input")).toHaveCSS("outline-style", "none")
     await expect(window.locator(".desk_wbox_body_text_input")).toHaveCSS("border-top-width", "0px")
-    await expect(window.locator(".desk_wbox_body_text")).toHaveCSS("outline-style", "solid")
+    const viewport = window.locator(".desk_wbox_body_editor")
+    expect(await viewport.evaluate(element => getComputedStyle(element, "::after").zIndex)).toBe("4")
+    await expect(window.locator(".desk_wbox_body_text_input")).toHaveCSS("font-family", /Jasouza/)
+    const assertFocusFrame = async () => {
+        const png = await viewport.screenshot({ path: ".cache/desk-browser-results/editor-frame.png" })
+        execFileSync("python", ["-c", "import sys,io; from PIL import Image; im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGB'); w,h=im.size; sides=[[(i,h//2) for i in range(4)],[(w-1-i,h//2) for i in range(4)],[(w//2,i) for i in range(4)],[(w//2,h-1-i) for i in range(4)]]; near=lambda p: max(abs(a-b) for a,b in zip(im.getpixel(p),(109,74,255)))<25; assert all(any(near(p) for p in side) for side in sides), [[im.getpixel(p) for p in side] for side in sides]"], { input: png })
+    }
+    await assertFocusFrame()
     await page.screenshot({ path: ".cache/desk-browser-results/editor-focus.png" })
     await expect(window).toHaveAttribute("data-plugin", "code")
     await expect(toggle).not.toHaveAttribute("open", "")
     await toggle.locator("summary").click()
     const bytes = window.locator(".desk_wbox_body_text_hex_input")
     await expect(bytes).toBeEnabled()
+    await bytes.focus()
+    await assertFocusFrame()
     await toggle.locator("summary").click()
     await window.locator(".desk_wbox_body_text_input").fill("const updated = 7;\n")
     await expect(window.locator(".desk_wbox_body_text_line_dec")).toHaveText("1\n2")
