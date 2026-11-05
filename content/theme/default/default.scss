@@ -88,6 +88,9 @@ background-position: $pos;
 // ---- dark palette (used by the OS preference and by the Dark radio) ----
 @mixin theme-dark {
     color-scheme: dark;
+    --terminal-text: #ffffff;
+    --terminal-cursor: #ffffff;
+    --terminal-cursor-text: #000000;
     --bg-valley: #04060c;
     --bg-mid: #0a1120;
     --bg-hill: #14223a;
@@ -118,6 +121,9 @@ background-position: $pos;
 
 :root {
     color-scheme: light dark;
+    --terminal-text: #000000;
+    --terminal-cursor: #000000;
+    --terminal-cursor-text: #ffffff;
     // contour map palette (6-digit hex only: contour.js parses these)
     --bg-valley: #f3f7fc;
     --bg-mid: #e1e9f4;
@@ -6706,6 +6712,13 @@ html.desk_dragging {
             min-width: 0;
         }
     }
+}
+
+.desk_side :is(.desk_files_buttons, .desk_side_item_tool) > button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    pointer-events: none;
+    color: var(--text-dim);
 }
 
 // a file with no viewer, or a mode with none

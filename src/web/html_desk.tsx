@@ -534,6 +534,8 @@ const runtime_keys = [
     "files_delete",
     "files_copy",
     "files_paste",
+    "files_cut",
+    "files_cut_ready",
     "files_copied",
     "files_download",
     "files_open_folder",
@@ -604,7 +606,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "paste", "download", "delete"]
+    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 

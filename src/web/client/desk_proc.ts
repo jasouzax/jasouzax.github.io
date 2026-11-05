@@ -134,7 +134,21 @@ function terminal_body(item: desk_window): HTMLElement {
     const box = document.createElement("div")
     box.className = "desk_wbox_body_term"
     box.style.cssText = "position:relative;display:block;min-height:120px;height:100%;overflow:hidden;padding:8px"
-    const terminal = new Terminal({ allowTransparency: true, cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000, theme: { background: "#00000000", foreground: getComputedStyle(item.el).color } })
+    const terminal = new Terminal({ allowTransparency: true, cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000 })
+    const sync_theme = (): void => {
+        const style = getComputedStyle(item.el)
+        const foreground = style.getPropertyValue("--terminal-text").trim() || style.color
+        terminal.options.theme = {
+            background: "#00000000", foreground,
+            cursor: style.getPropertyValue("--terminal-cursor").trim() || foreground,
+            cursorAccent: style.getPropertyValue("--terminal-cursor-text").trim() || style.getPropertyValue("--panel").trim(),
+        }
+    }
+    const theme_observer = new MutationObserver(sync_theme)
+    theme_observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode", "data-theme"] })
+    const scheme = matchMedia("(prefers-color-scheme: dark)")
+    scheme.addEventListener("change", sync_theme)
+    document.addEventListener("change", sync_theme)
     const fit = new FitAddon()
     terminal.loadAddon(fit)
     const append = (chunk: string): void => { terminal.write(chunk) }
@@ -149,6 +163,7 @@ function terminal_body(item: desk_window): HTMLElement {
     queueMicrotask(() => {
         if (!box.isConnected) return
         terminal.open(box)
+        sync_theme()
         observer.observe(box)
         fit.fit()
         proc.terminal_size = [terminal.cols, terminal.rows]
@@ -161,6 +176,9 @@ function terminal_body(item: desk_window): HTMLElement {
     })
     cleanups.set(item, () => {
         observer.disconnect(); input.dispose(); sized.dispose()
+        theme_observer.disconnect()
+        scheme.removeEventListener("change", sync_theme)
+        document.removeEventListener("change", sync_theme)
         proc.listeners.delete(append); proc.exit_listeners.delete(finished)
         terminal.dispose()
     })

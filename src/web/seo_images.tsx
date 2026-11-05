@@ -28,7 +28,8 @@ export function icon_source(model: site_model): string | null {
     for (const file of [
         join(model.content_dir, "icon.svg"),
         join(model.content_dir, "media", "icon.svg"),
-        join(model.content_dir, "media", "signature.svg")
+        join(model.content_dir, "media", "signature.svg"),
+        join(model.content_dir, "favicon.svg")
     ]) {
         if (existsSync(file)) return file
     }
@@ -142,6 +143,12 @@ export async function icon_files(model: site_model, colors: brand, files: output
         [16, 32, 48].map(async (size) => ({ size, png: await png(size, size <= 16 ? 0.92 : 0.84) }))
     )
     files.set("favicon.ico", build_ico(ico))
+    const favicon = join(model.content_dir, "favicon.svg")
+    if (existsSync(favicon)) {
+        const svg = freeze_svg(readFileSync(favicon, "utf8"))
+        files.set("icon.svg", svg)
+        files.set("favicon.ico", build_ico(await Promise.all([16, 32, 48].map(async size => ({ size, png: await svg_to_png(svg, size) })))))
+    }
     files.set("apple-touch-icon.png", await png(180, 0.78))
     files.set("icons/icon-192.png", await png(192, 0.8))
     files.set("icons/icon-512.png", await png(512, 0.8))
