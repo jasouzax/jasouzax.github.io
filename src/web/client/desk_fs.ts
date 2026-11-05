@@ -181,7 +181,7 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
     article.dataset.path = node.path
     const box = document.createElement("details")
     box.className = "desk_side_item_box"
-    box.open = node.kind === "dir" && current.open.has(node.path)
+    box.open = node.kind === "dir" ? current.open.has(node.path) : current.selected === node
     const head = document.createElement("summary")
     head.className = "desk_side_item_head"
     if (current.selected === node) head.setAttribute("data-selected", "")
@@ -337,9 +337,27 @@ function select(node: fs_node | null): void {
     if (!tree) return
     tree.selected = node
     for (const head of tree.page.querySelectorAll("[data-selected]")) head.removeAttribute("data-selected")
+    for (const tools of tree.page.querySelectorAll(".desk_side_item_tool")) tools.remove()
+    for (const box of tree.page.querySelectorAll<HTMLDetailsElement>('[data-kind="file"] > details')) box.open = false
     if (!node) return
     const article = [...tree.page.querySelectorAll<HTMLElement>(".desk_side_item")].find(item => item.dataset.path === node.path)
     article?.querySelector(":scope > details > summary")?.setAttribute("data-selected", "")
+    const box = article?.querySelector<HTMLDetailsElement>(":scope > details")
+    if (box && node.parent) {
+        const tools = make_item_tools(node)
+        box.insertBefore(tools, box.querySelector(":scope > ul"))
+        if (node.kind === "file") box.open = true
+    }
+}
+
+function activate(node: fs_node): void {
+    if (!tree) return
+    if (node.kind === "file") void open_file(node)
+    else {
+        const article = [...tree.page.querySelectorAll<HTMLElement>(".desk_side_item")].find(item => item.dataset.path === node.path)
+        const box = article?.querySelector<HTMLDetailsElement>(":scope > details")
+        if (box) box.open = !box.open
+    }
 }
 
 function on_click(event: MouseEvent): void {
@@ -354,13 +372,26 @@ function on_click(event: MouseEvent): void {
     if (!head || !tree.page.contains(head)) return
     const node = node_of(head)
     if (!node) return
+    const rect = head.getBoundingClientRect()
+    event.preventDefault()
     if (tree.draft) {
         tree.draft = null
         redraw()
     }
     select(node)
     note(node.path === "/home" ? text("files_open_folder") : "")
-    if (node.kind === "file") void open_file(node)
+    // Keep the row in place so the second click can produce a native dblclick.
+    // Keyboard activation and the right-hand disclosure chevron still open a folder.
+    if (event.detail === 0 || (node.kind === "dir" && event.clientX >= rect.right - 24 && event.detail === 1)) activate(node)
+}
+
+function on_double_click(event: MouseEvent): void {
+    const head = (event.target as Element).closest(".desk_side_item_head")
+    if (!tree || !head || !tree.page.contains(head)) return
+    const node = node_of(head)
+    if (!node || (node.kind === "dir" && event.clientX >= head.getBoundingClientRect().right - 24)) return
+    event.preventDefault()
+    activate(node)
 }
 
 // the browser opens and closes a folder; this keeps the set of open ones, so a redraw does not close them
@@ -994,6 +1025,7 @@ export function init_fs(desk: HTMLElement): void {
     if (!page.dataset.bound) {
         page.dataset.bound = "1"
         page.addEventListener("click", on_click)
+        page.addEventListener("dblclick", on_double_click)
         page.addEventListener("toggle", on_toggle, true)
         bind_drag(page)
     }

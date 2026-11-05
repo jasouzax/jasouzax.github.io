@@ -1726,6 +1726,8 @@ a {
                 border-left: 1px solid var(--line);
                 background: var(--panel);
                 z-index: 1;
+                height: 1.25em;
+                line-height: 1.25em;
             }
 
             // Tool bar: ONE row that never wraps. Each tool is a cell with the icon + count on top and its label
@@ -1774,7 +1776,7 @@ a {
             }
 
             &_info+&_tool {
-                top: calc(var(--stack) + var(--head) + 1em);
+                top: calc(var(--stack) + var(--head) + 1.25em);
             }
 
             // The toggle only exists to open its list, so the <details> itself generates no box.
@@ -1813,8 +1815,12 @@ a {
                 --stack: calc(var(--new-stack) + var(--head) + var(--tool-h));
             }
 
+            &_info~&_sub {
+                --stack: calc(var(--new-stack) + var(--head) + 1.25em);
+            }
+
             &_info+&_tool~&_sub {
-                --stack: calc(var(--new-stack) + var(--head) + 1em + var(--tool-h) - 1px);
+                --stack: calc(var(--new-stack) + var(--head) + 1.25em + var(--tool-h));
             }
 
             &_icon {
@@ -1860,6 +1866,16 @@ a {
                 margin-left: -0.125em;
                 border-radius: 50%;
                 z-index: 4;
+                left: .25em;
+                top: 0;
+            }
+
+            // Continue the parent's guide across each opaque child heading.
+            &_sub>li>&>&_box>&_head {
+                background-image: repeating-linear-gradient(to bottom, var(--line) 0 2px, transparent 2px 4px);
+                background-size: 1px 100%;
+                background-position: .25em 0;
+                background-repeat: no-repeat;
             }
 
             &_sub>li>&>&_box#{$slim}>&_head::before {
@@ -6545,6 +6561,44 @@ html.desk_dragging {
 }
 
 // the Files side: the selected item, and the tool bar under the tree (create / upload / rename / delete)
+.desk_side_page[data-path="file:///"] {
+    .desk_side_item_box { --tool-h: 2em; }
+
+    // Selecting a collapsed folder exposes its actions without expanding its children.
+    .desk_side_item_box:has(> summary[data-selected])::details-content {
+        content-visibility: visible;
+    }
+
+    .desk_side_item_box:not([open]) > .desk_side_item_tool {
+        display: flex;
+        top: calc(var(--stack) + var(--head));
+    }
+
+    [data-kind="file"] > details > summary::after { display: none; }
+
+    .desk_side_item_tool {
+        box-sizing: border-box;
+        border-right-width: 1px;
+
+        > button {
+            display: grid;
+            align-content: center;
+            justify-items: center;
+            gap: .1em;
+            min-width: 0;
+            min-block-size: 0;
+            flex: 1 1 0;
+            padding: 0 .2em;
+            font-size: .8em;
+            line-height: 1;
+
+            &:last-child { box-shadow: none; }
+        }
+
+        .desk_files_icon { font-size: 1.1em; }
+    }
+}
+
 // the name field of a new file or folder, in place of the row's name
 .desk_side_item_rename {
     min-width: 0;
@@ -6580,7 +6634,7 @@ html.desk_dragging {
 }
 
 .desk_side_item_head[data-selected] {
-    background: var(--tint-2);
+    background-color: var(--tint-2);
     color: var(--accent);
 }
 
@@ -6612,7 +6666,21 @@ html.desk_dragging {
 
     .desk_files_buttons>button {
         flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .2em;
+        padding: .45em .25em;
+        font-size: .875em;
+        line-height: 1.15;
+
+        + button { border-left: 1px solid var(--line); }
+
+        .desk_files_icon { margin: 0; font-size: 1.5em; }
     }
+
+    .desk_files_msg:empty { display: none; }
 
     .desk_files_form {
         display: flex;
@@ -7731,7 +7799,7 @@ html.spa_loading #main-content {
 }
 @media (orientation: landscape) {
     #head_tabs { margin-inline-start: auto; padding-inline-start: 1em; }
-    #head_tabs:not(:has(> a)) + #head_tray > :first-child { margin-inline-start: auto; }
+    #head_tabs:not(:has(> a)) { display: flex; }
 }
 @media (orientation: portrait) {
     #head_path { flex: 1 1 auto; }
@@ -7789,7 +7857,8 @@ html.spa_loading #main-content {
         min-width: 0;
         max-width: 45%;
         > summary {
-            display: block;
+            display: flex;
+            align-items: center;
             box-sizing: border-box;
             height: 1.5rem;
             border: 0;
@@ -7830,7 +7899,7 @@ html.spa_loading #main-content {
         &:last-child { border-radius: 0 var(--r-sm) var(--r-sm) 0; }
         &[aria-checked=true] {
             color: var(--accent);
-            background: var(--tint-3);
+            background: var(--tint-1);
             box-shadow: inset 0 -2px var(--accent);
         }
     }

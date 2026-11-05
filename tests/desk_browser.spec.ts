@@ -1,5 +1,54 @@
 import { test, expect } from "@playwright/test"
 
+test("Files selects before opening and keeps tree controls and sticky rows aligned", async ({ page }) => {
+    await page.goto("/desk")
+    await page.locator("#head_menu > summary").click()
+    const tree = page.locator('.desk_side_page[data-path="file:///"]')
+    const bin = tree.locator('.desk_side_item[data-path="/bin"]')
+    const head = bin.locator(":scope > details > summary")
+    const box = bin.locator(":scope > details")
+    await expect(tree.locator('[data-path="/bin/cat"]')).toBeAttached()
+    const count = await page.locator(".desk_wbox").count()
+    await head.click({ position: { x: 60, y: 10 } })
+    await expect(box).not.toHaveAttribute("open", "")
+    await expect(box.locator(":scope > .desk_side_item_tool")).toBeVisible()
+    await expect(page.locator(".desk_wbox")).toHaveCount(count)
+    await head.dblclick({ position: { x: 60, y: 10 } })
+    await expect(box).toHaveAttribute("open", "")
+    await tree.evaluate(element => { element.scrollTop = 180 })
+    const rootInfo = tree.locator('[data-path="/"] > details > .desk_side_item_info')
+    const rootBottom = await rootInfo.evaluate(element => element.getBoundingClientRect().bottom)
+    expect(await head.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(rootBottom - 1)
+    const infoBottom = await box.locator(":scope > .desk_side_item_info").evaluate(element => element.getBoundingClientRect().bottom)
+    expect(await box.locator(":scope > .desk_side_item_tool").evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(infoBottom - 1)
+    const file = tree.locator('[data-path="/bin/cat"] > details > summary')
+    await file.click()
+    await expect(page.locator(".desk_wbox")).toHaveCount(count)
+    await expect(tree.locator('[data-path="/bin/cat"] > details > .desk_side_item_tool')).toBeVisible()
+    const tools = tree.locator('[data-path="/bin/cat"] > details > .desk_side_item_tool')
+    const edges = await tools.evaluate(element => ({
+        right: element.getBoundingClientRect().right,
+        last: element.lastElementChild!.getBoundingClientRect().right,
+        height: element.getBoundingClientRect().height,
+        font: parseFloat(getComputedStyle(element).fontSize),
+    }))
+    expect(edges.last).toBeLessThanOrEqual(edges.right)
+    expect(edges.height).toBeLessThanOrEqual(edges.font * 2 + 1)
+    await file.dblclick()
+    await expect(page.locator('.desk_wbox_head_path').last()).toHaveValue("file:///bin/cat")
+    const source = page.locator(".desk_wbox_head_source").last()
+    const centers = await source.evaluate(element => [...element.querySelectorAll(":scope > .desk_wbox_head_mime > summary, :scope > input")].map(item => {
+        const rect = item.getBoundingClientRect(); return rect.y + rect.height / 2
+    }))
+    expect(Math.abs(centers[0] - centers[1])).toBeLessThanOrEqual(1)
+    const footer = page.locator(".desk_files_buttons")
+    await expect(footer.locator("button").first()).toHaveCSS("flex-direction", "column")
+    await page.screenshot({ path: ".cache/desk-browser-results/files-layout.png" })
+    while (await page.locator(".desk_wbox").count()) await page.locator("#head_exit").click()
+    const controls = await page.locator("#head_window").boundingBox()
+    expect(controls!.x).toBeGreaterThan(900)
+})
+
 test("desk plugins show code lines, toggle hex, preserve binary edits and report missing resources", async ({ page }) => {
     const plugin_scripts: string[] = []
     page.on("request", request => {
