@@ -2,7 +2,8 @@
 // (#head_new) clones the empty window from <template id="desk_window_template">. This file owns the list of windows, their tabs in the
 // header and the layout of the desk (a grid, see arrange()). What a window shows lives in client_desk_view.ts, the files in client_desk_fs.ts.
 
-import { init_view, open_source, render_window } from "./desk_view.ts"
+import { init_view, open_source, render_window, save_window } from "./desk_view.ts"
+import { navigate_window } from "./desk_navigation.ts"
 import { init_fs } from "./desk_fs.ts"
 import { init_proc } from "./desk_proc.ts"
 
@@ -293,6 +294,7 @@ export function new_window(existing?: HTMLElement): desk_window | null {
     const template = document.getElementById("desk_window_template") as HTMLTemplateElement | null
     if (!desk || !template) return null
     const element = existing ?? template.content.firstElementChild!.cloneNode(true) as HTMLElement
+    element.tabIndex = -1
     const id = state.next_id++
     element.id = `desk_win_${id}`
     element.dataset.window = String(id)
@@ -687,6 +689,33 @@ export function init_desk(): void {
 
 let bound = false
 
+function desk_shortcut(event: KeyboardEvent): void {
+    if (!state.desk?.isConnected || event.isComposing) return
+    const ctrl = event.ctrlKey && !event.altKey && !event.metaKey
+    const key = event.key.toLowerCase()
+    const item = state.focused
+    let action: (() => void) | null = null
+    if (ctrl && key === "enter") action = () => {
+        if (event.repeat) return
+        if (event.shiftKey) close_window(item)
+        else { const added = new_window(); if (added) { if (state.maximized) toggle_maximize(added); added.el.focus({ preventScroll: true }) } }
+    }
+    else if (item && ctrl && !event.shiftKey) {
+        if (key === "s") action = () => { void save_window(item) }
+        else if (key === "r") action = () => navigate_window(item, "refresh")
+        else if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) action = () => move_window(item, key.slice(5))
+    }
+    if (item && ctrl && key === "tab") action = () => {
+        const tabs = [...document.querySelectorAll<HTMLAnchorElement>("#head_tabs a[data-desk-tab]")]
+        const list = tabs.map(tab => state.windows.find(window => window.tab === tab)).filter((window): window is desk_window => !!window)
+        const index = list.indexOf(item)
+        const next = list[(index + (event.shiftKey ? -1 : 1) + list.length) % list.length]
+        if (next && next !== item) { if (state.maximized) toggle_maximize(next); else focus_window(next); next.el.focus({ preventScroll: true }) }
+    }
+    if (item && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ["arrowleft", "arrowright"].includes(key)) action = () => navigate_window(item, key === "arrowleft" ? "previous" : "forward")
+    if (action) { event.preventDefault(); event.stopImmediatePropagation(); action() }
+}
+
 export function bind_desk(): void {
     if (bound) return
     bound = true
@@ -698,6 +727,7 @@ export function bind_desk(): void {
     document.addEventListener("pointerdown", start_drag)
     document.addEventListener("pointerdown", start_resize)
     document.addEventListener("keydown", key_resize)
+    document.addEventListener("keydown", desk_shortcut, true)
     // A window's glass (backdrop-filter) makes it the containing block of the dropdowns' full-screen click-away layer, which is switched off
     // in the theme; a press outside an open list inside a window closes it here instead.
     document.addEventListener("pointerdown", event => {

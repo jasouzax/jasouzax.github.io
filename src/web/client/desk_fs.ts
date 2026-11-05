@@ -8,7 +8,7 @@ import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handl
 import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory } from "./memory_fs.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk_files_util.ts"
-import { can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
+import { can_browse, can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
 import { selection_click, type file_selection } from "./desk_selection.ts"
 import { local_file_path } from "./desk_paths.ts"
 import { sync_navigation } from "./desk_navigation.ts"
@@ -200,8 +200,8 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
     head.className = "desk_side_item_head"
     if (current.selection.has(node.path)) head.setAttribute("data-selected", "")
     if (current.selected === node) head.setAttribute("data-focused", "")
-    // what lives in a writable folder can be dragged to another one; the markup's own folders and the mounts stay where they are
-    if (node.parent?.writable && !node.mount) head.draggable = true
+    // Readable entries can be dropped into a viewer; move targets separately enforce write permissions.
+    head.draggable = node.kind === "dir" ? can_browse(node) : can_read(node)
     const icon = document.createElement("span")
     icon.className = "desk_side_item_icon"
     icon.setAttribute("aria-hidden", "true")
@@ -1045,7 +1045,7 @@ export function start_entry_drag(nodes: fs_node[], transfer: DataTransfer): void
     dragged = topmost(nodes)
     transfer.setData(desk_drag_type, JSON.stringify(dragged.map(node => node.path)))
     transfer.setData("text/plain", dragged.map(node => node.path).join("\n"))
-    transfer.effectAllowed = "move"
+    transfer.effectAllowed = "copyMove"
 }
 
 export function dragged_entries(): fs_node[] { return dragged }

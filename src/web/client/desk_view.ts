@@ -3,13 +3,14 @@
 
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 import type { desk_window } from "./desk.ts"
-import { state, text, refresh_tab, window_hooks } from "./desk.ts"
+import { state, text, refresh_tab, window_hooks, focus_window } from "./desk.ts"
 import { detect_mimes, mime_matches, is_mime } from "./desk_mime.ts"
 import { prepare_plugins } from "./desk_plugins.ts"
 import { media_player } from "./desk_media.ts"
 import { markdown_body } from "./desk_markdown.ts"
 import { folder_body } from "./desk_folder.ts"
 import { bind_navigation, sync_navigation } from "./desk_navigation.ts"
+import { desk_drag_type } from "./desk_fs.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -618,29 +619,40 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
     let depth = 0
     box.addEventListener("dragenter", event => {
         if (item.mime === "inode/directory") return
-        if (!has_files(event)) return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         depth++
         box.classList.add("is_drop")
     })
     box.addEventListener("dragover", event => {
         if (item.mime === "inode/directory") return
-        if (!has_files(event)) return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
     })
     box.addEventListener("dragleave", event => {
         if (item.mime === "inode/directory") return
-        if (!has_files(event)) return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         depth = Math.max(0, depth - 1)
         if (depth === 0) box.classList.remove("is_drop")
     })
     box.addEventListener("drop", event => {
         if (item.mime === "inode/directory") return
-        if (!has_files(event)) return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         depth = 0
         box.classList.remove("is_drop")
+        if (event.dataTransfer?.types.includes(desk_drag_type)) {
+            try {
+                const paths: unknown = JSON.parse(event.dataTransfer.getData(desk_drag_type))
+                if (!Array.isArray(paths) || !paths.every(path => typeof path === "string" && path.startsWith("/"))) return
+                paths.forEach((path, index) => {
+                    const target = index === 0 ? item : open_window()
+                    if (target) { if (index === 0) focus_window(target); void open_source(target, `file://${path}`) }
+                })
+            } catch { /* ignore malformed drag payloads */ }
+            return
+        }
         take_files(item, [...(event.dataTransfer?.files ?? [])], open_window)
     })
     box.addEventListener("change", event => {

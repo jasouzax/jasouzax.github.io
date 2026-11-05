@@ -1,6 +1,6 @@
 import type { desk_window } from "./desk.ts"
 import { text } from "./desk.ts"
-import { can_create, can_move, can_read } from "./desk_fs_permissions.ts"
+import { can_browse, can_create, can_read } from "./desk_fs_permissions.ts"
 import { can_drop_entries, desk_drag_type, dragged_entries, end_entry_drag, move_folder_entries, start_entry_drag, type fs_node } from "./desk_fs.ts"
 import { capture_imports, import_entries } from "./desk_folder_drop.ts"
 import { resolve } from "./desk_vfs.ts"
@@ -18,7 +18,7 @@ export function bind_folder_drag(item: desk_window, body: HTMLElement, status: H
     const start = (event: DragEvent) => {
         const node = entry_at(event.target as Element)
         if (!node || !event.dataTransfer) return
-        if (!can_move(node) || !can_read(node)) { event.preventDefault(); return }
+        if (!(node.kind === "dir" ? can_browse(node) : can_read(node))) { event.preventDefault(); return }
         start_entry_drag([node], event.dataTransfer)
     }
     const over = (event: DragEvent) => {

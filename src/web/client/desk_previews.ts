@@ -1,9 +1,10 @@
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 
 const width = 320, height = 200
-const version = "folder-previews-2-text-39x10"
+const version = "folder-previews-3-dynamic-cards"
 export const preview_cache_path = "/home/user/.cache/previews"
-export type preview_result = { blob: Blob, text?: string, source: "cache" | "generated" | "temporary" }
+export type preview_card = { extension: string, name: string, mime: string, size: number }
+export type preview_result = { blob: Blob, text?: string, card?: preview_card, source: "cache" | "generated" | "temporary" }
 const pending = new Map<string, Promise<preview_result>>()
 let writes = 0
 let trimming: Promise<void> | null = null
@@ -26,7 +27,7 @@ async function cache_directory(): Promise<FileSystemDirectoryHandle | null> {
 
 async function trim_cache(dir: FileSystemDirectoryHandle): Promise<void> {
     const files: { name: string, modified: number }[] = []
-    for await (const entry of dir.values()) if (entry.kind === "file" && /^[a-f0-9]{64}\.(png|txt)$/.test(entry.name)) {
+    for await (const entry of dir.values()) if (entry.kind === "file" && /^[a-f0-9]{64}\.(png|txt|json)$/.test(entry.name)) {
         files.push({ name: entry.name, modified: (await entry.getFile()).lastModified })
     }
     files.sort((a, b) => b.modified - a.modified)
@@ -88,14 +89,13 @@ async function video_preview(ctx: CanvasRenderingContext2D, file: File): Promise
     }
 }
 
-function file_card(ctx: CanvasRenderingContext2D, file: File, mime: string): void {
-    ctx.fillStyle = "#7ee7f7"; ctx.font = "bold 32px monospace"
-    ctx.fillText((file.name.split(".").pop() || "FILE").slice(0, 10).toUpperCase(), 24, 76)
-    ctx.fillStyle = "#ffffff"; ctx.font = "14px monospace"
-    ctx.fillText(file.name.slice(0, 31), 24, 116)
-    ctx.fillStyle = "#9db2c7"; ctx.font = "12px monospace"
-    ctx.fillText(mime.slice(0, 36), 24, 146)
-    ctx.fillText(`${file.size.toLocaleString()} bytes`, 24, 168)
+export function card_preview_node(card: preview_card): HTMLElement {
+    const box = document.createElement("span")
+    box.className = "desk_folder_card"; box.setAttribute("aria-hidden", "true")
+    for (const [tag, value] of [["strong", card.extension], ["span", card.name], ["small", card.mime], ["small", `${card.size.toLocaleString()} bytes`]]) {
+        const line = document.createElement(tag); line.textContent = value; box.append(line)
+    }
+    return box
 }
 
 export function is_text_preview(mime: string): boolean {
@@ -151,11 +151,8 @@ export function text_preview_node(value: string, mime: string): HTMLElement {
 
 async function make_preview(file: File, mime: string): Promise<Blob> {
     const [element, ctx] = canvas()
-    try {
-        if (mime.startsWith("image/")) await image_preview(ctx, file)
-        else if (mime.startsWith("video/")) await video_preview(ctx, file)
-        else file_card(ctx, file, mime)
-    } catch { ctx.fillStyle = "#05121b"; ctx.fillRect(0, 0, width, height); file_card(ctx, file, mime) }
+    if (mime.startsWith("image/")) await image_preview(ctx, file)
+    else await video_preview(ctx, file)
     return new Promise((resolve, reject) => element.toBlob(blob => blob ? resolve(blob) : reject(new Error("Preview unavailable")), "image/png"))
 }
 
@@ -163,7 +160,10 @@ export async function file_preview(path: string, file: File, mime: string): Prom
     const textual = is_text_preview(mime)
     const generate = async (): Promise<Omit<preview_result, "source">> => {
         const text = textual ? await text_excerpt(file) : null
-        return text !== null ? { blob: new Blob([text], { type: "text/plain" }), text } : { blob: await make_preview(file, mime) }
+        if (text !== null) return { blob: new Blob([text], { type: "text/plain" }), text }
+        if (/^(image|video)\//.test(mime)) try { return { blob: await make_preview(file, mime) } } catch { /* unsupported media uses a themed file card */ }
+        const card = { extension: (file.name.split(".").pop() || "FILE").slice(0, 10).toUpperCase(), name: file.name, mime, size: file.size }
+        return { blob: new Blob([JSON.stringify(card)], { type: "application/json" }), card }
     }
     // Browsing the cache itself must not create previews of previews.
     if (path.startsWith("/home/user/.cache/")) return { ...(mime.startsWith("image/") ? { blob: file } : await generate()), source: "temporary" }
@@ -173,6 +173,11 @@ export async function file_preview(path: string, file: File, mime: string): Prom
     const work = (async (): Promise<preview_result> => {
         const dir = await cache_directory()
         if (dir) try {
+            try {
+                const cached = await (await dir.getFileHandle(`${key}.json`)).getFile()
+                const card = cached.size <= 16384 ? JSON.parse(await cached.text()) as preview_card : null
+                if (card && typeof card.extension === "string" && card.name === file.name && card.mime === mime && card.size === file.size) return { blob: cached, card, source: "cache" }
+            } catch { /* the preview may be text or raster media */ }
             if (textual) {
                 try {
                     const cached = await (await dir.getFileHandle(`${key}.txt`)).getFile()
@@ -182,13 +187,13 @@ export async function file_preview(path: string, file: File, mime: string): Prom
                     }
                 } catch { /* a text-labelled binary file may have a raster fallback */ }
             }
-            const file = await (await dir.getFileHandle(`${key}.png`)).getFile()
-            const signature = [...new Uint8Array(await file.slice(0, 8).arrayBuffer())].join(",")
-            if (signature === "137,80,78,71,13,10,26,10") return { blob: file, source: "cache" }
+            const image = await (await dir.getFileHandle(`${key}.png`)).getFile()
+            const signature = [...new Uint8Array(await image.slice(0, 8).arrayBuffer())].join(",")
+            if (signature === "137,80,78,71,13,10,26,10") return { blob: image, source: "cache" }
         } catch { /* a missing or damaged thumbnail is generated again */ }
         const result = await generate()
         if (dir) try {
-            const writer = await (await dir.getFileHandle(`${key}.${result.text !== undefined ? "txt" : "png"}`, { create: true })).createWritable()
+            const writer = await (await dir.getFileHandle(`${key}.${result.text !== undefined ? "txt" : result.card ? "json" : "png"}`, { create: true })).createWritable()
             await writer.write(result.blob); await writer.close()
             if (++writes % 32 === 0 && !trimming) {
                 trimming = trim_cache(dir).catch(() => {}).finally(() => { trimming = null })

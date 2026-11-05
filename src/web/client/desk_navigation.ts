@@ -4,6 +4,8 @@ import { local_file_path } from "./desk_paths.ts"
 
 type history = { entries: string[], index: number }
 const histories = new WeakMap<desk_window, history>()
+const actions = new WeakMap<desk_window, (action: string) => void>()
+export function navigate_window(item: desk_window, action: "previous" | "refresh" | "forward"): void { actions.get(item)?.(action) }
 
 export function url_parts(uri: string): { scheme: string, parts: { label: string, uri: string }[] } {
     const match = uri.match(/^([a-z][a-z\d+.-]*:(?:\/\/)?)(.*)$/i)
@@ -67,18 +69,22 @@ export function bind_navigation(item: desk_window, open: (uri: string) => Promis
         if (event.key !== "Enter") return
         event.preventDefault(); const value = input.value; input.blur(); void open(value)
     })
-    head.addEventListener("click", event => {
-        const target = event.target as Element
-        if (target.closest("[data-url-edit]")) { input.value = item.path || item.name; input.focus(); input.select(); return }
-        const crumb = target.closest<HTMLElement>("[data-url]")
-        if (crumb?.dataset.url) { void open(crumb.dataset.url); return }
-        const action = target.closest<HTMLElement>("[data-navigation]")?.dataset.navigation
+    const navigate = (action: string) => {
         if (action === "refresh") { refresh(); return }
         const history = histories.get(item)
-        if (!history || !action) return
+        if (!history) return
         const index = history.index + (action === "previous" ? -1 : 1)
         if (index < 0 || index >= history.entries.length) return
         history.index = index
         void open(history.entries[index])
+    }
+    actions.set(item, navigate)
+    head.addEventListener("click", event => {
+        const target = event.target as Element
+        if (target.closest("[data-url-edit]") || (target.closest(".desk_wbox_head_address") && !target.closest("[data-url], input"))) { input.value = item.path || item.name; input.focus(); input.select(); return }
+        const crumb = target.closest<HTMLElement>("[data-url]")
+        if (crumb?.dataset.url) { void open(crumb.dataset.url); return }
+        const action = target.closest<HTMLElement>("[data-navigation]")?.dataset.navigation
+        if (action) navigate(action)
     })
 }
