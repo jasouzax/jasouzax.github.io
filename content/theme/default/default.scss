@@ -7722,7 +7722,7 @@ html.spa_loading #main-content {
 #head_div > summary::before, #head_div > summary::after { content: none; }
 #head_path { flex: 0 1 auto; }
 #head_tray { display: contents; }
-#head_account {
+#head_tray > :first-child {
     flex: 0 0 auto;
     // End-aligned dropdowns use direction: rtl; keep the separator on the visual left edge.
     border-left: 1px solid var(--line);
