@@ -6564,16 +6564,6 @@ html.desk_dragging {
 .desk_side_page[data-path="file:///"] {
     .desk_side_item_box { --tool-h: 2em; }
 
-    // Selecting a collapsed folder exposes its actions without expanding its children.
-    .desk_side_item_box:has(> summary[data-selected])::details-content {
-        content-visibility: visible;
-    }
-
-    .desk_side_item_box:not([open]) > .desk_side_item_tool {
-        display: flex;
-        top: calc(var(--stack) + var(--head));
-    }
-
     [data-kind="file"] > details > summary::after { display: none; }
 
     .desk_side_item_tool {
@@ -6587,7 +6577,7 @@ html.desk_dragging {
             gap: .1em;
             min-width: 0;
             min-block-size: 0;
-            flex: 1 1 0;
+            flex: 1 0 auto;
             padding: 0 .2em;
             font-size: .8em;
             line-height: 1;
@@ -6630,12 +6620,35 @@ html.desk_dragging {
 .desk_side_item_head[data-drop] {
     outline: 2px dashed var(--accent);
     outline-offset: -2px;
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel));
 }
 
 .desk_side_item_head[data-selected] {
-    background-color: var(--tint-2);
+    background-color: color-mix(in srgb, var(--text) 12%, var(--panel));
     color: var(--accent);
+}
+
+.desk_side_item_head[data-focused] {
+    box-shadow: inset 2px 0 var(--accent);
+}
+
+// Sticky tree rows must cover the children scrolling under them, including on hover.
+.desk_side_item_head:hover {
+    background-color: color-mix(in srgb, var(--text) 6%, var(--panel));
+}
+.desk_side_item_head[data-selected]:hover {
+    background-color: color-mix(in srgb, var(--text) 12%, var(--panel));
+}
+
+// The editor draws one focus ring around its line numbers, text and hex columns.
+.desk_wbox_body_text:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+}
+.desk_wbox_body_text :is(textarea, input):focus-visible {
+    border: 0 !important;
+    outline: none;
+    box-shadow: none;
 }
 
 .desk_files_bar {

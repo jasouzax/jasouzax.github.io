@@ -3,10 +3,11 @@
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
 
 import type { desk_window } from "./desk.ts"
-import { state, text, new_window, focus_window } from "./desk.ts"
-import { load_file, render_window as window_refresh, upload_hooks, uri_handlers } from "./desk_view.ts"
+import { state, text, new_window, focus_window, refresh_tab } from "./desk.ts"
+import { load_file, render_window as window_refresh, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory } from "./memory_fs.ts"
+import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk_files_util.ts"
 
 export type fs_node = {
     name: string
@@ -28,6 +29,8 @@ type tree_state = {
     page: HTMLElement
     open: Set<string>
     selected: fs_node | null
+    selection: Set<string>
+    tools_visible: boolean
     message: HTMLElement | null
     // a new file or folder that has no name yet: its row sits first in the folder, with the name field active (nothing exists until it is named)
     draft: { dir: fs_node, kind: "file" | "dir", value: string } | null
@@ -41,6 +44,7 @@ const temporary_files = memory_directory("tmp")
 let home_node: fs_node | null = null
 let tmp_node: fs_node | null = null
 let executable_names: string[] = []
+let clipboard: fs_node[] = []
 export async function mount_executables(names: string[]): Promise<void> {
     executable_names = names
     const bin = find_node("/bin")
@@ -168,8 +172,9 @@ function make_item_tools(node: fs_node): HTMLElement {
     tools.setAttribute("role", "toolbar")
     tools.setAttribute("aria-label", `${text("files_toolbar")}: ${node.name}`)
     tools.append(button("rename", text("files_rename"), "rename"))
-    if (node.handle && !node.mount) tools.append(button("copy", text("files_copy"), "copy"))
-    if (node.kind === "file" && node.handle) tools.append(button("download", text("files_download"), "download"))
+    tools.append(button("copy", text("files_copy"), "copy"))
+    if (node.kind === "dir") tools.append(button("paste", text("files_paste"), "paste"))
+    tools.append(button("download", text("files_download"), "download"))
     tools.append(button("delete", text("files_delete"), "delete"))
     return tools
 }
@@ -181,10 +186,11 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
     article.dataset.path = node.path
     const box = document.createElement("details")
     box.className = "desk_side_item_box"
-    box.open = node.kind === "dir" ? current.open.has(node.path) : current.selected === node
+    box.open = node.kind === "dir" ? current.open.has(node.path) : current.selected === node && current.tools_visible
     const head = document.createElement("summary")
     head.className = "desk_side_item_head"
-    if (current.selected === node) head.setAttribute("data-selected", "")
+    if (current.selection.has(node.path)) head.setAttribute("data-selected", "")
+    if (current.selected === node) head.setAttribute("data-focused", "")
     // what lives in a writable folder can be dragged to another one; the markup's own folders and the mounts stay where they are
     if (node.parent?.writable && !node.mount) head.draggable = true
     const icon = document.createElement("span")
@@ -202,7 +208,7 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
         info.textContent = node.info
         box.append(info)
     }
-    if (current.selected === node && node.parent) box.append(make_item_tools(node))
+    if (current.selected === node && current.tools_visible && node.parent) box.append(make_item_tools(node))
     if (node.kind === "dir") {
         const list = document.createElement("ul")
         list.className = "desk_side_item_sub"
@@ -241,6 +247,8 @@ export async function refresh_dir(dir: fs_node): Promise<void> {
 
 export function redraw(): void {
     if (!tree) return
+    if (tree.selected) tree.selected = find_node(tree.selected.path)
+    tree.selection = new Set([...tree.selection].filter(path => find_node(path)))
     const holder = tree.page
     holder.replaceChildren(render_node(tree.root, tree))
     // a row that waits for its name keeps the focus (and what was typed) through a redraw
@@ -328,22 +336,30 @@ async function open_file(node: fs_node): Promise<void> {
 
 // ---- events -----------------------------------------------------------------------------------------------------------------------
 
+let first_click: { path: string, x: number, y: number } | null = null
+
 function node_of(element: Element): fs_node | null {
     const article = element.closest<HTMLElement>(".desk_side_item")
     return article?.dataset.path ? find_node(article.dataset.path) : null
 }
 
-function select(node: fs_node | null): void {
+function select(node: fs_node | null, append = false, tools_visible = true): void {
     if (!tree) return
     tree.selected = node
-    for (const head of tree.page.querySelectorAll("[data-selected]")) head.removeAttribute("data-selected")
+    tree.tools_visible = tools_visible
+    if (!append) tree.selection.clear()
+    if (node) tree.selection.add(node.path)
+    for (const head of tree.page.querySelectorAll<HTMLElement>(".desk_side_item_head")) {
+        head.toggleAttribute("data-selected", tree.selection.has(node_of(head)?.path ?? ""))
+        head.removeAttribute("data-focused")
+    }
     for (const tools of tree.page.querySelectorAll(".desk_side_item_tool")) tools.remove()
     for (const box of tree.page.querySelectorAll<HTMLDetailsElement>('[data-kind="file"] > details')) box.open = false
     if (!node) return
     const article = [...tree.page.querySelectorAll<HTMLElement>(".desk_side_item")].find(item => item.dataset.path === node.path)
-    article?.querySelector(":scope > details > summary")?.setAttribute("data-selected", "")
+    article?.querySelector(":scope > details > summary")?.setAttribute("data-focused", "")
     const box = article?.querySelector<HTMLDetailsElement>(":scope > details")
-    if (box && node.parent) {
+    if (box && node.parent && tools_visible) {
         const tools = make_item_tools(node)
         box.insertBefore(tools, box.querySelector(":scope > ul"))
         if (node.kind === "file") box.open = true
@@ -362,6 +378,18 @@ function activate(node: fs_node): void {
 
 function on_click(event: MouseEvent): void {
     if (!tree) return
+    // Moving the toolbar off a parent can move the clicked child upward. Use the
+    // native second-click count and original position even if it now hits a tool.
+    const previous = first_click
+    first_click = null
+    if (event.detail === 2 && previous && Math.abs(previous.x - event.clientX) <= 4 && Math.abs(previous.y - event.clientY) <= 4) {
+        const node = find_node(previous.path)
+        if (node?.kind === "file") {
+            event.preventDefault()
+            void open_file(node)
+            return
+        }
+    }
     const tool = (event.target as Element).closest<HTMLButtonElement>(".desk_side_item_tool button[data-act]")
     if (tool && tree.page.contains(tool)) {
         const owner = node_of(tool)
@@ -372,26 +400,27 @@ function on_click(event: MouseEvent): void {
     if (!head || !tree.page.contains(head)) return
     const node = node_of(head)
     if (!node) return
+    if (node.kind === "file" && event.detail === 1) first_click = { path: node.path, x: event.clientX, y: event.clientY }
+    if (node.kind === "dir" && event.detail > 1) { event.preventDefault(); return }
     const rect = head.getBoundingClientRect()
+    const box = head.parentElement as HTMLDetailsElement
+    const was_open = box.open
+    const chevron = node.kind === "dir" && event.clientX >= rect.right - 24 && event.detail !== 0
     event.preventDefault()
     if (tree.draft) {
         tree.draft = null
         redraw()
     }
-    select(node)
+    select(node, event.shiftKey, !(chevron && was_open))
     note(node.path === "/home" ? text("files_open_folder") : "")
-    // Keep the row in place so the second click can produce a native dblclick.
-    // Keyboard activation and the right-hand disclosure chevron still open a folder.
-    if (event.detail === 0 || (node.kind === "dir" && event.clientX >= rect.right - 24 && event.detail === 1)) activate(node)
+    if (node.kind === "dir" && event.detail < 2 && (!was_open || chevron || event.detail === 0)) activate(node)
+    else if (node.kind === "file" && event.detail === 0) activate(node)
 }
 
 function on_double_click(event: MouseEvent): void {
-    const head = (event.target as Element).closest(".desk_side_item_head")
-    if (!tree || !head || !tree.page.contains(head)) return
-    const node = node_of(head)
-    if (!node || (node.kind === "dir" && event.clientX >= head.getBoundingClientRect().right - 24)) return
+    // Activation is handled by the second click so toolbar layout shifts cannot
+    // redirect it; suppress the browser's text selection for this double click.
     event.preventDefault()
-    activate(node)
 }
 
 // the browser opens and closes a folder; this keeps the set of open ones, so a redraw does not close them
@@ -636,7 +665,11 @@ async function reload(dir: fs_node, select_path: string | null = null): Promise<
     await load_children(dir)
     if (!tree) return
     tree.open.add(dir.path)
-    if (select_path) tree.selected = find_node(select_path)
+    if (select_path) {
+        tree.selected = find_node(select_path)
+        tree.selection = new Set([select_path])
+        tree.tools_visible = true
+    }
     redraw()
 }
 
@@ -700,10 +733,10 @@ async function copy_into(from: file_handle | dir_handle, to_parent: dir_handle, 
 
 async function rename_entry(node: fs_node, name: string): Promise<void> {
     const parent = node.parent
-    if (!parent || !valid_name(name)) return note(text("files_bad_name"))
+    if (!parent || !valid_name(name)) throw new Error(text("files_bad_name"))
     if (name === node.name) return clear_form()
     if (parent.children === null) await load_children(parent)
-    if (exists_in(parent, name)) return note(text("files_exists"))
+    if (exists_in(parent, name)) throw new Error(text("files_exists"))
     const handle = node.handle as file_handle | dir_handle
     try {
         if (typeof handle.move === "function") await handle.move(name)
@@ -712,7 +745,7 @@ async function rename_entry(node: fs_node, name: string): Promise<void> {
             await (parent.handle as dir_handle).removeEntry(node.name, { recursive: true })
         }
     } catch {
-        return note(text("files_failed"))
+        throw new Error(text("files_failed"))
     }
     const old_path = node.path
     const new_path = `${parent.path}/${name}`
@@ -720,24 +753,28 @@ async function rename_entry(node: fs_node, name: string): Promise<void> {
     note("")
     // open folders and windows that pointed into the old path follow the new one
     if (tree) tree.open = new Set([...tree.open].map(path => (path === old_path || path.startsWith(`${old_path}/`) ? new_path + path.slice(old_path.length) : path)))
+    const affected: desk_window[] = []
     for (const item of state.windows) {
         if (item.path === `file://${old_path}`) {
             item.path = `file://${new_path}`
             item.name = name
         } else if (item.path.startsWith(`file://${old_path}/`)) item.path = `file://${new_path}${item.path.slice(`file://${old_path}`.length)}`
+        else continue
+        affected.push(item)
     }
     await reload(parent, new_path)
-    for (const item of state.windows) {
-        if (!item.path.startsWith("file://")) continue
-        // the old File object points at the old name: read the file again from its handle
-        if (item.path === `file://${new_path}` && node.kind === "file") {
-            try {
-                item.file = await (handle as file_handle).getFile()
-            } catch {
-                item.file = null
-            }
+    for (const item of affected) {
+        const renamed = await resolve_node(item.path.replace(/^file:\/\//, ""))
+        if (renamed?.kind === "file" && renamed.handle) {
+            const renamed_handle = renamed.handle as file_handle
+            item.file = await renamed_handle.getFile()
+            if (renamed.writable) item.save = blob => write_blob(renamed_handle, blob)
         }
-        window_refresh(item)
+        // Keep the editor and its pending changes intact while updating its destination.
+        const field = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
+        if (field) field.value = item.path
+        item.el.dataset.path = item.path
+        refresh_tab(item)
     }
 }
 
@@ -747,7 +784,7 @@ async function delete_entry(node: fs_node): Promise<void> {
     try {
         await (parent.handle as dir_handle).removeEntry(node.name, { recursive: true })
     } catch {
-        return note(text("files_failed"))
+        throw new Error(text("files_failed"))
     }
     clear_form()
     note("")
@@ -764,45 +801,121 @@ function on_bar_click(event: MouseEvent): void {
     run_action(control.dataset.act ?? "", tree.selected)
 }
 
-// a free name next to the original: "a.txt" -> "a copy.txt" -> "a copy 2.txt"
-function copy_name(dir: fs_node, name: string): string {
-    const dot = name.lastIndexOf(".")
-    const stem = dot > 0 ? name.slice(0, dot) : name
-    const ext = dot > 0 ? name.slice(dot) : ""
-    let candidate = `${stem} copy${ext}`
-    for (let count = 2; exists_in(dir, candidate); count++) candidate = `${stem} copy ${count}${ext}`
-    return candidate
+function selected_nodes(node: fs_node): fs_node[] {
+    if (!tree?.selection.has(node.path)) return [node]
+    return [...tree.selection].map(path => find_node(path)).filter((item): item is fs_node => !!item)
 }
 
-async function copy_entry(node: fs_node): Promise<void> {
-    const parent = node.parent
-    if (!parent?.writable || !node.handle) return note(text("files_unsupported"))
-    if (parent.children === null) await load_children(parent)
-    const name = copy_name(parent, node.name)
-    try {
-        await copy_into(node.handle as file_handle | dir_handle, parent.handle as dir_handle, name)
-    } catch {
-        return note(text("files_failed"))
-    }
-    note("")
-    await reload(parent, `${parent.path}/${name}`)
+// A selected parent already includes its selected descendants for recursive actions.
+function topmost(nodes: fs_node[]): fs_node[] {
+    return nodes.filter(node => !nodes.some(parent => parent !== node && (parent.path === "/" || node.path.startsWith(`${parent.path}/`))))
 }
 
-async function download_entry(node: fs_node): Promise<void> {
-    if (node.kind !== "file" || !node.handle) return
-    try {
-        const file = await (node.handle as file_handle).getFile()
-        const url = URL.createObjectURL(file)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = node.name
-        document.body.append(link)
-        link.click()
-        link.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 10000)
-    } catch {
-        note(text("files_failed"))
+async function rename_entries(nodes: fs_node[], pattern: string): Promise<void> {
+    const occupied = new Map<fs_node, Set<string>>()
+    const plans: { path: string, name: string }[] = []
+    // Validate every expansion before changing any files, including invalid regex filters.
+    for (const [index, node] of nodes.entries()) {
+        const parent = node.parent!
+        if (parent.children === null) await load_children(parent)
+        let names = occupied.get(parent)
+        if (!names) occupied.set(parent, names = new Set((parent.children ?? []).map(child => child.name)))
+        const expanded = rename_pattern(pattern, node.name, index)
+        if (!valid_name(expanded)) throw new Error(text("files_bad_name"))
+        names.delete(node.name)
+        const name = available_name(expanded, names)
+        names.add(name)
+        plans.push({ path: node.path, name })
     }
+    const renamed: { from: string, to: string }[] = []
+    const paths: string[] = []
+    for (const plan of plans) {
+        let path = plan.path
+        for (const change of renamed) if (path === change.from || path.startsWith(`${change.from}/`)) path = change.to + path.slice(change.from.length)
+        const current = await resolve_node(path)
+        if (!current?.parent) throw new Error(text("files_failed"))
+        const next_path = `${current.parent.path}/${plan.name}`
+        if (current.mount) await rename_mount(current, plan.name)
+        else await rename_entry(current, plan.name)
+        if (!find_node(next_path)) throw new Error(text("files_failed"))
+        renamed.push({ from: path, to: next_path })
+        // Previously renamed children follow a subsequently renamed parent.
+        for (let i = 0; i < paths.length; i++) if (paths[i].startsWith(`${path}/`)) paths[i] = next_path + paths[i].slice(path.length)
+        paths.push(next_path)
+    }
+    if (tree) {
+        tree.selection = new Set(paths)
+        tree.selected = find_node(paths.at(-1) ?? "")
+        tree.tools_visible = true
+        redraw()
+    }
+}
+
+async function copy_node(node: fs_node, parent: dir_handle, name: string): Promise<void> {
+    if (node.handle) return copy_into(node.handle as file_handle | dir_handle, parent, name)
+    if (node.kind !== "dir") throw new Error(text("files_failed"))
+    const folder = await parent.getDirectoryHandle(name, { create: true })
+    for (const child of node.children ?? []) await copy_node(child, folder, child.name)
+}
+
+async function paste_entries(dir: fs_node): Promise<void> {
+    if (dir.kind !== "dir" || !dir.writable || !dir.handle || !clipboard.length) return note(text("files_unsupported"))
+    if (clipboard.some(node => node.kind === "dir" && (dir.path === node.path || node.path === "/" || dir.path.startsWith(`${node.path}/`)))) return note(text("files_unsupported"))
+    await load_children(dir)
+    const occupied = new Set((dir.children ?? []).map(node => node.name))
+    const paths: string[] = []
+    for (const node of clipboard) {
+        const name = available_name(node.name, occupied)
+        await copy_node(node, dir.handle as dir_handle, name)
+        occupied.add(name)
+        paths.push(`${dir.path}/${name}`)
+    }
+    await reload(dir)
+    if (tree) {
+        tree.selection = new Set(paths)
+        tree.selected = find_node(paths.at(-1) ?? "")
+        tree.tools_visible = true
+        redraw()
+    }
+}
+
+function save_download(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = name
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+}
+
+async function archive_node(node: fs_node, path: string, entries: zip_entry[]): Promise<void> {
+    if (node.kind === "file") {
+        if (!node.handle) throw new Error(text("files_failed"))
+        entries.push({ name: path, data: new Uint8Array(await (await (node.handle as file_handle).getFile()).arrayBuffer()) })
+        return
+    }
+    entries.push({ name: `${path}/`, data: new Uint8Array() })
+    // Enumerate handles directly: a closed folder need not have been loaded in the tree.
+    if (node.handle) {
+        for await (const handle of (node.handle as dir_handle).values()) await archive_node(child_of(node, handle), `${path}/${handle.name}`, entries)
+    } else for (const child of node.children ?? []) await archive_node(child, `${path}/${child.name}`, entries)
+}
+
+async function download_entries(nodes: fs_node[]): Promise<void> {
+    const roots = topmost(nodes)
+    if (nodes.length === 1 && roots[0].kind === "file") {
+        save_download(await (roots[0].handle as file_handle).getFile(), roots[0].name)
+        return
+    }
+    const entries: zip_entry[] = [], names = new Set<string>()
+    for (const node of roots) {
+        const name = available_name(node.name === "/" ? "root" : node.name, names)
+        names.add(name)
+        await archive_node(node, name, entries)
+    }
+    save_download(zip_blob(entries), nodes.length === 1 ? `${nodes[0].name === "/" ? "root" : nodes[0].name}.zip` : "files.zip")
 }
 
 // The folder a new item goes into: the selected folder, the folder of the selected file, or /home/user when nothing is selected.
@@ -833,16 +946,33 @@ function run_action(action: string, node: fs_node | null): void {
         return
     }
     if (!node) return note(text("files_no_selection"))
+    const nodes = selected_nodes(node)
+    const attempt = async (work: () => Promise<void>): Promise<void> => {
+        try { await work() }
+        catch (error) { note(error instanceof Error ? error.message : text("files_failed")) }
+    }
     if (action === "rename") {
-        if (node.mount) return show_form(text("files_name"), node.name, [{ text: text("files_ok"), done: value => rename_mount(node, value) }])
-        if (!node.parent?.writable) return note(text("files_unsupported"))
-        show_form(text("files_name"), node.name, [{ text: text("files_ok"), done: value => rename_entry(node, value) }])
+        if (nodes.some(item => !item.mount && !item.parent?.writable)) return note(text("files_unsupported"))
+        show_form(text("files_name"), nodes.length === 1 ? node.name : "", [{ text: text("files_ok"), done: value => attempt(() => rename_entries(nodes, value)) }])
     } else if (action === "delete") {
-        if (node.mount) return show_form(`${text("files_confirm_delete")} ${node.name}`, null, [{ text: text("files_delete"), done: () => forget_mount(node) }])
-        if (!node.parent?.writable) return note(text("files_unsupported"))
-        show_form(`${text("files_confirm_delete")} ${node.name}`, null, [{ text: text("files_delete"), done: () => delete_entry(node) }])
-    } else if (action === "copy") void copy_entry(node)
-    else if (action === "download") void download_entry(node)
+        const roots = topmost(nodes)
+        if (roots.some(item => !item.mount && !item.parent?.writable)) return note(text("files_unsupported"))
+        show_form(`${text("files_confirm_delete")} ${roots.map(item => item.name).join(", ")}`, null, [{ text: text("files_delete"), done: () => attempt(async () => {
+            for (const item of roots) {
+                if (item.mount) await forget_mount(item)
+                else await delete_entry(item)
+            }
+            if (tree) {
+                tree.selection.clear()
+                tree.tools_visible = false
+                redraw()
+            }
+        }) }])
+    } else if (action === "copy") {
+        clipboard = topmost(nodes)
+        note(`${text("files_copied")}: ${nodes.length}`)
+    } else if (action === "paste") void attempt(() => paste_entries(node))
+    else if (action === "download") void attempt(() => download_entries(nodes))
 }
 
 // ---- moving by drag and drop ----------------------------------------------------------------------------------------------------
@@ -1010,7 +1140,7 @@ export function init_fs(desk: HTMLElement): void {
     }
     const root = shared_root ?? read_markup(root_box, null)
     shared_root = root
-    tree = { root, page, open: new Set(["/", "/home"]), selected: null, message: null, draft: null }
+    tree = { root, page, open: new Set(["/", "/home"]), selected: null, selection: new Set(), tools_visible: false, message: null, draft: null }
     upload_hooks.store = store_upload
     mount_opfs(root)
     void mount_executables(executable_names)
