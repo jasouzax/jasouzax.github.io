@@ -87,6 +87,9 @@ export type proc = {
     screen: { text: string, err: boolean }[]
     listeners: Set<(text: string, err: boolean) => void>
     exit_listeners: Set<() => void>
+    resize?: (cols: number, rows: number) => void
+    terminal_size?: [number, number]
+    background?: boolean
 }
 
 export type kernel_hooks = {
@@ -141,7 +144,7 @@ function finish(item: proc, code: number): void {
 }
 
 function leaves_of(item: proc): proc[] {
-    const running = [...item.children].map(pid => kernel.table.get(pid)).filter((child): child is proc => !!child && child.running)
+    const running = [...item.children].map(pid => kernel.table.get(pid)).filter((child): child is proc => !!child && child.running && !child.background)
     return running.length === 0 ? [item] : running.flatMap(leaves_of)
 }
 
@@ -164,6 +167,7 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
         stdin, stdout: options.stdout ?? make_sink(() => undefined), stderr: options.stderr ?? options.stdout ?? make_sink(() => undefined),
         running: true, code: null, abort: new AbortController(), interrupt: [], children: new Set(), done: null as unknown as Promise<number>,
         root: options.root ?? false, interactive: options.interactive ?? kernel.terminals.has(stdin), screen: [], listeners: new Set(), exit_listeners: new Set(),
+        background: options.background,
     }
     // a root process writes to its window: every write is kept (the window may open later or twice) and shown to whoever listens
     if (item.root && !options.stdout) {
@@ -181,7 +185,8 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
     parent?.children.add(pid)
     const aborted = new Promise<number>(done => item.abort.signal.addEventListener("abort", () => done(item.code ?? interrupted_code())))
     const api: proc_api = {
-        pid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: hooks.fs(), interactive: item.interactive,
+        pid, ppid: item.ppid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: hooks.fs(), interactive: item.interactive,
+        wasm: options.wasm,
         signal: item.abort.signal,
         on_interrupt: handler => { item.interrupt.push(handler) },
         spawn: (child_argv, child_options) => {
@@ -192,15 +197,20 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
         list_procs, kill,
         commands: [],
     }
+    // The host updates cwd/argv after chdir/exec and forwards PTY dimensions.
+    Object.defineProperty(api, "cwd", { get: () => item.cwd, set: value => { item.cwd = value } })
+    Object.defineProperty(api, "argv", { get: () => item.argv, set: value => { item.argv = value } })
+    Object.defineProperty(api, "env", { get: () => item.env, set: value => { item.env = value } })
+    Object.defineProperty(api, "resize", { get: () => item.resize, set: value => { item.resize = value; if (item.terminal_size) value?.(...item.terminal_size) } })
     const run = (async (): Promise<number> => {
-        const programs = await hooks.programs()
-        api.commands = Object.keys(programs).sort()
-        const main = programs[argv[0]]
-        if (!main) {
-            item.stderr.write(`${argv[0]}: command not found\n`)
-            return 127
-        }
         try {
+            const programs = await hooks.programs()
+            api.commands = Object.keys(programs).sort()
+            const main = programs[argv[0]]
+            if (!main) {
+                item.stderr.write(`${argv[0]}: command not found\n`)
+                return 127
+            }
             return await main(api)
         } catch (error) {
             item.stderr.write(`${argv[0]}: ${error instanceof Error ? error.message : String(error)}\n`)

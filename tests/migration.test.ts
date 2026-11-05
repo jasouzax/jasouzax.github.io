@@ -150,6 +150,7 @@ test("builds repair missing JSON, invalidate changed article content and prune d
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         f.put("content/blogs/article.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
         f.put("content/blogs/article.md", "# First article")
         const options = { root: f.root, out: join(f.root, "dist"), mode: "production" as const, force: false, build_date: new Date("2026-11-04"), only_check: false }

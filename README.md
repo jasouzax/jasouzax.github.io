@@ -32,6 +32,7 @@ The supplied media was ignored by gen-11's Git repository. It has been copied lo
 | `src/web/` | TSX generators, virtual-node rendering, print layouts, SEO and TSX partials |
 | `src/web/client/` | SPA, search, theme switching, browser filesystem, processes and desk windows |
 | `src/node/` | Local serving and cloud/origin adapters |
+| `src/desk/` | BusyBox WASM toolchain, prepared binaries and browser process port |
 | `src/font/` | Node.js OpenType table writer and WOFF/WOFF2 packaging |
 | `tests/` | Migration contract regression tests |
 | `dist/`, `.cache/` | Generated, disposable files |

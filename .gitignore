@@ -12,3 +12,6 @@ content/media/*
 !content/media/signature.svg
 
 !content/media/icon.svg
+
+wasmbox
+src/desk/**/.build/

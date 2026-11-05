@@ -4,6 +4,7 @@ import { join, extname, resolve } from "node:path"
 import { inside } from "../paths.ts"
 
 const types: Record<string, string> = {
+    ".wasm": "application/wasm",
     ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml",
     ".woff2": "font/woff2", ".woff": "font/woff", ".png": "image/png", ".jpg": "image/jpeg", ".mp4": "video/mp4", ".xml": "application/xml", ".txt": "text/plain; charset=utf-8", ".avif": "image/avif", ".ico": "image/x-icon", ".webmanifest": "application/manifest+json", ".md": "text/markdown; charset=utf-8",
 }

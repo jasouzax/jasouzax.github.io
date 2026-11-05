@@ -22,6 +22,9 @@ export function should_intercept(event: MouseEvent, link: HTMLAnchorElement): bo
     if (link.target && link.target !== "_self") return false
     if (link.hasAttribute("download")) return false
     if (link.origin !== location.origin) return false
+    // Isolation is a document response policy; an SPA swap cannot enable it.
+    const is_desk = (path: string) => /^\/(?:ja\/)?desk(?:\/|$)/.test(path)
+    if (is_desk(link.pathname) !== is_desk(location.pathname)) return false
     // files (pdf, images, the .json payloads themselves) are real downloads, not pages
     if (/\.[a-z0-9]{2,5}$/i.test(link.pathname) && !link.pathname.endsWith(".html")) return false
     if (link.pathname.startsWith("/api/") || link.pathname.startsWith("/work")) return false

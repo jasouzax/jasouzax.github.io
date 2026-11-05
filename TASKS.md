@@ -65,6 +65,7 @@ Ordered dependency checklist. `[x]` means implemented and verified, `[ ]` means 
 
 - [x] Preserve SPA navigation, search, themes, preferences and header menus (3.1–3.4).
 - [x] Preserve desk windows, layout, resizing, syntax, shell, processes and visitor OPFS home (3.5, 3.7).
+- [x] Replace the JavaScript shell/utilities with compiled BusyBox ash and applets; use Worker processes, shared byte filesystem calls, inherited descriptors, pipes, fork/exec/wait and local xterm.js. Build recipes and scope are in `src/desk/README.md`.
 - [x] Keep uploads strictly in memory; remove inherited OPFS /tmp behavior.
 - [ ] Offer a destination picker on Save for new/read-only windows.
 - [ ] Mount public /srv resources consistently in browser VFS and desk window loading.

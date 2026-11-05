@@ -33,11 +33,30 @@ type tree_state = {
 }
 
 let tree: tree_state | null = null
+let shared_root: fs_node | null = null
 
 // Uploads stay in a memory directory until explicitly saved into /home/user.
 const temporary_files = memory_directory("tmp")
 let home_node: fs_node | null = null
 let tmp_node: fs_node | null = null
+let executable_names: string[] = []
+export async function mount_executables(names: string[]): Promise<void> {
+    executable_names = names
+    const bin = find_node("/bin")
+    if (!bin) return
+    const directory = memory_directory("bin")
+    for (const name of names) {
+        const file = await directory.getFileHandle(name, { create: true })
+        const writer = await file.createWritable!()
+        await writer.write(JSON.stringify({ executable: `/bin/${name}`, runtime: "wasm" }))
+        await writer.close()
+    }
+    bin.handle = directory
+    bin.writable = false
+    bin.children = null
+    await load_children(bin)
+    redraw()
+}
 
 // ---- the tree ---------------------------------------------------------------------------------------------------------------------
 
@@ -210,7 +229,7 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
 }
 
 export function fs_root(): fs_node | null {
-    return tree?.root ?? null
+    return shared_root
 }
 
 // a folder was changed from outside the tree (a process): list it again and redraw, without opening it
@@ -943,12 +962,15 @@ export function init_fs(desk: HTMLElement): void {
         tree = null
         return
     }
-    const root = read_markup(root_box, null)
+    const root = shared_root ?? read_markup(root_box, null)
+    shared_root = root
     tree = { root, page, open: new Set(["/", "/home"]), selected: null, message: null, draft: null }
     upload_hooks.store = store_upload
     mount_opfs(root)
+    void mount_executables(executable_names)
     redraw()
     void restore_mounts(root)
+    document.dispatchEvent(new Event("jazu:fs:init"))
     // the bar sits under the tree, in the panel itself, so it stays in view while the tree scrolls
     const side = page.closest(".desk_side")
     const bar = make_bar()

@@ -23,6 +23,8 @@ export type fs_api = {
     mkdir(path: string): Promise<void>
     remove(path: string, recursive?: boolean): Promise<void>
     rename(from: string, to: string): Promise<void>
+    read_bytes?(path: string): Promise<Uint8Array>
+    write_bytes?(path: string, data: Uint8Array): Promise<void>
 }
 
 export type proc_info = { pid: number, ppid: number, argv: string[], running: boolean, code: number | null }
@@ -33,11 +35,14 @@ export type spawn_options = {
     stdin: text_stream
     stdout: text_stream
     stderr: text_stream
+    background?: boolean
+    wasm?: { descriptors: import("./wasm_protocol.ts").descriptor[], snapshot?: import("./wasm_protocol.ts").fork_state }
 }
 
 // what a running program gets
 export type proc_api = {
     pid: number
+    ppid: number
     argv: string[]
     cwd: string
     env: Record<string, string>
@@ -59,6 +64,8 @@ export type proc_api = {
     kill(pid: number, code?: number): boolean
     // every program name the runtime has (for `help`, `which`, completion)
     commands: string[]
+    wasm?: spawn_options["wasm"]
+    resize?: (cols: number, rows: number) => void
 }
 
 // a program of the shell runtime: gets its process and answers its exit code

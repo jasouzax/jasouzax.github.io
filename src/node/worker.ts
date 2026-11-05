@@ -74,6 +74,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         if (object) {
             const headers = new Headers({ etag: object.httpEtag, "accept-ranges": "bytes", "cache-control": "public, max-age=31536000, immutable", "access-control-allow-origin": `https://${env.DOMAIN}` })
             object.writeHttpMetadata(headers)
+            if (path === "/assets/wasm/manifest.json") headers.set("cache-control", "no-cache")
             if (path.endsWith(".wasm")) headers.set("content-type", "application/wasm")
             if (!object.body) return new Response(null, { status: request.headers.has("if-none-match") ? 304 : 412, headers })
             if (object.range) headers.set("content-range", `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`)

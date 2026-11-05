@@ -1,14 +1,11 @@
-// Entry of the lazily loaded shell runtime (one script, like client_theme_switch.ts): the shell and every utility in a single bundle, so
-// the first `pid:` fetches it once and nothing else is requested when a program is started. The page's kernel (client_desk_proc.ts) loads it
-// and starts programs from `programs`.
+// Lazy registration only: command parsing and utilities execute in compiled WASM.
 
-import type { program } from "./proc_types.ts"
-import { sh_program, set_programs } from "./desk_sh.ts"
-import { utility_programs } from "./desk_utils.ts"
+import { register_wasm, registered_programs } from "./wasm_host.ts"
+import type { wasm_image } from "./wasm_protocol.ts"
 
-const programs: Record<string, program> = { ...utility_programs, sh: sh_program, bash: sh_program }
-programs.egrep = async p => programs.grep({ ...p, argv: ["grep", "-E", ...p.argv.slice(1)] })
-programs.fgrep = async p => programs.grep({ ...p, argv: ["grep", "-F", ...p.argv.slice(1)] })
-set_programs(programs)
-
-;(window as Window & { jazu_desk_shell?: unknown }).jazu_desk_shell = { programs }
+const ready = fetch("/assets/wasm/manifest.json").then(async response => {
+    if (!response.ok) throw new Error(`Cannot load executable manifest: ${response.status}`)
+    const images: wasm_image[] = await response.json()
+    for (const image of images) register_wasm(image)
+})
+;(window as Window & { jazu_desk_shell?: unknown }).jazu_desk_shell = { programs: registered_programs, ready, register_wasm }

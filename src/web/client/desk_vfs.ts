@@ -5,6 +5,7 @@ import type { fs_api, stat_info } from "./proc_types.ts"
 import type { fs_node, file_handle, dir_handle } from "./desk_fs.ts"
 import { fs_root, load_children, refresh_dir } from "./desk_fs.ts"
 import { list_procs, kernel } from "./kernel.ts"
+import { proc_record } from "./wasm_procfs.ts"
 
 type kind = "file" | "dir"
 
@@ -53,8 +54,8 @@ function split_parent(path: string): { dir: string, name: string } {
 function proc_file(pid: number, name: string): string | null {
     const item = kernel.table.get(pid)
     if (!item) return null
-    if (name === "cmdline") return item.argv.join(" ") + "\n"
-    if (name === "status") return `Name:\t${item.argv[0]}\nPid:\t${item.pid}\nPPid:\t${item.ppid}\nState:\t${item.running ? "R (running)" : "Z (exited)"}\n`
+    const record = proc_record(list_procs(), `/proc/${pid}/${name}`)
+    if (record !== null) return record
     if (name === "cwd") return item.cwd + "\n"
     return null
 }
@@ -78,6 +79,29 @@ function virtual_stat(path: string, programs: string[]): stat_info | null {
 
 export function make_fs(programs: () => string[]): fs_api {
     const api: fs_api = {
+        async read_bytes(path) {
+            const clean = norm(path)
+            if (clean.startsWith("/proc/") || clean.startsWith("/bin/") || clean === "/dev/null") return new TextEncoder().encode(await api.read(clean))
+            const node = await resolve(clean)
+            if (!node) throw new Error("ENOENT")
+            if (node.kind === "dir") throw new Error("EISDIR")
+            if (!node.handle) throw new Error("EACCES")
+            return new Uint8Array(await (await (node.handle as file_handle).getFile()).arrayBuffer())
+        },
+        async write_bytes(path, data) {
+            const clean = norm(path)
+            if (clean === "/dev/null") return
+            const { dir, name } = split_parent(clean)
+            const parent = await resolve(dir)
+            const handle = writable_dir(parent)
+            const file = await handle.getFileHandle(name, { create: true })
+            if (!file.createWritable) throw new Error("EROFS")
+            const stream = await file.createWritable()
+            await stream.write(new Blob([new Uint8Array(data)]))
+            await stream.close()
+            await refresh_dir(parent!)
+            document.dispatchEvent(new CustomEvent("jazu:fs", { detail: { path: clean } }))
+        },
         async stat(path) {
             const virtual = virtual_stat(path, programs())
             if (virtual) return virtual
@@ -100,7 +124,7 @@ export function make_fs(programs: () => string[]): fs_api {
                 return [...out].map(([name, kind]) => ({ name, kind }))
             }
             const proc_dir = /^\/proc\/(\d+)$/.exec(clean)
-            if (proc_dir && kernel.table.has(Number(proc_dir[1]))) return ["cmdline", "status", "cwd"].map(name => ({ name, kind: "file" as const }))
+            if (proc_dir && kernel.table.has(Number(proc_dir[1]))) return ["cmdline", "status", "stat", "cwd"].map(name => ({ name, kind: "file" as const }))
             const node = await resolve(clean)
             if (!node && clean !== "/bin" && clean !== "/dev") throw new Error("No such file or directory")
             if (node && node.kind !== "dir") throw new Error("Not a directory")
@@ -118,7 +142,7 @@ export function make_fs(programs: () => string[]): fs_api {
                 const text = proc_file(Number(proc_match[1]), proc_match[2])
                 if (text !== null) return text
             }
-            if (virtual_stat(clean, programs())?.kind === "file" && clean.startsWith("/bin/")) return `#!/bin/sh\n# ${clean.slice(5)} is built into the shell runtime\n`
+            if (virtual_stat(clean, programs())?.kind === "file" && clean.startsWith("/bin/")) return JSON.stringify({ executable: clean, runtime: "wasm" })
             const node = await resolve(clean)
             if (!node) throw new Error("No such file or directory")
             if (node.kind === "dir") throw new Error("Is a directory")

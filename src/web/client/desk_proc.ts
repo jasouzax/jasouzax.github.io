@@ -1,7 +1,5 @@
-// Processes on the desk. A process has the uri `pid:{id}`; typing `pid:` (no id) in a window's source starts a new one, whose program is the
-// shell (`sh`), and the window shows it as a terminal: what the process writes to stdout and stderr, and a line to type into its stdin. `pid:3`
-// shows an existing one. The programs live in a separate script (client_desk_shell.ts, loaded the first time) and the process table in
-// client_kernel.ts; this file is the part in the page: the window, the loader and the file system the processes see.
+// Process windows use xterm's VT parser and raw input. The kernel owns PIDs;
+// the lazy registry supplies compiled programs and their shared filesystem.
 
 import type { desk_window } from "./desk.ts"
 import { state, text, window_hooks, refresh_tab } from "./desk.ts"
@@ -10,19 +8,22 @@ import { kernel, kill, interrupt, make_stream, start_process } from "./kernel.ts
 import type { proc } from "./kernel.ts"
 import type { program } from "./proc_types.ts"
 import { make_fs } from "./desk_vfs.ts"
+import { mount_executables } from "./desk_fs.ts"
+import { Terminal } from "@xterm/xterm"
+import { FitAddon } from "@xterm/addon-fit"
 
 export const pid_mime = "application/x-pid"
 
 // the page script's data-desk-shell attribute is the address of the shell bundle; document.currentScript is only set while it first runs
 const shell_url = document.currentScript?.getAttribute("data-desk-shell") ?? ""
 
-type shell_window = Window & { jazu_desk_shell?: { programs: Record<string, program> } }
+type shell_window = Window & { jazu_desk_shell?: { programs: Record<string, program>, ready: Promise<void> } }
 
 let runtime: Promise<Record<string, program>> | null = null
 
 function load_runtime(): Promise<Record<string, program>> {
     const loaded = (window as shell_window).jazu_desk_shell
-    if (loaded) return Promise.resolve(loaded.programs)
+    if (loaded) return loaded.ready.then(() => loaded.programs)
     runtime ??= new Promise((done, fail) => {
         if (!shell_url) {
             fail(new Error("the shell runtime is not part of this page"))
@@ -32,7 +33,7 @@ function load_runtime(): Promise<Record<string, program>> {
         script.src = shell_url
         script.onload = () => {
             const api = (window as shell_window).jazu_desk_shell
-            if (api) done(api.programs)
+            if (api) api.ready.then(() => done(api.programs), fail)
             else fail(new Error("the shell runtime did not start"))
         }
         script.onerror = () => {
@@ -87,18 +88,18 @@ function detach(item: desk_window): void {
 function new_shell(): proc {
     const stdin = make_stream()
     kernel.terminals.add(stdin)
-    return start_process(["sh"], { root: true, stdin, cwd: "/home/user", env: { HOME: "/home/user", USER: "user" }, interactive: true })
+    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: "/home/user", env: { HOME: "/home/user", USER: "user", LOGNAME: "user", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "user@jazu:$PWD$ " }, interactive: true })
 }
 
 async function open_pid(item: desk_window, uri: string): Promise<boolean> {
-    const match = /^pid:(\d*)$/i.exec(uri.trim())
+    const match = /^pid:(\d*)$/i.exec(uri.trim()) ?? (uri.trim() === "pid://sh" ? [uri, ""] : null)
     if (!match) return false
     if (match[1] === "") {
         attach(item, new_shell().pid)
         return true
     }
     const found = kernel.table.get(Number(match[1]))
-    if (!found || !found.root) {
+    if (!found) {
         const path = item.el.querySelector<HTMLInputElement>(".desk_wbox_head_path")
         if (path) path.setCustomValidity(`${text("process_gone")} ${match[1]}`)
         path?.reportValidity()
@@ -124,115 +125,67 @@ function note_body(message: string): HTMLElement {
 function terminal_body(item: desk_window): HTMLElement {
     cleanups.get(item)?.()
     cleanups.delete(item)
-    // only the view works on a process: text and edit have no file to show or change
-    if (item.mode !== "view") return note_body(`${text(item.mode === "edit" ? "unsupported_edit" : "unsupported_text")} ${item.mime}`)
+    if (item.mode !== "view") return note_body(text("unsupported_edit"))
     const proc = item.pid === null ? undefined : kernel.table.get(item.pid)
-    if (!proc) return note_body(`${text("process_gone")} ${item.pid ?? ""}`)
+    if (!proc) return note_body(text("process_gone"))
+    if (!document.querySelector("link[data-terminal-css]")) {
+        const css = document.createElement("link")
+        css.rel = "stylesheet"; css.href = "/assets/terminal/xterm-5.5.0.css"; css.dataset.terminalCss = "1"
+        document.head.append(css)
+    }
     const box = document.createElement("div")
     box.className = "desk_wbox_body_term"
-    const out = document.createElement("div")
-    out.className = "desk_wbox_body_term_out"
-    out.setAttribute("role", "log")
-    const row = document.createElement("label")
-    row.className = "desk_wbox_body_term_row"
-    const prompt = document.createElement("span")
-    prompt.className = "desk_wbox_body_term_prompt"
-    const input = document.createElement("input")
-    input.className = "desk_wbox_body_term_input"
-    input.type = "text"
-    input.autocomplete = "off"
-    input.spellcheck = false
-    input.setAttribute("autocapitalize", "off")
-    input.setAttribute("aria-label", text("process_input"))
-    row.append(prompt, input)
-    box.append(out, row)
-
-    // everything up to the last newline is history (spans in `out`); the rest is the line in progress, which is shown as the prompt
-    let tail = ""
-    const append = (chunk: string, err: boolean): void => {
-        if (chunk.includes("\x1b[2J")) {
-            out.replaceChildren()
-            tail = ""
-            chunk = chunk.slice(chunk.lastIndexOf("\x1b[2J") + 4)
-        }
-        chunk = chunk.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "")
-        const parts = (tail + chunk).split("\n")
-        tail = parts.pop() ?? ""
-        if (parts.length > 0) {
-            const span = document.createElement("span")
-            if (err) span.className = "term_err"
-            span.textContent = parts.join("\n") + "\n"
-            out.append(span)
-            while (out.childNodes.length > 2000) out.firstChild?.remove()
-        }
-        prompt.textContent = tail
-        box.scrollTop = box.scrollHeight
-    }
-    for (const entry of proc.screen) append(entry.text, entry.err)
-
-    const finished = (): void => {
-        append(`\n[pid:${proc.pid} ${text("process_exited")} ${proc.code ?? 0}]\n`, false)
-        input.disabled = true
-        input.placeholder = ""
-    }
-    const listener = (chunk: string, err: boolean): void => append(chunk, err)
-    proc.listeners.add(listener)
-    proc.exit_listeners.add(finished)
-    if (!proc.running) finished()
+    box.style.cssText = "position:relative;display:block;min-height:120px;height:100%;overflow:hidden;padding:8px"
+    const terminal = new Terminal({ cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000, theme: { background: "#101318", foreground: "#e4e8ef" } })
+    const fit = new FitAddon()
+    terminal.loadAddon(fit)
+    const append = (chunk: string): void => { terminal.write(chunk) }
+    const finished = (): void => { terminal.writeln("\r\n[process exited " + (proc.code ?? 0) + "]"); terminal.options.disableStdin = true }
+    const input = terminal.onData(data => {
+        if (!proc.running) return
+        if (data === "\x03") { interrupt(proc); return }
+        proc.stdin.write(data)
+    })
+    const sized = terminal.onResize(({ cols, rows }) => { proc.terminal_size = [cols, rows]; proc.resize?.(cols, rows) })
+    const observer = new ResizeObserver(() => { if (box.isConnected) { try { fit.fit() } catch {} } })
+    queueMicrotask(() => {
+        if (!box.isConnected) return
+        terminal.open(box)
+        observer.observe(box)
+        fit.fit()
+        proc.terminal_size = [terminal.cols, terminal.rows]
+        proc.resize?.(terminal.cols, terminal.rows)
+        for (const entry of proc.screen) append(entry.text)
+        proc.listeners.add(append)
+        proc.exit_listeners.add(finished)
+        if (!proc.running) finished()
+        terminal.focus()
+    })
     cleanups.set(item, () => {
-        proc.listeners.delete(listener)
-        proc.exit_listeners.delete(finished)
+        observer.disconnect(); input.dispose(); sized.dispose()
+        proc.listeners.delete(append); proc.exit_listeners.delete(finished)
+        terminal.dispose()
     })
-
-    const history: string[] = []
-    let at = 0
-    input.addEventListener("keydown", event => {
-        if (event.key === "Enter") {
-            event.preventDefault()
-            const line = input.value
-            input.value = ""
-            if (!proc.running) return
-            if (line.trim() !== "" && history[history.length - 1] !== line) history.push(line)
-            at = history.length
-            // the terminal echoes what is typed, after the prompt that was waiting
-            append(line + "\n", false)
-            proc.stdin.write(line + "\n")
-        } else if (event.ctrlKey && event.key.toLowerCase() === "c") {
-            event.preventDefault()
-            if (!proc.running) return
-            input.value = ""
-            append("^C", false)
-            interrupt(proc)
-        } else if (event.ctrlKey && event.key.toLowerCase() === "d" && input.value === "") {
-            event.preventDefault()
-            if (proc.running) proc.stdin.eof()
-        } else if (event.ctrlKey && event.key.toLowerCase() === "l") {
-            event.preventDefault()
-            out.replaceChildren()
-        } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-            event.preventDefault()
-            at = Math.max(0, Math.min(history.length, at + (event.key === "ArrowUp" ? -1 : 1)))
-            input.value = history[at] ?? ""
-        }
-    })
-    box.addEventListener("click", () => {
-        if (!getSelection()?.toString()) input.focus()
-    })
-    queueMicrotask(() => input.focus({ preventScroll: true }))
     return box
 }
 
 // ---- wiring -------------------------------------------------------------------------------------------------------------------------
 
 export function init_proc(): void {
+    const programs = async () => {
+        const programs = await load_runtime()
+        const names = Object.keys(programs).sort()
+        if (names.join("\0") !== program_names.join("\0")) {
+            program_names = names
+            await mount_executables(program_names)
+        }
+        return programs
+    }
     kernel.hooks = {
-        programs: async () => {
-            const programs = await load_runtime()
-            program_names = Object.keys(programs).sort()
-            return programs
-        },
+        programs,
         fs: () => fs,
     }
+    document.addEventListener("jazu:fs:init", () => { void programs().catch(error => console.error(error)) })
     const fs = make_fs(() => program_names)
     process_hooks.body = terminal_body
     uri_handlers.push(open_pid)

@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync, copyFileSync, unlinkSync } from "node:fs"
 import { join, dirname, relative } from "node:path"
+import { fileURLToPath } from "node:url"
 import { build as esbuild_build, transform } from "esbuild"
 import { load_config } from "./config.ts"
 import type { diagnostics } from "./diag.ts"
@@ -78,15 +79,28 @@ async function bundle_script(root: string, entry: string, files: output_files, m
         minify: mode === "production", entryNames: "assets/runtime/[name].[hash]", target: "es2020", logLevel: "silent",
     })
     const output = result.outputFiles[0]
-    const rel = relative(outdir, output.path)
+    const rel = relative(outdir, output.path).replace(/\\/g, "/")
     files.set(rel, Buffer.from(output.contents))
     return "/" + rel
 }
 
 async function bundle_runtime(root: string, files: output_files, mode: string): Promise<{ page: string, theme_switch: string, desk_shell: string, boot: string }> {
+    const artifact = join(root, "src", "desk", "busybox", "artifacts")
+    const worker = await bundle_script(root, "wasm_worker", files, mode)
+    const wasm_bytes = readFileSync(join(artifact, "busybox.wasm"))
+    const hash = sha256(wasm_bytes)
+    const wasm_path = `assets/wasm/busybox-${hash.slice(0, 10)}.wasm`
+    files.set(wasm_path, wasm_bytes)
+    files.set("assets/wasm/busybox-LICENSE", readFileSync(join(artifact, "LICENSE")))
+    files.set("assets/wasm/busybox.config", readFileSync(join(artifact, "busybox.config")))
+    files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
+    files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(artifact, "busybox-source.tar.bz2")))
+    for (const name of ["build.sh", "port.py", "host.c"]) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(join(root, "src", "desk", "busybox", name)))
+    files.set("assets/wasm/manifest.json", JSON.stringify([{ id: "busybox", version: "1.36.1-jazu.1", worker, wasm: "/" + wasm_path, sha256: hash,
+        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")), license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
-    // the shell runtime of /desk processes (shell + utilities in one script), fetched the first time a `pid:` is opened
+    // Executable registration is small; WASM bytes remain lazy until a process starts.
     const desk_shell = await bundle_script(root, "desk_shell", files, mode)
     const boot_source = readFileSync(join(root, "src", "web", "client", "boot.ts"), "utf8")
     const boot = await transform(boot_source, { loader: "ts", minify: true })
@@ -151,7 +165,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     const assets: page_assets = { themes, runtime_page: runtime.page, runtime_theme_switch: runtime.theme_switch, runtime_desk_shell: runtime.desk_shell, boot_script: runtime.boot, nav_index: nav, page_styles }
     const cache = load_cache(options.root)
     const next_cache: Record<string, string> = {}
-    const shared = shared_hash(model, JSON.stringify(manifest) + runtime.page + runtime.boot + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
+    const shared = shared_hash(model, JSON.stringify(manifest) + JSON.stringify(runtime) + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
     let skipped = 0
     for (const page of model.pages) {
         const expertise = expertise_by_lang.get(page.lang) ?? null
