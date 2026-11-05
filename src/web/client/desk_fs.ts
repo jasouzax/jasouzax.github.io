@@ -1004,6 +1004,77 @@ async function download_entries(nodes: fs_node[]): Promise<void> {
     save_download(zip_blob(entries), nodes.length === 1 ? `${nodes[0].name === "/" ? "root" : nodes[0].name}.zip` : "files.zip")
 }
 
+export type folder_action = "new_file" | "new_folder" | "paste" | "upload" | "rename" | "copy" | "cut" | "download" | "delete"
+export function folder_action_enabled(action: folder_action, dir: fs_node, nodes: fs_node[] = []): boolean {
+    if (["new_file", "new_folder", "upload", "paste"].includes(action)) {
+        if (!can_create(dir)) return false
+        if (action !== "paste") return true
+        return clipboard.length > 0 && clipboard.every(source => can_read(source) && (clipboard_mode !== "cut" || can_move(source)) && !(source.kind === "dir" && (source.path === "/" || dir.path === source.path || dir.path.startsWith(`${source.path}/`))))
+    }
+    if (!nodes.length) return false
+    if (action === "rename" || action === "delete") return nodes.every(node => node.mount || can_move(node))
+    if (action === "cut") return nodes.every(node => can_move(node) && can_read(node))
+    return nodes.every(can_read)
+}
+
+export async function perform_folder_action(action: folder_action, dir: fs_node, nodes: fs_node[] = [], value = ""): Promise<void> {
+    await check_permissions([dir, ...nodes, ...clipboard])
+    if (!folder_action_enabled(action, dir, nodes)) throw new Error(text("files_unsupported"))
+    if (action === "new_file" || action === "new_folder") {
+        if (!valid_name(value)) throw new Error(text("files_bad_name"))
+        await load_children(dir)
+        if (exists_in(dir, value)) throw new Error(text("files_exists"))
+        await create_entry(dir, value, action === "new_file" ? "file" : "dir")
+        if (!find_node(`${dir.path}/${value}`)) throw new Error(text("files_failed"))
+    } else if (action === "rename") await rename_entries(nodes, value)
+    else if (action === "paste") await paste_entries(dir)
+    else if (action === "download") await download_entries(nodes)
+    else if (action === "delete") {
+        for (const node of topmost(nodes)) {
+            if (node.mount) await forget_mount(node)
+            else await delete_entry(node)
+        }
+    } else if (action === "copy" || action === "cut") {
+        clipboard = topmost(nodes); clipboard_mode = action
+        sync_buttons()
+    }
+}
+
+export const desk_drag_type = "application/x-jazu-files"
+export function start_entry_drag(nodes: fs_node[], transfer: DataTransfer): void {
+    dragged = topmost(nodes)
+    transfer.setData(desk_drag_type, JSON.stringify(dragged.map(node => node.path)))
+    transfer.setData("text/plain", dragged.map(node => node.path).join("\n"))
+    transfer.effectAllowed = "move"
+}
+
+export function dragged_entries(): fs_node[] { return dragged }
+export function end_entry_drag(): void { dragged = [] }
+
+export function can_drop_entries(dir: fs_node, nodes: fs_node[]): boolean {
+    return can_create(dir) && nodes.length > 0 && nodes.every(node => can_move(node) && can_read(node) && node.path !== dir.path && !dir.path.startsWith(`${node.path}/`)) && nodes.some(node => node.parent?.path !== dir.path)
+}
+
+export async function move_folder_entries(dir: fs_node, paths: string[]): Promise<void> {
+    const nodes: fs_node[] = []
+    for (const path of paths) {
+        const node = await resolve_node(path)
+        if (!node) throw new Error(text("files_failed"))
+        if (!nodes.some(existing => existing.path === node.path)) nodes.push(node)
+    }
+    const roots = topmost(nodes)
+    await check_permissions([dir, ...roots])
+    if (!can_drop_entries(dir, roots)) throw new Error(text("files_unsupported"))
+    await load_children(dir)
+    const occupied = new Set((dir.children ?? []).map(node => node.name))
+    for (const node of roots) {
+        if (node.parent?.path === dir.path) continue
+        const name = available_name(node.name, occupied)
+        await move_entry(node, dir, name)
+        occupied.add(name)
+    }
+}
+
 // The folder a new item goes into: the selected folder, the folder of the selected file, or /home/user when nothing is selected.
 function create_target(): fs_node | null {
     const picked = tree?.selected ? target_dir(tree.selected) : null
@@ -1066,15 +1137,7 @@ function run_action(action: string, node: fs_node | null): void {
 // Only what lives in a writable folder (/home/user, /tmp, a picked folder) moves, and only into another writable folder: the system folders
 // described by the markup are neither sources nor targets.
 
-let dragged: fs_node | null = null
-
-function can_drop(node: fs_node, onto: fs_node): fs_node | null {
-    const dir = target_dir(onto)
-    if (!dir || !dir.writable || !dir.handle || !node.parent?.writable || node.mount) return null
-    if (dir === node.parent || dir === node) return null
-    if (dir.path === node.path || dir.path.startsWith(`${node.path}/`)) return null
-    return dir
-}
+let dragged: fs_node[] = []
 
 async function move_entry(node: fs_node, dir: fs_node, name = node.name): Promise<void> {
     const from = node.parent
@@ -1141,15 +1204,14 @@ function bind_drag(page: HTMLElement): void {
         const head = drop_head(event)
         const node = head ? node_of(head) : null
         if (!node || !head?.draggable) return
-        dragged = node
-        event.dataTransfer?.setData("text/plain", node.path)
-        if (event.dataTransfer) event.dataTransfer.effectAllowed = "move"
+        if (event.dataTransfer) start_entry_drag(selected_nodes(node), event.dataTransfer)
     })
     page.addEventListener("dragover", event => {
         const head = drop_head(event)
         const onto = head ? node_of(head) : null
         clear_drop_marks()
-        if (!dragged || !head || !onto || !can_drop(dragged, onto)) return
+        if (!event.dataTransfer?.types.includes(desk_drag_type)) return
+        if (!head || !onto || !can_drop_entries(target_dir(onto)!, dragged)) return
         event.preventDefault()
         if (event.dataTransfer) event.dataTransfer.dropEffect = "move"
         head.setAttribute("data-drop", "")
@@ -1160,16 +1222,17 @@ function bind_drag(page: HTMLElement): void {
     page.addEventListener("drop", event => {
         const head = drop_head(event)
         const onto = head ? node_of(head) : null
-        const node = dragged
-        dragged = null
+        const nodes = dragged
+        dragged = []
         clear_drop_marks()
-        const dir = node && onto ? can_drop(node, onto) : null
-        if (!node || !dir) return
+        if (!event.dataTransfer?.types.includes(desk_drag_type)) return
+        const dir = onto ? target_dir(onto) : null
+        if (!dir || !can_drop_entries(dir, nodes)) return
         event.preventDefault()
-        void move_entry(node, dir).catch(() => note(text("files_failed")))
+        void move_folder_entries(dir, nodes.map(node => node.path)).catch(() => note(text("files_failed")))
     })
     page.addEventListener("dragend", () => {
-        dragged = null
+        dragged = []
         clear_drop_marks()
     })
 }

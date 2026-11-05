@@ -514,6 +514,7 @@ const runtime_keys = [
     "open_terminal",
     "open_folder",
     "folder_navigation",
+    "folder_context_menu",
     "folder_up",
     "folder_refresh",
     "folder_contents",

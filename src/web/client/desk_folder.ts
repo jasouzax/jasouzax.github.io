@@ -3,9 +3,12 @@ import { state, text } from "./desk.ts"
 import { load_children, open_entry, redraw, type fs_node, type file_handle } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
 import { open_source } from "./desk_view.ts"
-import { can_read, check_permissions } from "./desk_fs_permissions.ts"
+import { can_browse, can_move, can_read, check_permissions } from "./desk_fs_permissions.ts"
 import { file_preview } from "./desk_previews.ts"
 import { local_file_path } from "./desk_paths.ts"
+import { folder_change, folder_cover_plan } from "./desk_folder_cover.ts"
+import { bind_folder_context } from "./desk_folder_context.ts"
+import { bind_folder_drag } from "./desk_folder_drag.ts"
 
 function mime_of(node: fs_node, file: File): string {
     const ext = node.name.split(".").pop()?.toLowerCase() ?? ""
@@ -39,6 +42,10 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
     nav.append(up, location, reload)
     body.append(nav, status, grid)
     const urls = new Set<string>()
+    const entries = new Map<string, fs_node>()
+    const cover_refreshers = new Map<string, () => void>()
+    let directory: fs_node | null = null
+    let close_context = () => {}
     let revision = 0, active = 0
     let queue: (() => Promise<void>)[] = []
     let observer: IntersectionObserver | null = null
@@ -53,7 +60,7 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
     }
     const refresh = async (): Promise<void> => {
         const current = ++revision
-        observer?.disconnect(); queue = []; release()
+        close_context(); observer?.disconnect(); queue = []; release(); entries.clear(); cover_refreshers.clear()
         grid.replaceChildren()
         status.textContent = text("folder_loading")
         const path = path_of()
@@ -66,6 +73,7 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
             await check_permissions([dir])
             if (signal.aborted || revision !== current) return
             if (dir.readable === false || dir.content_readable === false) throw new Error(text("files_denied"))
+            directory = dir
             redraw()
             const children = dir.children ?? []
             status.textContent = children.length ? `${children.length} ${text("folder_items")}` : text("files_empty")
@@ -80,14 +88,18 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
             }, { root: grid, rootMargin: "160px" })
             for (const child of children) {
                 const row = document.createElement("li")
+                row.className = "desk_folder_entry"; row.dataset.path = child.path
+                entries.set(child.path, child)
                 const tile = document.createElement("button")
                 tile.type = "button"; tile.className = "desk_folder_tile"
                 tile.dataset.path = child.path; tile.dataset.kind = child.kind
-                tile.title = child.name; tile.disabled = !can_read(child)
+                tile.title = child.name; tile.disabled = child.kind === "dir" ? !can_browse(child) : !can_read(child)
+                tile.draggable = can_move(child) && can_read(child)
                 const frame = document.createElement("span")
                 frame.className = "desk_folder_preview"
                 const icon = document.createElement("span")
                 icon.className = "desk_folder_glyph"; icon.setAttribute("aria-hidden", "true"); icon.textContent = icon_of(child)
+                if (child.kind === "dir") icon.dataset.icon = icon_of(child)
                 const image = document.createElement("img")
                 image.alt = ""; image.hidden = true; image.decoding = "async"
                 frame.append(icon, image)
@@ -99,6 +111,67 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
                     if (child.kind === "dir") void open_source(item, `file://${child.path}`)
                     else void open_entry(child, true)
                 })
+                if (child.kind === "dir" && !tile.disabled) {
+                    let cover_revision = 0
+                    const old_urls = new Set<string>()
+                    const revoke = (values: Set<string>) => { for (const url of values) { URL.revokeObjectURL(url); urls.delete(url) }; values.clear() }
+                    const job = () => {
+                        const cover_current = ++cover_revision
+                        const live = () => !signal.aborted && revision === current && cover_current === cover_revision
+                        return async () => {
+                            if (!live()) return
+                            const latest = await resolve(child.path)
+                            if (!latest || latest.kind !== "dir") return
+                            await check_permissions([latest])
+                            if (!can_browse(latest)) { if (live()) tile.disabled = true; return }
+                            await load_children(latest)
+                            if (!live()) return
+                            const plan = folder_cover_plan(latest.children ?? [])
+                            icon.dataset.double = String(plan.nested)
+                            tile.dataset.coverFiles = JSON.stringify(plan.files.map(node => node.path))
+                            tile.dataset.coverCount = String(plan.count)
+                            const cover = document.createElement("span")
+                            cover.className = "desk_folder_cover"
+                            const next_urls = new Set<string>()
+                            for (const node of plan.files) {
+                                if (!live()) break
+                                try {
+                                    await check_permissions([node])
+                                    if (!can_read(node) || !node.handle) continue
+                                    const file = await (node.handle as file_handle).getFile()
+                                    const preview = await file_preview(node.path, file, mime_of(node, file))
+                                    if (!live()) break
+                                    const url = URL.createObjectURL(preview.blob)
+                                    next_urls.add(url); urls.add(url)
+                                    const picture = document.createElement("img")
+                                    picture.alt = ""; picture.src = url
+                                    await picture.decode()
+                                    cover.append(picture)
+                                } catch { /* an unreadable direct file does not hide the folder */ }
+                            }
+                            if (!live()) { revoke(next_urls); return }
+                            frame.querySelector(".desk_folder_cover")?.remove()
+                            frame.querySelector(".desk_folder_more")?.remove()
+                            revoke(old_urls)
+                            for (const url of next_urls) old_urls.add(url)
+                            tile.classList.toggle("has_cover", cover.childElementCount > 0)
+                            cover.dataset.count = String(cover.childElementCount)
+                            if (cover.childElementCount) frame.insertBefore(cover, icon)
+                            if (plan.count > 4) {
+                                const more = document.createElement("span"); more.className = "desk_folder_more"; more.textContent = `+${plan.count - 4}`
+                                frame.append(more)
+                            }
+                            tile.dataset.preview = "cover"
+                        }
+                    }
+                    tasks.set(tile, job())
+                    cover_refreshers.set(child.path, () => {
+                        observer?.unobserve(tile); tasks.delete(tile)
+                        queue.push(job()); pump()
+                    })
+                    observer.observe(tile)
+                    continue
+                }
                 if (child.kind !== "file" || !child.handle || tile.disabled) continue
                 tasks.set(tile, async () => {
                     try {
@@ -132,13 +205,17 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
         void open_source(item, `file://${path.slice(0, path.lastIndexOf("/")) || "/"}`)
     })
     reload.addEventListener("click", () => void refresh())
+    const entry_at = (target: Element) => entries.get(target.closest<HTMLElement>(".desk_folder_entry")?.dataset.path ?? "") ?? null
+    close_context = bind_folder_context(item, body, status, signal)
+    bind_folder_drag(item, body, status, () => directory, entry_at, signal)
     let timer: ReturnType<typeof setTimeout> | undefined
     const changed = (event: Event) => {
         const path = (event as CustomEvent<{ path: string }>).detail.path
         const current = path_of()
-        if (path === current || current.startsWith(`${path === "/" ? "" : path}/`)) {
+        const kind = folder_change(current, path)
+        if (kind === "contents") {
             clearTimeout(timer); timer = setTimeout(() => void refresh(), 80)
-        }
+        } else if (kind === "cover") cover_refreshers.get(path)?.()
     }
     document.addEventListener("jazu:fs:changed", changed)
     signal.addEventListener("abort", () => {

@@ -619,22 +619,26 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
     })
     let depth = 0
     box.addEventListener("dragenter", event => {
+        if (item.mime === "inode/directory") return
         if (!has_files(event)) return
         event.preventDefault()
         depth++
         box.classList.add("is_drop")
     })
     box.addEventListener("dragover", event => {
+        if (item.mime === "inode/directory") return
         if (!has_files(event)) return
         event.preventDefault()
         if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
     })
     box.addEventListener("dragleave", event => {
+        if (item.mime === "inode/directory") return
         if (!has_files(event)) return
         depth = Math.max(0, depth - 1)
         if (depth === 0) box.classList.remove("is_drop")
     })
     box.addEventListener("drop", event => {
+        if (item.mime === "inode/directory") return
         if (!has_files(event)) return
         event.preventDefault()
         depth = 0

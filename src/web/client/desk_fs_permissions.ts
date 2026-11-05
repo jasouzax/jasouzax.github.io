@@ -11,6 +11,8 @@ export function can_read(node: fs_node): boolean {
     return (node.children ?? []).every(can_read)
 }
 
+export function can_browse(node: fs_node): boolean { return node.kind === "dir" && accessible(node) }
+
 export function can_create(node: fs_node | null): boolean {
     if (!node || node.kind !== "dir" || !node.writable || !node.handle || !accessible(node)) return false
     for (let parent: fs_node | null = node; parent; parent = parent.parent) if (parent.write_allowed === false) return false
