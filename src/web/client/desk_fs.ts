@@ -11,6 +11,7 @@ import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk
 import { can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
 import { selection_click, type file_selection } from "./desk_selection.ts"
 import { local_file_path } from "./desk_paths.ts"
+import { sync_navigation } from "./desk_navigation.ts"
 
 export type fs_node = {
     name: string
@@ -845,8 +846,7 @@ async function rename_entry(node: fs_node, name: string): Promise<void> {
             if (renamed.writable) item.save = blob => save_file(item, renamed_handle, blob)
         }
         // Keep the editor and its pending changes intact while updating its destination.
-        const field = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
-        if (field) field.value = item.path
+        sync_navigation(item)
         item.el.dataset.path = item.path
         refresh_tab(item)
     }
@@ -1184,8 +1184,7 @@ async function move_entry(node: fs_node, dir: fs_node, name = node.name): Promis
             item.file = await moved_handle.getFile()
             if (moved.writable) item.save = blob => save_file(item, moved_handle, blob)
         }
-        const field = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
-        if (field) field.value = item.path
+        sync_navigation(item)
         item.el.dataset.path = item.path
         refresh_tab(item)
     }

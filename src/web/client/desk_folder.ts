@@ -4,7 +4,7 @@ import { load_children, open_entry, redraw, type fs_node, type file_handle } fro
 import { resolve } from "./desk_vfs.ts"
 import { open_source } from "./desk_view.ts"
 import { can_browse, can_move, can_read, check_permissions } from "./desk_fs_permissions.ts"
-import { file_preview } from "./desk_previews.ts"
+import { file_preview, text_preview_node } from "./desk_previews.ts"
 import { local_file_path } from "./desk_paths.ts"
 import { folder_change, folder_cover_plan } from "./desk_folder_cover.ts"
 import { bind_folder_context } from "./desk_folder_context.ts"
@@ -25,22 +25,12 @@ function icon_of(node: fs_node): string {
 export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_wbox_body_folder"
-    const nav = document.createElement("nav")
-    nav.className = "desk_folder_nav"
-    nav.setAttribute("aria-label", text("folder_navigation"))
-    const up = document.createElement("button")
-    up.type = "button"; up.textContent = text("folder_up")
-    const location = document.createElement("span")
-    location.className = "desk_folder_location"
-    const reload = document.createElement("button")
-    reload.type = "button"; reload.textContent = text("folder_refresh")
     const status = document.createElement("p")
     status.className = "desk_folder_status"; status.setAttribute("role", "status")
     const grid = document.createElement("ul")
     grid.className = "desk_folder_grid"
     grid.setAttribute("aria-label", text("folder_contents"))
-    nav.append(up, location, reload)
-    body.append(nav, status, grid)
+    body.append(status, grid)
     const urls = new Set<string>()
     const entries = new Map<string, fs_node>()
     const cover_refreshers = new Map<string, () => void>()
@@ -64,8 +54,6 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
         grid.replaceChildren()
         status.textContent = text("folder_loading")
         const path = path_of()
-        location.textContent = path; location.title = path
-        up.disabled = path === "/"
         try {
             const dir = await resolve(path)
             if (!dir || dir.kind !== "dir") throw new Error(text("folder_not_found"))
@@ -141,6 +129,7 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
                                     const file = await (node.handle as file_handle).getFile()
                                     const preview = await file_preview(node.path, file, mime_of(node, file))
                                     if (!live()) break
+                                    if (preview.text !== undefined) { cover.append(text_preview_node(preview.text, mime_of(node, file))); continue }
                                     const url = URL.createObjectURL(preview.blob)
                                     next_urls.add(url); urls.add(url)
                                     const picture = document.createElement("img")
@@ -181,6 +170,11 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
                         const file = await (child.handle as file_handle).getFile()
                         const result = await file_preview(child.path, file, mime_of(child, file))
                         if (signal.aborted || revision !== current) return
+                        if (result.text !== undefined) {
+                            frame.append(text_preview_node(result.text, mime_of(child, file)))
+                            icon.hidden = true; tile.dataset.preview = result.source
+                            return
+                        }
                         const url = URL.createObjectURL(result.blob)
                         urls.add(url)
                         image.addEventListener("load", () => {
@@ -200,11 +194,6 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
             if (!signal.aborted && revision === current) status.textContent = error instanceof Error ? error.message : text("files_failed")
         }
     }
-    up.addEventListener("click", () => {
-        const path = path_of()
-        void open_source(item, `file://${path.slice(0, path.lastIndexOf("/")) || "/"}`)
-    })
-    reload.addEventListener("click", () => void refresh())
     const entry_at = (target: Element) => entries.get(target.closest<HTMLElement>(".desk_folder_entry")?.dataset.path ?? "") ?? null
     close_context = bind_folder_context(item, body, status, signal)
     bind_folder_drag(item, body, status, () => directory, entry_at, signal)

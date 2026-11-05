@@ -1,9 +1,9 @@
-import { token_map } from "./desk_syntax.ts"
+import { token_map, coloured_nodes } from "./desk_syntax.ts"
 
 const width = 320, height = 200
-const version = "folder-previews-1-320x200"
+const version = "folder-previews-2-text-39x10"
 export const preview_cache_path = "/home/user/.cache/previews"
-export type preview_result = { blob: Blob, source: "cache" | "generated" | "temporary" }
+export type preview_result = { blob: Blob, text?: string, source: "cache" | "generated" | "temporary" }
 const pending = new Map<string, Promise<preview_result>>()
 let writes = 0
 let trimming: Promise<void> | null = null
@@ -26,7 +26,7 @@ async function cache_directory(): Promise<FileSystemDirectoryHandle | null> {
 
 async function trim_cache(dir: FileSystemDirectoryHandle): Promise<void> {
     const files: { name: string, modified: number }[] = []
-    for await (const entry of dir.values()) if (entry.kind === "file" && /^[a-f0-9]{64}\.png$/.test(entry.name)) {
+    for await (const entry of dir.values()) if (entry.kind === "file" && /^[a-f0-9]{64}\.(png|txt)$/.test(entry.name)) {
         files.push({ name: entry.name, modified: (await entry.getFile()).lastModified })
     }
     files.sort((a, b) => b.modified - a.modified)
@@ -98,26 +98,55 @@ function file_card(ctx: CanvasRenderingContext2D, file: File, mime: string): voi
     ctx.fillText(`${file.size.toLocaleString()} bytes`, 24, 168)
 }
 
-async function code_preview(ctx: CanvasRenderingContext2D, file: File, mime: string): Promise<void> {
-    const source = (await file.slice(0, 16000).text()).replace(/\r\n/g, "\n")
-    if (source.includes("\0")) { file_card(ctx, file, mime); return }
-    ctx.fillStyle = "#132632"; ctx.fillRect(0, 0, width, 29)
-    ctx.fillStyle = "#7ee7f7"; ctx.font = "12px monospace"; ctx.fillText(file.name.slice(0, 40), 12, 19)
-    const map = token_map(source, mime)
-    const colors = ["#e6f1fb", "#86a78b", "#efbd85", "#7ee7cb", "#cda8ff", "#82bfff", "#e9d28e", "#8cd8ff", "#f09fc3", "#8fc1f1", "#f09fc3", "#a5b4c2"]
-    let offset = 0
-    for (const [index, line] of source.split("\n").slice(0, 10).entries()) {
-        const y = 45 + index * 15
-        ctx.fillStyle = "#718799"; ctx.fillText(String(index + 1), 8, y)
-        let column = 0
-        for (let i = 0; i < line.length && column < 39; i++) {
-            if (line[i] === "\t") { column += 4 - column % 4; continue }
-            ctx.fillStyle = colors[map?.[offset + i] ?? 0]
-            ctx.fillText(line[i], 34 + column * 7.2, y)
-            column++
+export function is_text_preview(mime: string): boolean {
+    return !mime.startsWith("image/") && (mime.startsWith("text/") || /json|javascript|typescript|xml|yaml|sql|x-sh/.test(mime))
+}
+
+// Retain only the visible excerpt, even when the source has extremely long lines.
+export async function text_excerpt(file: Blob): Promise<string | null> {
+    const reader = file.stream().getReader(), decoder = new TextDecoder()
+    const lines = [""]
+    let column = 0, carriage = false, binary = false
+    const consume = (value: string): boolean => {
+        for (const char of value) {
+            if (char === "\0") { binary = true; return false }
+            if (char === "\n" && carriage) { carriage = false; continue }
+            carriage = char === "\r"
+            if (char === "\n" || char === "\r") {
+                if (lines.length === 10) return false
+                lines.push(""); column = 0
+            } else if (column < 39) {
+                const value = char === "\t" ? " ".repeat(Math.min(39 - column, 4 - column % 4)) : char
+                lines[lines.length - 1] += value; column += [...value].length
+            }
         }
-        offset += line.length + 1
+        return true
     }
+    try {
+        while (true) {
+            const chunk = await reader.read()
+            const value = decoder.decode(chunk.value, { stream: !chunk.done })
+            // A NUL within the inspected content identifies binary data.
+            if (!consume(value)) break
+            if (chunk.done) break
+        }
+    } finally { await reader.cancel(); reader.releaseLock() }
+    return binary ? null : lines.join("\n")
+}
+
+export function text_preview_node(value: string, mime: string): HTMLElement {
+    const box = document.createElement("span")
+    box.className = "desk_folder_text"; box.setAttribute("aria-hidden", "true")
+    const map = token_map(value, mime)
+    let offset = 0
+    for (const [index, line] of value.split("\n").entries()) {
+        const row = document.createElement("span"); row.className = "desk_folder_text_line"
+        const number = document.createElement("span"); number.className = "desk_folder_text_number"; number.textContent = String(index + 1)
+        const code = document.createElement("span")
+        code.append(...(map ? coloured_nodes(value, map, offset, offset + line.length, false) : [document.createTextNode(line)]))
+        row.append(number, code); box.append(row); offset += line.length + 1
+    }
+    return box
 }
 
 async function make_preview(file: File, mime: string): Promise<Blob> {
@@ -125,35 +154,48 @@ async function make_preview(file: File, mime: string): Promise<Blob> {
     try {
         if (mime.startsWith("image/")) await image_preview(ctx, file)
         else if (mime.startsWith("video/")) await video_preview(ctx, file)
-        else if (mime.startsWith("text/") || /json|javascript|typescript|xml|yaml|sql|x-sh/.test(mime)) await code_preview(ctx, file, mime)
         else file_card(ctx, file, mime)
     } catch { ctx.fillStyle = "#05121b"; ctx.fillRect(0, 0, width, height); file_card(ctx, file, mime) }
     return new Promise((resolve, reject) => element.toBlob(blob => blob ? resolve(blob) : reject(new Error("Preview unavailable")), "image/png"))
 }
 
 export async function file_preview(path: string, file: File, mime: string): Promise<preview_result> {
+    const textual = is_text_preview(mime)
+    const generate = async (): Promise<Omit<preview_result, "source">> => {
+        const text = textual ? await text_excerpt(file) : null
+        return text !== null ? { blob: new Blob([text], { type: "text/plain" }), text } : { blob: await make_preview(file, mime) }
+    }
     // Browsing the cache itself must not create previews of previews.
-    if (path.startsWith("/home/user/.cache/")) return { blob: mime.startsWith("image/") ? file : await make_preview(file, mime), source: "temporary" }
+    if (path.startsWith("/home/user/.cache/")) return { ...(mime.startsWith("image/") ? { blob: file } : await generate()), source: "temporary" }
     const key = await preview_key(path, file, mime)
     const existing = pending.get(key)
     if (existing) return existing
     const work = (async (): Promise<preview_result> => {
         const dir = await cache_directory()
         if (dir) try {
+            if (textual) {
+                try {
+                    const cached = await (await dir.getFileHandle(`${key}.txt`)).getFile()
+                    if (cached.size <= 1600) {
+                        const text = await cached.text()
+                        if (!text.includes("\0") && text.split("\n").length <= 10 && text.split("\n").every(line => [...line].length <= 39)) return { blob: cached, text, source: "cache" }
+                    }
+                } catch { /* a text-labelled binary file may have a raster fallback */ }
+            }
             const file = await (await dir.getFileHandle(`${key}.png`)).getFile()
             const signature = [...new Uint8Array(await file.slice(0, 8).arrayBuffer())].join(",")
             if (signature === "137,80,78,71,13,10,26,10") return { blob: file, source: "cache" }
         } catch { /* a missing or damaged thumbnail is generated again */ }
-        const blob = await make_preview(file, mime)
+        const result = await generate()
         if (dir) try {
-            const writer = await (await dir.getFileHandle(`${key}.png`, { create: true })).createWritable()
-            await writer.write(blob); await writer.close()
+            const writer = await (await dir.getFileHandle(`${key}.${result.text !== undefined ? "txt" : "png"}`, { create: true })).createWritable()
+            await writer.write(result.blob); await writer.close()
             if (++writes % 32 === 0 && !trimming) {
                 trimming = trim_cache(dir).catch(() => {}).finally(() => { trimming = null })
             }
-            return { blob, source: "generated" }
+            return { ...result, source: "generated" }
         } catch { /* storage may be unavailable or full; tiles can still be shown */ }
-        return { blob, source: "temporary" }
+        return { ...result, source: "temporary" }
     })()
     pending.set(key, work)
     try { return await work } finally { pending.delete(key) }

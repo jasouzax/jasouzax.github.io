@@ -186,14 +186,23 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
                 mimes,
                 t(ctx, "filter_mimes")
             )}
-            <input
-                class={"desk_wbox_head_path"}
-                type={"text"}
-                aria-label={t(ctx, "window_source")}
-                autocomplete={"off"}
-                spellcheck={"false"}
-                value={attrs.path ?? ""}
-            />
+            <div class="desk_wbox_head_navigation" role="group" aria-label={t(ctx, "folder_navigation")}>
+                {[["previous", "previous", "←"], ["refresh", "folder_refresh", "[refresh]"], ["forward", "forward", "→"]].map(([action, key, mark]) =>
+                    <button type="button" class={`desk_wbox_head_tool desk_wbox_head_${action}`} data-navigation={action}
+                        title={t(ctx, key)} aria-label={t(ctx, key)} disabled={action !== "refresh"}>{glyph(ctx, mark)}</button>
+                )}
+            </div>
+            <div class="desk_wbox_head_address">
+                <input
+                    class={"desk_wbox_head_path"}
+                    type={"text"}
+                    aria-label={t(ctx, "window_source")}
+                    autocomplete={"off"}
+                    spellcheck={"false"}
+                    value={attrs.path ?? ""}
+                />
+                <nav class="desk_wbox_head_breadcrumbs" aria-label={t(ctx, "window_source")}></nav>
+            </div>
             <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
         </div>,
         attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
@@ -513,6 +522,10 @@ const runtime_keys = [
     "choose_file",
     "open_terminal",
     "open_folder",
+    "open_new_window",
+    "window_source",
+    "previous",
+    "forward",
     "folder_navigation",
     "folder_context_menu",
     "folder_up",

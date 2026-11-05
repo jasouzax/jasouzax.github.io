@@ -9,6 +9,7 @@ import { prepare_plugins } from "./desk_plugins.ts"
 import { media_player } from "./desk_media.ts"
 import { markdown_body } from "./desk_markdown.ts"
 import { folder_body } from "./desk_folder.ts"
+import { bind_navigation, sync_navigation } from "./desk_navigation.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -411,6 +412,7 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
         process_hooks.release(item)
         item.file = null
         item.path = item.name = ""
+        item.mime = item.icon = ""; item.candidates = []; item.save = null; item.mode = "view"
         render_window(item)
         return
     }
@@ -479,8 +481,7 @@ function body_for(item: desk_window): void {
 
 export function render_window(item: desk_window): void {
     refresh_tab(item)
-    const path = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
-    if (path) path.value = item.path || item.name
+    sync_navigation(item)
     const summary = head_part(item, ".desk_wbox_head_mime > summary")
     if (summary) summary.textContent = item.mime || text("no_mime")
     for (const button of item.el.querySelectorAll<HTMLElement>(".desk_wbox_head_mode button[data-mode]")) {
@@ -563,12 +564,9 @@ function wire_head(item: desk_window): void {
         event.preventDefault()
         void save_window(item)
     })
-    // a source typed in the head and confirmed with Enter is opened: pid: starts a process, pid:3 shows one
-    head_part<HTMLInputElement>(item, ".desk_wbox_head_path")?.addEventListener("keydown", event => {
-        if (event.key !== "Enter") return
-        event.preventDefault()
-        const value = (event.target as HTMLInputElement).value
-        void open_source(item, value)
+    bind_navigation(item, uri => open_source(item, uri), () => {
+        if (item.pid !== null || !item.path) render_window(item)
+        else void open_source(item, item.path)
     })
     const search = head_part<HTMLInputElement>(item, ".desk_wbox_head_mime .list_drop_search input")
     search?.addEventListener("input", () => fill_mime_list(item, search.value))

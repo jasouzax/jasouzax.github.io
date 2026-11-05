@@ -1,8 +1,9 @@
 import type { desk_window } from "./desk.ts"
-import { state, text } from "./desk.ts"
+import { state, text, new_window } from "./desk.ts"
+import { open_source } from "./desk_view.ts"
 import { folder_action_enabled, perform_folder_action, type folder_action, type fs_node } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
-import { check_permissions } from "./desk_fs_permissions.ts"
+import { can_browse, can_read, check_permissions } from "./desk_fs_permissions.ts"
 import { import_entries } from "./desk_folder_drop.ts"
 import { local_file_path } from "./desk_paths.ts"
 
@@ -68,6 +69,16 @@ export function bind_folder_context(item: desk_window, body: HTMLElement, status
         if (signal.aborted || current !== revision) return
         const popup = document.createElement("div")
         menu = popup; popup.className = "desk_folder_context"; popup.setAttribute("role", "menu"); popup.setAttribute("aria-label", text("folder_context_menu"))
+        const open = document.createElement("button")
+        open.type = "button"; open.setAttribute("role", "menuitem"); open.textContent = text("open_new_window")
+        open.disabled = (entry ?? dir).kind === "dir" ? !can_browse(entry ?? dir) : !can_read(entry ?? dir)
+        open.addEventListener("click", () => {
+            close()
+            const window = new_window()
+            if (window) void open_source(window, `file://${(entry ?? dir).path}`)
+        })
+        popup.append(open)
+        const first_separator = document.createElement("div"); first_separator.setAttribute("role", "separator"); popup.append(first_separator)
         const groups: folder_action[][] = []
         if (!entry || entry.kind === "dir") groups.push(["new_file", "new_folder", "paste", "upload"])
         if (entry) groups.push(["rename", "copy", "cut", "download", "delete"])
@@ -88,14 +99,19 @@ export function bind_folder_context(item: desk_window, body: HTMLElement, status
             }
         }
         document.body.append(popup)
-        popup.style.left = `${Math.max(8, Math.min(event.clientX, innerWidth - popup.offsetWidth - 8))}px`
-        popup.style.top = `${Math.max(8, Math.min(event.clientY, innerHeight - popup.offsetHeight - 8))}px`
+        const left = event.clientX + popup.offsetWidth > innerWidth - 8
+        const above = event.clientY + popup.offsetHeight > innerHeight - 8 && event.clientY > innerHeight - event.clientY
+        popup.style.maxHeight = `${Math.max(24, (above ? event.clientY : innerHeight - event.clientY) - 8)}px`
+        popup.dataset.edge = above ? "bottom" : "top"
+        popup.dataset.corner = `${above ? "bottom" : "top"}-${left ? "right" : "left"}`
+        popup.style.left = `${Math.max(8, left ? event.clientX - popup.offsetWidth : event.clientX)}px`
+        popup.style.top = `${Math.max(8, above ? event.clientY - popup.offsetHeight : event.clientY)}px`
         popup.querySelector<HTMLButtonElement>("button:enabled")?.focus()
     }
     const outside = (event: Event) => { if (!menu?.contains(event.target as Node)) close() }
     const key = (event: KeyboardEvent) => {
-        if (!menu) return
         if (event.key === "Escape" || event.key === "Tab") { close(); return }
+        if (!menu) return
         const buttons = [...menu.querySelectorAll<HTMLButtonElement>("button:enabled")]
         const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
         const index = event.key === "ArrowDown" ? (current + 1) % buttons.length : event.key === "ArrowUp" ? (current + buttons.length - 1) % buttons.length : event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : -1
@@ -105,12 +121,14 @@ export function bind_folder_context(item: desk_window, body: HTMLElement, status
     body.addEventListener("contextmenu", show)
     document.addEventListener("pointerdown", outside, true)
     document.addEventListener("click", outside, true)
+    document.addEventListener("focusin", outside, true)
     document.addEventListener("contextmenu", outside, true)
     document.addEventListener("jazu:folder:context-open", close)
     document.addEventListener("keydown", key)
     signal.addEventListener("abort", () => {
         close(); form?.remove(); body.removeEventListener("contextmenu", show)
         document.removeEventListener("pointerdown", outside, true); document.removeEventListener("click", outside, true)
+        document.removeEventListener("focusin", outside, true)
         document.removeEventListener("contextmenu", outside, true)
         document.removeEventListener("jazu:folder:context-open", close); document.removeEventListener("keydown", key)
     }, { once: true })
