@@ -19,7 +19,7 @@ function norm(path: string): string {
     return "/" + parts.join("/")
 }
 
-async function resolve(path: string): Promise<fs_node | null> {
+export async function resolve(path: string): Promise<fs_node | null> {
     let node = fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {

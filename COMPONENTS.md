@@ -40,6 +40,8 @@ Dependencies, build order, implementation status and verification are tracked in
 | `mime` | RFC 6838 media type, wildcards allowed in triggers (`image/*`) |
 | `icon` | One character: a registry token `[globe]`, a raw private-use character, an emoji or a letter |
 
+Boolean attributes may omit their value: `<window full save/>` means `full="true" save="true"`. Use an explicit `="false"` to turn one off. This content XML extension applies only to start-tag attributes; quoted values, text, comments and CDATA retain normal XML behavior.
+
 **Text tokens.** In `icon`, `text`, `name`, `info` and `data` values, `[name]` is replaced by the character registered for `name` in the icon registry (1.12). Unregistered tokens stay literal and raise a build warning. A literal bracket is written `&#91;`.
 
 **Secrets.** Tokens and other vulnerable values are never in `content` or `config.json`; they live in `.env` (local) or Cloudflare secrets (cloud).
@@ -64,11 +66,11 @@ Dependencies, build order, implementation status and verification are tracked in
 | `<blog>` | A blog post page (1.7) |
 | `<theme>` | A theme (1.9) |
 | `<print>` | A print mode (1.13) |
-| `<plugins>` | Desktop plugins (1.10) |
+| `<plugin>` | A desktop plugin (1.10) |
 
 Skills and stacks are not roots: they are detected from what projects, slides and events reference, and declared only inside `<expertise>` (1.3).
 
-Other files are interpreted by extension: `.md` (text windows and descriptions), `.scss` and `.css` (styles), `.js` (theme or plugin scripts), and media (`.svg`, `.png`, `.avif`, ...). TSX partials live under `src/web/partials`; interface strings live in `config.json.languages` (1.11). Object files are strict UTF-8 XML; raw text such as SCSS goes in CDATA. Configuration that does not describe an object (pages, projects, ...) is not in `content`; it is in `config.json` (1.12).
+Other files are interpreted by extension: `.md` (text windows and descriptions), `.scss` and `.css` (styles), `.js` (theme or plugin scripts), and media (`.svg`, `.png`, `.avif`, ...). TSX partials live under `src/web/partials`; interface strings live in `config.json.languages` (1.11). Object files are UTF-8 XML with the valueless boolean-attribute extension above; raw text such as SCSS goes in CDATA. Configuration that does not describe an object (pages, projects, ...) is not in `content`; it is in `config.json` (1.12).
 
 - [x] Existing English/Japanese page and blog variants share XML files, retaining one root per language and stable URLs.
 
@@ -327,11 +329,11 @@ SCSS receives the compiler's virtual module `jazu:api` (palette variables, `mode
 
 Planned themes (the system is designed for any number): **Default** (sci-fi, clean, vectorized, dithering, contour map, rotating globe, glass), **Memory** (weirdcore/dreamcore, nostalgic operating-system look, ransom-note text), **Frutiger Aero**, **Punk**, and later vaporwave, inkblot and art nouveau. Themes use original assets only.
 
-### 1.10 Plugins `<plugins>`
+### 1.10 Plugin `<plugin>`
 
 **Objective.** Make desk capabilities easy to add, replace and manage one at a time, without touching how content becomes the website.
 
-**Solution.** `<plugins>` is a root element holding `<plugin>` entries. A plugin declares when it applies (trigger) and ships a behavior script. Plugins affect only desk runtime features; they never change how the engine generates pages. A plugin may supply any of: a window body, a flow between windows (converter, comparator, mirror or any other relation of a parent and child window), a process, menu tabs and foot actions, and map nodes and edges.
+**Solution.** Each `<plugin>` is a root element, normally authored in `content/plugins`. Plugins may share one XML file, occupy separate files, or live in any folder under `content`; the engine discovers them recursively by their root tag, without a wrapper. Relative script and WASM paths resolve from the XML file that declares the plugin. A plugin uses ordered `<case>` children to declare when it applies and which built-in host renders its body. Scripts are optional for custom behavior. Plugins affect only desk runtime features; they never change how the engine generates pages. A plugin may supply any of: a window body, a flow between windows (converter, comparator, mirror or any other relation of a parent and child window), a process, menu tabs and foot actions, and map nodes and edges.
 
 **Interface.** `<plugin id name icon version mime path mode from to flow wasm sha256 script options>`:
 
@@ -341,8 +343,21 @@ Planned themes (the system is designed for any number): **Default** (sci-fi, cle
 | `from`, `to` | Conversion edges (mime to mime); they form the conversion graph (3.5.3) |
 | `flow` | `list` of flow kinds the plugin provides (`convert`, `compare`, `mirror`, or its own) |
 | `wasm`, `sha256` | WebAssembly module location and integrity hash, loaded on demand |
-| `script` | Behavior script: refines the trigger with custom conditions, loads WASM, adds menu tabs, foot actions, head controls and map nodes, and renders the window body |
+| `script` | Optional behavior script: refines the trigger with custom conditions, loads WASM, adds menu tabs, foot actions, head controls and map nodes, and optionally renders the window body |
 | `options` | Schema of the options the plugin reports to a `window:N:/options` menu |
+
+Children: `<case file error view edit mime url host script>`.
+
+| Attribute | Meaning |
+|---|---|
+| `file` | `bool`; true requires loaded file data, false requires no file, omitted accepts either |
+| `error` | `bool`; true matches error windows, default false excludes them |
+| `view`, `edit` | `bool`; allowed modes. Omit both to accept either; a true flag allows that mode |
+| `mime`, `url` | Comma-separated resource patterns with `*` wildcards; each defaults to `*`. `url` matches the window's resource URI |
+| `host` | Built-in body: `text` (lines/colors/hex toggle), `hex` (same editor with hex open), `media`, `shell`, `markdown`, or `default` (upload/error/unsupported) |
+| `script` | Optional case-specific script; overrides the plugin's script. Without a script renderer, `host` renders the body |
+
+Cases are checked in document order. The first complete match wins. An exact matching MIME or URL (a matching pattern without `*`) reserves that resource: if its file/error/mode conditions fail, the whole plugin returns no match instead of trying later cases. Thus `<case file edit mime="text/markdown" host="text"/>` before `<case file view edit mime="text/*" host="text"/>` excludes Markdown in view mode. Other plugins can still handle it. Plugin-level triggers, when present, are checked before cases; script-only plugins remain supported.
 
 Examples: text and hex viewer, markdown, media player, graphic editor, table editor, image converter (Magick), Python runtime, shell, archiver, virtual network editor, AI agent window.
 
@@ -816,7 +831,7 @@ If the server goes down, git pull and push stop and live dashboards show their l
 | Desk map | none | `<map>` inside `<menu>` (1.4.3) |
 | Window modes | `text`, `view`, `edit` | `view`, `edit` only; use mime to choose bytes or text. `keep` removed, `save` writes to the filesystem |
 | Window paths | `shell:N`, `pid:N` | `pid://name` and `pid:N` |
-| Desk tools | `wasm/registry.json` | `<plugins>` (1.10) |
+| Desk tools | `wasm/registry.json` | `<plugin>` (1.10) |
 | API path | `/api/{resource}/{version}` | `/api/{version}/{resource}/{id}/{subresource}` |
 | Source layout | flat `src/`, `client_*.ts` | `src`, `src/web`, `src/web/client`, `src/node`, `src/desk` |
 | Names | `jasouza` identifiers and files | `jazu` (synthetic root, virtual module, CLI) |

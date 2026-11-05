@@ -4,7 +4,8 @@
 
 import type { desk_window } from "./desk.ts"
 import { state, text, new_window, focus_window } from "./desk.ts"
-import { load_file, render_window as window_refresh, upload_hooks } from "./desk_view.ts"
+import { load_file, render_window as window_refresh, upload_hooks, uri_handlers } from "./desk_view.ts"
+import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory } from "./memory_fs.ts"
 
 export type fs_node = {
@@ -955,7 +956,21 @@ async function store_upload(file: File): Promise<string | null> {
     return `${dir.path}/${file.name}`
 }
 
+let uri_bound = false
 export function init_fs(desk: HTMLElement): void {
+    if (!uri_bound) {
+        uri_bound = true
+        uri_handlers.push(async (item, uri) => {
+            if (!/^(file:\/\/\/|\/)/.test(uri)) return false
+            const path = uri.replace(/^file:\/\//, "")
+            const node = await resolve_node(path)
+            if (!node || node.kind !== "file" || !node.handle) return false
+            const handle = node.handle as file_handle
+            await load_file(item, await handle.getFile(), node.name, `file://${node.path}`)
+            if (node.writable) item.save = blob => write_blob(handle, blob)
+            return true
+        })
+    }
     const page = desk.querySelector<HTMLElement>('.desk_side_page[data-path="file:///"]')
     const root_box = page?.querySelector(":scope > .desk_side_item")
     if (!page || !root_box) {

@@ -7736,3 +7736,48 @@ html.spa_loading #main-content {
 @media (orientation: portrait) {
     #head_path { flex: 1 1 auto; }
 }
+
+// Shared code/hex editor: all columns use exactly the same row height.
+.desk_wbox_body_text {
+    font-family: monospace;
+    line-height: 1.5;
+    overflow: auto;
+    min-height: 0;
+}
+.desk_wbox_body_text_line_dec,
+.desk_wbox_body_text_line_hex,
+.desk_wbox_body_text_body_split {
+    margin: 0;
+    font: inherit;
+    white-space: pre;
+}
+.desk_wbox_body_text_hex_input {
+    display: block;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    white-space: pre;
+    resize: none;
+    overflow: hidden;
+    min-width: 48ch;
+}
+.desk_wbox_body_text_byte::before,
+.desk_wbox_body_text_body_split::before { pointer-events: none; }
+
+.desk_wbox_body_media_viewport {
+    grid-area: 2 / 1;
+    display: grid;
+    place-items: center;
+    overflow: auto;
+    min-height: 0;
+}
+.desk_wbox_body_media_viewport > img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.desk_wbox_body_media_audio { grid-area: 2 / 1; width: 100%; align-self: center; }
+.desk_wbox_body_media_head { pointer-events: none; }
+.desk_wbox_body_media_tool { display: flex; align-items: center; gap: .5em; overflow-x: auto; }
+.desk_wbox_body_media_tool input[type=range] { width: 6em; }
+.desk_wbox_body_media_time_seek { width: 100%; }
+.desk_wbox_body_media:fullscreen { background: var(--panel, black); padding: 1em; }

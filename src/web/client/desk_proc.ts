@@ -3,7 +3,7 @@
 
 import type { desk_window } from "./desk.ts"
 import { state, text, window_hooks, refresh_tab } from "./desk.ts"
-import { process_hooks, uri_handlers, render_window } from "./desk_view.ts"
+import { process_hooks, uri_handlers, render_window, fail_window } from "./desk_view.ts"
 import { kernel, kill, interrupt, make_stream, start_process } from "./kernel.ts"
 import type { proc } from "./kernel.ts"
 import type { program } from "./proc_types.ts"
@@ -55,6 +55,7 @@ const cleanups = new WeakMap<desk_window, () => void>()
 function attach(item: desk_window, pid: number): void {
     detach(item)
     item.pid = pid
+    item.error = ""
     item.file = null
     item.name = `pid:${pid}`
     item.path = `pid:${pid}`
@@ -100,10 +101,7 @@ async function open_pid(item: desk_window, uri: string): Promise<boolean> {
     }
     const found = kernel.table.get(Number(match[1]))
     if (!found) {
-        const path = item.el.querySelector<HTMLInputElement>(".desk_wbox_head_path")
-        if (path) path.setCustomValidity(`${text("process_gone")} ${match[1]}`)
-        path?.reportValidity()
-        path?.setCustomValidity("")
+        fail_window(item, uri, `${text("process_gone")} ${match[1]}`)
         return true
     }
     attach(item, found.pid)
@@ -188,6 +186,8 @@ export function init_proc(): void {
     document.addEventListener("jazu:fs:init", () => { void programs().catch(error => console.error(error)) })
     const fs = make_fs(() => program_names)
     process_hooks.body = terminal_body
+    process_hooks.release = detach
+    process_hooks.release_body = item => { cleanups.get(item)?.(); cleanups.delete(item) }
     uri_handlers.push(open_pid)
     const previous = window_hooks.closed
     window_hooks.closed = item => {

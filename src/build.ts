@@ -26,6 +26,7 @@ import { jazu_error } from "./diag.ts"
 import { emit_page_styles } from "./web/page_style.tsx"
 import { output_directory, output_file } from "./paths.ts"
 import { serialize, type serialized_node } from "./web/vnode.tsx"
+import { compile_plugins } from "./plugins.ts"
 
 export type build_options = {
     root: string
@@ -144,6 +145,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     const model = load_site(options.root, config, diag, options.build_date, options.mode)
     synthesize(model)
     const files: output_files = new Map()
+    await compile_plugins(model, files)
     const expertise_by_lang = new Map<string, expertise_model | null>(Object.keys(config.languages).map(lang => [lang, build_expertise(model, lang)]))
     fail_on_errors(diag)
     const data_scss = scss_data(expertise_by_lang.get(config.default_language) ?? null)
@@ -207,7 +209,6 @@ export async function build_site(options: build_options): Promise<build_result> 
         await cover_files(model, theme_colors, files)
     }
     for (const [url, source] of model.resources) files.set(url.slice(1), readFileSync(source))
-    files.set("assets/plugins.json", JSON.stringify(model.plugins.map(node => node.attrs)))
     if (options.only_check) return { model, diag, written: [], skipped, pages: model.pages.length }
     const { written, hashes } = write_files(options.out, files)
     for (const [name, hash] of Object.entries(hashes)) next_cache[`out:${name}`] = hash

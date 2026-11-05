@@ -2,7 +2,7 @@
 // (#head_new) clones the empty window from <template id="desk_window_template">. This file owns the list of windows, their tabs in the
 // header and the layout of the desk (a grid, see arrange()). What a window shows lives in client_desk_view.ts, the files in client_desk_fs.ts.
 
-import { init_view } from "./desk_view.ts"
+import { init_view, open_source, render_window } from "./desk_view.ts"
 import { init_fs } from "./desk_fs.ts"
 import { init_proc } from "./desk_proc.ts"
 
@@ -38,6 +38,7 @@ export type desk_window = {
     problem: string
     // the process this window shows (client_desk_proc.ts), or null
     pid: number | null
+    error?: string
 }
 
 export const state = {
@@ -286,11 +287,11 @@ export function focus_window(item: desk_window | null): void {
     arrange()
 }
 
-export function new_window(): desk_window | null {
+export function new_window(existing?: HTMLElement): desk_window | null {
     const desk = state.desk
     const template = document.getElementById("desk_window_template") as HTMLTemplateElement | null
     if (!desk || !template) return null
-    const element = template.content.firstElementChild!.cloneNode(true) as HTMLElement
+    const element = existing ?? template.content.firstElementChild!.cloneNode(true) as HTMLElement
     const id = state.next_id++
     element.id = `desk_win_${id}`
     element.dataset.window = String(id)
@@ -311,7 +312,7 @@ export const window_hooks = {
 }
 
 function dispose(): void {
-    for (const item of state.windows) item.tab.remove()
+    for (const item of state.windows) { window_hooks.closed(item); item.tab.remove() }
     state.windows = []
     state.focused = null
     state.maximized = null
@@ -644,10 +645,24 @@ export function init_desk(): void {
     state.data = read_data()
     state.next_id = 1
     restore_tabs()
+    init_fs(desk)
+    const initial = [...desk.querySelectorAll<HTMLElement>(":scope > .desk_wbox")]
+    for (const tab of document.querySelectorAll('#head_tabs a[href^="#window-"]')) tab.remove()
+    for (const element of initial) {
+        const item = new_window(element)
+        if (!item) continue
+        const path = element.dataset.path ?? ""
+        const mode = element.dataset.mode || "view"
+        const mime = element.dataset.mime || ""
+        if (path) void open_source(item, path).then(() => {
+            if (mime) item.mime = mime
+            item.mode = mode
+            render_window(item)
+        })
+    }
     // A desk whose windows are all made by the runtime starts blank: it opens with one empty window (the first file opened fills it).
     if (state.windows.length === 0) new_window()
     arrange()
-    init_fs(desk)
 }
 
 let bound = false

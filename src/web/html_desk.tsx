@@ -289,6 +289,9 @@ export function render_window(ctx: render_ctx, info: window_info, columns: numbe
                 id={`window-${info.index}`}
                 style={`grid-area: ${row} / ${column}`}
                 data-full={is_true(info.node.attrs.full) ? "" : undefined}
+                data-path={info.node.attrs.path ?? ""}
+                data-mode={info.node.attrs.mode ?? "view"}
+                data-mime={info.node.attrs.type ?? ""}
             >
                 {is_true(info.node.attrs.full) ? "" : render_window_head(ctx, info)}
                 {render_window_body(ctx, info)}
@@ -649,7 +652,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const windows = window_infos(ctx, desk)
     const columns = Math.max(1, Math.ceil(Math.sqrt(windows.length)))
     // A desk with a Files side is a file-system desk: the runtime owns its windows (it creates, moves and closes them).
-    const runtime = sides.some((side) => side.attrs.path === "file:///")
+    const runtime = true
     const flags = {
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
         "data-server": is_true(desk.attrs.server) ? "" : undefined,
