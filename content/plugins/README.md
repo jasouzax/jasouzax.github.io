@@ -48,10 +48,23 @@ Available hosts:
 |---|---|
 | `text` | Line numbers, syntax colors and a hex toggle; editable in edit mode |
 | `hex` | The same text editor with its hex toggle initially open |
+| `folder` | Large icon folder contents, with local image, video and code previews |
 | `media` | Image viewer or audio/video player |
 | `shell` | Terminal for the selected process |
 | `markdown` | Rendered Markdown document |
 | `default` | Upload area, resource error or unsupported-resource message |
+
+Double-click a sidebar folder, or enter a folder URI such as
+`file:///home/user` in a window source, to open the Folder body. Clicking a file
+tile opens a separate window; folder tiles and Up navigate inside the folder
+window. A declarative window can use `type="inode/directory"` and `mode="view"`.
+
+Previews are generated locally and stored as PNGs under
+`/home/user/.cache/previews`. Images, video frames and code have visual previews;
+other formats receive a file-type card. Tiles load lazily, source changes
+invalidate cached previews, and the cache is periodically limited to 256 entries.
+Browsing the cache never caches previews of its own PNGs. If browser storage is
+unavailable, previews remain usable for the current view without persistence.
 
 Legacy plugin-level `mime`, `path` and `mode` filters remain supported and apply
 before cases. Legacy script-only plugins remain supported too.

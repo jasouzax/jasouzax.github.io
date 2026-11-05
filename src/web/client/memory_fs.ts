@@ -15,11 +15,12 @@ export function memory_directory(name: string): dir_handle {
             if (!handle) {
                 if (!options?.create) throw new DOMException("Not found", "NotFoundError")
                 let data = new Blob()
+                let modified = Date.now()
                 const file: file_handle = { kind: "file", name,
-                    async getFile() { return new File([data], name, { type: data.type }) },
+                    async getFile() { return new File([data], name, { type: data.type, lastModified: modified }) },
                     async createWritable() {
                         let next = data
-                        return { async write(value) { next = typeof value === "string" ? new Blob([value]) : value }, async close() { data = next } }
+                        return { async write(value) { next = typeof value === "string" ? new Blob([value]) : value }, async close() { data = next; modified = Math.max(Date.now(), modified + 1) } }
                     },
                 }
                 handle = file

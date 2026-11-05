@@ -1,6 +1,174 @@
 import { test, expect } from "@playwright/test"
 import { execFileSync } from "node:child_process"
 
+test("home folder loads with an older registry and accepts either file URI spelling", async ({ page }) => {
+    await page.route("**/assets/plugins.json", async route => {
+        const response = await route.fetch()
+        const plugins = (await response.json()).filter((plugin: { id: string }) => plugin.id !== "folder")
+        await route.fulfill({ response, json: plugins })
+    })
+    await page.goto("/desk")
+    const manifest = await page.request.get("/assets/plugins.json")
+    expect(manifest.headers()["cache-control"]).toBe("no-cache")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const writer = await (await root.getFileHandle("lone.txt", { create: true })).createWritable()
+        await writer.write("one visible file"); await writer.close()
+    })
+    const source = page.locator(".desk_wbox_head_path").first()
+    await source.fill("file:///home/user"); await source.press("Enter")
+    await expect(page.locator('.desk_folder_tile[data-path="/home/user/lone.txt"]')).toBeVisible()
+    await expect(page.locator(".desk_folder_status")).not.toHaveText("Loading folder…")
+    await source.fill("file://home/user"); await source.press("Enter")
+    await expect(source).toHaveValue("file:///home/user")
+    await expect(page.locator('.desk_folder_tile[data-path="/home/user/lone.txt"]')).toBeVisible()
+})
+
+test("Open folder is primary and waits for home storage initialization", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" })
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const writer = await (await root.getFileHandle("home.txt", { create: true })).createWritable()
+        await writer.write("home file"); await writer.close()
+    })
+    await page.addInitScript(() => {
+        const getDirectory = navigator.storage.getDirectory.bind(navigator.storage)
+        const gate = new Promise<void>(resolve => { (window as any).releaseHomeStorage = resolve })
+        navigator.storage.getDirectory = async () => { await gate; return getDirectory() }
+    })
+    await page.reload({ waitUntil: "domcontentloaded" })
+    const actions = page.locator(".desk_wbox_body_empty_actions")
+    await expect(actions.getByRole("button")).toHaveText(["Open folder", "Open terminal"])
+    const home = actions.getByRole("button", { name: "Open folder", exact: true })
+    await expect(home).toHaveCSS("background-color", "rgb(7, 90, 133)")
+    await expect(home).toHaveCSS("font-weight", "700")
+    await page.screenshot({ path: ".cache/desk-browser-results/new-window-home.png" })
+    await home.click()
+    await expect(page.locator(".desk_folder_status")).toHaveCount(0)
+    await page.evaluate(() => (window as any).releaseHomeStorage())
+    await expect(page.locator('.desk_folder_tile[data-path="/home/user/home.txt"]')).toBeVisible()
+    await expect(page.locator(".desk_wbox_head_path")).toHaveValue("file:///home/user")
+})
+
+test("a terminal request is not overwritten by a pending home folder request", async ({ page }) => {
+    await page.addInitScript(() => {
+        const getDirectory = navigator.storage.getDirectory.bind(navigator.storage)
+        const gate = new Promise<void>(resolve => { (window as any).releaseHomeStorage = resolve })
+        navigator.storage.getDirectory = async () => { await gate; return getDirectory() }
+    })
+    await page.goto("/desk", { waitUntil: "domcontentloaded" })
+    await page.getByRole("button", { name: "Open folder", exact: true }).click()
+    await page.getByRole("button", { name: "Open terminal", exact: true }).click()
+    await page.evaluate(() => (window as any).releaseHomeStorage())
+    await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:")
+    await expect(page.locator(".desk_wbox_head_path")).toHaveValue(/^pid:/)
+    await expect(page.locator(".desk_wbox_body_folder")).toHaveCount(0)
+})
+
+test("folder tiles preview images, videos and code, reuse disk thumbnails and open files", async ({ page }) => {
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const gallery = await root.getDirectoryHandle("gallery", { create: true })
+        const write = async (name: string, data: Blob | string) => {
+            const writer = await (await gallery.getFileHandle(name, { create: true })).createWritable()
+            await writer.write(data); await writer.close()
+        }
+        await gallery.getDirectoryHandle("nested", { create: true })
+        await write("hello.js", "const version = 1;\nconsole.log(version);\n")
+        await write("data.bin", new Blob([new Uint8Array([0, 255, 1, 2, 3])]))
+        const canvas = document.createElement("canvas")
+        canvas.width = 128; canvas.height = 72
+        const context = canvas.getContext("2d")!
+        context.fillStyle = "#2266ee"; context.fillRect(0, 0, 128, 72)
+        await write("picture.png", await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), "image/png")))
+        const stream = canvas.captureStream(10)
+        const recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp8" })
+        const chunks: Blob[] = []
+        recorder.ondataavailable = event => chunks.push(event.data)
+        const stopped = new Promise<Blob>(resolve => { recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" })) })
+        context.fillStyle = "#ee3344"; context.fillRect(0, 0, 128, 72)
+        recorder.start()
+        for (let i = 0; i < 5; i++) {
+            context.fillRect(0, 0, 128, 72)
+            await new Promise(resolve => setTimeout(resolve, 60))
+        }
+        recorder.stop()
+        await write("clip.webm", await stopped)
+        stream.getTracks().forEach(track => track.stop())
+    })
+    await page.reload()
+    await page.locator("#head_menu > summary").click()
+    const tree = page.locator('.desk_side_page[data-path="file:///"]')
+    await expect(tree.locator('[data-path="/bin/cat"]')).toBeAttached()
+    await tree.locator('[data-path="/home/user/gallery"] > details > summary').dblclick({ position: { x: 60, y: 8 } })
+    const folder = page.locator(".desk_wbox").first()
+    await expect(folder).toHaveAttribute("data-plugin", "folder")
+    await expect(folder.locator(".desk_folder_tile")).toHaveCount(5)
+    const tile = (name: string) => folder.locator(`.desk_folder_tile[data-path="/home/user/gallery/${name}"]`)
+    for (const name of ["hello.js", "data.bin", "picture.png", "clip.webm"]) await expect(tile(name)).toHaveAttribute("data-preview", "generated", { timeout: 15000 })
+    const color = (name: string) => tile(name).locator("img").evaluate((image: HTMLImageElement) => {
+        const canvas = document.createElement("canvas"); canvas.width = 320; canvas.height = 200
+        const context = canvas.getContext("2d")!; context.drawImage(image, 0, 0, 320, 200)
+        return [...context.getImageData(20, 100, 1, 1).data]
+    })
+    expect((await color("picture.png"))[2]).toBeGreaterThan(200)
+    expect((await color("clip.webm"))[0]).toBeGreaterThan(180)
+    await page.screenshot({ path: ".cache/desk-browser-results/folder-gallery.png" })
+    const cacheNames = () => page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const cache = await (await root.getDirectoryHandle(".cache")).getDirectoryHandle("previews")
+        const names: string[] = []
+        for await (const entry of cache.values()) names.push(entry.name)
+        return names.sort()
+    })
+    const initial = await cacheNames()
+    expect(initial).toHaveLength(4)
+    expect(initial.every(name => /^[a-f0-9]{64}\.png$/.test(name))).toBe(true)
+    await tile("hello.js").click()
+    await expect(page.locator(".desk_wbox")).toHaveCount(2)
+    const opened = page.locator(".desk_wbox").last()
+    await expect(opened.locator(".desk_wbox_head_path")).toHaveValue("file:///home/user/gallery/hello.js")
+    await expect(opened.locator(".desk_wbox_body_text_input")).toHaveValue(/const version = 1/)
+    await expect(folder).toHaveAttribute("data-plugin", "folder")
+    await page.locator("#head_exit").click()
+    await tile("nested").click()
+    await expect(folder.locator(".desk_folder_location")).toHaveText("/home/user/gallery/nested")
+    await expect(folder.locator(".desk_folder_status")).toHaveText("Empty")
+    await folder.getByRole("button", { name: "Up", exact: true }).click()
+    await expect(tile("hello.js")).toBeVisible()
+    await page.reload()
+    const source = page.locator(".desk_wbox_head_path").first()
+    await source.fill("file:///home/user/gallery"); await source.press("Enter")
+    await expect(folder).toHaveAttribute("data-plugin", "folder")
+    for (const name of ["hello.js", "data.bin", "picture.png", "clip.webm"]) await expect(tile(name)).toHaveAttribute("data-preview", "cache")
+    expect(await cacheNames()).toEqual(initial)
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const dir = await root.getDirectoryHandle("gallery")
+        const writer = await (await dir.getFileHandle("hello.js")).createWritable()
+        await writer.write("const version = 2;\nconsole.log(version);\n"); await writer.close()
+    })
+    await folder.getByRole("button", { name: "Refresh", exact: true }).click()
+    await expect(tile("hello.js")).toHaveAttribute("data-preview", "generated")
+    await expect(tile("picture.png")).toHaveAttribute("data-preview", "cache")
+    expect(await cacheNames()).toHaveLength(5)
+    await tile("hello.js").click()
+    const editor = page.locator(".desk_wbox").last()
+    await expect(editor.locator(".desk_wbox_body_text_input")).toBeVisible()
+    await editor.locator('[data-mode="edit"]').click()
+    await editor.locator(".desk_wbox_body_text_input").fill("const version = 3;\nconsole.log(version);\n")
+    await editor.locator(".desk_wbox_head_save").click()
+    await expect.poll(async () => (await cacheNames()).length).toBe(6)
+    await expect(tile("hello.js")).toHaveAttribute("data-preview", "generated")
+    await page.locator("#head_exit").click()
+    await source.fill("file:///home/user/.cache/previews"); await source.press("Enter")
+    await expect(folder.locator(".desk_folder_tile")).toHaveCount(6)
+    await expect(folder.locator('.desk_folder_tile[data-preview="temporary"]')).toHaveCount(6)
+    expect(await cacheNames()).toHaveLength(6)
+})
+
 test("Ctrl selects individual entries and repeated Shift clicks replace anchored ranges", async ({ page }) => {
     await page.goto("/desk")
     await page.evaluate(async () => {

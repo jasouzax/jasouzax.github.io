@@ -7,6 +7,7 @@ export type plugin_host = {
     terminal: (item: desk_window) => HTMLElement | null
     fallback: (item: desk_window) => HTMLElement
     markdown: (item: desk_window, signal: AbortSignal) => HTMLElement
+    folder: (item: desk_window, signal: AbortSignal) => HTMLElement
     state: typeof desk_state
     text: (key: string) => string
     render_window: (item: desk_window) => void
@@ -32,10 +33,10 @@ const modules = new Map<string, Promise<plugin_module>>()
 const wasm = new Map<string, Promise<WebAssembly.Module>>()
 
 export function plugin_registry(): Promise<plugin_info[]> {
-    return registry ??= fetch("/assets/plugins.json").then(async response => {
+    return registry ??= fetch("/assets/plugins.json", { cache: "no-cache" }).then(async response => {
         if (!response.ok) throw new Error(`Plugins: ${response.status}`)
         return response.json()
-    })
+    }).catch(error => { registry = null; throw error })
 }
 
 function load_module(url: string): Promise<plugin_module> {
@@ -91,6 +92,7 @@ function render_host(name: NonNullable<plugin_case["host"]>, { item, host, signa
         case "media": return host.media(item)
         case "shell": return host.terminal(item)
         case "markdown": return host.markdown(item, signal)
+        case "folder": return host.folder(item, signal)
         case "default": return host.fallback(item)
     }
 }

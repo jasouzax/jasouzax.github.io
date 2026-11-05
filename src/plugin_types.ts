@@ -24,7 +24,7 @@ export type plugin_case = {
     edit?: string
     mime?: string
     url?: string
-    host?: "text" | "hex" | "media" | "shell" | "markdown" | "default"
+    host?: "text" | "hex" | "media" | "shell" | "markdown" | "folder" | "default"
     script?: string
 }
 

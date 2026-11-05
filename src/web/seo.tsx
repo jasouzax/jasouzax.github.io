@@ -380,6 +380,8 @@ export function headers_file(inline_hashes: string[]): string {
         "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/wasm/manifest.json",
         "  Cache-Control: no-cache",
+        "/assets/plugins.json",
+        "  Cache-Control: no-cache",
         ...text("/manifest.json", "application/manifest+json; charset=utf-8", 3600),
         ...text("/robots.txt", "text/plain; charset=utf-8", 3600),
         ...text("/sitemap.xml", "application/xml; charset=utf-8", 3600),

@@ -6732,6 +6732,93 @@ html.desk_dragging {
 }
 
 // a file with no viewer, or a mode with none
+.desk_wbox_body_folder {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 8em;
+    min-width: 0;
+    overflow: hidden;
+}
+.desk_folder_nav {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex: 0 0 auto;
+    padding: .5em;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--panel);
+    > button {
+        padding: .25em .5em;
+        border: 1px solid var(--edge);
+        border-radius: var(--r-sm);
+        &:hover:enabled { background: var(--tint-1); }
+        &:disabled { opacity: .4; cursor: default; }
+    }
+}
+.desk_folder_location {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.desk_folder_status {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: .5em .75em;
+    color: var(--text-dim);
+    font-size: .875em;
+}
+.desk_folder_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 11em), 1fr));
+    align-content: start;
+    gap: .75em;
+    flex: 1 1 0;
+    min-height: 0;
+    margin: 0;
+    padding: .5em .75em 1em;
+    list-style: none;
+    overflow: auto;
+    > li { min-width: 0; }
+}
+.desk_folder_tile {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    gap: .5em;
+    padding: .5em;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    background: var(--panel);
+    color: var(--text);
+    text-align: center;
+    &:hover:enabled { background: var(--panel-2); border-color: var(--accent); }
+    &:disabled { opacity: .45; cursor: not-allowed; }
+}
+.desk_folder_preview {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 8 / 5;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+    background: var(--tint-1);
+    > img { width: 100%; height: 100%; object-fit: contain; }
+    > [hidden] { display: none; }
+}
+.desk_folder_glyph { font-size: 3.5em; line-height: 1; color: var(--accent); }
+.desk_folder_name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}
+
 .desk_wbox_body_none {
     display: grid;
     flex: 1 1 auto;
@@ -6989,17 +7076,34 @@ html.desk_dragging {
     gap: .75em;
     align-content: center;
 
-    &_upload { cursor: pointer; }
+    &_upload { cursor: pointer; font-size: .875em; }
 
-    &_terminal {
+    &_actions {
         position: relative;
         z-index: 1;
-        padding: .4em .75em;
-        border: 1px solid var(--edge);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: .75em;
+    }
+
+    &_terminal,
+    &_folder {
+        padding: .6em 1em;
+        border: 2px solid var(--edge);
         border-radius: var(--r-sm);
         color: var(--text);
         background: var(--panel);
         &:hover { background: var(--panel-2); }
+    }
+
+    &_folder {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--on-solid);
+        font-weight: bold;
+        &:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); }
     }
 
     @media (prefers-reduced-motion: no-preference) {

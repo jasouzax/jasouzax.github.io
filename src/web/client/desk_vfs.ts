@@ -25,6 +25,7 @@ export async function resolve(path: string): Promise<fs_node | null> {
     for (const part of norm(path).split("/").filter(Boolean)) {
         if (node.kind !== "dir") return null
         if (node.children === null) await load_children(node)
+        if (node.handle && !(node.children ?? []).some(child => child.name === part)) await load_children(node)
         node = (node.children ?? []).find(child => child.name === part) ?? null
         if (!node) return null
     }

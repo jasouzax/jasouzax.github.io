@@ -4,12 +4,13 @@
 
 import type { desk_window } from "./desk.ts"
 import { state, text, new_window, focus_window, refresh_tab } from "./desk.ts"
-import { load_file, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
+import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory } from "./memory_fs.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk_files_util.ts"
 import { can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
 import { selection_click, type file_selection } from "./desk_selection.ts"
+import { local_file_path } from "./desk_paths.ts"
 
 export type fs_node = {
     name: string
@@ -46,6 +47,7 @@ let shared_root: fs_node | null = null
 // Uploads stay in a memory directory until explicitly saved into /home/user.
 const temporary_files = memory_directory("tmp")
 let home_node: fs_node | null = null
+let filesystem_ready: Promise<void> = Promise.resolve()
 let tmp_node: fs_node | null = null
 let executable_names: string[] = []
 let clipboard: fs_node[] = []
@@ -249,6 +251,7 @@ export function fs_root(): fs_node | null {
 export async function refresh_dir(dir: fs_node): Promise<void> {
     await load_children(dir)
     redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: dir.path } }))
 }
 
 export function redraw(): void {
@@ -327,25 +330,40 @@ async function write_blob(handle: file_handle, blob: Blob): Promise<void> {
     await stream.close()
 }
 
+async function save_file(item: desk_window, handle: file_handle, blob: Blob): Promise<void> {
+    await write_blob(handle, blob)
+    const node = await resolve_node(item.path.replace(/^file:\/\//, ""))
+    if (node?.parent) await refresh_dir(node.parent)
+}
+
 // ---- opening files ----------------------------------------------------------------------------------------------------------------
 
-async function open_file(node: fs_node): Promise<void> {
+async function open_file(node: fs_node, force_new = false): Promise<void> {
     const handle = node.handle as file_handle | null
     if (!handle) return
     // an empty window takes the file; otherwise it gets a window of its own
     const focused = state.focused
-    let target: desk_window | null = focused && !focused.file ? focused : null
+    let target: desk_window | null = !force_new && focused && !focused.file && !focused.path && focused.pid === null ? focused : null
     target ??= new_window()
     if (!target) return
     try {
         const file = await handle.getFile()
         await load_file(target, file, node.name, `file://${node.path}`)
         // an edit made in the window goes back into the file
-        if (node.writable) target.save = blob => write_blob(handle, blob)
+        if (node.writable) target.save = blob => save_file(target, handle, blob)
         focus_window(target)
     } catch {
         note(text("files_open_failed"))
     }
+}
+
+export async function open_entry(node: fs_node, force_new = false): Promise<void> {
+    if (node.kind === "file") return open_file(node, force_new)
+    const focused = state.focused
+    const target = !force_new && focused && !focused.file && !focused.path && focused.pid === null ? focused : new_window()
+    if (!target) return
+    await open_source(target, `file://${node.path}`)
+    focus_window(target)
 }
 
 // ---- events -----------------------------------------------------------------------------------------------------------------------
@@ -400,9 +418,9 @@ function on_click(event: MouseEvent): void {
     const modified = event.ctrlKey || event.metaKey || event.shiftKey
     if (!modified && event.detail === 2 && previous && Math.abs(previous.x - event.clientX) <= 4 && Math.abs(previous.y - event.clientY) <= 4) {
         const node = find_node(previous.path)
-        if (node?.kind === "file") {
+        if (node) {
             event.preventDefault()
-            void open_file(node)
+            void open_entry(node)
             return
         }
     }
@@ -416,12 +434,12 @@ function on_click(event: MouseEvent): void {
     if (!head || !tree.page.contains(head)) return
     const node = node_of(head)
     if (!node) return
-    if (!modified && node.kind === "file" && event.detail === 1) first_click = { path: node.path, x: event.clientX, y: event.clientY }
     if (!modified && node.kind === "dir" && event.detail > 1) { event.preventDefault(); return }
     const rect = head.getBoundingClientRect()
     const box = head.parentElement as HTMLDetailsElement
     const was_open = box.open
     const chevron = node.kind === "dir" && event.clientX >= rect.right - 24 && event.detail !== 0
+    if (!modified && !chevron && event.detail === 1) first_click = { path: node.path, x: event.clientX, y: event.clientY }
     event.preventDefault()
     if (tree.draft) {
         tree.draft = null
@@ -726,6 +744,7 @@ async function reload(dir: fs_node, select_path: string | null = null): Promise<
         tree.tools_visible = true
     }
     redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: dir.path } }))
 }
 
 function exists_in(dir: fs_node, name: string): boolean {
@@ -823,7 +842,7 @@ async function rename_entry(node: fs_node, name: string): Promise<void> {
         if (renamed?.kind === "file" && renamed.handle) {
             const renamed_handle = renamed.handle as file_handle
             item.file = await renamed_handle.getFile()
-            if (renamed.writable) item.save = blob => write_blob(renamed_handle, blob)
+            if (renamed.writable) item.save = blob => save_file(item, renamed_handle, blob)
         }
         // Keep the editor and its pending changes intact while updating its destination.
         const field = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
@@ -1100,7 +1119,7 @@ async function move_entry(node: fs_node, dir: fs_node, name = node.name): Promis
         if (moved?.kind === "file" && moved.handle) {
             const moved_handle = moved.handle as file_handle
             item.file = await moved_handle.getFile()
-            if (moved.writable) item.save = blob => write_blob(moved_handle, blob)
+            if (moved.writable) item.save = blob => save_file(item, moved_handle, blob)
         }
         const field = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
         if (field) field.value = item.path
@@ -1156,7 +1175,7 @@ function bind_drag(page: HTMLElement): void {
 }
 
 // /home/user is the browser's private file system for this site (OPFS): it is kept between visits, and only this site can see it.
-function mount_opfs(root: fs_node): void {
+async function mount_opfs(root: fs_node): Promise<void> {
     const home = find_node("/home", root)
     const user = find_node("/home/user", root)
     const tmp = find_node("/tmp", root)
@@ -1164,17 +1183,25 @@ function mount_opfs(root: fs_node): void {
     home_node = user
     tmp_node = tmp
     if (tmp) { tmp.handle = temporary_files; tmp.writable = true; tmp.children = null }
-    if (!home || !user || !storage?.getDirectory) return
+    if (!home || !user) return
+    if (!storage?.getDirectory) {
+        user.writable = false; user.readable = false; user.children = []
+        redraw()
+        return
+    }
     user.writable = true
     user.children = null
-    void storage.getDirectory().then(async handle => {
+    try {
+        const handle = await storage.getDirectory()
         user.handle = handle
         await load_children(user)
         redraw()
-    }).catch(() => {
+    } catch {
         user.writable = false
+        user.readable = false
         user.children = []
-    })
+        redraw()
+    }
 }
 
 // A file brought in from outside the tree (dropped on a window) is written to /tmp; the answer is its path in the tree.
@@ -1196,14 +1223,23 @@ export function init_fs(desk: HTMLElement): void {
     if (!uri_bound) {
         uri_bound = true
         window.addEventListener("focus", () => void refresh_permissions())
-        uri_handlers.push(async (item, uri) => {
-            if (!/^(file:\/\/\/|\/)/.test(uri)) return false
-            const path = uri.replace(/^file:\/\//, "")
+        uri_handlers.push(async (item, uri, current = () => true) => {
+            const path = local_file_path(uri)
+            if (path === null) return false
+            await filesystem_ready
+            if (!current()) return true
             const node = await resolve_node(path)
+            if (!current()) return true
+            if (node?.kind === "dir") {
+                load_folder(item, `file://${node.path}`, node.name)
+                return true
+            }
             if (!node || node.kind !== "file" || !node.handle) return false
             const handle = node.handle as file_handle
-            await load_file(item, await handle.getFile(), node.name, `file://${node.path}`)
-            if (node.writable) item.save = blob => write_blob(handle, blob)
+            const file = await handle.getFile()
+            if (!current()) return true
+            await load_file(item, file, node.name, `file://${node.path}`, current)
+            if (current() && node.writable) item.save = blob => save_file(item, handle, blob)
             return true
         })
     }
@@ -1218,7 +1254,7 @@ export function init_fs(desk: HTMLElement): void {
     const initial = find_node("/home/user", root)
     tree = { root, page, open: new Set(["/", "/home", "/home/user"]), selected: initial, selection: new Set(initial ? [initial.path] : []), anchor: initial?.path ?? null, range_base: null, tools_visible: true, message: null, draft: null }
     upload_hooks.store = store_upload
-    mount_opfs(root)
+    filesystem_ready = mount_opfs(root)
     void mount_executables(executable_names)
     redraw()
     void restore_mounts(root)

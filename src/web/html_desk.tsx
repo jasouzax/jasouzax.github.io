@@ -242,6 +242,10 @@ function render_window_body(ctx: render_ctx, info: window_info): html {
         return (
             <>
                 <div class={"desk_wbox_body_empty"}>
+                    <div class="desk_wbox_body_empty_actions">
+                        <button type="button" class="desk_wbox_body_empty_folder" title="/home/user">{t(ctx, "open_folder")}</button>
+                        <button type="button" class="desk_wbox_body_empty_terminal">{t(ctx, "open_terminal")}</button>
+                    </div>
                     <label class={"desk_wbox_body_empty_upload"}>
                         <span class={"desk_wbox_body_empty_text"}>{t(ctx, "drop_file_or_upload")}</span>
                         <input
@@ -251,7 +255,6 @@ function render_window_body(ctx: render_ctx, info: window_info): html {
                             aria-label={t(ctx, "choose_file")}
                         />
                     </label>
-                    <button type="button" class="desk_wbox_body_empty_terminal">{t(ctx, "open_terminal")}</button>
                 </div>
             </>
         )
@@ -509,6 +512,14 @@ const runtime_keys = [
     "drop_file_or_upload",
     "choose_file",
     "open_terminal",
+    "open_folder",
+    "folder_navigation",
+    "folder_up",
+    "folder_refresh",
+    "folder_contents",
+    "folder_loading",
+    "folder_not_found",
+    "folder_items",
     "mime_type",
     "view_mode",
     "process_gone",

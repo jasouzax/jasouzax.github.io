@@ -1,6 +1,9 @@
 <plugin id="shell" name="Shell" version="1.0.0">
     <case view mime="application/x-pid" host="shell" />
 </plugin>
+<plugin id="folder" name="Folder" version="1.0.0">
+    <case view file="false" mime="inode/directory" host="folder" />
+</plugin>
 <plugin id="code" name="Code" version="1.0.0">
     <case file edit mime="text/markdown" host="text" />
     <case file view edit mime="text/*,application/json,application/*+json,application/xml,application/*+xml,application/javascript,application/typescript,application/x-sh,application/x-yaml,application/sql" host="text" />

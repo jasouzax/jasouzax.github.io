@@ -8,6 +8,7 @@ import { detect_mimes, mime_matches, is_mime } from "./desk_mime.ts"
 import { prepare_plugins } from "./desk_plugins.ts"
 import { media_player } from "./desk_media.ts"
 import { markdown_body } from "./desk_markdown.ts"
+import { folder_body } from "./desk_folder.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -344,7 +345,7 @@ export const process_hooks = {
     release: (_item: desk_window): void => {},
     release_body: (_item: desk_window): void => {},
 }
-export const uri_handlers: ((item: desk_window, uri: string) => Promise<boolean>)[] = []
+export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
 const renders = new WeakMap<desk_window, AbortController>()
 
 function fallback_body(item: desk_window): HTMLElement {
@@ -368,15 +369,24 @@ function fallback_body(item: desk_window): HTMLElement {
         input.multiple = true
         input.setAttribute("aria-label", text("choose_file"))
         label.append(message, input)
+        const actions = document.createElement("div")
+        actions.className = "desk_wbox_body_empty_actions"
+        const folder = document.createElement("button")
+        folder.type = "button"
+        folder.className = "desk_wbox_body_empty_folder"
+        folder.textContent = text("open_folder")
+        folder.title = "/home/user"
         const terminal = document.createElement("button")
         terminal.type = "button"
         terminal.className = "desk_wbox_body_empty_terminal"
         terminal.textContent = text("open_terminal")
-        empty.append(label, terminal)
+        actions.append(folder, terminal)
+        empty.append(actions, label)
         return empty
     }
     const note = unknown_body(item)
-    note.firstElementChild!.textContent = `${text(`unsupported_${item.mode}`)} ${item.mime}`
+    note.firstElementChild!.textContent = item.mime === "inode/directory" && item.mode === "view"
+        ? text("folder_loading") : `${text(`unsupported_${item.mode}`)} ${item.mime}`
     return note
 }
 
@@ -394,6 +404,7 @@ const loads = new WeakMap<desk_window, number>()
 export async function open_source(item: desk_window, uri: string): Promise<void> {
     const revision = (loads.get(item) ?? 0) + 1
     loads.set(item, revision)
+    const current = () => loads.get(item) === revision && item.el.isConnected
     renders.get(item)?.abort()
     item.error = ""
     if (!uri.trim()) {
@@ -404,7 +415,10 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
         return
     }
     try {
-        for (const handler of uri_handlers) if (await handler(item, uri)) return
+        for (const handler of uri_handlers) {
+            if (!current()) return
+            if (await handler(item, uri, current)) return
+        }
         const path = uri.replace(/^file:\/\//, "")
         const url = new URL(path, location.href)
         if (!["https:", "http:", "blob:", "data:"].includes(url.protocol)) throw new Error("Unsupported URI")
@@ -412,7 +426,7 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
         if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
         const file = await response.blob()
         if (loads.get(item) !== revision || !item.el.isConnected) return
-        await load_file(item, file, path.split("/").pop() || path, uri)
+        await load_file(item, file, path.split("/").pop() || path, uri, current)
     } catch (error) {
         if (loads.get(item) === revision) fail_window(item, uri, `${text("files_open_failed")}: ${String(error)}`)
     }
@@ -427,7 +441,15 @@ function body_for(item: desk_window): void {
     release_url(item)
     const controller = new AbortController()
     renders.set(item, controller)
-    const host = { code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, state, text, render_window, save_window }
+    const is_folder = () => !item.error && item.mime === "inode/directory" && item.mode === "view"
+    const fallback = (target: desk_window) => !target.error && target.mime === "inode/directory" && target.mode === "view"
+        ? folder_body(target, controller.signal) : fallback_body(target)
+    const show_fallback = () => {
+        set_body(item, fallback(item))
+        item.el.dataset.plugin = is_folder() ? "folder" : "default"
+        sync_save(item)
+    }
+    const host = { code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
@@ -436,7 +458,7 @@ function body_for(item: desk_window): void {
                 const body = module.render?.(context)
                 if (body) {
                     set_body(item, body)
-                    item.el.dataset.plugin = context.plugin.id
+                    item.el.dataset.plugin = body.classList.contains("desk_wbox_body_folder") ? "folder" : context.plugin.id
                 }
                 const cleanup = module.setup?.(context)
                 if (cleanup) controller.signal.addEventListener("abort", cleanup, { once: true })
@@ -445,8 +467,10 @@ function body_for(item: desk_window): void {
                 console.warn(`Plugin ${context.plugin.id} failed`, error)
             }
         }
+        if (!controller.signal.aborted && item.el.isConnected) show_fallback()
     }).catch(error => {
         if (!controller.signal.aborted) {
+            if (is_folder()) { show_fallback(); return }
             item.error = String(error)
             set_body(item, fallback_body(item))
         }
@@ -473,7 +497,8 @@ export function render_window(item: desk_window): void {
     sync_save(item)
 }
 
-export async function load_file(item: desk_window, file: Blob, name: string, path: string = ""): Promise<void> {
+export async function load_file(item: desk_window, file: Blob, name: string, path: string = "", current = () => true): Promise<void> {
+    if (!current()) return
     process_hooks.release(item)
     item.error = ""
     item.pid = null
@@ -481,10 +506,22 @@ export async function load_file(item: desk_window, file: Blob, name: string, pat
     item.name = name
     item.path = path
     item.save = null
-    item.candidates = await detect_mimes(file, name)
+    const candidates = await detect_mimes(file, name)
+    if (!current()) return
+    item.candidates = candidates
     item.mime = item.candidates[0] ?? ""
     item.icon = mime_icon(item.mime)
     item.mode = "view"
+    render_window(item)
+}
+
+export function load_folder(item: desk_window, path: string, name: string): void {
+    process_hooks.release(item)
+    item.error = ""; item.pid = null; item.file = null; item.save = null
+    item.path = path; item.name = name; item.mode = "view"
+    item.mime = "inode/directory"; item.candidates = [item.mime]
+    item.icon = state.data?.folder_icon ?? ""
+    item.el.dataset.path = path; item.el.dataset.mime = item.mime
     render_window(item)
 }
 
@@ -577,6 +614,7 @@ function take_files(item: desk_window, files: File[], open_window: () => desk_wi
 function wire(item: desk_window, open_window: () => desk_window | null): void {
     const box = item.el
     box.addEventListener("click", event => {
+        if ((event.target as Element).closest(".desk_wbox_body_empty_folder")) void open_source(item, "file:///home/user")
         if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, "pid:")
     })
     let depth = 0
