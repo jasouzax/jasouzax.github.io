@@ -6301,6 +6301,16 @@ body::after {
 .desk[data-runtime] {
     @media (orientation: landscape) {
         padding-block: .25em;
+        // Reserve the runtime's tracks before its scripts initialize the windows.
+        grid-template-columns: var(--desk-initial-columns);
+        grid-template-rows: var(--desk-initial-rows);
+    }
+
+    @media (orientation: portrait) {
+        // init_desk focuses the last initial window; earlier ones stay hidden.
+        > .desk_wbox:not([data-window]):has(~ .desk_wbox) {
+            display: none;
+        }
     }
 
     .desk_side {

@@ -20,6 +20,30 @@ const choose = (page: Page, id: string) => page.locator(`#${id}`).evaluate((inpu
     input.dispatchEvent(new Event("change", { bubbles: true }))
 })
 
+for (const width of [1440, 390]) {
+    for (const path of ["/projects/stesis", "/desk"]) {
+        test(`${path} at ${width}px reserves the loaded window bounds before runtime downloads`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 1000 })
+            let release!: () => void
+            const gate = new Promise<void>(done => { release = done })
+            await page.route("**/assets/themes/default/*.css", async route => { await gate; await route.continue() })
+            await page.route("**/assets/runtime/page.*.js", async route => { await gate; await route.continue() })
+            await page.goto(path, { waitUntil: "commit" })
+            const placeholder = page.locator('[data-skeleton-group="window"]')
+            await expect(placeholder).toHaveCount(1)
+            const promised = (await placeholder.boundingBox())!
+            release()
+            await ready(page)
+            const windows = page.locator(".desk > .desk_wbox:visible")
+            await expect(windows).toHaveCount(1)
+            const actual = (await windows.boundingBox())!
+            for (const key of ["x", "y", "width", "height"] as const) {
+                expect(Math.abs(actual[key] - promised[key]), key).toBeLessThan(1)
+            }
+        })
+    }
+}
+
 for (const mode of ["light", "dark"] as const) {
     test(`inline ${mode} skeleton paints while the theme request is held`, async ({ page }) => {
         await page.emulateMedia({ colorScheme: mode })

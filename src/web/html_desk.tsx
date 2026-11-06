@@ -298,15 +298,17 @@ function render_window_body(ctx: render_ctx, info: window_info): html {
     return note(ctx, `unsupported_${mode}`, mime)
 }
 
-export function render_window(ctx: render_ctx, info: window_info, columns: number): html {
-    const row = Math.floor(info.index / columns) + 1
-    const column = (info.index % columns) + 2
+export function render_window(ctx: render_ctx, info: window_info, columns: number, count: number): html {
+    const row = Math.floor(info.index / columns)
+    const column = info.index % columns
+    const span = info.index === count - 1 ? columns - column : 1
+    const from = 3 + 2 * column
     return (
         <>
             <section
                 class={"desk_wbox"}
                 id={`window-${info.index}`}
-                style={`grid-area: ${row} / ${column}`}
+                style={`grid-area: ${1 + 2 * row} / ${from} / ${2 + 2 * row} / ${from + 2 * span - 1}`}
                 data-full={is_true(info.node.attrs.full) ? "" : undefined}
                 data-path={info.node.attrs.path ?? ""}
                 data-mode={info.node.attrs.mode ?? "view"}
@@ -613,7 +615,7 @@ function json_script(id: string, data: unknown): html {
 }
 
 // The window a new <window> starts as: no icon, no type, no source, view mode. The runtime clones it, so the file picker works without any markup of its own.
-function render_window_template(ctx: render_ctx): child {
+function empty_window_info(ctx: render_ctx): window_info {
     const node: xml_node = {
         tag: "window",
         attrs: {},
@@ -623,7 +625,10 @@ function render_window_template(ctx: render_ctx): child {
         file: ctx.page.file,
         parent: null
     }
-    const info = { index: 0, label: "", icon: "", node }
+    return { index: 0, label: "", icon: "", node }
+}
+function render_window_template(ctx: render_ctx): child {
+    const info = empty_window_info(ctx)
     return (
         <template id="desk_window_template">
             <section class="desk_wbox">
@@ -688,7 +693,12 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
         )
     })
     const windows = window_infos(ctx, desk)
+    // Match init_desk's initial empty window before the boot skeleton is captured.
+    if (!windows.length) windows.push(empty_window_info(ctx))
     const columns = Math.max(1, Math.ceil(Math.sqrt(windows.length)))
+    const rows = Math.ceil(windows.length / columns)
+    const initial_columns = ["1fr", ".25em", ...Array.from({ length: columns }, () => "minmax(0, 9999fr)").flatMap((track, index) => index ? [".5em", track] : [track]), ".25em"].join(" ")
+    const initial_rows = Array.from({ length: rows }, () => "minmax(0, 1fr)").join(" .5em ")
     // A desk with a Files side is a file-system desk: the runtime owns its windows (it creates, moves and closes them).
     const runtime = true
     const flags = {
@@ -707,9 +717,9 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const extra = runtime ? [render_window_template(ctx), render_runtime_data(ctx)] : null
     return (
         <>
-            <article class={"desk article"} id={"desk"} {...flags}>
+            <article class={"desk article"} id={"desk"} style={`--desk-initial-columns: ${initial_columns}; --desk-initial-rows: ${initial_rows}`} {...flags}>
                 {side}
-                {windows.map((info) => render_window(ctx, info, columns))}
+                {windows.map((info) => render_window(ctx, info, columns, windows.length))}
                 {extra}
             </article>
         </>
