@@ -2,10 +2,9 @@
    MEMORY THEME   (weirdcore / dreamcore / Windows XP / liminal / surreal)
    Techniques: ransom notes, glitch, checkerboard.
 
-   Loads after style.css and only does anything while the Memory radio
-   (#theme_name_memory) is checked: the same CSS-only :has() switch the
-   Light / Dark radios use. It redefines the theme tokens, then restyles
-   the existing components. The background is drawn by memory.js.
+   Uses the inline shared layout and supplies its own skin. It does not import
+   Default. The compiler scopes its selectors to data-theme="memory".
+   The background is drawn by memory.js.
 
    Uses native CSS nesting (Chrome 112+, Safari 16.5+, Firefox 117+),
    the same baseline as the :has() / color-mix() the site already needs.
@@ -176,20 +175,15 @@
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='30' viewBox='0 0 22 30'%3E%3Cpath d='M2 1v22l5.5-5 4 9.5 3.5-1.6-4-9.2H19z' fill='%23fff' stroke='%23000' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") 2 1, auto;
 }
 
-/* ---------- dark = Windows XP "dark" (charcoal Luna, orange task-pane headers) ----------
-   Specificity: the default theme switches its dark palette with
-   :root:has(#theme_state_dark:checked), and that ID gives it (1,2,0), more than
-   a plain [data-mode] selector. The :not(#m_dark) below adds an ID's worth of
-   specificity so Memory's dark tokens and overrides always win over it.
-   Both entry points (Dark radio, OS preference while Auto) share the mixin. */
+/* Dark = charcoal Luna. Explicit mode and the OS preference share the mixin. */
 @mixin m_dark($root: ":root") {
     @media (prefers-color-scheme: dark) {
-        #{$root}[data-theme="memory"]:not([data-mode="light"]):not(#m_dark) {
+        #{$root}[data-theme="memory"]:not([data-mode="light"]) {
             @content;
         }
     }
 
-    #{$root}[data-theme="memory"][data-mode="dark"]:not(#m_dark) {
+    #{$root}[data-theme="memory"][data-mode="dark"] {
         @content;
     }
 }

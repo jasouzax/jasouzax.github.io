@@ -14,6 +14,7 @@ import { text_direction } from "./seo_common.tsx"
 import { body_class, type page_style } from "./page_style.tsx"
 import { background_default } from "./partials/background_default.tsx"
 import { background_memory } from "./partials/background_memory.tsx"
+import { skeleton_css } from "./skeleton_css.ts"
 
 export type theme_assets = {
     name: string
@@ -25,6 +26,7 @@ export type theme_assets = {
     label: string
 }
 export type page_assets = {
+    inline_css?: string
     themes: Record<string, theme_assets>
     runtime_page: string
     runtime_theme_switch: string
@@ -127,6 +129,7 @@ export function render_page(
                 <title>{title}</title>
                 {fixed_head(model, theme.colors)}
                 {managed}
+                <style id="layout_css">{raw_text(assets.inline_css ?? skeleton_css)}</style>
                 <script>{raw_text(assets.boot_script)}</script>
                 {theme.fonts.map((href) => (
                     <link rel="preload" href={href} as="font" type="font/woff2" crossorigin="" />
@@ -135,16 +138,20 @@ export function render_page(
                     rel="stylesheet"
                     href={theme.css}
                     id="theme_css"
+                    media="print"
                     data-theme-css={model.config.default_theme}
                 />
+                <noscript><link rel="stylesheet" href={theme.css} /></noscript>
                 {styles.map((style) => (
                     <link
                         rel="stylesheet"
                         href={style.href}
-                        media={style.media || undefined}
+                        media="print"
+                        data-page-media={style.media || "all"}
                         data-page-css=""
                     />
                 ))}
+                <noscript>{styles.map(style => <link rel="stylesheet" href={style.href} media={style.media || undefined} />)}</noscript>
             {theme.js && <script src={theme.js} defer />}
             </head>
             <body class={body_class(page)}>

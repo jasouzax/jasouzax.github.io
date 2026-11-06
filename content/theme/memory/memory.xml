@@ -1,17 +1,8 @@
 <theme name="memory" label="Memory" icon="[star]" color="#8aa5fb/#101a66" js="memory.js" background="memory" preload="Jasouza, FontAwesome, FontAwesomeBrands">
-    <style src="../default/default.scss"/>
-    <style src="memory.scss" scope="global"/>
+    <style src="memory.scss"/>
     <style><![CDATA[
         /* Japanese: phrase-aware line breaks, and CJK families after the XP interface stack */
         :root:lang(ja) { line-break: strict; word-break: auto-phrase; --xp-ui: Tahoma, "Trebuchet MS", Verdana, "Meiryo UI", "Yu Gothic UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif, "FontAwesome", "FontAwesomeBrands"; }
-        #head_tray, #theme_background { display: contents; }
-        .needs_js { display: none; }
-        :root.js .needs_js { display: revert; }
-        .background_entity:nth-of-type(n + 6) { display: none; }
-        .site_foot { scroll-snap-align: end; position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 1em; justify-content: center; }
-        .site_foot a { color: inherit; }
-        .site_foot_note { margin: 0; }
-        .cookie_notice[hidden] { display: none; }
     ]]></style>
     <font name="Jasouza" author="Jasouza" size="60x100">
         <!-- Uppercase -->

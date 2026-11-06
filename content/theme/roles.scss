@@ -1,0 +1,132 @@
+// Roles type in, hold (the caret blinks), delete and hand over to the next one: 4s each, 16s loop.
+// Shared component behavior: each theme gets one role at a time in the grid.
+// Needs a fixed-width face: the text is revealed in steps of one character (clip-path) and the caret moves in ch (translate).
+// Keyframes are generated per length because steps() cannot take a var().
+.landing_role {
+    position: relative;
+    grid-area: 1 / 1;
+    justify-self: start;
+    white-space: nowrap;
+
+    &_text {
+        display: block;
+        clip-path: inset(0 100% 0 0);
+        animation: role_type_17 16s linear infinite 1s;
+    }
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: .5ch;
+        background: var(--accent);
+        opacity: 0;
+        animation: role_caret_17 16s linear infinite 1s;
+    }
+
+    &:nth-child(2)>&_text {
+        animation-name: role_type_16;
+        animation-delay: 5s;
+    }
+
+    &:nth-child(3)>&_text {
+        animation-name: role_type_19;
+        animation-delay: 9s;
+    }
+
+    &:nth-child(4)>&_text {
+        animation-name: role_type_19;
+        animation-delay: 13s;
+    }
+
+    &:nth-child(2)::after {
+        animation-name: role_caret_16;
+        animation-delay: 5s;
+    }
+
+    &:nth-child(3)::after {
+        animation-name: role_caret_19;
+        animation-delay: 9s;
+    }
+
+    &:nth-child(4)::after {
+        animation-name: role_caret_19;
+        animation-delay: 13s;
+    }
+}
+
+@mixin still_roles {
+    .landing_role_text { animation: none; }
+    .landing_role:first-child > .landing_role_text { clip-path: none; }
+    .landing_role:not(:first-child) { display: none; }
+    .landing_role::after { content: none; animation: none; }
+}
+@media (prefers-reduced-motion: reduce) { @include still_roles; }
+body:has(#motion_pause:checked) { @include still_roles; }
+
+@each $n in (16, 17, 19) {
+    @keyframes role_type_#{$n} {
+        0% {
+            clip-path: inset(0 100% 0 0);
+            animation-timing-function: steps(#{$n}, jump-start);
+        }
+
+        9%,
+        19% {
+            clip-path: inset(0 0 0 0);
+            animation-timing-function: steps(#{$n}, end);
+        }
+
+        24%,
+        100% {
+            clip-path: inset(0 100% 0 0);
+        }
+    }
+
+    @keyframes role_caret_#{$n} {
+        0% {
+            opacity: 1;
+            translate: 0 0;
+            animation-timing-function: steps(#{$n}, jump-start);
+        }
+
+        9% {
+            opacity: 1;
+            translate: #{$n}ch 0;
+            animation-timing-function: step-end;
+        }
+
+        11.5% {
+            opacity: 0;
+            animation-timing-function: step-end;
+        }
+
+        14% {
+            opacity: 1;
+            animation-timing-function: step-end;
+        }
+
+        16.5% {
+            opacity: 0;
+            animation-timing-function: step-end;
+        }
+
+        19% {
+            opacity: 1;
+            translate: #{$n}ch 0;
+            animation-timing-function: steps(#{$n}, end);
+        }
+
+        24% {
+            opacity: 1;
+            translate: 0 0;
+        }
+
+        24.01%,
+        100% {
+            opacity: 0;
+            translate: 0 0;
+        }
+    }
+}
+

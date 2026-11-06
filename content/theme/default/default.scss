@@ -5,8 +5,8 @@
 
 // =====================================================================
 // THEME TOKENS: "Clean Sci-fi" (the default theme)
-// Everything below the tokens reads these custom properties, so another theme
-// (Memory, Fresh, ...) only has to redefine them, e.g. :root[data-theme-name="memory"] { ... }.
+// The compiler extracts geometry into the unnamed inline layout theme. The
+// remaining paint and motion are scoped to Default; other themes supply a skin.
 // Light and dark follow the OS (prefers-color-scheme) unless the Light or Dark radio in the theme menu is checked (CSS only, via :has()).
 // The --bg-valley / --bg-mid / --bg-hill / --bg-primary hex values also drive the WebGL contour map (contour.js reads them).
 // =====================================================================
@@ -463,11 +463,19 @@ html {
 body {
     margin: 2.5em 0 0 0;
     font: 14px Jasouza, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 2.5em);
+}
+
+#main-content {
+    flex-shrink: 0;
 }
 
 @media (orientation: portrait) {
     body {
-        margin: 2.5em 0 calc(3em + var(--safe_bottom)) 0
+        margin: 2.5em 0 calc(3em + var(--safe_bottom)) 0;
+        min-height: calc(100dvh - 5.5em - var(--safe_bottom));
     }
 }
 
@@ -4542,6 +4550,8 @@ body::after {
 // Drawn like the header (glass + one hairline) but short and at 75% opacity; the border is on the side facing the page above.
 .site_foot {
     isolation: isolate;
+    flex-shrink: 0;
+    margin-top: auto;
     padding: .35em 1em;
     font-size: .8em;
     line-height: 1.4;
@@ -4577,13 +4587,6 @@ body::after {
     @media (orientation: portrait) {
         height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
         min-height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
-    }
-}
-
-// the fixed bottom tab bar covers the last 3em of the screen: leave that room under the (now short) footer
-@media (orientation: portrait) {
-    .site_foot {
-        margin-bottom: 3em;
     }
 }
 
@@ -4838,128 +4841,6 @@ body::after {
     -webkit-text-fill-color: transparent;
     color: transparent;
     filter: drop-shadow(0 0 .35em var(--bg)) drop-shadow(0 0 .9em var(--bg));
-}
-
-// Roles type in, hold (the caret blinks), delete and hand over to the next one: 4s each, 16s loop.
-// Needs a fixed-width face: the text is revealed in steps of one character (clip-path) and the caret moves in ch (translate).
-// Keyframes are generated per length because steps() cannot take a var().
-.landing_role {
-    position: relative;
-    grid-area: 1 / 1;
-    justify-self: start;
-    white-space: nowrap;
-
-    &_text {
-        display: block;
-        clip-path: inset(0 100% 0 0);
-        animation: role_type_17 16s linear infinite 1s;
-    }
-
-    &::after {
-        content: '';
-        position: absolute;
-        inset: 0 auto 0 0;
-        width: .5ch;
-        background: var(--accent);
-        opacity: 0;
-        animation: role_caret_17 16s linear infinite 1s;
-    }
-
-    &:nth-child(2)>&_text {
-        animation-name: role_type_16;
-        animation-delay: 5s;
-    }
-
-    &:nth-child(3)>&_text {
-        animation-name: role_type_19;
-        animation-delay: 9s;
-    }
-
-    &:nth-child(4)>&_text {
-        animation-name: role_type_19;
-        animation-delay: 13s;
-    }
-
-    &:nth-child(2)::after {
-        animation-name: role_caret_16;
-        animation-delay: 5s;
-    }
-
-    &:nth-child(3)::after {
-        animation-name: role_caret_19;
-        animation-delay: 9s;
-    }
-
-    &:nth-child(4)::after {
-        animation-name: role_caret_19;
-        animation-delay: 13s;
-    }
-}
-
-@each $n in (16, 17, 19) {
-    @keyframes role_type_#{$n} {
-        0% {
-            clip-path: inset(0 100% 0 0);
-            animation-timing-function: steps(#{$n}, jump-start);
-        }
-
-        9%,
-        19% {
-            clip-path: inset(0 0 0 0);
-            animation-timing-function: steps(#{$n}, end);
-        }
-
-        24%,
-        100% {
-            clip-path: inset(0 100% 0 0);
-        }
-    }
-
-    @keyframes role_caret_#{$n} {
-        0% {
-            opacity: 1;
-            translate: 0 0;
-            animation-timing-function: steps(#{$n}, jump-start);
-        }
-
-        9% {
-            opacity: 1;
-            translate: #{$n}ch 0;
-            animation-timing-function: step-end;
-        }
-
-        11.5% {
-            opacity: 0;
-            animation-timing-function: step-end;
-        }
-
-        14% {
-            opacity: 1;
-            animation-timing-function: step-end;
-        }
-
-        16.5% {
-            opacity: 0;
-            animation-timing-function: step-end;
-        }
-
-        19% {
-            opacity: 1;
-            translate: #{$n}ch 0;
-            animation-timing-function: steps(#{$n}, end);
-        }
-
-        24% {
-            opacity: 1;
-            translate: 0 0;
-        }
-
-        24.01%,
-        100% {
-            opacity: 0;
-            translate: 0 0;
-        }
-    }
 }
 
 .landing_prompt {
@@ -7946,50 +7827,6 @@ body:has(#motion_pause:checked) {
     }
 }
 
-
-// ================= PAGE SWAP LOADING (client_spa.ts) =================
-// The old page is blurred while the next one is fetched; the spinner is one div with a round border.
-#head,
-#main-content {
-    transition: filter .25s var(--ease), opacity .25s var(--ease);
-}
-
-// The page being left fades out completely, so it is clear that something is loading; the new content fades back in (the same element, so the
-// transition runs when the class is removed after the swap). The header only stops taking clicks.
-#main-content {
-    @media (prefers-reduced-motion: no-preference) {
-        transition: opacity .25s ease;
-    }
-}
-
-html.spa_loading #head {
-    pointer-events: none;
-}
-
-html.spa_loading #main-content {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.spa_spinner {
-    position: fixed;
-    z-index: 1000;
-    top: 50%;
-    left: 50%;
-    width: 2.6em;
-    height: 2.6em;
-    margin: -1.3em 0 0 -1.3em;
-    border: .28em solid color-mix(in srgb, var(--accent) 25%, transparent);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spa_spin .8s linear infinite;
-}
-
-@keyframes spa_spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
 
 // links installed by client_search.ts replace the state-bound generated ones (.st: hidden unless their own state is the target)
 .expertise.is_searching .dot_a.st,

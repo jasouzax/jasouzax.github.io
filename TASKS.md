@@ -36,6 +36,9 @@ Ordered dependency checklist. `[x]` means implemented and verified, `[ ]` means 
 - [ ] Complete transitive Markdown/HTML resource discovery and collision-safe nested relative publication.
 - [x] Preserve translations, theme compilation, custom fonts, SEO, SPA payloads and no-JavaScript HTML.
 - [ ] Complete skeleton theme, shared fixed canvas/slots and theme lifecycle contract (1.9, 2.4).
+  - [x] Inline shared geometry and mode-aware shimmer; load named themes without blocking first paint, with readable no-JavaScript and failure fallbacks.
+  - [x] Diagonal SPA wipes through skeletons, preserve the signature node, and isolate named skins with rollback on failed theme changes.
+  - [ ] Replace the legacy theme background trees/renderers with the shared fixed canvas/slots contract.
 - [ ] Implement full plugin trigger/flow/WASM pipeline (1.10, 2.10).
   - [x] Validate plugin declarations and require WASM SHA-256 metadata.
   - [ ] Publish scripts/WASM manifests and verify bytes before execution.

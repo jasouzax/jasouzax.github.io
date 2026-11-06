@@ -11,6 +11,7 @@ import type { site_model } from "./model.ts"
 import { report_error, report_warning, jazu_error } from "./diag.ts"
 import { short_hash, split_list } from "./util.ts"
 import { emit_font } from "./font_build.ts"
+import { split_layout_css } from "./layout_css.ts"
 
 export type output_files = Map<string, Buffer | string>
 
@@ -137,14 +138,30 @@ async function bundle_js(file: string): Promise<string> {
     return text
 }
 
-export async function compile_theme(model: site_model, node: xml_node, data_scss: string, files: output_files): Promise<theme_result> {
+export function compile_inline_layout(model: site_model, data_scss: string, files: output_files): { css: string, sources: Set<string> } {
+    const parts: string[] = [], sources = new Set<string>()
+    for (const node of model.themes.filter(node => !node.attrs.name)) {
+        for (const style of child_nodes(node, "style")) {
+            const { css, base_dir } = compile_scss(model, node, style, data_scss)
+            if (style.attrs.scope === "layout") {
+                parts.push(split_layout_css(css).layout)
+                if (style.attrs.src) sources.add(resolve(dirname(node.file), style.attrs.src))
+            } else parts.push(rewrite_urls(css, base_dir, "layout", files, model))
+        }
+    }
+    // The layer gives a theme's explicit geometry overrides predictable priority.
+    return { css: `@layer skeleton, layout;@layer layout{${parts.join("\n")}}`, sources }
+}
+
+export async function compile_theme(model: site_model, node: xml_node, data_scss: string, files: output_files, layout_sources = new Set<string>()): Promise<theme_result> {
     const name = node.attrs.name
     const url_dir = `/assets/themes/${name}`
     const parts: string[] = []
     const fonts: string[] = []
     for (const style of child_nodes(node, "style")) {
         const { css, base_dir } = compile_scss(model, node, style, data_scss)
-        const rewritten = rewrite_urls(css, base_dir, name, files, model)
+        const shared = style.attrs.src && layout_sources.has(resolve(dirname(node.file), style.attrs.src))
+        const rewritten = rewrite_urls(shared ? split_layout_css(css).skin : css, base_dir, name, files, model)
         parts.push(style.attrs.scope === "global" ? rewritten : scope_css(rewritten, name))
     }
     for (const font of child_nodes(node, "font")) {

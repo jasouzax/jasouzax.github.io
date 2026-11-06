@@ -1,0 +1,151 @@
+import { test, expect, type Page } from "@playwright/test"
+
+const ready = (page: Page) => expect(page.locator("html")).not.toHaveAttribute("data-skeleton", /.+/, { timeout: 12000 })
+const choose = (page: Page, id: string) => page.locator(`#${id}`).evaluate((input: HTMLInputElement) => {
+    input.checked = true
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+})
+
+for (const mode of ["light", "dark"] as const) {
+    test(`inline ${mode} skeleton paints while the theme request is held`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: mode })
+        let release!: () => void
+        const gate = new Promise<void>(done => { release = done })
+        await page.route("**/assets/themes/default/*.css", async route => { await gate; await route.continue() })
+        const errors: string[] = []
+        page.on("console", message => { if (message.text().includes("Content Security Policy")) errors.push(message.text()) })
+        await page.goto("/", { waitUntil: "domcontentloaded" })
+        await expect(page.locator("html")).toHaveAttribute("data-skeleton", "loading")
+        await expect(page.locator("#head")).toHaveCSS("position", "fixed")
+        await expect(page.locator("body")).toHaveCSS("display", "flex")
+        await expect(page.locator("h1")).toHaveCSS("-webkit-text-fill-color", "rgba(0, 0, 0, 0)")
+        await expect(page.locator("h1")).toHaveCSS("background-image", /linear-gradient/)
+        await expect(page.locator("html")).toHaveCSS("background-color", mode === "dark" ? "rgb(4, 6, 12)" : "rgb(243, 247, 252)")
+        await expect(page.locator("#head_signature")).toBeVisible()
+        expect(errors).toEqual([])
+        await page.screenshot({ path: `.cache/loading-${mode}.png` })
+        release()
+        await ready(page)
+        await expect(page.locator(".landing_lead").first()).not.toHaveCSS("color", "rgba(0, 0, 0, 0)")
+        await expect(page.locator("h1")).toHaveCSS("background-clip", "text")
+        await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
+    })
+}
+
+test("SPA wipes through a skeleton and keeps the exact signature node", async ({ page }) => {
+    await page.goto("/")
+    await ready(page)
+    await page.evaluate(() => { (window as any).original_signature = document.getElementById("head_signature") })
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route("**/privacy/index.json", async route => { await gate; await route.continue() })
+    await page.locator('.site_foot a[href="/privacy"]').evaluate((link: HTMLAnchorElement) => link.click())
+    await expect.poll(() => page.locator("#main-content").evaluate(element => getComputedStyle(element).maskImage)).toContain("linear-gradient")
+    release()
+    await expect(page.locator("html")).toHaveAttribute("data-skeleton", "loading")
+    expect(await page.evaluate(() => (window as any).original_signature === document.getElementById("head_signature"))).toBe(true)
+    await ready(page)
+    await expect(page).toHaveURL(/\/privacy$/)
+    await expect(page.locator("#main-content")).toBeFocused()
+    await expect(page.locator("#spa_spinner")).toHaveCount(0)
+    await page.goBack()
+    await ready(page)
+    await expect(page.locator("h1")).toContainText("Jason")
+    expect(await page.evaluate(() => (window as any).original_signature === document.getElementById("head_signature"))).toBe(true)
+})
+
+test("Memory uses the inline intermediary and switches back without Default skin inheritance", async ({ page }) => {
+    await page.goto("/")
+    await ready(page)
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route("**/assets/themes/memory/*.css", async route => { await gate; await route.continue() })
+    await choose(page, "theme_name_memory")
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "")
+    await expect(page.locator("html")).toHaveAttribute("data-skeleton", "loading")
+    await expect(page.locator("#head")).toHaveCSS("position", "fixed")
+    release()
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "memory")
+    await expect(page.locator('link[data-theme-css="default"]')).toHaveCount(0)
+    await expect(page.locator('link[data-theme-css="memory"]')).toHaveCount(1)
+    await page.screenshot({ path: ".cache/loading-memory-ready.png" })
+    await choose(page, "theme_state_dark")
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "dark")
+    await choose(page, "theme_name_default")
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "default")
+    await expect(page.locator('link[data-theme-css="memory"]')).toHaveCount(0)
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg-valley").trim())).toBe("#04060c")
+})
+
+test("failed theme downloads restore the current theme and reveal readable content", async ({ page }) => {
+    await page.goto("/")
+    await ready(page)
+    await page.route("**/assets/themes/memory/*.css", route => route.abort())
+    await choose(page, "theme_name_memory")
+    await expect(page.locator("#spa_live")).toContainText("failed")
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "default")
+    await expect(page.locator("#theme_name_default")).toBeChecked()
+    await expect(page.locator(".landing_lead").first()).not.toHaveCSS("color", "rgba(0, 0, 0, 0)")
+})
+
+test("stored Memory and explicit dark mode restore without exposing Default", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" })
+    await page.addInitScript(() => {
+        localStorage.setItem("jazu_theme", "memory")
+        localStorage.setItem("jazu_mode", "dark")
+    })
+    await page.goto("/privacy", { waitUntil: "domcontentloaded" })
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "dark")
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "memory")
+    await expect(page.locator('link[data-theme-css="default"]')).toHaveCount(0)
+    await expect(page.locator("#theme_state_dark")).toBeChecked()
+})
+
+test("an unavailable initial stylesheet leaves the inline layout readable", async ({ page }) => {
+    await page.route("**/assets/themes/default/*.css", route => route.abort())
+    await page.goto("/privacy")
+    await ready(page)
+    await expect(page.locator("h1")).not.toHaveCSS("color", "rgba(0, 0, 0, 0)")
+    await expect(page.locator("#head")).toHaveCSS("position", "fixed")
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
+})
+
+test("a newer theme selection wins when an earlier CSS request is slow", async ({ page }) => {
+    await page.goto("/privacy")
+    await ready(page)
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route("**/assets/themes/memory/*.css", async route => { await gate; await route.continue() })
+    await choose(page, "theme_name_memory")
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "")
+    await choose(page, "theme_name_default")
+    release()
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("jazu_theme"))).toBe("default")
+    await ready(page)
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "default")
+    await expect(page.locator("link[data-theme-css]")).toHaveCount(1)
+})
+
+test("reduced motion stops shimmer, and JavaScript-disabled pages remain readable", async ({ browser }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce", baseURL: "http://127.0.0.1:8125" })
+    const page = await context.newPage()
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route("**/assets/themes/default/*.css", async route => { await gate; await route.continue() })
+    await page.goto("/", { waitUntil: "domcontentloaded" })
+    await expect(page.locator("h1")).toHaveCSS("animation-duration", "0s")
+    release()
+    await context.close()
+    const nojs = await browser.newContext({ javaScriptEnabled: false, baseURL: "http://127.0.0.1:8125" })
+    const plain = await nojs.newPage()
+    await plain.goto("/privacy")
+    await expect(plain.locator("html")).not.toHaveAttribute("data-skeleton")
+    await expect(plain.locator("h1")).not.toHaveCSS("-webkit-text-fill-color", "rgba(0, 0, 0, 0)")
+    await expect(plain.locator("#head")).toHaveCSS("position", "fixed")
+    await nojs.close()
+})

@@ -338,12 +338,12 @@ export function robots_txt(model: site_model): string {
     return groups.join("\n\n") + "\n"
 }
 
-export function headers_file(inline_hashes: string[]): string {
+export function headers_file(inline_hashes: string[], style_hashes: string[] = []): string {
     const script_hashes = inline_hashes.map((hash) => `'sha256-${hash}'`).join(" ")
     const csp = [
         "default-src 'self'",
         `script-src 'self' 'wasm-unsafe-eval' ${script_hashes}`.trim(),
-        "style-src 'self'",
+        `style-src 'self' ${style_hashes.map(hash => `'sha256-${hash}'`).join(" ")}`.trim(),
         "style-src-attr 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "font-src 'self'",

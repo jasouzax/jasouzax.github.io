@@ -1,6 +1,7 @@
 import { init_reveal, update_tab_spy } from "./scroll.ts"
 import { sync_theme_radios } from "./menus.ts"
 import { deserialize, to_dom, type serialized_node } from "../vnode.tsx"
+import { begin_loading, finish_loading, wait_resources, wipe_page } from "./loading.ts"
 
 type page_payload = {
     path: string
@@ -61,8 +62,9 @@ function announce(title: string): void {
     region.textContent = title
 }
 
-function swap_page_styles(styles: { href: string, media: string }[]): void {
+function swap_page_styles(styles: { href: string, media: string }[]): Promise<unknown[]> {
     const current = [...document.head.querySelectorAll<HTMLLinkElement>("link[data-page-css]")]
+    const pending: Promise<void>[] = []
     for (const link of current) {
         if (!styles.some(style => link.getAttribute("href") === style.href)) link.remove()
     }
@@ -73,11 +75,34 @@ function swap_page_styles(styles: { href: string, media: string }[]): void {
         link.href = style.href
         if (style.media) link.media = style.media
         link.dataset.pageCss = ""
+        pending.push(new Promise<void>(done => {
+            link.onload = () => done()
+            link.onerror = () => done()
+            setTimeout(done, 4000)
+        }))
         document.head.append(link)
+    }
+    return Promise.all(pending)
+}
+
+function swap_header(tree: serialized_node): void {
+    const header = document.getElementById("head")!
+    const signature = document.getElementById("head_signature")!
+    const next = to_dom(deserialize(tree)) as HTMLElement
+    // Keep the SVG attached to the same header. Moving it into a replacement
+    // header would restart the signature's SMIL timeline in some browsers.
+    for (const child of Array.from(header.childNodes)) if (child !== signature) child.remove()
+    let before_signature = true
+    for (const child of Array.from(next.childNodes)) {
+        if (child instanceof HTMLElement && child.id === "head_signature") {
+            for (const attr of Array.from(child.attributes)) signature.setAttribute(attr.name, attr.value)
+            before_signature = false
+        } else if (before_signature) header.insertBefore(child, signature)
+        else header.append(child)
     }
 }
 
-function swap_page(payload: page_payload): void {
+function swap_page(payload: page_payload): Promise<unknown[]> {
     document.title = payload.title
     // switching language swaps the page without a reload: keep <html lang> (fonts, hyphenation, screen readers) and the spinner label in step
     if (payload.loading) document.documentElement.dataset.loading = payload.loading
@@ -89,11 +114,12 @@ function swap_page(payload: page_payload): void {
         document.head.append(to_dom(deserialize(payload.head)))
     }
     document.body.className = payload.body_class
-    swap_page_styles(payload.styles ?? [])
-    document.getElementById("head")!.replaceWith(to_dom(deserialize(payload.header)))
+    const styles = swap_page_styles(payload.styles ?? [])
+    swap_header(payload.header)
     document.getElementById("main-content")!.replaceChildren(to_dom(deserialize(payload.main)))
     sync_theme_radios()
     document.dispatchEvent(new Event("jazu:page"))
+    return styles
 }
 
 let current_path = location.pathname
@@ -105,44 +131,41 @@ function scroll_to_hash(hash: string): void {
     else scrollTo(0, 0)
 }
 
-// While the next page loads the current one fades to nothing and a spinner (a div with a round border) turns in the middle; both go away
-// once the new page is in. The look is in default.scss (.spa_loading, .spa_spinner).
-function show_loading(): void {
-    document.documentElement.classList.add("spa_loading")
-    if (document.getElementById("spa_spinner")) return
-    const spinner = document.createElement("div")
-    spinner.id = "spa_spinner"
-    spinner.className = "spa_spinner"
-    spinner.setAttribute("role", "progressbar")
-    spinner.setAttribute("aria-label", document.documentElement.dataset.loading ?? "Loading")
-    document.body.append(spinner)
-}
-
-function hide_loading(): void {
-    document.documentElement.classList.remove("spa_loading")
-    document.getElementById("spa_spinner")?.remove()
-}
-
 let navigation = 0
+let cancel_wipe = (): void => {}
 
 export async function navigate(url: URL, push: boolean): Promise<void> {
     const mine = ++navigation
-    show_loading()
+    cancel_wipe()
+    const outgoing = wipe_page("out")
     const payload = await fetch_payload(url)
+    const clear_outgoing = await outgoing
     // a newer click superseded this one
-    if (mine !== navigation) return
+    if (mine !== navigation) { clear_outgoing(); return }
+    cancel_wipe = clear_outgoing
     if (!payload) {
         location.assign(url.href)
         return
     }
-    swap_page(payload)
-    hide_loading()
+    begin_loading("page")
+    const styles = swap_page(payload)
+    clear_outgoing()
     current_path = url.pathname
     if (push) history.pushState({}, "", url)
+    scroll_to_hash(url.hash)
+    const incoming = wipe_page("in")
+    // Resources can finish during the incoming wipe, but the skeleton must be
+    // painted at least once before the content is revealed.
+    await Promise.all([styles, wait_resources()])
+    const clear_incoming = await incoming
+    if (mine !== navigation) { clear_incoming(); return }
+    cancel_wipe = clear_incoming
+    clear_incoming()
+    await finish_loading("page")
+    if (mine !== navigation) return
     announce(payload.title)
     const main = document.getElementById("main-content")!
     main.focus({ preventScroll: true })
-    scroll_to_hash(url.hash)
     init_reveal()
     update_tab_spy()
 }

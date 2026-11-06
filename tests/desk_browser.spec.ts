@@ -691,7 +691,7 @@ test("portrait tabs keep their height and the final desk leaves the footer visib
         await page.setViewportSize(size)
         const footer = (await page.locator(".site_foot").boundingBox())!
         const bottom = size.width < size.height ? (await tabs.boundingBox())!.y : size.height
-        expect(footer.y + footer.height).toBeLessThanOrEqual(bottom + 1)
+        expect(Math.abs(footer.y + footer.height - bottom)).toBeLessThanOrEqual(1)
         expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(size.height + 1)
     }
     await page.setViewportSize({ width: 390, height: 844 })
@@ -700,6 +700,7 @@ test("portrait tabs keep their height and the final desk leaves the footer visib
 
 test("mode buttons stay square and video controls fit a narrow window", async ({ page }) => {
     await page.goto("/desk")
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
     const window = page.locator(".desk_wbox").first()
     const view = window.locator('[data-mode="view"]')
     const edit = window.locator('[data-mode="edit"]')
