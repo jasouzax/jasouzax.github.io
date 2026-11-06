@@ -588,14 +588,10 @@ a {
 
     &.crumb>&_summ {
         padding: 0 0.125em;
-
-        &::before {
-            content: '\f054'
-        }
     }
 
-    &.crumb[open]>&_summ::before {
-        content: '\f107'
+    &.crumb[open]>&_summ>span {
+        transform: rotate(90deg);
     }
 
     &[open]:has(> .list_drop)>&_summ::after {
