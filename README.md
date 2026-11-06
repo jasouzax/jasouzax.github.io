@@ -40,6 +40,15 @@ The supplied media was ignored by gen-11's Git repository. It has been copied lo
 
 XML filenames and folders do not choose routes. `<page path="/">` defines a page; `<project id="example">`, `<event id="example">`, and `<blog id="example">` generate their own pages. Keep translations together: a single file contains one `<page path="…" lang="en">` and one `<page path="…" lang="ja">` for the same route. Blog translations likewise share a file. A file may contain several roots. `<expertise>` declares the skill/stack vocabulary; entries come from project and event roots. `<hero tab="Home" name="…">` overrides the head-tab label while preserving the visible hero name. `<hero>` replaces landing/contact; `<item>` holds contact links. Desks use `<menu>` and `<window mode="view|edit">`. A root `<print name="resume">` supplies print styles; a page selects it with `print="resume"`. Print personal information comes only from the landing hero and its labelled items.
 
+Projects keep shared metadata such as name, date and role. Put `skill` and `info` on their child slides. A slide's comma-separated `skill` list selects the expertise views that render that version; each skill can belong to only one public slide per project. `description` remains supported as an alias for slide `info`, followed by inline text as a fallback. A featured project uses its `featured="true"` slide (or its first public slide) in Featured, page summaries and the generated project desk. The footer lists all the project's slide skills; choosing one keeps the project selected and changes the fragment, for example from `#web-app/gdsc` to `#cloud/gdsc`.
+
+```xml
+<project id="example" name="Example" date="Jan 2026" featured="true">
+    <slide skill="web-app" info="Interface and design work." stack="vue, vuetify"/>
+    <slide skill="cloud" info="Backend and database work." stack="firebase"/>
+</project>
+```
+
 UI translations are string dictionaries at `config.json.languages.en.<id>` (and `languages.ja.<id>`).
 
 Shared layout is emitted inline from the unnamed theme in `content/theme/layout.xml`. Its `scope="layout"` source extracts geometry from the legacy Sass after the content-dependent expertise selectors are generated; the remaining paint is scoped to Default. Other unnamed styles are inlined as written. Named skins inherit the low-priority `layout` CSS layer and can override geometry directly. Memory supplies its own skin without importing Default. Shared role-label behavior lives in `content/theme/roles.scss`.

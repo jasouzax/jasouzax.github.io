@@ -4,6 +4,7 @@
 <theme>
     <style src="default/default.scss" scope="layout"/>
     <style src="roles.scss"/>
+    <style src="slide_skills.scss"/>
     <style><![CDATA[
         #head_tray, #theme_background { display: contents; }
         .needs_js { display: none; }

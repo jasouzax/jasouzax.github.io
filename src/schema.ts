@@ -51,8 +51,8 @@ export const rules: Record<string, rule> = {
 Object.assign(rules, {
     hero: { attrs: ["status", "name", "tab", "tags", "info", "profile"], required: [], children: ["item", "action"] },
     item: { attrs: ["icon", "name", "text", "link", "print"], required: [], children: [] },
-    project: { attrs: [...page_attrs, "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window"], bools: ["featured", "private"] },
-    slide: { attrs: ["media", "poster", "alt", "description", "skill", "stack", "hashtags", "tags", "featured", "private", "website", "paper", "source"], required: [], children: ["action"], bools: ["featured", "private"] },
+    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window"], bools: ["featured", "private"] },
+    slide: { attrs: ["media", "poster", "alt", "info", "description", "skill", "stack", "feature_stack", "hashtags", "tags", "featured", "private", "website", "paper", "event", "source"], required: ["skill"], children: ["action"], bools: ["featured", "private"] },
     event: { attrs: [...page_attrs, "id", "type", "lang", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
     blog: { attrs: ["id", "name", "date", "icon", "info", "lang"], required: ["id", "name"], children: ["menu", "window"] },
     print: { attrs: ["name", "lang", "size", "layout"], required: ["name"], children: ["style", "font"] },

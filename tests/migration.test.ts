@@ -14,6 +14,9 @@ import { build_site } from "../src/build.ts"
 import { build_expertise, scss_data } from "../src/expertise.ts"
 import { memory_directory } from "../src/web/client/memory_fs.ts"
 import { build_font } from "../src/font_build.ts"
+import { render_expertise } from "../src/web/html_expertise.tsx"
+import { to_html } from "../src/web/vnode.tsx"
+import { parseHTML } from "linkedom"
 
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), "jazu_test_"))
@@ -27,7 +30,7 @@ function fixture() {
 test("free-form roots generate pages and never publish private projects/slides", async () => {
     const f = fixture()
     try {
-        f.put("content/arbitrary/nested.xml", `<project id="public" name="Public" date="2026"><slide skill="web" description="public description"/><slide private="true" media="secret.png" description="secret slide"/></project><project id="hidden" name="Secret Project" private="true" date="2026"><window path="secret.txt"/></project>` )
+        f.put("content/arbitrary/nested.xml", `<project id="public" name="Public" date="2026"><slide skill="web" description="public description"/><slide skill="web" private="true" media="secret.png" description="secret slide"/></project><project id="hidden" name="Secret Project" private="true" date="2026"><window path="secret.txt"/></project>` )
         f.put("content/blogs/post.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
         f.put("content/blogs/article.md", "# Public article")
         f.put("content/arbitrary/secret.txt", "must never publish")
@@ -84,8 +87,8 @@ test("output/HTTP paths reject traversal, dotfiles, malformed escapes and accide
 test("project skill variants preserve distinct descriptions/media and select the featured fallback", async () => {
     const f = fixture()
     try {
-        f.put("content/anywhere.xml", `<page path="/" name="Home"><hero name="Owner"/><expertise><skill name="web"/><skill name="iot"/></expertise></page>`)
-        f.put("content/project.xml", `<project id="tracker" name="Tracker" date="2026" featured="true"><slide skill="web" description="Dashboard" media="web.svg"/><slide skill="iot" description="Sensor hardware" featured="true" media="iot.svg"/></project>`)
+        f.put("content/anywhere.xml", `<page path="/" name="Home"><hero name="Owner"/><expertise><skill name="web"/><skill name="cloud"/><skill name="iot"/></expertise></page>`)
+        f.put("content/project.xml", `<project id="tracker" name="Tracker" date="2026" featured="true"><slide skill="web, cloud" info="Dashboard" media="web.svg"/><slide skill="iot" info="Sensor hardware" featured="true" media="iot.svg"/></project>`)
         f.put("content/web.svg", '<svg xmlns="http://www.w3.org/2000/svg"/>')
         f.put("content/iot.svg", '<svg xmlns="http://www.w3.org/2000/svg"><path/></svg>')
         const model = load_site(f.root, await load_config(f.root), new_diagnostics(), new Date("2026-11-04"))
@@ -97,7 +100,21 @@ test("project skill variants preserve distinct descriptions/media and select the
         assert.notEqual(web.media, iot.media)
         assert(!web.states.includes("expertise"))
         assert(iot.states.includes("expertise"))
+        assert(web.states.includes("cloud"))
+        assert.equal(model.pages.find(page => page.path === "/projects/tracker")!.info, "Sensor hardware")
         assert.equal((scss_data(data).match(/"tracker":/g) ?? []).length, 1)
+        const page = model.pages.find(page => page.path === "/")!
+        const node = page.node.children.find(node => node.tag === "expertise")!
+        const { document } = parseHTML(to_html(render_expertise({ model, page, lang: "en", expertise: data }, node, data)))
+        const slides = [...document.querySelectorAll(".slide")]
+        assert.equal(slides.length, 2)
+        for (const slide of slides) {
+            assert.deepEqual([...slide.querySelectorAll(".slide_skill")].map(link => link.getAttribute("href")), ["#web/tracker", "#cloud/tracker", "#iot/tracker"])
+            assert.equal(slide.querySelectorAll('.slide_skill[aria-current="true"]').length, 1)
+        }
+        const pins = [...document.querySelectorAll("[id]")].map(node => node.id)
+        assert.equal(new Set(pins).size, pins.length)
+        assert.notEqual(slides[0].getAttribute("data-search-id"), slides[1].getAttribute("data-search-id"))
     } finally { f.close() }
 })
 

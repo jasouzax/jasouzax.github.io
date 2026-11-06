@@ -19,6 +19,7 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:desk:browser": "playwright test --config tests/desk_browser.config.ts",
     "test:loading:browser": "playwright test --config tests/loading_browser.config.ts",
+    "test:expertise:browser": "playwright test --config tests/expertise_browser.config.ts",
     "deploy:dry": "node src/main.ts deploy --dry_run",
     "cloud:dev": "wrangler dev --config wrangler.local.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",

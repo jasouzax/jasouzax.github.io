@@ -125,11 +125,25 @@ function update_nav(): void {
     point_nav(article, next, slides[index + 1])
 }
 
+function update_slide_skills(): void {
+    const state = nav_state()
+    for (const nav of document.querySelectorAll<HTMLElement>(".slide_skills")) {
+        const links = [...nav.querySelectorAll<HTMLAnchorElement>(".slide_skill")]
+        const active = links.find(link => link.dataset.skill === state)
+            ?? links.find(link => link.dataset.skill === nav.dataset.defaultSkill)
+        for (const link of links) {
+            if (link === active) link.setAttribute("aria-current", "true")
+            else link.removeAttribute("aria-current")
+        }
+    }
+}
+
 let nav_frame = 0
 function schedule_nav(): void {
     if (nav_frame) return
     nav_frame = requestAnimationFrame(() => {
         nav_frame = 0
+        update_slide_skills()
         update_nav()
     })
 }

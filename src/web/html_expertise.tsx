@@ -248,7 +248,7 @@ function render_pin(entry: entry): html {
     )
     return (
         <>
-            <li class={`tl_i tl_pin in_any ${classes.join(" ")} p_${entry.id}`} style={style}>
+            <li class={`tl_i tl_pin in_any ${classes.join(" ")} p_${entry.id}${entry.variant ? ` p_${entry.variant}` : ""}`} style={style}>
                 <span class={"tl_date"}>{entry.date_label}</span>
                 {card}
             </li>
@@ -368,7 +368,7 @@ function render_dot(entry: entry): html {
     ))
     return (
         <>
-            <li class={`dot ${gate_classes(entry)} d_${entry.id}`}>{links}</li>
+            <li class={`dot ${gate_classes(entry)} d_${entry.id}${entry.variant ? ` d_${entry.variant}` : ""}`}>{links}</li>
         </>
     )
 }
@@ -473,6 +473,24 @@ function render_actions(ctx: render_ctx, entry: entry): html {
     )
 }
 
+function render_slide_skills(ctx: render_ctx, data: expertise_model, entry: entry): child {
+    if (!entry.href?.includes("/projects/")) return ""
+    const variants = data.entries.filter(item => item.id === entry.id && item.href === entry.href)
+    const ids = unique(variants.flatMap(item => item.states)).filter(id => data.skills.some(skill => skill.id === id))
+    const fallback = ids.find(id => entry.states.includes(id))
+    if (!ids.length) return ""
+    return (
+        <nav class="slide_skills" aria-label={t(ctx, "skills")} data-default-skill={fallback}>
+            {ids.map(id => (
+                <a class={`slide_skill skill_${id}${id === fallback ? " is_default" : ""}`}
+                    href={`#${id}/${entry.id}`} data-skill={id} aria-current={id === fallback ? "true" : undefined}>
+                    {data.skills.find(skill => skill.id === id)!.name}
+                </a>
+            ))}
+        </nav>
+    )
+}
+
 function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): html {
     const pins = entry.states.map((state) => (
         <>
@@ -543,6 +561,7 @@ function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): htm
         <>
             <div class={"slide_foot"}>
                 {render_tags(ctx, data, entry)}
+                {render_slide_skills(ctx, data, entry)}
                 {render_actions(ctx, entry)}
             </div>
         </>
@@ -560,7 +579,7 @@ function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): htm
     )
     return (
         <>
-            <article class={`slide ${gate_classes(entry)}`}>
+            <article class={`slide ${gate_classes(entry)}`} data-search-id={entry.variant}>
                 {pins}
                 {arrows}
                 {card}

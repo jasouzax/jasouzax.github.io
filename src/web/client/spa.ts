@@ -130,6 +130,13 @@ function swap_page(payload: page_payload): Promise<unknown[]> {
 
 let current_path = location.pathname + location.search
 
+// Search edits the current page's query without replacing its DOM. Keep the
+// router in sync so the next fragment navigation does not reload that page.
+export function replace_page_url(url: URL): void {
+    history.replaceState(history.state, "", url)
+    current_path = url.pathname + url.search
+}
+
 function scroll_to_hash(hash: string): void {
     let id = hash.slice(1)
     try { id = decodeURIComponent(id) } catch { /* malformed fragments remain literal IDs */ }
