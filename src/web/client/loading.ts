@@ -24,18 +24,50 @@ export function capture_skeleton(): void {
     shapes.className = "loading_shapes"
     overlay.append(shapes)
     const shine_bounds: string[] = []
-    const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
-    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
-        if (element.closest("#head_signature, [hidden]")) continue
-        const box = element.getBoundingClientRect()
-        if (!box.width || !box.height || box.bottom < 0 || box.top > innerHeight || box.right < 0) continue
-        // Nested labels are covered by their enclosing control.
-        if (element.parentElement?.closest("button,.landing_contact,.landing_btn")) continue
+    const covered = new Set<Element>()
+    const add_box = (box: DOMRect, group?: string): void => {
+        if (!box.width || !box.height || box.bottom < 0 || box.top > innerHeight || box.right < 0) return
         const placeholder = document.createElement("div")
         placeholder.className = "loading_placeholder"
+        if (group) placeholder.dataset.skeletonGroup = group
         Object.assign(placeholder.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px`, boxSizing: "border-box" })
         shine_bounds.push(`M${box.left},${box.top}h${box.width}v${box.height}h${-box.width}Z`)
         shapes.append(placeholder)
+    }
+    const visible_rects = (element: Element): DOMRect[] => {
+        if (element.closest("[hidden]")) return []
+        // display:contents has no box of its own (notably the head tray).
+        if (getComputedStyle(element).display === "contents") return Array.from(element.children).flatMap(visible_rects)
+        return Array.from(element.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0)
+    }
+    const groups: [string, string, boolean][] = [
+        ["hero-items", ".landing_contacts", false],
+        ["hero-actions", ".landing_actions", false],
+        ["head-tray", "#head_tray", false],
+        ["breadcrumbs", "#head_div, #head_path", true],
+        ["head-tabs", "#head_tabs", false]
+    ]
+    for (const [name, selector, combine] of groups) {
+        const elements = Array.from(document.querySelectorAll(selector))
+        const sets = combine ? [elements] : elements.map(element => [element])
+        for (const members of sets) {
+            const rects = members.flatMap(visible_rects)
+            if (!rects.length) continue
+            members.forEach(member => covered.add(member))
+            const left = Math.min(...rects.map(rect => rect.left)), top = Math.min(...rects.map(rect => rect.top))
+            const right = Math.max(...rects.map(rect => rect.right)), bottom = Math.max(...rects.map(rect => rect.bottom))
+            add_box(new DOMRect(left, top, right - left, bottom - top), name)
+        }
+    }
+    const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+        if (element.closest("#head_signature, [hidden]")) continue
+        let parent: Element | null = element
+        while (parent && !covered.has(parent)) parent = parent.parentElement
+        if (parent) continue
+        // Nested labels are covered by their enclosing control.
+        if (element.parentElement?.closest("button,.landing_contact,.landing_btn")) continue
+        add_box(element.getBoundingClientRect())
     }
     // One viewport-sized light layer, clipped to the union of all boxes.
     shapes.style.clipPath = `path("${shine_bounds.join(" ")}")`

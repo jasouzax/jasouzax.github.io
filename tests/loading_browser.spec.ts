@@ -23,6 +23,11 @@ for (const mode of ["light", "dark"] as const) {
         await expect(page.locator("body")).toHaveCSS("display", "flex")
         await expect(page.locator("h1")).toHaveCSS("visibility", "hidden")
         await expect(page.locator(".loading_placeholder").first()).toBeVisible()
+        for (const group of ["hero-items", "hero-actions", "head-tray", "breadcrumbs", "head-tabs"]) {
+            await expect(page.locator(`[data-skeleton-group="${group}"]`)).toHaveCount(1)
+        }
+        const contacts = await page.locator("#home .landing_contacts").boundingBox()
+        expect(await page.locator('[data-skeleton-group="hero-items"]').boundingBox()).toEqual(contacts)
         const boxes = await page.locator(".loading_placeholder").evaluateAll(elements => elements.map(element => element.getBoundingClientRect().toJSON()))
         await page.waitForTimeout(350)
         expect(await page.locator(".loading_placeholder").evaluateAll(elements => elements.map(element => element.getBoundingClientRect().toJSON()))).toEqual(boxes)
