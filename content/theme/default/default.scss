@@ -6202,6 +6202,7 @@ body::after {
 // ---- desktop (windows, side panel) -----------------------------------------------------------
 .desk_side {
     background: var(--panel);
+    border-top: 1px solid var(--edge);
     border-right-color: var(--edge);
 
     &_head {
@@ -7378,35 +7379,11 @@ html.desk_dragging {
     }
 }
 
-// The scroll range of head_scroll is held in two registered lengths (--r0, --r1) so the menu can change it, see the menu rule below.
-@property --r0 {
-    syntax: '<length>';
-    inherits: false;
-    initial-value: 0px;
-}
-
-@property --r1 {
-    syntax: '<length>';
-    inherits: false;
-    initial-value: 120px;
-}
-
 @supports (animation-timeline: scroll()) {
     #head::before {
         animation: head_scroll linear both, head_fade .9s var(--ease) .1s backwards;
         animation-timeline: scroll(root), auto;
-        animation-range: var(--r0) var(--r1), normal;
-        // closing the menu: the open range is kept for a moment, until the page has its height and scroll position back
-        transition: --r0 0s .15s, --r1 0s .15s;
-    }
-
-    // menu open: the range ends below the top of the page, so the bar is fully on at any scroll position (--hs: 1 covers the case where
-    // the page has become too short to scroll and the scroll timeline is inactive). The animations are not touched, so the intro does not replay.
-    html:has(#head_menu[open]) #head::before {
-        --r0: -2px;
-        --r1: -1px;
-        --hs: 1;
-        transition: none;
+        animation-range: 0px 120px, normal;
     }
 }
 
@@ -7415,8 +7392,7 @@ html.desk_dragging {
         transition: --hs .3s var(--ease);
     }
 
-    html[data-scrolled] #head::before,
-    html:has(#head_menu[open]) #head::before {
+    html[data-scrolled] #head::before {
         --hs: 1;
     }
 }
