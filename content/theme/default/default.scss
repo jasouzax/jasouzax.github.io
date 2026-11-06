@@ -1003,15 +1003,17 @@ a {
     }
 
     &_contacts {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .75em;
+        width: 100%;
         margin: .75em 0 0 0;
         padding: 0;
         list-style: none;
+
+        > li + li {
+            border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+        }
     }
 
-    &_chip_value {
+    &_contact_value {
         min-width: 0;
         overflow-wrap: anywhere;
     }
@@ -1023,32 +1025,32 @@ a {
             width: 100%;
         }
 
-        &_contacts>li,
         &_btn {
             flex: 1 1 100%;
         }
-
-        &_chip {
-            width: 100%;
-        }
     }
 
-    &_chip {
+    &_contact {
         display: grid;
-        grid-template: auto auto / auto 1fr;
+        grid-template-columns: 1.6em minmax(5em, 7em) minmax(0, 1fr);
         column-gap: .75em;
         align-items: center;
-        padding: .5em .9em .5em .7em;
-        border: 2px solid var(--edge);
-        background: var(--panel);
+        padding: .85em 1em;
+        border: 0;
+        color: var(--text);
 
-        &:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+        &[href]:hover .landing_contact_value {
+            text-decoration: underline;
+            text-underline-offset: .2em;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: -3px;
+            border-radius: var(--r);
         }
 
         &_icon {
-            grid-row: 1 / span 2;
             font-size: 1.6em;
             line-height: 1;
             text-align: center;
@@ -1059,6 +1061,14 @@ a {
             letter-spacing: .12em;
             text-transform: uppercase;
             color: var(--text-dim);
+        }
+
+        @media (max-width: 30em) {
+            grid-template: auto auto / 1.6em minmax(0, 1fr);
+
+            &_icon {
+                grid-row: 1 / span 2;
+            }
         }
     }
 
@@ -4955,20 +4965,13 @@ body::after {
     @include btn-solid;
 }
 
-.landing_chip {
+.landing_contacts {
     @include glass(8px, var(--surface-strong));
     border: 1px solid var(--edge);
     border-radius: var(--r);
-    transition: color .2s, border-color .2s;
-
-    &:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        box-shadow: var(--glow);
-    }
 }
 
-.landing_chip_icon {
+.landing_contact_icon {
     color: var(--accent);
 }
 

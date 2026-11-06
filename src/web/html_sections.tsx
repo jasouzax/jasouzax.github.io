@@ -49,19 +49,19 @@ export function render_hero(ctx: render_ctx, node: xml_node, next_id = ""): chil
                     {items.map((item) => {
                         const body = (
                             <>
-                                {glyph(ctx, item.attrs.icon, "landing_chip_icon")}
-                                <span class="landing_chip_type">{item.attrs.name ?? ""}</span>
-                                <span class="landing_chip_value">{item.attrs.text ?? ""}</span>
+                                {glyph(ctx, item.attrs.icon, "landing_contact_icon")}
+                                <span class="landing_contact_type">{item.attrs.name ?? ""}</span>
+                                <span class="landing_contact_value">{item.attrs.text ?? ""}</span>
                             </>
                         )
                         return (
                             <li>
                                 {item.attrs.link ? (
-                                    <a class="landing_chip" {...link_attrs(ctx, item.attrs.link)}>
+                                    <a class="landing_contact" {...link_attrs(ctx, item.attrs.link)}>
                                         {body}
                                     </a>
                                 ) : (
-                                    <span class="landing_chip">{body}</span>
+                                    <span class="landing_contact">{body}</span>
                                 )}
                             </li>
                         )

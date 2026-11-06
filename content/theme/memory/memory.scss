@@ -881,7 +881,7 @@
         box-shadow: var(--glow);
     }
 
-    & .landing_chip_icon {
+    & .landing_contact_icon {
         color: #1f5ce0;
     }
 
@@ -1604,7 +1604,7 @@
         box-shadow: var(--xp-hot);
     }
 
-    & :is(.landing_chip_icon, .contact_btn_icon, .landing_btn_icon) {
+    & :is(.landing_contact_icon, .contact_btn_icon, .landing_btn_icon) {
         color: #1f5ce0;
     }
 
@@ -2826,7 +2826,7 @@
         background: var(--xp-btn-bg);
     }
 
-    & :is(.landing_chip_icon, .contact_btn_icon, .landing_btn_icon, .contact_icon, .error_maybe_icon) {
+    & :is(.landing_contact_icon, .contact_btn_icon, .landing_btn_icon, .contact_icon, .error_maybe_icon) {
         color: var(--m-orange);
     }
 
