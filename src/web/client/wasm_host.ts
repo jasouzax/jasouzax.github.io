@@ -1,7 +1,7 @@
-import type { proc_api, program } from "./proc_types.ts"
+import type { proc_api, program, stat_info } from "./proc_types.ts"
 import type { descriptor, fork_state, wasm_image, worker_message, worker_start } from "./wasm_protocol.ts"
 import { rpc_capacity, errno, error_number } from "./wasm_protocol.ts"
-import { proc_record } from "./wasm_procfs.ts"
+import { proc_record, browser_system } from "./wasm_procfs.ts"
 
 const encoder = new TextEncoder()
 type byte_queue = { chunks: Uint8Array[], readers: (() => void)[], writers: number, size: number }
@@ -24,6 +24,10 @@ async function with_file<T>(path: string, operation: () => Promise<T>): Promise<
     finally { release(); if (file_locks.get(path) === next) file_locks.delete(path) }
 }
 export const registered_programs: Record<string, program> = {}
+export function inherit_descriptors(descriptors: descriptor[]): descriptor[] {
+    for (const descriptor of descriptors) get(descriptor.handle).refs++
+    return descriptors
+}
 type worker_like = { postMessage(value: unknown): void, terminate(): unknown, onmessage: ((event: MessageEvent<worker_message>) => void) | null, onerror: ((event: any) => void) | null }
 export type worker_factory = (url: string) => worker_like
 const make_worker: worker_factory = url => new Worker(url)
@@ -107,11 +111,11 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
         const device = /^\/dev\/(null|zero|random|urandom|tty|stdin|stdout|stderr)$/.test(path)
         const record = proc_record(p.list_procs(), path)
         const proc_dir = /^\/proc\/(\d+)$/.exec(path)
-        const info = device ? { kind: "file", size: 0, writable: true } : record !== null ? { kind: "file", size: encoder.encode(record).length, writable: false } : proc_dir && p.list_procs().some(item => item.pid === Number(proc_dir[1])) ? { kind: "dir", size: 0, writable: false } : await p.fs.stat(path)
+        const info: stat_info | null = device ? { kind: "file", size: 0, writable: true } : record !== null ? { kind: "file", size: encoder.encode(record).length, writable: false } : proc_dir && p.list_procs().some(item => item.pid === Number(proc_dir[1])) ? { kind: "dir", size: 0, writable: false } : await p.fs.stat(path)
         if (!info) throw new Error("ENOENT")
         if (!inode.has(path)) inode.set(path, inode.size + 1)
         const saved = metadata.get(path)
-        return { size: info.size, ino: inode.get(path), mode: saved?.mode ?? (device ? 0o20666 : info.kind === "dir" ? (info.writable ? 0o40755 : 0o40555) : executables.has(path) ? 0o100755 : info.writable ? 0o100644 : 0o100444), mtime: saved?.mtime ?? Date.now() }
+        return { size: info.size, ino: inode.get(path), uid: info.uid ?? 1000, gid: info.gid ?? 1000, mode: saved?.mode ?? (device ? 0o20666 : info.kind === "dir" ? (info.writable ? 0o40755 : 0o40555) : executables.has(path) ? 0o100755 : info.writable ? 0o100644 : 0o100444), mtime: saved?.mtime ?? Date.now() }
     }
     async function read(h: handle, length: number): Promise<Uint8Array> {
         if (h.kind === "null") return new Uint8Array()
@@ -170,10 +174,44 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
     }
     async function dispatch(op: string, a: any): Promise<any> {
         switch (op) {
+            case "identity": return { uid: p.uid ?? 1000, gid: p.gid ?? 1000 }
+            case "account": {
+                let source = ""
+                try { source = await p.fs.read(a.group ? "/etc/group" : "/etc/passwd") } catch { return null }
+                const lines = source.split("\n").filter(line => line && !line.startsWith("#"))
+                if (a.index >= 0) return lines[a.index] ?? null
+                return lines.find(line => { const fields = line.split(":"); return a.name === null ? Number(fields[2]) === a.id : fields[0] === a.name }) ?? null
+            }
+            case "system": return browser_system(p.list_procs())
+            case "poll": {
+                const ready = () => a.entries.map((entry: { handle: number, events: number }) => {
+                    if (entry.handle < 0) return 0
+                    const handle = handles.get(entry.handle)
+                    if (!handle) return 32
+                    let flags = entry.events & 4
+                    if (entry.events & 1) {
+                        if (handle.kind === "stdin") { if ((handle.terminal?.pending.length ?? 0) > 0 || handle.proc?.stdin.available?.()) flags |= 1 }
+                        else if (handle.kind === "pipe_read") { if (handle.queue!.chunks.length || !handle.queue!.writers) flags |= 1 }
+                        else flags |= 1
+                    }
+                    return flags
+                })
+                const deadline = a.timeout < 0 ? Infinity : performance.now() + a.timeout
+                let flags = ready()
+                while (!stopped && !flags.some(Boolean) && performance.now() < deadline) {
+                    await new Promise<void>(resolve => {
+                        const done = () => { clearTimeout(timer); controller.signal.removeEventListener("abort", done); resolve() }
+                        const timer = setTimeout(done, Math.min(20, deadline-performance.now()))
+                        controller.signal.addEventListener("abort", done, { once: true })
+                    })
+                    flags = ready()
+                }
+                return flags
+            }
             case "diagnostic": p.stderr.write(a.text); return 0
             case "stat": return stat(a.path)
             case "list": {
-                if (a.path === "/proc") return ["uptime", ...p.list_procs().map(item => String(item.pid))]
+                if (a.path === "/proc") return ["uptime", "meminfo", "cpuinfo", "version", ...p.list_procs().map(item => String(item.pid))]
                 if (/^\/proc\/\d+$/.test(a.path)) return ["cmdline", "status", "stat"]
                 const entries = (await p.fs.list(a.path)).map(e => e.name)
                 if (a.path === "/dev") for (const name of ["null", "zero", "random", "urandom", "tty", "stdin", "stdout", "stderr"]) if (!entries.includes(name)) entries.push(name)
@@ -189,9 +227,10 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
             case "setattr": {
                 const path = norm(a.path)
                 const record = proc_record(p.list_procs(), path)
-                const info = record === null ? await p.fs.stat(path) : { kind: "file", writable: false }
+                const info: stat_info | null = record === null ? await p.fs.stat(path) : { kind: "file", size: 0, writable: false }
                 if (!info) throw new Error("ENOENT")
                 if (!info.writable) throw new Error("EROFS")
+                if ((a.uid !== undefined || a.gid !== undefined) && p.fs.chown) await p.fs.chown(path, a.uid ?? info.uid ?? 1000, a.gid ?? info.gid ?? 1000)
                 if (a.size !== undefined) await with_file(path, async () => { const old = await fs_read(path); const bytes = new Uint8Array(a.size); bytes.set(old.subarray(0, a.size)); await fs_write(path, bytes) })
                 metadata.set(path, { ...metadata.get(path), ...(a.mode === undefined ? {} : { mode: a.mode }), mtime: a.timestamp ?? Date.now() })
                 return 0
@@ -276,7 +315,7 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
             case "spawn": {
                 const env = Object.fromEntries(a.env.map((entry: string) => { const at = entry.indexOf("="); return [entry.slice(0, at), entry.slice(at + 1)] }))
                 const paths = a.argv[0].includes("/") ? [norm(a.argv[0].startsWith("/") ? a.argv[0] : a.cwd + "/" + a.argv[0])] : (env.PATH ?? "/bin").split(":").map((dir: string) => norm((dir.startsWith("/") ? dir : a.cwd + "/" + dir) + "/" + a.argv[0]))
-                const path = paths.find((path: string) => executables.has(path))
+                const path = paths.find((path: string) => executables.has(path) || (path.startsWith("/bin/") && registered_programs[path.slice(5)]))
                 if (!path) return -errno.ENOENT
                 for (const d of a.descriptors) get(d.handle).refs++
                 const child = p.spawn([path.split("/").pop()!, ...a.argv.slice(1)], { cwd: a.cwd, env, wasm: { descriptors: a.descriptors } })
@@ -339,12 +378,19 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                         const a = data.args
                         const path = a.file === "/proc/self/exe" ? "/bin/sh" : norm(a.file)
                         const next = executables.get(path)
-                        if (!next) { respond(errno.ENOEXEC); return }
+                        const builtin = path.startsWith("/bin/") ? registered_programs[path.slice(5)] : undefined
+                        if ((!next && !builtin) || !(await p.fs.stat(path))) { respond(errno.ENOEXEC); return }
                         descriptors = a.descriptors
                         p.argv = a.argv
                         p.env = Object.fromEntries(a.env.map((entry: string) => { const at = entry.indexOf("="); return [entry.slice(0, at), entry.slice(at + 1)] }))
                         p.cwd = a.cwd
                         worker.terminate()
+                        if (!next) {
+                            active = null
+                            const child = p.spawn([path.slice(5), ...a.argv.slice(1)], { cwd: p.cwd, env: p.env, wasm: { descriptors: descriptors! } })
+                            finish(await child.done)
+                            return
+                        }
                         await launch(next, [path.split("/").pop()!, ...a.argv.slice(1)], p.env).catch(error => finish(1, error))
                         return
                     }

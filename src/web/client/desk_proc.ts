@@ -199,10 +199,9 @@ export function init_proc(): void {
     }
     kernel.hooks = {
         programs,
-        fs: () => fs,
+        fs: uid => make_fs(() => program_names, uid),
     }
     document.addEventListener("jazu:fs:init", () => { void programs().catch(error => console.error(error)) })
-    const fs = make_fs(() => program_names)
     process_hooks.body = terminal_body
     process_hooks.release = detach
     process_hooks.release_body = item => { cleanups.get(item)?.(); cleanups.delete(item) }

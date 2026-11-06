@@ -3,11 +3,34 @@
 
 import type { fs_api, stat_info } from "./proc_types.ts"
 import type { fs_node, file_handle, dir_handle } from "./desk_fs.ts"
-import { fs_root, load_children, refresh_dir } from "./desk_fs.ts"
+import { fs_root, filesystem_initialized, load_children, refresh_dir } from "./desk_fs.ts"
 import { list_procs, kernel } from "./kernel.ts"
 import { proc_record } from "./wasm_procfs.ts"
 
 type kind = "file" | "dir"
+let compiler_headers: Promise<void> | null = null
+function ensure_compiler_headers(): Promise<void> {
+    return compiler_headers ??= (async () => {
+        const root = fs_root()?.handle as dir_handle | null
+        if (!root) throw new Error("ENOENT")
+        // Existing system directories are not resurrected if root removed them.
+        const usr = await root.getDirectoryHandle("usr")
+        const lib = await usr.getDirectoryHandle("lib", { create: true })
+        const tcc = await lib.getDirectoryHandle("tcc", { create: true })
+        const include = await tcc.getDirectoryHandle("include", { create: true })
+        const response = await fetch("/assets/wasm/tcc-sysroot.json", { cache: "no-cache" })
+        if (!response.ok) throw new Error("Compiler headers unavailable")
+        const files: Record<string, string> = await response.json()
+        for (const [name, text] of Object.entries(files)) {
+            const parts = name.split("/")
+            if (parts.some(part => !part || part === "." || part === ".." || part.includes("\\"))) throw new Error("Invalid compiler header path")
+            let directory = include
+            for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part, { create: true })
+            const file = await directory.getFileHandle(parts.at(-1)!, { create: true }), writer = await file.createWritable!()
+            await writer.write(text); await writer.close()
+        }
+    })().catch(error => { compiler_headers = null; throw error })
+}
 
 function norm(path: string): string {
     const parts: string[] = []
@@ -20,6 +43,10 @@ function norm(path: string): string {
 }
 
 export async function resolve(path: string): Promise<fs_node | null> {
+    await filesystem_initialized()
+    // WASM pathname lookup checks each parent before reaching the header itself.
+    const clean = norm(path)
+    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/tcc")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
     let node = fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {
@@ -37,12 +64,15 @@ async function list_node(node: fs_node): Promise<fs_node[]> {
     return node.children ?? []
 }
 
-function writable_dir(node: fs_node | null): dir_handle {
+function writable_dir(node: fs_node | null, uid: number): dir_handle {
     if (!node) throw new Error("No such file or directory")
     if (node.kind !== "dir") throw new Error("Not a directory")
-    if (!node.writable || !node.handle) throw new Error("Read-only file system")
+    if (!can_write(node, uid) || !node.handle) throw new Error("Read-only file system")
     return node.handle as dir_handle
 }
+
+function owner(node: fs_node): number { return node.owner_uid ?? (node.writable ? 1000 : 0) }
+function can_write(node: fs_node, uid: number): boolean { return uid === 0 || node.path === "/tmp" || node.path.startsWith("/tmp/") || ((node.writable || node.owner_uid !== undefined) && owner(node) === uid) }
 
 function split_parent(path: string): { dir: string, name: string } {
     const clean = norm(path)
@@ -63,6 +93,8 @@ function proc_file(pid: number, name: string): string | null {
 
 function virtual_stat(path: string, programs: string[]): stat_info | null {
     const clean = norm(path)
+    const record = proc_record(list_procs(), clean)
+    if (record !== null) return { kind: "file", size: new TextEncoder().encode(record).length, writable: false }
     if (clean === "/dev/null") return { kind: "file", size: 0, writable: true }
     if (clean === "/proc") return { kind: "dir", size: 0, writable: false }
     const proc_match = /^\/proc\/(\d+)(?:\/([a-z]+))?$/.exec(clean)
@@ -73,13 +105,18 @@ function virtual_stat(path: string, programs: string[]): stat_info | null {
         const text = proc_file(pid, proc_match[2])
         return text === null ? null : { kind: "file", size: text.length, writable: false }
     }
-    const bin = /^\/bin\/([^/]+)$/.exec(clean)
-    if (bin && programs.includes(bin[1])) return { kind: "file", size: 0, writable: false }
     return null
 }
 
-export function make_fs(programs: () => string[]): fs_api {
+export function make_fs(programs: () => string[], uid = 1000): fs_api {
+    const writable = (node: fs_node | null) => writable_dir(node, uid)
     const api: fs_api = {
+        async chown(path, new_uid, gid) {
+            if (uid !== 0) throw new Error("EACCES")
+            const node = await resolve(path)
+            if (!node) throw new Error("ENOENT")
+            node.owner_uid = new_uid; node.owner_gid = gid
+        },
         async read_bytes(path) {
             const clean = norm(path)
             if (clean.startsWith("/proc/") || clean.startsWith("/bin/") || clean === "/dev/null") return new TextEncoder().encode(await api.read(clean))
@@ -94,7 +131,7 @@ export function make_fs(programs: () => string[]): fs_api {
             if (clean === "/dev/null") return
             const { dir, name } = split_parent(clean)
             const parent = await resolve(dir)
-            const handle = writable_dir(parent)
+            const handle = writable(parent)
             const file = await handle.getFileHandle(name, { create: true })
             if (!file.createWritable) throw new Error("EROFS")
             const stream = await file.createWritable()
@@ -108,19 +145,20 @@ export function make_fs(programs: () => string[]): fs_api {
             if (virtual) return virtual
             const node = await resolve(path)
             if (!node) return null
-            if (node.kind === "dir") return { kind: "dir", size: 0, writable: node.writable }
+            if (node.kind === "dir") return { kind: "dir", size: 0, writable: can_write(node, uid), uid: owner(node), gid: node.owner_gid ?? owner(node) }
             let size = 0
             try {
                 size = (await (node.handle as file_handle | null)?.getFile())?.size ?? 0
             } catch {
                 size = 0
             }
-            return { kind: "file", size, writable: node.writable }
+            return { kind: "file", size, writable: can_write(node, uid), uid: owner(node), gid: node.owner_gid ?? owner(node) }
         },
         async list(path) {
             const clean = norm(path)
             const out = new Map<string, kind>()
             if (clean === "/proc") {
+                for (const name of ["uptime", "meminfo", "cpuinfo", "version"]) out.set(name, "file")
                 for (const item of list_procs()) out.set(String(item.pid), "dir")
                 return [...out].map(([name, kind]) => ({ name, kind }))
             }
@@ -130,13 +168,13 @@ export function make_fs(programs: () => string[]): fs_api {
             if (!node && clean !== "/bin" && clean !== "/dev") throw new Error("No such file or directory")
             if (node && node.kind !== "dir") throw new Error("Not a directory")
             for (const child of node ? await list_node(node) : []) out.set(child.name, child.kind)
-            if (clean === "/bin") for (const name of programs()) out.set(name, "file")
             if (clean === "/dev") out.set("null", "file")
-            if (clean === "/") out.set("proc", "dir")
             return [...out].map(([name, kind]) => ({ name, kind }))
         },
         async read(path) {
             const clean = norm(path)
+            const record = proc_record(list_procs(), clean)
+            if (record !== null) return record
             if (clean === "/dev/null") return ""
             const proc_match = /^\/proc\/(\d+)\/([a-z]+)$/.exec(clean)
             if (proc_match) {
@@ -157,7 +195,7 @@ export function make_fs(programs: () => string[]): fs_api {
             const { dir, name } = split_parent(clean)
             if (!name) throw new Error("Is a directory")
             const parent = await resolve(dir)
-            const handle = writable_dir(parent)
+            const handle = writable(parent)
             const existing = (await list_node(parent!)).find(child => child.name === name)
             if (existing?.kind === "dir") throw new Error("Is a directory")
             let text = data
@@ -167,12 +205,12 @@ export function make_fs(programs: () => string[]): fs_api {
             const stream = await file.createWritable()
             await stream.write(text)
             await stream.close()
-            if (!existing) await refresh_dir(parent!)
+            await refresh_dir(parent!)
         },
         async mkdir(path) {
             const { dir, name } = split_parent(path)
             const parent = await resolve(dir)
-            const handle = writable_dir(parent)
+            const handle = writable(parent)
             if ((await list_node(parent!)).some(child => child.name === name)) throw new Error("File exists")
             await handle.getDirectoryHandle(name, { create: true })
             await refresh_dir(parent!)
@@ -181,7 +219,7 @@ export function make_fs(programs: () => string[]): fs_api {
             const clean = norm(path)
             const node = await resolve(clean)
             if (!node || !node.parent) throw new Error("No such file or directory")
-            const handle = writable_dir(node.parent)
+            const handle = writable(node.parent)
             if (node.kind === "dir" && !recursive && (await list_node(node)).length > 0) throw new Error("Directory not empty")
             await handle.removeEntry(node.name, { recursive })
             await refresh_dir(node.parent)
@@ -189,10 +227,10 @@ export function make_fs(programs: () => string[]): fs_api {
         async rename(from, to) {
             const source = await resolve(from)
             if (!source || !source.parent) throw new Error("No such file or directory")
-            writable_dir(source.parent)
+            writable(source.parent)
             const { dir, name } = split_parent(to)
             const target_dir = await resolve(dir)
-            const target = writable_dir(target_dir)
+            const target = writable(target_dir)
             const same = target_dir === source.parent
             const handle = source.handle as file_handle | dir_handle
             if (same && typeof handle.move === "function") await handle.move(name)

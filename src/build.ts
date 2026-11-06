@@ -97,8 +97,20 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
     files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
     files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(artifact, "busybox-source.tar.bz2")))
     for (const name of ["build.sh", "port.py", "host.c"]) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(join(root, "src", "desk", "busybox", name)))
-    files.set("assets/wasm/manifest.json", JSON.stringify([{ id: "busybox", version: "1.36.1-jazu.1", worker, wasm: "/" + wasm_path, sha256: hash,
-        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")), license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]))
+    const images = [{ id: "busybox", version: "1.36.1-jazu.2", worker, wasm: "/" + wasm_path, sha256: hash,
+        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
+    const programs = join(root, "src", "desk", "programs", "artifacts")
+    for (const [name, version, extension] of [["fastfetch", "2.40.4-jazu.1", "tar.gz"], ["htop", "3.4.1-jazu.1", "tar.gz"], ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"]]) {
+        const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
+        const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`
+        files.set(path, bytes)
+        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(join(programs, `${name}-LICENSE`)))
+        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
+        images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
+    }
+    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE"]) files.set(`assets/wasm/${name}`, readFileSync(join(programs, name)))
+    for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
+    files.set("assets/wasm/manifest.json", JSON.stringify(images))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
     // Executable registration is small; WASM bytes remain lazy until a process starts.

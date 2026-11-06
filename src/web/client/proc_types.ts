@@ -10,9 +10,10 @@ export type text_stream = {
     // a terminal's Ctrl+D: the reader that is waiting gets null once, the stream goes on
     eof(): void
     ended: boolean
+    available?(): boolean
 }
 
-export type stat_info = { kind: "file" | "dir", size: number, writable: boolean }
+export type stat_info = { kind: "file" | "dir", size: number, writable: boolean, uid?: number, gid?: number }
 
 // The file system a process sees: one tree with the desk's files, plus /bin and /proc made by the kernel. Paths are absolute.
 export type fs_api = {
@@ -25,11 +26,14 @@ export type fs_api = {
     rename(from: string, to: string): Promise<void>
     read_bytes?(path: string): Promise<Uint8Array>
     write_bytes?(path: string, data: Uint8Array): Promise<void>
+    chown?(path: string, uid: number, gid: number): Promise<void>
 }
 
-export type proc_info = { pid: number, ppid: number, argv: string[], running: boolean, code: number | null }
+export type proc_info = { pid: number, ppid: number, argv: string[], running: boolean, code: number | null, uid?: number, gid?: number }
 
 export type spawn_options = {
+    uid: number
+    gid: number
     cwd: string
     env: Record<string, string>
     stdin: text_stream
@@ -41,6 +45,8 @@ export type spawn_options = {
 
 // what a running program gets
 export type proc_api = {
+    uid: number
+    gid: number
     pid: number
     ppid: number
     argv: string[]

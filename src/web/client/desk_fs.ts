@@ -6,7 +6,7 @@ import type { desk_window } from "./desk.ts"
 import { state, text, new_window, focus_window, refresh_tab } from "./desk.ts"
 import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
-import { memory_directory } from "./memory_fs.ts"
+import { memory_directory, named_directory, type memory_handle } from "./memory_fs.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk_files_util.ts"
 import { can_browse, can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
 import { selection_click, type file_selection } from "./desk_selection.ts"
@@ -27,6 +27,8 @@ export type fs_node = {
     readable?: boolean
     content_readable?: boolean
     write_allowed?: boolean
+    owner_uid?: number
+    owner_gid?: number
     // a folder from the visitor's computer, listed under /home (its handle is kept in IndexedDB)
     mount?: boolean
 }
@@ -49,11 +51,35 @@ let shared_root: fs_node | null = null
 const temporary_files = memory_directory("tmp")
 let home_node: fs_node | null = null
 let filesystem_ready: Promise<void> = Promise.resolve()
+export function filesystem_initialized(): Promise<void> { return filesystem_ready }
+
+export function replace_directory(node: fs_node, handle: dir_handle, writable: boolean): void {
+    node.handle = named_directory(node.name, handle); node.writable = writable; node.children = null
+    const parent = node.parent?.handle as memory_handle | null
+    parent?.mount?.(node.name, node.handle as dir_handle)
+}
+
+async function seed_system(node: fs_node): Promise<void> {
+    const handle = memory_directory(node.name)
+    node.handle = handle
+    for (const child of node.children ?? []) { await seed_system(child); handle.mount(child.name, child.handle as dir_handle) }
+    if (node.path === "/etc") {
+        const files: Record<string, string> = {
+            passwd: "root::0:0:Administrator:/root:/bin/sh\nuser::1000:1000:Browser user:/home/user:/bin/sh\n",
+            group: "root:x:0:\nuser:x:1000:\n",
+            "os-release": "NAME=Jazu\nPRETTY_NAME=\"Jazu Browser Desktop\"\nID=jazu\nVERSION_ID=0.12\n",
+            hostname: "jasouza\n", shells: "/bin/sh\n/bin/ash\n",
+        }
+        for (const [name, content] of Object.entries(files)) { const file = await handle.getFileHandle(name, { create: true }); const writer = await file.createWritable!(); await writer.write(content); await writer.close() }
+        await load_children(node)
+    }
+}
 let tmp_node: fs_node | null = null
 let executable_names: string[] = []
 let clipboard: fs_node[] = []
 let clipboard_mode: "copy" | "cut" = "copy"
 export async function mount_executables(names: string[]): Promise<void> {
+    await filesystem_initialized()
     executable_names = names
     const bin = find_node("/bin")
     if (!bin) return
@@ -61,12 +87,10 @@ export async function mount_executables(names: string[]): Promise<void> {
     for (const name of names) {
         const file = await directory.getFileHandle(name, { create: true })
         const writer = await file.createWritable!()
-        await writer.write(JSON.stringify({ executable: `/bin/${name}`, runtime: "wasm" }))
+        await writer.write(JSON.stringify({ executable: `/bin/${name}`, runtime: "desk" }))
         await writer.close()
     }
-    bin.handle = directory
-    bin.writable = false
-    bin.children = null
+    replace_directory(bin, directory, false)
     await load_children(bin)
     redraw()
 }
@@ -291,12 +315,14 @@ export type dir_handle = {
     move?: (name: string) => Promise<void>
     queryPermission?: (options: { mode: string }) => Promise<string>
     requestPermission?: (options: { mode: string }) => Promise<string>
+    native_handle?: dir_handle
 }
 
 function child_of(parent: fs_node, handle: file_handle | dir_handle): fs_node {
     return {
-        name: handle.name, path: `${parent.path}/${handle.name}`, kind: handle.kind === "directory" ? "dir" : "file", info: "", parent,
+        name: handle.name, path: `${parent.path === "/" ? "" : parent.path}/${handle.name}`, kind: handle.kind === "directory" ? "dir" : "file", info: "", parent,
         children: handle.kind === "directory" ? null : [], handle, writable: parent.writable,
+        owner_uid: parent.owner_uid, owner_gid: parent.owner_gid,
     }
 }
 
@@ -304,6 +330,7 @@ export async function load_children(node: fs_node): Promise<void> {
     const handle = node.handle as dir_handle | null
     if (!handle) return
     const list: fs_node[] = []
+    const previous = new Map((node.children ?? []).map(child => [child.name, child]))
     if (node.mount && !(await allowed(handle, "read"))) {
         node.readable = false
         note(text("files_denied"))
@@ -311,7 +338,11 @@ export async function load_children(node: fs_node): Promise<void> {
         return
     }
     try {
-        for await (const entry of handle.values()) if (!(node === home_node && entry.name === ".jazu_tmp")) list.push(child_of(node, entry))
+        for await (const entry of handle.values()) if (!(node === home_node && entry.name === ".jazu_tmp")) {
+            const old = previous.get(entry.name)
+            if (old && (old.kind === "dir") === (entry.kind === "directory")) { old.handle = entry; list.push(old) }
+            else list.push(child_of(node, entry))
+        }
         node.readable = true
         node.content_readable = true
     } catch {
@@ -578,7 +609,9 @@ async function allowed(handle: dir_handle, mode = "readwrite"): Promise<boolean>
 }
 
 function mount_node(home: fs_node, name: string, handle: dir_handle): fs_node {
-    return { name, path: `${home.path}/${name}`, kind: "dir", info: "", parent: home, children: null, handle, writable: true, mount: true }
+    const node: fs_node = { name, path: `${home.path}/${name}`, kind: "dir", info: "", parent: home, children: null, handle, writable: true, mount: true }
+    ;(home.handle as memory_handle)?.mount?.(name, handle)
+    return node
 }
 
 async function restore_mounts(root: fs_node): Promise<void> {
@@ -631,6 +664,7 @@ async function forget_mount(node: fs_node): Promise<void> {
     const home = node.parent
     if (!home?.children) return
     home.children = home.children.filter(child => child !== node)
+    await (home.handle as dir_handle)?.removeEntry(node.name, { recursive: true })
     try {
         await with_store("readwrite", store => store.delete(node.name))
     } catch {
@@ -652,11 +686,12 @@ async function rename_mount(node: fs_node, name: string): Promise<void> {
     if (exists_in(home, name)) return note(text("files_exists"))
     try {
         await with_store("readwrite", store => store.delete(node.name))
-        await with_store("readwrite", store => store.put({ name, handle: node.handle }))
+        await with_store("readwrite", store => store.put({ name, handle: (node.handle as dir_handle).native_handle ?? node.handle }))
     } catch {
         // kept for this visit only
     }
     const old_path = node.path
+    await (home.handle as dir_handle)?.removeEntry(node.name, { recursive: true })
     home.children = home.children!.filter(child => child !== node)
     const next = mount_node(home, name, node.handle as dir_handle)
     home.children.push(next)
@@ -1244,7 +1279,7 @@ async function mount_opfs(root: fs_node): Promise<void> {
     const storage = navigator.storage as { getDirectory?: () => Promise<dir_handle> } | undefined
     home_node = user
     tmp_node = tmp
-    if (tmp) { tmp.handle = temporary_files; tmp.writable = true; tmp.children = null }
+    if (tmp) replace_directory(tmp, temporary_files, true)
     if (!home || !user) return
     if (!storage?.getDirectory) {
         user.writable = false; user.readable = false; user.children = []
@@ -1255,7 +1290,7 @@ async function mount_opfs(root: fs_node): Promise<void> {
     user.children = null
     try {
         const handle = await storage.getDirectory()
-        user.handle = handle
+        replace_directory(user, handle, true)
         await load_children(user)
         redraw()
     } catch {
@@ -1316,10 +1351,10 @@ export function init_fs(desk: HTMLElement): void {
     const initial = find_node("/home/user", root)
     tree = { root, page, open: new Set(["/", "/home", "/home/user"]), selected: initial, selection: new Set(initial ? [initial.path] : []), anchor: initial?.path ?? null, range_base: null, tools_visible: true, message: null, draft: null }
     upload_hooks.store = store_upload
-    filesystem_ready = mount_opfs(root)
+    filesystem_ready = (root.handle ? Promise.resolve() : seed_system(root)).then(() => mount_opfs(root))
     void mount_executables(executable_names)
     redraw()
-    void restore_mounts(root)
+    void filesystem_ready.then(() => restore_mounts(root))
     document.dispatchEvent(new Event("jazu:fs:init"))
     // the bar sits under the tree, in the panel itself, so it stays in view while the tree scrolls
     const side = page.closest(".desk_side")

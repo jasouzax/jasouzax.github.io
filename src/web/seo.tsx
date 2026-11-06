@@ -374,7 +374,7 @@ export function headers_file(inline_hashes: string[]): string {
             "  Cross-Origin-Opener-Policy: same-origin", "  Cross-Origin-Embedder-Policy: require-corp",
             // xterm's DOM renderer generates its dimension/theme style elements.
             `  Content-Security-Policy: ${csp}; style-src-elem 'self' 'unsafe-inline'`]),
-        "/assets/runtime/wasm_worker.*.js",
+        "/assets/runtime/wasm_worker*.js",
         "  Cross-Origin-Embedder-Policy: require-corp",
         "/assets/*",
         "  Cache-Control: public, max-age=31536000, immutable",

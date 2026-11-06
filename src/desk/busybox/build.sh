@@ -35,10 +35,10 @@ for name in ASH SH_IS_ASH ASH_JOB_CONTROL ASH_ALIAS ASH_EXPAND_PRMT ASH_GETOPTS 
   FEATURE_FIND_TYPE FEATURE_FIND_MTIME FEATURE_FIND_SIZE FEATURE_FIND_MAXDEPTH FEATURE_FIND_PATH FEATURE_FIND_NOT FEATURE_FIND_DELETE FEATURE_FIND_EXEC \
   FEATURE_FANCY_HEAD FEATURE_FANCY_TAIL FEATURE_FANCY_ECHO FEATURE_DATE_ISOFMT FEATURE_CP_LONG_OPTIONS FEATURE_HUMAN_READABLE; do enable "$name"; done
 string EXTRA_CFLAGS '-Os -Wno-error -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-unused-command-line-argument'
-string EXTRA_LDFLAGS '-sMODULARIZE=1 -sEXPORT_NAME=createBusybox -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web,worker -sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,TTY,PIPEFS,stackSave,stackRestore -sEXPORTED_FUNCTIONS=_main,_jazu_child,_jazu_interrupt,_emscripten_resize_heap -sSTACK_SIZE=1048576 -sINITIAL_MEMORY=8388608 -sERROR_ON_UNDEFINED_SYMBOLS=0 -Os'
+string EXTRA_LDFLAGS '-Wl,--wrap=getpwuid,--wrap=getpwnam,--wrap=getpwent -sMODULARIZE=1 -sEXPORT_NAME=createBusybox -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web,worker -sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,TTY,PIPEFS,stackSave,stackRestore -sEXPORTED_FUNCTIONS=_main,_jazu_child,_jazu_interrupt,_emscripten_resize_heap -sSTACK_SIZE=1048576 -sINITIAL_MEMORY=8388608 -sERROR_ON_UNDEFINED_SYMBOLS=0 -Os'
 (yes '' || true) | make oldconfig >/dev/null
 sed -i 's/-Wl,--sort-common//g; s/-Wl,--sort-section alignment//g; s/-Wl,--warn-common//g' scripts/trylink
-make -j"$(nproc)" CC=emcc HOSTCC=gcc AR=emar RANLIB=emranlib LD=emcc SKIP_STRIP=y busybox_unstripped
+make -j"${JAZU_BUILD_JOBS:-4}" CC=emcc HOSTCC=gcc AR=emar RANLIB=emranlib LD=emcc SKIP_STRIP=y busybox_unstripped
 cp busybox_unstripped "$ROOT/artifacts/busybox.js"
 cp busybox_unstripped.wasm "$ROOT/artifacts/busybox.wasm"
 sed -i 's/busybox_unstripped\.wasm/busybox.wasm/g' "$ROOT/artifacts/busybox.js"

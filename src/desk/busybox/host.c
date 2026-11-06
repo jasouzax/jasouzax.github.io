@@ -7,6 +7,66 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/utsname.h>
+#include <pwd.h>
+#include <grp.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* libc NSS is unavailable in a browser. Resolve the same editable /etc records
+ * through the kernel, without hard-coding account names in a WASM image. */
+EM_JS(int, desk_account, (int id, const char *name, int group, int index, char *out, int capacity), {
+    const line = Module.jazu.call('account', { id, name: name ? UTF8ToString(name) : null, group: !!group, index });
+    if (!line || lengthBytesUTF8(line) + 1 > capacity) return 0;
+    stringToUTF8(line, out, capacity); return 1;
+});
+static char passwd_buffer[16384], group_buffer[16384];
+static struct passwd passwd_entry;
+static struct group group_entry;
+static char *group_members[128];
+static int passwd_index, group_index;
+static int split_fields(char *buffer, char **fields, int count) {
+    fields[0] = buffer;
+    for (int i=1;i<count;i++) { char *colon = strchr(fields[i-1], ':'); if (!colon) return 0; *colon=0; fields[i]=colon+1; }
+    return 1;
+}
+static struct passwd *lookup_passwd(int id, const char *name, int index) {
+    char *fields[7];
+    if (!desk_account(id,name,0,index,passwd_buffer,sizeof(passwd_buffer)) || !split_fields(passwd_buffer,fields,7)) return NULL;
+    passwd_entry = (struct passwd){.pw_name=fields[0],.pw_passwd=fields[1],.pw_uid=strtoul(fields[2],NULL,10),.pw_gid=strtoul(fields[3],NULL,10),.pw_gecos=fields[4],.pw_dir=fields[5],.pw_shell=fields[6]};
+    return &passwd_entry;
+}
+struct passwd *__wrap_getpwuid(uid_t id) { return lookup_passwd(id,NULL,-1); }
+struct passwd *__wrap_getpwnam(const char *name) { return lookup_passwd(-1,name,-1); }
+void setpwent(void) { passwd_index=0; }
+void endpwent(void) { passwd_index=0; }
+struct passwd *__wrap_getpwent(void) { return lookup_passwd(-1,NULL,passwd_index++); }
+static struct group *lookup_group(int id, const char *name, int index) {
+    char *fields[4];
+    if (!desk_account(id,name,1,index,group_buffer,sizeof(group_buffer)) || !split_fields(group_buffer,fields,4)) return NULL;
+    int count=0; char *member=fields[3];
+    while (*member && count<127) { group_members[count++]=member; char *comma=strchr(member,','); if(!comma) break; *comma=0; member=comma+1; }
+    group_members[count]=NULL;
+    group_entry=(struct group){.gr_name=fields[0],.gr_passwd=fields[1],.gr_gid=strtoul(fields[2],NULL,10),.gr_mem=group_members}; return &group_entry;
+}
+struct group *getgrgid(gid_t id) { return lookup_group(id,NULL,-1); }
+struct group *getgrnam(const char *name) { return lookup_group(-1,name,-1); }
+void setgrent(void) { group_index=0; }
+void endgrent(void) { group_index=0; }
+struct group *getgrent(void) { return lookup_group(-1,NULL,group_index++); }
+
+EM_JS(int, desk_identity, (int group), {
+    const identity = Module.jazu.call('identity');
+    return group ? identity.gid : identity.uid;
+});
+uid_t getuid(void) { return desk_identity(0); }
+uid_t geteuid(void) { return desk_identity(0); }
+gid_t getgid(void) { return desk_identity(1); }
+gid_t getegid(void) { return desk_identity(1); }
+int getgroups(int size, gid_t list[]) {
+    if (size == 0) return 1;
+    if (size < 1) { errno = EINVAL; return -1; }
+    list[0] = getgid(); return 1;
+}
 
 EM_JS(int, desk_getpid, (void), { return Module.jazu.pid; });
 EM_JS(int, desk_getppid, (void), { return Module.jazu.ppid; });
