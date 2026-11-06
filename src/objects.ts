@@ -52,7 +52,11 @@ export function expand_objects(model: site_model): void {
         if (!children.some(node => node.tag === "window")) children.push(element("window", {
             type: "text/markdown", mode: "view", data: info || object.attrs.name,
         }, object))
-        const desk = element("desk", { name: object.attrs.name, info, auto: "true" }, object, children)
+        const desk = element("desk", {
+            name: object.tag === "project" ? object.attrs.short ?? object.attrs.name : object.attrs.name,
+            info: object.tag === "project" ? object.attrs.note ?? "" : info,
+            auto: "true",
+        }, object, children)
         const node = element("page", { ...object.attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))
     }
