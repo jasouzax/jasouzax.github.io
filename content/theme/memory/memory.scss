@@ -18,6 +18,9 @@
 @use "sass:map";
 @use "sass:string";
 @use "jazu:api" as *;
+.list_drop_separator { border-top: 1px solid var(--line); margin: .25em .5em; }
+.list_drop_status { max-width: 24em; padding: .5em .75em; white-space: normal; font-size: .8em; }
+.list_drop button:disabled { opacity: .4; cursor: default; }
 
 // Fragment ids contain "/", which must be escaped in selectors (#cloud\/gdsc). Same rules as default.scss.
 @function m_esc($s) {
@@ -1354,9 +1357,7 @@
         background: #ffd24a;
     }
 
-    & .desk_wbox_head_path,
-    & .desk_wbox_head_mime>summary,
-    & .desk_wbox_head_mode>summary {
+    & .desk_wbox_head_source {
         background: #fff;
         color: #0a1a52;
         border: 1px solid #7f9db9;
@@ -2928,9 +2929,7 @@
         text-shadow: 1px 1px #222;
     }
 
-    & .desk_wbox_head_path,
-    & .desk_wbox_head_mime>summary,
-    & .desk_wbox_head_mode>summary {
+    & .desk_wbox_head_source {
         background: #1e1e1e;
         color: #ececec;
         border-color: #777;

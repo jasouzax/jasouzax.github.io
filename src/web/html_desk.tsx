@@ -159,7 +159,11 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
         ["view", "[view]", "mode_view"],
         ["edit", "[edit]", "mode_edit"]
     ].map(([value, icon_value, key]) =>
-        list_item(ctx, icon_value, t(ctx, key), value === mode, { "data-mode": value })
+        <button class="desk_wbox_head_tool" type="button" role="radio"
+            data-mode={value} aria-checked={String(value === mode)}
+            tabindex={value === mode ? 0 : -1} title={t(ctx, key)} aria-label={t(ctx, key)}>
+            {glyph(ctx, icon_value)}
+        </button>
     )
     const moves = [
         ["[move_right]", "move_right"],
@@ -173,25 +177,34 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
         <span class="desk_wbox_head_icon" aria-hidden="true">
             {icon(ctx, info.icon)}
         </span>,
-        head_list(
-            ctx,
-            "desk_wbox_head_mime",
-            t(ctx, "mime_type"),
-            mime || t(ctx, "no_mime"),
-            mimes,
-            t(ctx, "filter_mimes")
-        ),
-        <>
-            <input
-                class={"desk_wbox_head_path"}
-                type={"text"}
-                aria-label={t(ctx, "window_source")}
-                autocomplete={"off"}
-                spellcheck={"false"}
-                value={attrs.path ?? ""}
-            />
-        </>,
-        head_list(ctx, "desk_wbox_head_mode", t(ctx, "view_mode"), mode, modes, undefined, true),
+        <div class="desk_wbox_head_source">
+            {head_list(
+                ctx,
+                "desk_wbox_head_mime",
+                t(ctx, "mime_type"),
+                mime || t(ctx, "no_mime"),
+                mimes,
+                t(ctx, "filter_mimes")
+            )}
+            <div class="desk_wbox_head_navigation" role="group" aria-label={t(ctx, "folder_navigation")}>
+                {[["previous", "previous", "[arrow_left]"], ["refresh", "folder_refresh", "[refresh]"], ["forward", "forward", "[arrow_right]"]].map(([action, key, mark]) =>
+                    <button type="button" class={`desk_wbox_head_tool desk_wbox_head_${action}`} data-navigation={action}
+                        title={t(ctx, key)} aria-label={t(ctx, key)} disabled={action !== "refresh"}>{glyph(ctx, mark)}</button>
+                )}
+            </div>
+            <div class="desk_wbox_head_address">
+                <input
+                    class={"desk_wbox_head_path"}
+                    type={"text"}
+                    aria-label={t(ctx, "window_source")}
+                    autocomplete={"off"}
+                    spellcheck={"false"}
+                    value={attrs.path ?? ""}
+                />
+                <nav class="desk_wbox_head_breadcrumbs" aria-label={t(ctx, "window_source")}></nav>
+            </div>
+            <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
+        </div>,
         attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
         attrs.flow !== "false" &&
             head_button(ctx, "desk_wbox_head_split", t(ctx, "split_window"), "[split]", false),
@@ -237,15 +250,21 @@ function render_window_body(ctx: render_ctx, info: window_info): html {
     if (!mime && !path)
         return (
             <>
-                <label class={"desk_wbox_body_empty"}>
-                    <span class={"desk_wbox_body_empty_text"}>{t(ctx, "drop_file_or_upload")}</span>
-                    <input
-                        class={"desk_wbox_body_empty_input"}
-                        type={"file"}
-                        multiple={""}
-                        aria-label={t(ctx, "choose_file")}
-                    />
-                </label>
+                <div class={"desk_wbox_body_empty"}>
+                    <div class="desk_wbox_body_empty_actions">
+                        <button type="button" class="desk_wbox_body_empty_folder" title="/home/user">{t(ctx, "open_folder")}</button>
+                        <button type="button" class="desk_wbox_body_empty_terminal">{t(ctx, "open_terminal")}</button>
+                    </div>
+                    <label class={"desk_wbox_body_empty_upload"}>
+                        <span class={"desk_wbox_body_empty_text"}>{t(ctx, "drop_file_or_upload")}</span>
+                        <input
+                            class={"desk_wbox_body_empty_input"}
+                            type={"file"}
+                            multiple={""}
+                            aria-label={t(ctx, "choose_file")}
+                        />
+                    </label>
+                </div>
             </>
         )
     if (/^(window|shell|pid):/.test(path)) return note(ctx, "needs_js", path)
@@ -289,6 +308,9 @@ export function render_window(ctx: render_ctx, info: window_info, columns: numbe
                 id={`window-${info.index}`}
                 style={`grid-area: ${row} / ${column}`}
                 data-full={is_true(info.node.attrs.full) ? "" : undefined}
+                data-path={info.node.attrs.path ?? ""}
+                data-mode={info.node.attrs.mode ?? "view"}
+                data-mime={info.node.attrs.type ?? ""}
             >
                 {is_true(info.node.attrs.full) ? "" : render_window_head(ctx, info)}
                 {render_window_body(ctx, info)}
@@ -498,6 +520,21 @@ const runtime_keys = [
     "drop_file",
     "drop_file_or_upload",
     "choose_file",
+    "open_terminal",
+    "open_folder",
+    "open_new_window",
+    "files_toggle_hidden",
+    "window_source",
+    "previous",
+    "forward",
+    "folder_navigation",
+    "folder_context_menu",
+    "folder_up",
+    "folder_refresh",
+    "folder_contents",
+    "folder_loading",
+    "folder_not_found",
+    "folder_items",
     "mime_type",
     "view_mode",
     "process_gone",
@@ -526,6 +563,10 @@ const runtime_keys = [
     "files_rename",
     "files_delete",
     "files_copy",
+    "files_paste",
+    "files_cut",
+    "files_cut_ready",
+    "files_copied",
     "files_download",
     "files_open_folder",
     "files_empty",
@@ -595,7 +636,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "download", "delete"]
+    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 
@@ -649,7 +690,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const windows = window_infos(ctx, desk)
     const columns = Math.max(1, Math.ceil(Math.sqrt(windows.length)))
     // A desk with a Files side is a file-system desk: the runtime owns its windows (it creates, moves and closes them).
-    const runtime = sides.some((side) => side.attrs.path === "file:///")
+    const runtime = true
     const flags = {
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
         "data-server": is_true(desk.attrs.server) ? "" : undefined,

@@ -12,6 +12,7 @@ export function make_stream(): text_stream {
     const waiting: ((value: string | null) => void)[] = []
     const stream: text_stream = {
         ended: false,
+        available: () => queue.length > 0 || stream.ended,
         write(data) {
             if (stream.ended || data === "") return
             const reader = waiting.shift()
@@ -66,6 +67,8 @@ export function stream_of(text: string): text_stream {
 // ---- processes --------------------------------------------------------------------------------------------------------------------
 
 export type proc = {
+    uid: number
+    gid: number
     pid: number
     ppid: number
     argv: string[]
@@ -95,7 +98,7 @@ export type proc = {
 export type kernel_hooks = {
     // the programs of the shell runtime (loaded the first time a process is made)
     programs: () => Promise<Record<string, program>>
-    fs: () => fs_api
+    fs: (uid?: number, gid?: number) => fs_api
 }
 
 const screen_limit = 400_000
@@ -114,7 +117,7 @@ export function reset_kernel(): void {
 }
 
 export function list_procs(): proc_info[] {
-    return [...kernel.table.values()].map(item => ({ pid: item.pid, ppid: item.ppid, argv: item.argv, running: item.running, code: item.code }))
+    return [...kernel.table.values()].map(item => ({ pid: item.pid, ppid: item.ppid, argv: item.argv, running: item.running, code: item.code, uid: item.uid, gid: item.gid }))
 }
 
 function interrupted_code(): number {
@@ -163,6 +166,7 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
     const pid = kernel.next_pid++
     const stdin = options.stdin ?? stream_of("")
     const item: proc = {
+        uid: options.uid ?? parent?.uid ?? 1000, gid: options.gid ?? parent?.gid ?? 1000,
         pid, ppid: options.ppid ?? 0, argv, cwd: options.cwd ?? parent?.cwd ?? "/", env: { ...(options.env ?? parent?.env ?? {}) },
         stdin, stdout: options.stdout ?? make_sink(() => undefined), stderr: options.stderr ?? options.stdout ?? make_sink(() => undefined),
         running: true, code: null, abort: new AbortController(), interrupt: [], children: new Set(), done: null as unknown as Promise<number>,
@@ -185,7 +189,7 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
     parent?.children.add(pid)
     const aborted = new Promise<number>(done => item.abort.signal.addEventListener("abort", () => done(item.code ?? interrupted_code())))
     const api: proc_api = {
-        pid, ppid: item.ppid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: hooks.fs(), interactive: item.interactive,
+        pid, ppid: item.ppid, uid: item.uid, gid: item.gid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: hooks.fs(item.uid, item.gid), interactive: item.interactive,
         wasm: options.wasm,
         signal: item.abort.signal,
         on_interrupt: handler => { item.interrupt.push(handler) },
@@ -194,7 +198,10 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
             return { pid: child.pid, done: child.done }
         },
         pipe: make_stream,
-        list_procs, kill,
+        list_procs, kill: (target, code) => {
+            const found = kernel.table.get(target)
+            return !!found && (item.uid === 0 || found.uid === item.uid) && kill(target, code)
+        },
         commands: [],
     }
     // The host updates cwd/argv after chdir/exec and forwards PTY dimensions.

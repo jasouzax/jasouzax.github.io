@@ -26,6 +26,7 @@ import { jazu_error } from "./diag.ts"
 import { emit_page_styles } from "./web/page_style.tsx"
 import { output_directory, output_file } from "./paths.ts"
 import { serialize, type serialized_node } from "./web/vnode.tsx"
+import { compile_plugins } from "./plugins.ts"
 
 export type build_options = {
     root: string
@@ -96,8 +97,20 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
     files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
     files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(artifact, "busybox-source.tar.bz2")))
     for (const name of ["build.sh", "port.py", "host.c"]) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(join(root, "src", "desk", "busybox", name)))
-    files.set("assets/wasm/manifest.json", JSON.stringify([{ id: "busybox", version: "1.36.1-jazu.1", worker, wasm: "/" + wasm_path, sha256: hash,
-        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")), license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]))
+    const images = [{ id: "busybox", version: "1.36.1-jazu.2", worker, wasm: "/" + wasm_path, sha256: hash,
+        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
+    const programs = join(root, "src", "desk", "programs", "artifacts")
+    for (const [name, version, extension] of [["fastfetch", "2.40.4-jazu.1", "tar.gz"], ["htop", "3.4.1-jazu.1", "tar.gz"], ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"]]) {
+        const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
+        const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`
+        files.set(path, bytes)
+        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(join(programs, `${name}-LICENSE`)))
+        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
+        images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
+    }
+    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE"]) files.set(`assets/wasm/${name}`, readFileSync(join(programs, name)))
+    for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
+    files.set("assets/wasm/manifest.json", JSON.stringify(images))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
     // Executable registration is small; WASM bytes remain lazy until a process starts.
@@ -144,6 +157,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     const model = load_site(options.root, config, diag, options.build_date, options.mode)
     synthesize(model)
     const files: output_files = new Map()
+    await compile_plugins(model, files)
     const expertise_by_lang = new Map<string, expertise_model | null>(Object.keys(config.languages).map(lang => [lang, build_expertise(model, lang)]))
     fail_on_errors(diag)
     const data_scss = scss_data(expertise_by_lang.get(config.default_language) ?? null)
@@ -207,7 +221,6 @@ export async function build_site(options: build_options): Promise<build_result> 
         await cover_files(model, theme_colors, files)
     }
     for (const [url, source] of model.resources) files.set(url.slice(1), readFileSync(source))
-    files.set("assets/plugins.json", JSON.stringify(model.plugins.map(node => node.attrs)))
     if (options.only_check) return { model, diag, written: [], skipped, pages: model.pages.length }
     const { written, hashes } = write_files(options.out, files)
     for (const [name, hash] of Object.entries(hashes)) next_cache[`out:${name}`] = hash

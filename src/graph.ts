@@ -28,7 +28,7 @@ function window_sources(model: site_model, page: page): string {
 
 // The signature is inlined in every header and the icon source feeds every favicon, touch icon and cover, so both count as shared input.
 function signature_text(model: site_model): string {
-    const files = [join(model.content_dir, "media", "signature.svg"), icon_source(model) ?? ""]
+    const files = [join(model.content_dir, "media", "signature.svg"), icon_source(model) ?? "", join(model.content_dir, "favicon.svg")]
     const home = model.pages.filter(page => page.path === "/").map(page => `${page.lang}:${page.info}`).join("|")
     return files.map(file => (file && existsSync(file) ? readFileSync(file, "utf8") : "")).join("\u0002") + home
 }

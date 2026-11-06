@@ -4,6 +4,7 @@ import { init_spa } from "./spa.ts"
 import { init_expertise } from "./expertise.ts"
 import { init_search } from "./search.ts"
 import { init_sign } from "./sign.ts"
+import { init_connect_folder } from "./connect_folder.ts"
 import { init_pager } from "./pager.ts"
 import { bind_desk } from "./desk.ts"
 import { init_print } from "./print.ts"
@@ -47,6 +48,7 @@ init_spa()
 init_expertise()
 init_search()
 init_sign()
+init_connect_folder()
 init_pager()
 bind_desk()
 init_print()

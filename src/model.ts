@@ -105,7 +105,7 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
             if (node.tag === "theme") model.themes.push(node)
             if (["project", "event", "blog"].includes(node.tag)) model.objects.push(node)
             if (node.tag === "print") model.prints.push(node)
-            if (node.tag === "plugins") model.plugins.push(...node.children)
+            if (node.tag === "plugin") model.plugins.push(node)
         }
     }
     expand_objects(model)

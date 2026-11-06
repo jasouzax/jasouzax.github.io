@@ -60,10 +60,10 @@ Object.assign(rules, {
     node: { attrs: ["id", "name", "icon", "info", "link", "x", "y"], required: ["id"], children: ["node"] },
     edge: { attrs: ["from", "to", "text"], required: ["from", "to"], children: [] },
     foot: { attrs: [], required: [], children: ["action"] },
-    plugins: { attrs: ["lang"], required: [], children: ["plugin"] },
-    plugin: { attrs: ["id", "name", "icon", "version", "mime", "path", "mode", "from", "to", "flow", "wasm", "sha256", "script", "options"], required: ["id", "version"], children: [] },
+    plugin: { attrs: ["id", "name", "icon", "version", "mime", "path", "mode", "from", "to", "flow", "wasm", "sha256", "script", "options"], required: ["id", "version"], children: ["case"] },
+    case: { attrs: ["file", "error", "view", "edit", "mime", "url", "host", "script"], required: [], children: [], bools: ["file", "error", "view", "edit"] },
 } satisfies Record<string, rule>)
-export const root_tags = ["page", "theme", "project", "event", "blog", "print", "plugins"]
+export const root_tags = ["page", "theme", "project", "event", "blog", "print", "plugin"]
 
 function check_node(node: xml_node, diag: diagnostics): void {
     const rule = rules[node.tag]
@@ -83,6 +83,10 @@ function check_node(node: xml_node, diag: diagnostics): void {
     }
     if (node.tag === "window" && node.attrs.mode && !["view", "edit"].includes(node.attrs.mode)) report_error(diag, where_of(node), "window mode must be view or edit")
     if (node.tag === "plugin" && node.attrs.wasm && !/^[a-f0-9]{64}$/i.test(node.attrs.sha256 ?? "")) report_error(diag, where_of(node), "WASM requires a SHA-256 integrity hash")
+    if (node.tag === "case") {
+        if (node.attrs.host && !["text", "hex", "media", "shell", "markdown", "folder", "default"].includes(node.attrs.host)) report_error(diag, where_of(node), `unknown plugin host "${node.attrs.host}"`)
+        if (!node.attrs.host && !node.attrs.script && !node.parent?.attrs.script) report_error(diag, where_of(node), "case requires a host or script")
+    }
     for (const name of rule.bools ?? []) {
         const value = node.attrs[name]
         if (value !== undefined && value !== "true" && value !== "false") report_error(diag, where_of(node), `attribute "${name}" must be true or false`)

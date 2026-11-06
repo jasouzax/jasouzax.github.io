@@ -3,8 +3,14 @@
 
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 import type { desk_window } from "./desk.ts"
-import { state, text, refresh_tab, window_hooks } from "./desk.ts"
+import { state, text, refresh_tab, window_hooks, focus_window } from "./desk.ts"
 import { detect_mimes, mime_matches, is_mime } from "./desk_mime.ts"
+import { prepare_plugins } from "./desk_plugins.ts"
+import { media_player } from "./desk_media.ts"
+import { markdown_body } from "./desk_markdown.ts"
+import { folder_body } from "./desk_folder.ts"
+import { bind_navigation, sync_navigation } from "./desk_navigation.ts"
+import { desk_drag_type } from "./desk_fs.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -12,11 +18,6 @@ export function head_part<element extends HTMLElement>(item: desk_window, select
 
 function mime_icon(mime: string): string {
     return state.data?.mimes.find(info => info.mime === mime)?.icon ?? state.data?.file_icon ?? ""
-}
-
-function extension_mime(name: string): string {
-    const extension = name.split(".").pop()?.toLowerCase() ?? ""
-    return state.data?.mimes.find(info => info.extensions.includes(extension))?.mime ?? ""
 }
 
 // every child of the window except its head is the body
@@ -107,6 +108,7 @@ export function set_mime(item: desk_window, mime: string): void {
 }
 
 export function set_mode(item: desk_window, mode: string): void {
+    if (item.mode === mode) return
     item.mode = mode
     render_window(item)
 }
@@ -131,186 +133,125 @@ function url_of(item: desk_window): string {
 
 // image, video and audio: the browser's own player over the file, which stays in this tab (a blob: address, nothing is uploaded)
 function media_body(item: desk_window): HTMLElement {
-    const box = document.createElement("div")
-    box.className = "desk_wbox_body_media desk_wbox_body_media_simple"
-    const kind = item.mime.split("/")[0]
-    const media = document.createElement(kind === "image" ? "img" : kind === "video" ? "video" : "audio")
-    media.className = `desk_wbox_body_media_${kind}`
-    media.src = url_of(item)
-    if (media instanceof HTMLImageElement) media.alt = item.name
-    else media.controls = true
-    media.addEventListener("error", () => set_body(item, unknown_body(item)), { once: true })
-    box.append(media)
-    return box
+    return media_player(item, url_of(item), () => fail_window(item, item.path || item.name, text("files_open_failed")))
 }
 
-function is_media(mime: string): boolean {
-    return /^(image|video|audio)\//.test(mime)
-}
-
-export function is_text(mime: string): boolean {
-    return mime.startsWith("text/") || /^application\/(json|typescript|javascript|xml|x-sh|x-yaml|x-httpd-php|sql)$/.test(mime) || /\+(xml|json)$/.test(mime)
-}
-
-// a text file is read once per render and never past this many bytes (a note says so)
-const text_limit = 2_000_000
-
-async function read_text(item: desk_window): Promise<{ value: string, cut: boolean }> {
+// One shared line/byte layout for Code and Hex. The byte buffer remains authoritative
+// until text is explicitly changed, including when UTF-8 decoding is lossy.
+function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
     const file = item.file!
-    return { value: await file.slice(0, text_limit).text(), cut: file.size > text_limit }
-}
-
-// Text view: the characters as they are, coloured by the window's mime type (client_desk_syntax.ts; a type with no language stays plain).
-// They only ever go in through text nodes, so nothing in the file is parsed as HTML or run.
-function text_body(item: desk_window): HTMLElement {
-    const pre = document.createElement("pre")
-    pre.className = "desk_wbox_body_text desk_wbox_body_text_raw"
-    pre.tabIndex = 0
-    void read_text(item).then(({ value, cut }) => {
-        const map = token_map(value, item.mime)
-        pre.replaceChildren(...(map ? coloured_nodes(value, map, 0, value.length, false) : [document.createTextNode(value)]), ...(cut ? [document.createTextNode("\n\u2026")] : []))
-    }).catch(() => {
-        pre.textContent = text("files_failed")
-    })
-    return pre
-}
-
-// Text mode: line numbers beside the text, with the bytes (hex) a toggle away; the same markup the static page uses. The text itself is
-// editable in place: a see-through textarea sits over a coloured copy (as in the edit mode's code editor), the line numbers, the colours and
-// (while the toggle is open) the bytes follow every keystroke, and Save (or Ctrl+S) writes the file back like the edit mode does.
-function text_layout_body(item: desk_window): HTMLElement {
+    if (file.size > edit_limit) return too_large(item)
+    const editable = item.mode === "edit"
     const box = document.createElement("div")
     box.className = "desk_wbox_body_text"
-    const editable = item.file!.size <= edit_limit
-    const part = (tag: string, class_name: string): HTMLElement => {
-        const element = document.createElement(tag)
-        element.className = class_name
-        return element
+    const part = (tag: string, name: string): HTMLElement => {
+        const node = document.createElement(tag)
+        node.className = `desk_wbox_body_text_${name}`
+        return node
     }
-    const dec = part("span", "desk_wbox_body_text_line_dec")
-    const hex = part("span", "desk_wbox_body_text_line_hex")
-    const line = part("div", "desk_wbox_body_text_line")
+    const line = part("div", "line")
+    const dec = part("pre", "line_dec")
+    const hex = part("pre", "line_hex")
     const toggle = document.createElement("details")
     toggle.className = "desk_wbox_body_text_tog"
+    toggle.open = hex_mode
     const summary = document.createElement("summary")
-    const arrow = document.createElement("span")
-    arrow.setAttribute("aria-hidden", "true")
-    arrow.textContent = "\uf054"
-    summary.append(arrow)
+    summary.title = "Hex / Text"
+    summary.setAttribute("aria-label", "Hex / Text")
+    const chevron = document.createElement("span")
+    chevron.textContent = "›"
+    summary.append(chevron)
     toggle.append(summary)
     line.append(dec, hex, toggle)
-    const byte_column = part("div", "desk_wbox_body_text_byte")
-    const split_body = part("div", "desk_wbox_body_text_body desk_wbox_body_text_body_split")
-    const plain_body = part("div", "desk_wbox_body_text_body desk_wbox_body_text_body_plain")
-    box.append(line, byte_column, split_body, plain_body)
-
-    // the part of the view that depends on the text: line numbers and, when asked, the bytes (hex) with their split copy of the text
-    const lined = (parts: string[], source: string, colours: Uint8Array | null, starts?: number[]): DocumentFragment => {
-        const fragment = document.createDocumentFragment()
-        parts.forEach((one, index) => {
-            if (index > 0) fragment.append(document.createElement("br"))
-            if (colours && starts) fragment.append(...coloured_nodes(source, colours, starts[index], starts[index] + one.length, true))
-            else fragment.append(one.replace(/ /g, "\u00a0"))
-        })
-        return fragment
+    const byte_column = part("div", "byte")
+    const split = part("pre", "body desk_wbox_body_text_body_split")
+    const plain = part("div", "body desk_wbox_body_text_body_plain")
+    const holder = part("div", "edit")
+    const layer = part("pre", "colour")
+    const area = document.createElement("textarea")
+    area.className = "desk_wbox_body_text_input"
+    area.spellcheck = false
+    area.wrap = "off"
+    area.readOnly = !editable
+    area.disabled = true
+    area.setAttribute("aria-label", item.name)
+    const bytes_input = document.createElement("textarea")
+    bytes_input.className = "desk_wbox_body_text_hex_input"
+    bytes_input.spellcheck = false
+    bytes_input.wrap = "off"
+    bytes_input.readOnly = !editable
+    bytes_input.disabled = true
+    bytes_input.setAttribute("aria-label", `Hex: ${item.name}`)
+    byte_column.append(bytes_input)
+    holder.append(layer, area)
+    plain.append(holder)
+    box.append(line, byte_column, split, plain)
+    let bytes = new Uint8Array()
+    let ready = false
+    const draw = (): void => {
+        const value = area.value
+        const map = token_map(value, item.mime)
+        holder.classList.toggle("is_coloured", map !== null)
+        layer.replaceChildren(...(map ? coloured_nodes(value, map, 0, value.length, false) : [document.createTextNode(value)]), document.createTextNode("\n"))
+        dec.textContent = value.split("\n").map((_, index) => index + 1).join("\n")
+        const count = Math.max(1, Math.ceil(bytes.length / 16))
+        hex.textContent = Array.from({ length: count }, (_, index) => (index * 16).toString(16).padStart(6, "0").toUpperCase()).join("\n")
+        split.textContent = printable(bytes)
+        bytes_input.rows = count
+        bytes_input.cols = 48
+        bytes_input.style.height = `${count * 1.5}em`
     }
-    const draw_lines = (value: string): void => {
-        const count = value.split("\n").length
-        dec.replaceChildren(lined(Array.from({ length: count }, (_, index) => String(index + 1)), "", null))
+    const valid = (message: string): void => {
+        item.problem = message
+        bytes_input.setAttribute("aria-invalid", String(!!message))
+        sync_save(item)
     }
-    const draw_bytes = (value: string, colours: Uint8Array | null): void => {
-        const bytes = [...new TextEncoder().encode(value)]
-        const rows: string[] = []
-        for (let at = 0; at < bytes.length; at += 16) rows.push(bytes.slice(at, at + 16).map(byte => byte.toString(16).padStart(2, "0").toUpperCase()).join(" "))
-        hex.replaceChildren(lined(rows.map((_, index) => `${(index + 1).toString(16).padStart(2, "0").toUpperCase()}X`), "", null))
-        byte_column.replaceChildren(lined(rows, "", null))
-        const marked = value.replace(/\n/g, "\ue001")
-        const split = marked.match(/[\s\S]{1,16}/g) ?? []
-        // the colours are those of the text itself (the line breaks are the same one unit, so the positions agree)
-        split_body.replaceChildren(lined(split, marked, colours, split.map((_, row) => row * 16)))
-    }
-    const draw_static = (value: string, colours: Uint8Array | null): void => {
-        const lines = value.split("\n")
-        const starts: number[] = []
-        lines.reduce((at, one) => {
-            starts.push(at)
-            return at + one.length + 1
-        }, 0)
-        plain_body.replaceChildren(lined(lines, value, colours, starts))
-    }
-
-    void read_text(item).then(({ value }) => {
-        const colours = token_map(value, item.mime)
-        draw_lines(value)
-        draw_bytes(value, colours)
-        if (!editable) return draw_static(value, colours)
-        const area = document.createElement("textarea")
-        area.className = "desk_wbox_body_text_input"
-        area.spellcheck = false
-        area.wrap = "off"
-        area.value = value
-        area.setAttribute("aria-label", item.name)
-        const layer = document.createElement("pre")
-        layer.className = "desk_wbox_body_text_colour"
-        layer.setAttribute("aria-hidden", "true")
-        const holder = part("div", "desk_wbox_body_text_edit")
-        holder.append(layer, area)
-        plain_body.replaceChildren(holder)
-        let queued = 0
-        const paint = (): void => {
-            queued = 0
-            const text_now = area.value
-            const map = token_map(text_now, item.mime)
-            holder.classList.toggle("is_coloured", map !== null)
-            // the layer always holds the text: it is what gives the editor its height and width (the textarea is laid over it)
-            layer.replaceChildren(...(map ? coloured_nodes(text_now, map, 0, text_now.length, false) : [document.createTextNode(text_now)]), document.createTextNode("\n"))
-            draw_lines(text_now)
-            if (toggle.open) draw_bytes(text_now, map)
-        }
-        // the bytes are only worked out while they show: opening the toggle brings them up to date
-        toggle.addEventListener("toggle", () => {
-            if (toggle.open) draw_bytes(area.value, token_map(area.value, item.mime))
-        })
-        area.addEventListener("input", () => {
-            if (!queued) queued = requestAnimationFrame(paint)
-        })
-        // the box is what scrolls, so a caret that moves out of view moves the box
-        const reveal = (): void => {
-            const before = area.value.slice(0, area.selectionStart)
-            const row = before.split("\n").length
-            const height = parseFloat(getComputedStyle(area).lineHeight) || area.clientHeight / Math.max(1, area.value.split("\n").length)
-            const top = (row - 1) * height
-            const view = box.parentElement ?? box
-            const room = view.clientHeight
-            if (top < view.scrollTop) view.scrollTop = top
-            else if (top + height > view.scrollTop + room - height * 2) view.scrollTop = top + height - room + height * 2
-        }
-        area.addEventListener("keyup", reveal)
-        area.addEventListener("click", reveal)
-        let tab_leaves = false
-        area.addEventListener("keydown", event => {
-            if (event.key === "Escape") tab_leaves = true
-            else if (event.key === "Tab" && !event.shiftKey && !tab_leaves) {
-                event.preventDefault()
-                area.setRangeText("\t", area.selectionStart, area.selectionEnd, "end")
-                area.dispatchEvent(new Event("input", { bubbles: true }))
-            } else tab_leaves = false
-        })
-        paint()
-        // the head's save button commits through here (edit_shell, below), so it reads the textarea
-        box.dataset.ready = "true"
-        commit = async () => new Blob([area.value], { type: item.mime })
-    }).catch(() => {
-        box.textContent = text("files_failed")
+    area.addEventListener("input", () => {
+        bytes = new TextEncoder().encode(area.value)
+        bytes_input.value = hex_lines(bytes)
+        valid("")
+        draw()
     })
-    let commit: () => Promise<Blob | null> = async () => null
-    if (!editable) return box
-    return edit_shell(item, box, () => commit())
+    bytes_input.addEventListener("input", () => {
+        const parsed = parse_hex(bytes_input.value)
+        valid(parsed.bad ? `${text("hex_invalid")} ${parsed.bad}` : "")
+        if (parsed.bad) return
+        bytes = new Uint8Array(parsed.bytes)
+        area.value = new TextDecoder().decode(bytes)
+        draw()
+    })
+    toggle.addEventListener("toggle", () => {
+        if (item.problem) { toggle.open = true; return }
+        if (ready) draw()
+    })
+    area.addEventListener("keydown", event => {
+        if (event.key === "Tab" && !event.shiftKey && editable) {
+            event.preventDefault()
+            area.setRangeText("\t", area.selectionStart, area.selectionEnd, "end")
+            area.dispatchEvent(new Event("input", { bubbles: true }))
+        }
+    })
+    void file.arrayBuffer().then(buffer => {
+        if (!box.isConnected) return
+        bytes = new Uint8Array(buffer)
+        area.value = new TextDecoder().decode(bytes)
+        bytes_input.value = hex_lines(bytes)
+        area.disabled = bytes_input.disabled = false
+        ready = true
+        box.dataset.ready = "true"
+        draw()
+        sync_save(item)
+    }).catch(() => valid(text("files_failed")))
+    const viewport = editable
+        ? edit_shell(item, box, async () => ready && !item.problem ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null)
+        : document.createElement("div")
+    viewport.classList.add("desk_wbox_body_editor")
+    if (!editable) viewport.append(box)
+    return viewport
 }
 
 // ---- editors ------------------------------------------------------------------------------------------------------------------
-// Edit mode picks an editor from a short list of selectors; the first that matches wins and the last is the byte editor, which takes anything.
-// (Later entries, such as a picture or document editor, go in front of the text one.)
+// Editor factories report valid data to the shared Save control.
 
 const edit_limit = 2_000_000
 
@@ -376,60 +317,6 @@ function too_large(item: desk_window): HTMLElement {
     return note
 }
 
-function text_editor(item: desk_window): HTMLElement {
-    if (item.file!.size > edit_limit) return too_large(item)
-    const area = document.createElement("textarea")
-    area.className = "desk_wbox_body_edit_text"
-    area.spellcheck = false
-    area.wrap = "off"
-    area.disabled = true
-    // Code editor: a coloured copy of the text sits under the (see-through) textarea and follows its scrolling. The textarea stays the editor,
-    // so typing, selection, undo and the caret are the browser's own. Without a language for the mime it is the plain textarea.
-    const layer = document.createElement("pre")
-    layer.className = "desk_wbox_body_edit_colour"
-    layer.setAttribute("aria-hidden", "true")
-    let coloured = false
-    let queued = 0
-    const paint = (): void => {
-        queued = 0
-        const map = token_map(area.value, item.mime)
-        coloured = map !== null
-        area.classList.toggle("is_coloured", coloured)
-        // the extra line keeps the layer as tall as the textarea when the text ends in a line break
-        layer.replaceChildren(...(map ? coloured_nodes(area.value, map, 0, area.value.length, false) : []), document.createTextNode("\n"))
-        layer.scrollTop = area.scrollTop
-        layer.scrollLeft = area.scrollLeft
-    }
-    area.addEventListener("input", () => {
-        if (!queued) queued = requestAnimationFrame(paint)
-    })
-    area.addEventListener("scroll", () => {
-        layer.scrollTop = area.scrollTop
-        layer.scrollLeft = area.scrollLeft
-    })
-    // Tab types a tab instead of leaving the editor (Escape then Tab leaves it)
-    let tab_leaves = false
-    area.addEventListener("keydown", event => {
-        if (event.key === "Escape") tab_leaves = true
-        else if (event.key === "Tab" && !event.shiftKey && !tab_leaves) {
-            event.preventDefault()
-            area.setRangeText("\t", area.selectionStart, area.selectionEnd, "end")
-            area.dispatchEvent(new Event("input", { bubbles: true }))
-        } else tab_leaves = false
-    })
-    void item.file!.text().then(value => {
-        area.value = value
-        area.disabled = false
-        paint()
-    }).catch(() => {
-        area.value = text("files_failed")
-    })
-    const holder = document.createElement("div")
-    holder.className = "desk_wbox_body_edit_code"
-    holder.append(layer, area)
-    return edit_shell(item, holder, async () => new Blob([area.value], { type: item.mime }))
-}
-
 // Bytes as hex, 16 to a line, with the offsets and the characters beside them. Edit the hex; anything that is not a byte is reported and
 // the save is held back.
 function parse_hex(value: string): { bytes: Uint8Array, bad: string } {
@@ -454,105 +341,202 @@ function printable(bytes: Uint8Array): string {
     return rows.join("\n")
 }
 
-function byte_editor(item: desk_window): HTMLElement {
-    if (item.file!.size > edit_limit / 4) return too_large(item)
-    const grid = document.createElement("div")
-    grid.className = "desk_wbox_body_edit_bytes"
-    const offsets = document.createElement("pre")
-    offsets.className = "desk_wbox_body_edit_offsets"
-    offsets.setAttribute("aria-hidden", "true")
-    const area = document.createElement("textarea")
-    area.className = "desk_wbox_body_edit_hex"
-    area.spellcheck = false
-    area.wrap = "off"
-    area.disabled = true
-    const chars = document.createElement("pre")
-    chars.className = "desk_wbox_body_edit_chars"
-    chars.setAttribute("aria-hidden", "true")
-    grid.append(offsets, area, chars)
-    const refresh = (): { bytes: Uint8Array, bad: string } => {
-        const parsed = parse_hex(area.value)
-        const count = Math.max(1, Math.ceil(parsed.bytes.length / 16))
-        offsets.textContent = Array.from({ length: count }, (_, row) => (row * 16).toString(16).padStart(6, "0")).join("\n")
-        chars.textContent = printable(parsed.bytes)
-        grid.dispatchEvent(new CustomEvent("desk:invalid", { bubbles: true, detail: parsed.bad ? `${text("hex_invalid")} ${parsed.bad}` : "" }))
-        return parsed
-    }
-    area.addEventListener("input", refresh)
-    void item.file!.arrayBuffer().then(buffer => {
-        area.value = hex_lines(new Uint8Array(buffer))
-        area.disabled = false
-        refresh()
-    }).catch(() => {
-        area.value = ""
-        grid.dispatchEvent(new CustomEvent("desk:invalid", { bubbles: true, detail: text("files_failed") }))
-    })
-    return edit_shell(item, grid, async () => {
-        const parsed = refresh()
-        return parsed.bad ? null : new Blob([parsed.bytes as BlobPart], { type: item.mime })
-    })
-}
-
-// the editors by selector, first match wins
-const editors: { matches: (mime: string) => boolean, make: (item: desk_window) => HTMLElement }[] = [
-    { matches: mime => is_text(mime) || mime === "image/svg+xml", make: text_editor },
-    { matches: () => true, make: byte_editor },
-]
-
-// the body for the window's type and mode
-// what the window shows for a process (client_desk_proc.ts fills this in) and what typing a source in the head does
+// Process rendering is installed by desk_proc; plugin scripts choose when to use it.
 export const process_hooks = {
     body: (_item: desk_window): HTMLElement | null => null,
+    release: (_item: desk_window): void => {},
+    release_body: (_item: desk_window): void => {},
+}
+export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
+const renders = new WeakMap<desk_window, AbortController>()
+
+function fallback_body(item: desk_window): HTMLElement {
+    if (item.error) {
+        const note = unknown_body(item)
+        note.classList.add("desk_wbox_body_error")
+        note.firstElementChild!.textContent = item.error
+        return note
+    }
+    if (!item.file && !item.path && item.pid === null) {
+        const empty = document.createElement("div")
+        empty.className = "desk_wbox_body_empty"
+        const label = document.createElement("label")
+        label.className = "desk_wbox_body_empty_upload"
+        const message = document.createElement("span")
+        message.className = "desk_wbox_body_empty_text"
+        message.textContent = text("drop_file_or_upload")
+        const input = document.createElement("input")
+        input.className = "desk_wbox_body_empty_input"
+        input.type = "file"
+        input.multiple = true
+        input.setAttribute("aria-label", text("choose_file"))
+        label.append(message, input)
+        const actions = document.createElement("div")
+        actions.className = "desk_wbox_body_empty_actions"
+        const folder = document.createElement("button")
+        folder.type = "button"
+        folder.className = "desk_wbox_body_empty_folder"
+        folder.textContent = text("open_folder")
+        folder.title = "/home/user"
+        const terminal = document.createElement("button")
+        terminal.type = "button"
+        terminal.className = "desk_wbox_body_empty_terminal"
+        terminal.textContent = text("open_terminal")
+        actions.append(folder, terminal)
+        empty.append(actions, label)
+        return empty
+    }
+    const note = unknown_body(item)
+    note.firstElementChild!.textContent = item.mime === "inode/directory" && item.mode === "view"
+        ? text("folder_loading") : `${text(`unsupported_${item.mode}`)} ${item.mime}`
+    return note
 }
 
-export const uri_handlers: ((item: desk_window, uri: string) => Promise<boolean>)[] = []
+export function fail_window(item: desk_window, path: string, message: string): void {
+    process_hooks.release(item)
+    item.path = path
+    item.name = path.split("/").pop() || path
+    item.file = null
+    item.save = null
+    item.error = message
+    render_window(item)
+}
 
-function body_for(item: desk_window): HTMLElement {
-    if (item.pid !== null) return process_hooks.body(item) ?? unknown_body(item)
-    if (!item.file) return unknown_body(item)
-    if (item.mode === "view" && is_media(item.mime)) return media_body(item)
-    if (item.mode === "view" && is_text(item.mime)) return text_body(item)
-    if (item.mode === "text" && is_text(item.mime)) return text_layout_body(item)
-    if (item.mode === "edit") return editors.find(editor => editor.matches(item.mime))!.make(item)
-    return unknown_body(item)
+const loads = new WeakMap<desk_window, number>()
+export async function open_source(item: desk_window, uri: string): Promise<void> {
+    const revision = (loads.get(item) ?? 0) + 1
+    loads.set(item, revision)
+    const current = () => loads.get(item) === revision && item.el.isConnected
+    renders.get(item)?.abort()
+    item.error = ""
+    if (!uri.trim()) {
+        process_hooks.release(item)
+        item.file = null
+        item.path = item.name = ""
+        item.mime = item.icon = ""; item.candidates = []; item.save = null; item.mode = "view"
+        render_window(item)
+        return
+    }
+    try {
+        for (const handler of uri_handlers) {
+            if (!current()) return
+            if (await handler(item, uri, current)) return
+        }
+        const path = uri.replace(/^file:\/\//, "")
+        const url = new URL(path, location.href)
+        if (!["https:", "http:", "blob:", "data:"].includes(url.protocol)) throw new Error("Unsupported URI")
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+        const file = await response.blob()
+        if (loads.get(item) !== revision || !item.el.isConnected) return
+        await load_file(item, file, path.split("/").pop() || path, uri, current)
+    } catch (error) {
+        if (loads.get(item) === revision) fail_window(item, uri, `${text("files_open_failed")}: ${String(error)}`)
+    }
+}
+
+function body_for(item: desk_window): void {
+    renders.get(item)?.abort()
+    process_hooks.release_body(item)
+    const previous_media = item.el.querySelector<HTMLMediaElement>("video, audio")
+    if (previous_media) { previous_media.pause(); previous_media.removeAttribute("src"); previous_media.load() }
+    delete item.el.dataset.plugin
+    release_url(item)
+    const controller = new AbortController()
+    renders.set(item, controller)
+    const is_folder = () => !item.error && item.mime === "inode/directory" && item.mode === "view"
+    const fallback = (target: desk_window) => !target.error && target.mime === "inode/directory" && target.mode === "view"
+        ? folder_body(target, controller.signal) : fallback_body(target)
+    const show_fallback = () => {
+        set_body(item, fallback(item))
+        item.el.dataset.plugin = is_folder() ? "folder" : "default"
+        sync_save(item)
+    }
+    const host = { code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, state, text, render_window, save_window }
+    set_body(item, fallback_body(item))
+    void prepare_plugins(item, host, controller.signal).then(candidates => {
+        if (controller.signal.aborted || !item.el.isConnected) return
+        for (const { context, module } of candidates) {
+            try {
+                const body = module.render?.(context)
+                if (body) {
+                    set_body(item, body)
+                    item.el.dataset.plugin = body.classList.contains("desk_wbox_body_folder") ? "folder" : context.plugin.id
+                }
+                const cleanup = module.setup?.(context)
+                if (cleanup) controller.signal.addEventListener("abort", cleanup, { once: true })
+                if (body) { sync_save(item); return }
+            } catch (error) {
+                console.warn(`Plugin ${context.plugin.id} failed`, error)
+            }
+        }
+        if (!controller.signal.aborted && item.el.isConnected) show_fallback()
+    }).catch(error => {
+        if (!controller.signal.aborted) {
+            if (is_folder()) { show_fallback(); return }
+            item.error = String(error)
+            set_body(item, fallback_body(item))
+        }
+    })
 }
 
 export function render_window(item: desk_window): void {
     refresh_tab(item)
-    const path = head_part<HTMLInputElement>(item, ".desk_wbox_head_path")
-    if (path) path.value = item.path || item.name
+    sync_navigation(item)
     const summary = head_part(item, ".desk_wbox_head_mime > summary")
     if (summary) summary.textContent = item.mime || text("no_mime")
-    const mode = head_part(item, ".desk_wbox_head_mode > summary")
-    if (mode) mode.textContent = text(`mode_${item.mode}`)
     for (const button of item.el.querySelectorAll<HTMLElement>(".desk_wbox_head_mode button[data-mode]")) {
-        if (button.dataset.mode === item.mode) button.setAttribute("aria-current", "true")
-        else button.removeAttribute("aria-current")
+        const active = button.dataset.mode === item.mode
+        button.setAttribute("aria-checked", String(active))
+        button.tabIndex = active ? 0 : -1
     }
     fill_mime_list(item)
     // a new body starts with nothing to save; an editor claims the save button when it is made
     item.commit = null
     item.dirty = false
     item.problem = ""
-    set_body(item, body_for(item))
+    body_for(item)
     sync_save(item)
 }
 
-export async function load_file(item: desk_window, file: Blob, name: string, path: string = ""): Promise<void> {
+export async function load_file(item: desk_window, file: Blob, name: string, path: string = "", current = () => true): Promise<void> {
+    if (!current()) return
+    process_hooks.release(item)
+    item.error = ""
     item.pid = null
     item.file = file
     item.name = name
     item.path = path
     item.save = null
-    item.candidates = await detect_mimes(file, name)
+    const candidates = await detect_mimes(file, name)
+    if (!current()) return
+    item.candidates = candidates
     item.mime = item.candidates[0] ?? ""
     item.icon = mime_icon(item.mime)
     item.mode = "view"
     render_window(item)
 }
 
+export function load_folder(item: desk_window, path: string, name: string): void {
+    process_hooks.release(item)
+    item.error = ""; item.pid = null; item.file = null; item.save = null
+    item.path = path; item.name = name; item.mode = "view"
+    item.mime = "inode/directory"; item.candidates = [item.mime]
+    item.icon = state.data?.folder_icon ?? ""
+    item.el.dataset.path = path; item.el.dataset.mime = item.mime
+    render_window(item)
+}
+
 // the lists' clicks, the search and Enter
 function wire_head(item: desk_window): void {
+    item.el.addEventListener("keydown", event => {
+        const target = (event.target as Element).closest<HTMLElement>(".desk_wbox_head_mode button[data-mode]")
+        if (!target || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return
+        event.preventDefault()
+        const buttons = [...item.el.querySelectorAll<HTMLButtonElement>(".desk_wbox_head_mode button[data-mode]")]
+        const next = event.key === "Home" ? buttons[0] : event.key === "End" ? buttons[buttons.length - 1] : buttons.find(button => button !== target)
+        if (next) { set_mode(item, next.dataset.mode ?? "view"); next.focus() }
+    })
     item.el.addEventListener("click", event => {
         const target = event.target as HTMLElement
         if (target.closest(".desk_wbox_head_save")) {
@@ -566,7 +550,6 @@ function wire_head(item: desk_window): void {
             pick.closest("details")?.removeAttribute("open")
         } else if (mode) {
             set_mode(item, mode.dataset.mode ?? "view")
-            mode.closest("details")?.removeAttribute("open")
         }
     })
     // typing in the editor marks the change; Ctrl+S in the window saves it
@@ -582,14 +565,9 @@ function wire_head(item: desk_window): void {
         event.preventDefault()
         void save_window(item)
     })
-    // a source typed in the head and confirmed with Enter is opened: pid: starts a process, pid:3 shows one
-    head_part<HTMLInputElement>(item, ".desk_wbox_head_path")?.addEventListener("keydown", event => {
-        if (event.key !== "Enter") return
-        event.preventDefault()
-        const value = (event.target as HTMLInputElement).value
-        void (async () => {
-            for (const handler of uri_handlers) if (await handler(item, value)) return
-        })()
+    bind_navigation(item, uri => open_source(item, uri), () => {
+        if (item.pid !== null || !item.path) render_window(item)
+        else void open_source(item, item.path)
     })
     const search = head_part<HTMLInputElement>(item, ".desk_wbox_head_mime .list_drop_search input")
     search?.addEventListener("input", () => fill_mime_list(item, search.value))
@@ -628,34 +606,53 @@ function take_files(item: desk_window, files: File[], open_window: () => desk_wi
     files.forEach((file, index) => {
         const target = index === 0 ? item : open_window()
         if (!target) return
-        void upload_hooks.store(file).then(path => load_file(target, file, file.name, path ? `file://${path}` : ""))
+        void upload_hooks.store(file).then(path => path ? open_source(target, `file://${path}`) : load_file(target, file, file.name))
     })
 }
 
 function wire(item: desk_window, open_window: () => desk_window | null): void {
     const box = item.el
+    box.addEventListener("click", event => {
+        if ((event.target as Element).closest(".desk_wbox_body_empty_folder")) void open_source(item, "file:///home/user")
+        if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, "pid:")
+    })
     let depth = 0
     box.addEventListener("dragenter", event => {
-        if (!has_files(event)) return
+        if (item.mime === "inode/directory") return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         depth++
         box.classList.add("is_drop")
     })
     box.addEventListener("dragover", event => {
-        if (!has_files(event)) return
+        if (item.mime === "inode/directory") return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
     })
     box.addEventListener("dragleave", event => {
-        if (!has_files(event)) return
+        if (item.mime === "inode/directory") return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         depth = Math.max(0, depth - 1)
         if (depth === 0) box.classList.remove("is_drop")
     })
     box.addEventListener("drop", event => {
-        if (!has_files(event)) return
+        if (item.mime === "inode/directory") return
+        if (!has_files(event) && !event.dataTransfer?.types.includes(desk_drag_type)) return
         event.preventDefault()
         depth = 0
         box.classList.remove("is_drop")
+        if (event.dataTransfer?.types.includes(desk_drag_type)) {
+            try {
+                const paths: unknown = JSON.parse(event.dataTransfer.getData(desk_drag_type))
+                if (!Array.isArray(paths) || !paths.every(path => typeof path === "string" && path.startsWith("/"))) return
+                paths.forEach((path, index) => {
+                    const target = index === 0 ? item : open_window()
+                    if (target) { if (index === 0) focus_window(target); void open_source(target, `file://${path}`) }
+                })
+            } catch { /* ignore malformed drag payloads */ }
+            return
+        }
         take_files(item, [...(event.dataTransfer?.files ?? [])], open_window)
     })
     box.addEventListener("change", event => {
@@ -667,10 +664,15 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
 }
 
 export function init_view(open_window: () => desk_window | null): void {
-    window_hooks.closed = release_url
+    window_hooks.closed = item => {
+        renders.get(item)?.abort()
+        item.el.querySelectorAll<HTMLMediaElement>("video, audio").forEach(media => media.pause())
+        release_url(item)
+    }
     window_hooks.created = item => {
         wire(item, open_window)
         wire_head(item)
         fill_mime_list(item)
+        render_window(item)
     }
 }
