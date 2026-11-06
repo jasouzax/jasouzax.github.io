@@ -86,7 +86,7 @@ export function capture_skeleton(): void {
     const shine_bounds: string[] = []
     const covered = new Set<Element>()
     const add_box = (box: DOMRect, group?: string): void => {
-        if (!box.width || !box.height || box.bottom < 0 || box.top > innerHeight || box.right < 0) return
+        if (!box.width || !box.height || box.bottom < 0 || box.top > innerHeight || box.right < 0 || box.left > innerWidth) return
         const placeholder = document.createElement("div")
         placeholder.className = "loading_placeholder"
         if (group) placeholder.dataset.skeletonGroup = group
@@ -105,20 +105,43 @@ export function capture_skeleton(): void {
         ["hero-actions", ".landing_actions", false],
         ["head-tray", "#head_tray", false],
         ["breadcrumbs", "#head_div, #head_path", true],
-        ["head-tabs", "#head_tabs", false]
+        ["head-tabs", "#head_tabs", false],
+        ["expertise-head", "#expertise .expertise_head", false],
+        ["expertise-timeline", "#expertise .expertise_tlhead, #expertise .expertise_tl", true],
+        ["expertise-title", "#expertise .expertise_prjhead > .panel_title", false],
+        ["expertise-all", "#expertise .expertise_all", false],
+        ["expertise-stacks", "#expertise .expertise_stacks", false],
+        ["expertise-card", "#expertise .slide_card", false],
+        ["expertise-dots", "#expertise .expertise_dots", false]
     ]
     for (const [name, selector, combine] of groups) {
         const elements = Array.from(document.querySelectorAll(selector))
         const sets = combine ? [elements] : elements.map(element => [element])
         for (const members of sets) {
-            const rects = members.flatMap(visible_rects)
-            if (!rects.length) continue
             members.forEach(member => covered.add(member))
+            const rects = members.flatMap(member => {
+                const boxes = visible_rects(member)
+                if (name !== "expertise-card") return boxes
+                // Cards outside the horizontal scrollport must not create
+                // extra placeholders over neighbouring expertise controls.
+                const track = member.closest(".expertise_track")?.getBoundingClientRect()
+                if (!track) return boxes
+                return boxes.map(box => {
+                    const left = Math.max(box.left, track.left), top = Math.max(box.top, track.top)
+                    const right = Math.min(box.right, track.right), bottom = Math.min(box.bottom, track.bottom)
+                    return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top))
+                }).filter(box => box.width > 0 && box.height > 0)
+            })
+            if (!rects.length) continue
             const left = Math.min(...rects.map(rect => rect.left)), top = Math.min(...rects.map(rect => rect.top))
             const right = Math.max(...rects.map(rect => rect.right)), bottom = Math.max(...rects.map(rect => rect.bottom))
             add_box(new DOMRect(left, top, right - left, bottom - top), name)
         }
     }
+    // Expertise has explicit section placeholders. Its state/empty messages and
+    // scroll controls must not add smaller boxes on top of those sections.
+    const expertise = document.getElementById("expertise")
+    if (expertise) covered.add(expertise)
     const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
     for (const element of document.querySelectorAll<HTMLElement>(selector)) {
         if (element.closest("#head_signature, [hidden]")) continue

@@ -301,3 +301,40 @@ test("one signature draws at the center before shrinking into the header", async
     await expect(signature).not.toHaveCSS("position", "fixed")
     await expect(page.locator("#signature_intro")).toHaveCount(0)
 })
+
+
+for (const mode of ["light", "dark"] as const) {
+    test(`expertise ${mode} skeleton groups sections without overlapping filters`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme: mode })
+        await page.goto("/")
+        await ready(page)
+        await page.evaluate(() => {
+            document.documentElement.style.scrollSnapType = "none"
+            document.documentElement.style.scrollBehavior = "auto"
+            const head = document.querySelector("#expertise .expertise_head")!
+            scrollTo(0, head.getBoundingClientRect().top + scrollY - 60)
+        })
+        await expect.poll(() => page.locator("#expertise .expertise_head").evaluate(element => Math.abs(element.getBoundingClientRect().top - 60))).toBeLessThan(2)
+        let release!: () => void
+        const gate = new Promise<void>(done => { release = done })
+        await page.route("**/assets/themes/memory/*.css", async route => { await gate; await route.continue() })
+        await choose(page, "theme_name_memory")
+        await expect(page.locator("html")).toHaveAttribute("data-skeleton", "loading", { timeout: 10000 })
+        for (const name of ["head", "timeline", "title", "all", "stacks", "card", "dots"]) {
+            await expect(page.locator(`[data-skeleton-group="expertise-${name}"]`)).toHaveCount(1)
+        }
+        const overlapping = await page.locator('[data-skeleton-group="expertise-stacks"]').evaluate(element => {
+            const filter = element.getBoundingClientRect()
+            return Array.from(document.querySelectorAll(".loading_placeholder")).filter(other => {
+                const box = other.getBoundingClientRect()
+                return Math.min(box.right, filter.right) - Math.max(box.left, filter.left) > 1 &&
+                    Math.min(box.bottom, filter.bottom) - Math.max(box.top, filter.top) > 1
+            }).length
+        })
+        expect(overlapping).toBe(1)
+        await expect(page.locator(".loading_placeholder:not([data-skeleton-group])")).toHaveCount(0)
+        await page.screenshot({ path: `.cache/loading-expertise-${mode}.png` })
+        release()
+        await ready(page)
+    })
+}

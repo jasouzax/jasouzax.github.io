@@ -43,7 +43,7 @@ try {
 setTimeout(() => root.classList.remove("intro"), 1500)
 // Fail open if a runtime or stylesheet is unavailable, including restrictive
 // extensions. The inline layout remains usable with readable system fonts.
-setTimeout(() => {
+const boot_fail_timer = setTimeout(() => {
     if (!root.classList.contains("theme_ready")) {
         document.getElementById("loading_overlay")?.remove()
         delete root.dataset.signatureIntro
@@ -52,3 +52,6 @@ setTimeout(() => {
         if (main) { main.inert = false; main.setAttribute("aria-busy", "false") }
     }
 }, 12000)
+
+// Once boot succeeds, its safety timer must not clear a later theme skeleton.
+document.addEventListener("jazu:background-ready", () => clearTimeout(boot_fail_timer), { once: true })
