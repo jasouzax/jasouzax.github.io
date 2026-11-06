@@ -3,7 +3,7 @@
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
 
 import type { desk_window } from "./desk.ts"
-import { state, text, new_window, focus_window, refresh_tab } from "./desk.ts"
+import { state, text, new_window, focus_window, refresh_tab, working_directory } from "./desk.ts"
 import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
 import { memory_directory, named_directory, type memory_handle } from "./memory_fs.ts"
@@ -1322,8 +1322,11 @@ home_listeners.add(async ({ names }) => {
     clipboard = []
     if (tree) {
         tree.draft = null
-        tree.open = new Set(["/", "/home", "/home/user"])
-        select(home_node, new Set(["/home/user"])); redraw()
+        if (tree.selected?.path === "/home/user" || tree.selected?.path.startsWith("/home/user/")) {
+            tree.open = new Set(["/", "/home", "/home/user"])
+            select(home_node, new Set(["/home/user"]))
+        }
+        redraw()
     }
     for (const item of state.windows) {
         remap_navigation(item, remap)
@@ -1391,10 +1394,33 @@ export function init_fs(desk: HTMLElement): void {
     }
     const root = shared_root ?? read_markup(root_box, null)
     shared_root = root
-    const initial = find_node("/home/user", root)
-    tree = { root, page, open: new Set(["/", "/home", "/home/user"]), selected: initial, selection: new Set(initial ? [initial.path] : []), anchor: initial?.path ?? null, range_base: null, tools_visible: true, message: null, draft: null }
+    const cwd = working_directory()
+    // Desks share their filesystem across page swaps; add a project's directory when arriving from another desk.
+    let initial = root
+    for (const name of cwd.split("/").filter(Boolean)) {
+        let child = initial.children?.find(node => node.name === name)
+        if (!child) {
+            child = { name, path: `${initial.path === "/" ? "" : initial.path}/${name}`, kind: "dir", info: "", parent: initial, children: [], handle: null, writable: false }
+            initial.children ??= []
+            initial.children.push(child)
+        }
+        initial = child
+    }
+    const open = new Set<string>()
+    for (let node: fs_node | null = initial; node; node = node.parent) open.add(node.path)
+    tree = { root, page, open, selected: initial, selection: new Set([initial.path]), anchor: initial.path, range_base: null, tools_visible: true, message: null, draft: null }
     upload_hooks.store = store_upload
-    filesystem_ready = (root.handle ? Promise.resolve() : seed_system(root)).then(() => mount_opfs(root))
+    filesystem_ready = (root.handle ? (async () => {
+        let parent = root
+        for (const name of cwd.split("/").filter(Boolean)) {
+            const child = parent.children!.find(node => node.name === name)!
+            if (!child.handle) {
+                await seed_system(child)
+                ;(parent.handle as memory_handle).mount(name, child.handle as dir_handle)
+            }
+            parent = child
+        }
+    })() : seed_system(root)).then(() => mount_opfs(root))
     void mount_executables(executable_names)
     redraw()
     void filesystem_ready.then(() => restore_mounts(root))

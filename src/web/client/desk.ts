@@ -51,6 +51,10 @@ export const state = {
     next_id: 1,
 }
 
+export function working_directory(): string {
+    return state.desk?.dataset.cwd || "/home/user"
+}
+
 // weights of the window tracks (columns and rows): resizing a gap moves weight between the two windows beside it
 let col_weights: number[] = []
 let row_weights: number[] = []

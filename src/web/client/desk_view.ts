@@ -3,7 +3,7 @@
 
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 import type { desk_window } from "./desk.ts"
-import { state, text, refresh_tab, window_hooks, focus_window } from "./desk.ts"
+import { state, text, refresh_tab, window_hooks, focus_window, working_directory } from "./desk.ts"
 import { detect_mimes, mime_matches, is_mime } from "./desk_mime.ts"
 import { prepare_plugins } from "./desk_plugins.ts"
 import { media_player } from "./desk_media.ts"
@@ -377,7 +377,7 @@ function fallback_body(item: desk_window): HTMLElement {
         folder.type = "button"
         folder.className = "desk_wbox_body_empty_folder"
         folder.textContent = text("open_folder")
-        folder.title = "/home/user"
+        folder.title = working_directory()
         const terminal = document.createElement("button")
         terminal.type = "button"
         terminal.className = "desk_wbox_body_empty_terminal"
@@ -613,7 +613,7 @@ function take_files(item: desk_window, files: File[], open_window: () => desk_wi
 function wire(item: desk_window, open_window: () => desk_window | null): void {
     const box = item.el
     box.addEventListener("click", event => {
-        if ((event.target as Element).closest(".desk_wbox_body_empty_folder")) void open_source(item, "file:///home/user")
+        if ((event.target as Element).closest(".desk_wbox_body_empty_folder")) void open_source(item, `file://${working_directory()}`)
         if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, "pid:")
     })
     let depth = 0

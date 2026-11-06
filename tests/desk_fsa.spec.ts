@@ -20,6 +20,7 @@ async function connect(page: Page) {
     await page.locator("#head_account > summary").click()
 }
 async function open(pane: Locator, path: string) {
+    await expect(pane.page().locator("#main-content")).not.toHaveAttribute("inert", "")
     const input = pane.locator(".desk_wbox_head_path")
     await input.fill(`file://${path}`); await input.press("Enter")
 }
@@ -31,6 +32,31 @@ async function target_text(page: Page, path: string) {
         return (await (await dir.getFileHandle(parts.at(-1))).getFile()).text()
     }, path)
 }
+
+test("project terminals keep their working directory when home connects to a folder", async ({ page }) => {
+    test.setTimeout(120000)
+    await picker(page)
+    await page.goto("/projects/galactic-strike")
+    await connect(page)
+    const directory = page.locator('.desk_side_item[data-path="/srv/projects/galactic-strike"] > details > summary')
+    await expect(directory).toHaveAttribute("data-focused", "")
+    await page.keyboard.press("Control+Enter")
+    await page.locator(".desk_wbox").last().getByRole("button", { name: "Open terminal", exact: true }).click()
+    const screen = page.locator(".xterm-rows")
+    await expect(screen).toContainText("user@jasouza:/srv/projects/galactic-strike$")
+    const input = page.locator(".xterm-helper-textarea")
+    await input.pressSequentially("ls; echo LIST_STATUS_$?; echo connected-project > /home/user/project.txt; cd; pwd")
+    await input.press("Enter")
+    await expect(screen).toContainText("LIST_STATUS_0")
+    await expect(screen).toContainText("user@jasouza:/home/user$")
+    await expect.poll(() => target_text(page, "project.txt")).toBe("connected-project\n")
+    await page.reload()
+    await expect(page.locator(".desk_wbox_head_path").first()).toHaveValue("file:///srv/projects/galactic-strike")
+    const pane = page.locator(".desk_wbox").first()
+    await expect(pane.locator(".desk_folder_status")).toHaveText("Empty")
+    await open(pane, "/home/user/project.txt")
+    await expect(pane.locator(".desk_wbox_body_text_input")).toHaveValue("connected-project\n")
+})
 
 test("connecting home preserves conflicts, editor drafts, previews and the saved connection", async ({ page }) => {
     test.setTimeout(120000)

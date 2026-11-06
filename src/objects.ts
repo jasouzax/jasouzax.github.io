@@ -46,16 +46,23 @@ export function expand_objects(model: site_model): void {
             children.unshift(element("menu", { name: "Events" }, object, entries(object.children)))
         }
         if (object.tag === "project") {
-            children.unshift(element("menu", { name: "Files", path: `file:///srv/repo/${id}` }, object))
+            const folder = (name: string, children: xml_node[] = []): xml_node =>
+                element("entry", { name, type: "Folder" }, object, children)
+            const root = folder("/", ["bin", "boot", "dev", "etc", "home", "lib", "media", "mnt", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"].map(name =>
+                folder(name, name === "home" ? [folder("user")] : name === "srv" ? [folder("projects", [folder(id)])] : [])))
+            children.unshift(element("menu", { name: "Files", path: "file:///" }, object, [root]))
             children.push(element("menu", { name: "Version", path: `/api/v1/git/${id}/log` }, object))
         }
-        if (!children.some(node => node.tag === "window")) children.push(element("window", {
+        if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
+            type: "inode/directory", mode: "view", path: `file:///srv/projects/${id}`,
+        } : {
             type: "text/markdown", mode: "view", data: info || object.attrs.name,
         }, object))
         const desk = element("desk", {
             name: object.tag === "project" ? object.attrs.short ?? object.attrs.name : object.attrs.name,
             info: object.tag === "project" ? object.attrs.note ?? "" : info,
             auto: "true",
+            ...(object.tag === "project" ? { cwd: `/srv/projects/${id}` } : {}),
         }, object, children)
         const node = element("page", { ...object.attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))

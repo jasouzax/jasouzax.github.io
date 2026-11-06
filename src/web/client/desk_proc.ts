@@ -2,7 +2,7 @@
 // the lazy registry supplies compiled programs and their shared filesystem.
 
 import type { desk_window } from "./desk.ts"
-import { state, text, window_hooks, refresh_tab } from "./desk.ts"
+import { state, text, window_hooks, refresh_tab, working_directory } from "./desk.ts"
 import { process_hooks, uri_handlers, render_window, fail_window } from "./desk_view.ts"
 import { kernel, kill, interrupt, make_stream, start_process } from "./kernel.ts"
 import type { proc } from "./kernel.ts"
@@ -89,7 +89,7 @@ function detach(item: desk_window): void {
 function new_shell(): proc {
     const stdin = make_stream()
     kernel.terminals.add(stdin)
-    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: "/home/user", env: { HOME: "/home/user", USER: "user", LOGNAME: "user", HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "\\[\\033[1;32m\\]user@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ " }, interactive: true })
+    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: working_directory(), env: { HOME: "/home/user", USER: "user", LOGNAME: "user", HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "\\[\\033[1;32m\\]user@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ " }, interactive: true })
 }
 
 async function open_pid(item: desk_window, uri: string): Promise<boolean> {

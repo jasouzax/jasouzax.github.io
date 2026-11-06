@@ -702,6 +702,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     // A desk with a Files side is a file-system desk: the runtime owns its windows (it creates, moves and closes them).
     const runtime = true
     const flags = {
+        "data-cwd": desk.attrs.cwd,
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
         "data-server": is_true(desk.attrs.server) ? "" : undefined,
         "data-runtime": runtime ? "" : undefined
