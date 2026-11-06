@@ -1781,12 +1781,13 @@ function gpuFrame(now) {
   if (!G.on || !G.dev?.queue) return;
   const t0 = performance.now(); G.busy = true;
   G.dev.queue.onSubmittedWorkDone().then(() => {
-    G.busy = false; if (!G.on || !G.dev || window.MEMORY_GPU_FIXED || document.hidden) return;
+    G.busy = false; if (!G.on || !G.dev || window.MEMORY_GPU_FIXED || document.hidden || (root.hasAttribute("data-skeleton") && !root.hasAttribute("data-spa")) || root.hasAttribute("data-background-wait")) return;
     G.ft += performance.now() - t0; G.fn++;
     if (G.fn >= 30) { const avg = G.ft / G.fn; G.ft = 0; G.fn = 0; if (avg > 20 && G.q > .45 && gpuConfig().adaptive) { G.q = Math.max(.45, G.q * .8); gpuMeasure(); } }
   }).catch(() => { G.busy = false; });
 }
 function gpuSync() {
+  if ((root.hasAttribute("data-skeleton") && !root.hasAttribute("data-spa")) || root.hasAttribute("data-background-wait")) return;
   if (!G.on || !G.dev) return; cancelAnimationFrame(G.raf); G.raf = 0; G.lf = 0; G.ft = 0; G.fn = 0;
   if (document.hidden || stillV) { G.dt = 0; gpuRender(); return; }
   G.last = performance.now(); G.raf = requestAnimationFrame(gpuFrame);
@@ -1913,6 +1914,7 @@ function disable() {
   try { if (S.contourStopped && typeof Contour_Map !== 'undefined') { Contour_Map.instance = new Contour_Map(); S.contourStopped = false; } } catch (e) { }
 }
 function sync() {
+  if ((root.hasAttribute("data-skeleton") && !root.hasAttribute("data-spa")) || root.hasAttribute("data-background-wait")) return;
   if (!S.on) return;
   if (S.mode === 'gpu') { gpuSync(); return; }
   if (S.mode !== 'svg') return;
@@ -1961,3 +1963,4 @@ if (document.readyState === "loading") {
 if (typeof window !== "undefined") {
   window.jasouza_theme_memory = { mount, enable, disable };
 }
+document.addEventListener("jazu:background-ready", () => sync());

@@ -12,7 +12,8 @@ import { validate_roots } from "./schema.ts"
 import { build_expertise, scss_data } from "./expertise.ts"
 import type { expertise_model } from "./expertise.ts"
 import type { output_files } from "./theme_css.ts"
-import { compile_theme } from "./theme_css.ts"
+import { compile_theme, compile_inline_layout } from "./theme_css.ts"
+import { skeleton_css } from "./web/skeleton_css.ts"
 import type { page_assets, theme_assets } from "./web/html_page.tsx"
 import { render_page, background_html } from "./web/html_page.tsx"
 import { sitemap_xml, robots_txt, headers_file, redirects_file, inline_script_hash, nav_index } from "./web/seo.tsx"
@@ -115,9 +116,8 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
     // Executable registration is small; WASM bytes remain lazy until a process starts.
     const desk_shell = await bundle_script(root, "desk_shell", files, mode)
-    const boot_source = readFileSync(join(root, "src", "web", "client", "boot.ts"), "utf8")
-    const boot = await transform(boot_source, { loader: "ts", minify: true })
-    return { page, theme_switch, desk_shell, boot: boot.code.trim() }
+    const boot = await esbuild_build({ entryPoints: [join(root, "src", "web", "client", "boot.ts")], bundle: true, write: false, format: "iife", minify: true, logLevel: "silent" })
+    return { page, theme_switch, desk_shell, boot: boot.outputFiles[0].text.trim() }
 }
 
 function disk_hash(file: string): string | null {
@@ -161,13 +161,15 @@ export async function build_site(options: build_options): Promise<build_result> 
     const expertise_by_lang = new Map<string, expertise_model | null>(Object.keys(config.languages).map(lang => [lang, build_expertise(model, lang)]))
     fail_on_errors(diag)
     const data_scss = scss_data(expertise_by_lang.get(config.default_language) ?? null)
-    const built = model.themes.filter(node => config.themes === "all" || config.themes.includes(node.attrs.name))
+    const layout = compile_inline_layout(model, data_scss, files)
+    const inline_css = (await transform(layout.css + skeleton_css, { loader: "css", minify: true })).code.trim()
+    const built = model.themes.filter(node => node.attrs.name && (config.themes === "all" || config.themes.includes(node.attrs.name)))
     const themes: Record<string, theme_assets> = {}
-    const manifest: Record<string, { css: string, js: string | null, label: string, background: serialized_node }> = {}
+    const manifest: Record<string, { css: string, js: string | null, label: string, colors: [string, string], background: serialized_node }> = {}
     for (const node of built) {
-        const result = await compile_theme(model, node, data_scss, files)
+        const result = await compile_theme(model, node, data_scss, files, layout.sources)
         themes[result.name] = result
-        manifest[result.name] = { css: result.css, js: result.js, label: result.label, background: serialize(background_html(model, result)) }
+        manifest[result.name] = { css: result.css, js: result.js, label: result.label, colors: result.colors, background: serialize(background_html(model, result)) }
     }
     if (!themes[config.default_theme]) throw new jazu_error(`default theme "${config.default_theme}" is not built`, 2)
     files.set("assets/themes/manifest.json", JSON.stringify(manifest))
@@ -176,10 +178,10 @@ export async function build_site(options: build_options): Promise<build_result> 
     const runtime = await bundle_runtime(options.root, files, options.mode)
     const nav = JSON.stringify(nav_index(model))
     files.set("assets/nav_index.json", nav)
-    const assets: page_assets = { themes, runtime_page: runtime.page, runtime_theme_switch: runtime.theme_switch, runtime_desk_shell: runtime.desk_shell, boot_script: runtime.boot, nav_index: nav, page_styles }
+    const assets: page_assets = { themes, inline_css, runtime_page: runtime.page, runtime_theme_switch: runtime.theme_switch, runtime_desk_shell: runtime.desk_shell, boot_script: runtime.boot, nav_index: nav, page_styles }
     const cache = load_cache(options.root)
     const next_cache: Record<string, string> = {}
-    const shared = shared_hash(model, JSON.stringify(manifest) + JSON.stringify(runtime) + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
+    const shared = shared_hash(model, inline_css + JSON.stringify(manifest) + JSON.stringify(runtime) + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
     let skipped = 0
     for (const page of model.pages) {
         const expertise = expertise_by_lang.get(page.lang) ?? null
@@ -204,7 +206,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     fail_on_errors(diag)
     files.set("sitemap.xml", sitemap_xml(model))
     files.set("robots.txt", robots_txt(model))
-    files.set("_headers", headers_file([inline_script_hash(runtime.boot)]))
+    files.set("_headers", headers_file([inline_script_hash(runtime.boot)], [inline_script_hash(inline_css)]))
     files.set("_redirects", redirects_file())
     const theme_colors = themes[config.default_theme].colors
     const brand = brand_colors(model, theme_colors)

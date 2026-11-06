@@ -77,8 +77,11 @@ test("window headers navigate history and breadcrumbs while text covers follow t
             await expect(button).toHaveCSS("border-right-width", "0px")
         }
         expect(await window.locator(".desk_wbox_head_navigation").evaluate(element => {
-            const style = getComputedStyle(element, "::after")
-            return Math.abs(parseFloat(style.top) * 4 - element.getBoundingClientRect().height) < 1
+            const style = getComputedStyle(element)
+            return element.previousElementSibling?.classList.contains("desk_wbox_head_icon")
+                && element.nextElementSibling?.classList.contains("desk_wbox_head_source")
+                && style.borderWidth === "0px" && style.backgroundColor === "rgba(0, 0, 0, 0)"
+                && getComputedStyle(element, "::after").content === "none"
         })).toBe(true)
     }
     await page.setViewportSize({ width: 1440, height: 1000 })
@@ -103,13 +106,17 @@ test("window headers navigate history and breadcrumbs while text covers follow t
 
 test("folder context menus anchor their cyan edge and open entries in new windows", async ({ page }) => {
     await page.goto("/desk")
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
     await page.evaluate(async () => {
         const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle("menus", { create: true })
         await dir.getDirectoryHandle("child", { create: true })
     })
     const window = pane(page)
     await open(window, "/home/user/menus")
-    for (const [x, y, corner] of [[500, 150, "top-left"], [1428, 150, "top-right"], [500, 988, "bottom-left"], [1428, 988, "bottom-right"]] as const) {
+    // The pinned footer occupies the viewport bottom; click inside the folder.
+    const folder = (await window.locator(".desk_wbox_body_folder").boundingBox())!
+    const bottom = Math.min(988, folder.y + folder.height - 12)
+    for (const [x, y, corner] of [[500, 150, "top-left"], [1428, 150, "top-right"], [500, bottom, "bottom-left"], [1428, bottom, "bottom-right"]] as const) {
         await page.mouse.click(x, y, { button: "right" })
         await expect(menu(page)).toHaveAttribute("data-corner", corner)
         const rect = (await menu(page).boundingBox())!

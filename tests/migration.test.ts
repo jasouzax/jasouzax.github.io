@@ -146,13 +146,14 @@ test("custom font output is deterministic for a pinned build date", async () => 
     } finally { for (const dir of temporary) rmSync(dir, { recursive: true, force: true }); f.close() }
 })
 
-test("builds repair missing JSON, invalidate changed article content and prune deleted/private routes", async () => {
+test("builds repair JSON, invalidate inline layout and article changes, and prune deleted/private routes", async () => {
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
         symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         f.put("content/blogs/article.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
         f.put("content/blogs/article.md", "# First article")
+        f.put("content/theme/layout.xml", '<theme><style><![CDATA[body { --inline-version: 1; }]]></style></theme>')
         const options = { root: f.root, out: join(f.root, "dist"), mode: "production" as const, force: false, build_date: new Date("2026-11-04"), only_check: false }
         const first = await build_site(options)
         assert.match(readFileSync(join(options.out, "blogs/post/index.html"), "utf8"), /First article/)
@@ -161,7 +162,12 @@ test("builds repair missing JSON, invalidate changed article content and prune d
         const audit = execFileSync(process.execPath, [resolve("src/main.ts"), "icons", "check", "--root", f.root, "--date", "2026-11-04"], { encoding: "utf8", windowsHide: true })
         assert.match(audit, /icons audit/)
         unlinkSync(join(options.out, "blogs/post/index.json"))
-        await build_site(options)
+        f.put("content/theme/layout.xml", '<theme><style><![CDATA[body { --inline-version: 2; }]]></style></theme>')
+        const layout_change = await build_site(options)
+        assert.equal(layout_change.skipped, 0, "inline layout changes invalidate every HTML page")
+        assert.match(readFileSync(join(options.out, "index.html"), "utf8"), /--inline-version:\s*2/)
+        const manifest = JSON.parse(readFileSync(join(options.out, "assets/themes/manifest.json"), "utf8"))
+        assert.deepEqual(Object.keys(manifest), ["basic"], "the unnamed theme is never selectable")
         assert(existsSync(join(options.out, "blogs/post/index.json")))
         f.put("content/blogs/article.md", "# Changed article")
         await build_site(options)

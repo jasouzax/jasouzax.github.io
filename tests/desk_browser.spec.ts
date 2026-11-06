@@ -630,8 +630,77 @@ test("Media connects audio playback, seeking, volume and speed controls", async 
     await expect.poll(() => window.locator("audio").evaluate((media: HTMLAudioElement) => media.playbackRate)).toBe(1.5)
 })
 
+test("portrait window headers keep controls above a full-width joined URL field", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.goto("/desk")
+    const head = page.locator(".desk_wbox_head").first()
+    const mime = head.locator(".desk_wbox_head_mime")
+    await mime.locator("summary").evaluate(element => { element.textContent = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+    for (const width of [320, 390, 560, 768]) {
+        await page.setViewportSize({ width, height: 1000 })
+        const address = head.locator(".desk_wbox_head_address")
+        const url = (await address.boundingBox())!
+        const bounds = (await head.boundingBox())!
+        const controls = ["icon", "navigation", "mime", "mode", "save", "split", "drop"]
+        let previousRight = url.x
+        for (const name of controls) {
+            const rect = (await head.locator(`.desk_wbox_head_${name}`).boundingBox())!
+            expect(rect.x).toBeGreaterThanOrEqual(previousRight - 1)
+            expect(rect.y + rect.height).toBeLessThanOrEqual(url.y + 1)
+            expect(rect.y).toBeLessThan(url.y)
+            expect(rect.x + rect.width).toBeLessThanOrEqual(url.x + url.width + 1)
+            previousRight = rect.x + rect.width
+        }
+        expect(url.width).toBeGreaterThan(bounds.width - 10)
+        await expect(address).toHaveCSS("border-top-left-radius", "4px")
+        await expect(address).toHaveCSS("border-bottom-right-radius", "4px")
+        for (const name of ["mime", "mode"]) {
+            await expect(head.locator(`.desk_wbox_head_${name}`)).toHaveCSS("border-bottom-width", "0px")
+        }
+        for (const button of await head.locator(".desk_wbox_head_navigation button, .desk_wbox_head_mode button, :scope > button").all()) {
+            const rect = (await button.boundingBox())!
+            expect(rect.width).toBe(24)
+            expect(rect.height).toBe(24)
+        }
+        if (width === 390) await head.screenshot({ path: ".cache/desk-browser-results/portrait-header.png" })
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    const url = (await head.locator(".desk_wbox_head_address").boundingBox())!
+    const type = (await mime.boundingBox())!
+    expect(Math.abs(url.y - type.y)).toBeLessThanOrEqual(1)
+})
+
+test("portrait tabs keep their height and the final desk leaves the footer visible", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto("/desk")
+    const tabs = page.locator("#head_tabs")
+    const original = (await tabs.boundingBox())!
+    const input = page.locator(".desk_wbox_head_path").first()
+    await input.fill("file:///bin/cat")
+    await input.press("Enter")
+    await expect(tabs.locator("a > span[aria-hidden]")).toHaveCount(1)
+    expect((await tabs.boundingBox())!.height).toBe(original.height)
+    await page.locator("#head_window > summary").click()
+    await page.locator("#head_new").click()
+    await expect(tabs.locator("a")).toHaveCount(2)
+    expect((await tabs.boundingBox())!.height).toBe(original.height)
+    const heights = await tabs.locator("a").evaluateAll(items => items.map(item => item.getBoundingClientRect().height))
+    expect(heights).toEqual([original.height, original.height])
+    for (const size of [{ width: 390, height: 844 }, { width: 560, height: 1000 }, { width: 1440, height: 1000 }]) {
+        await page.setViewportSize(size)
+        const footer = (await page.locator(".site_foot").boundingBox())!
+        const bottom = size.width < size.height ? (await tabs.boundingBox())!.y : size.height
+        expect(Math.abs(footer.y + footer.height - bottom)).toBeLessThanOrEqual(1)
+        expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(size.height + 1)
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: ".cache/desk-browser-results/portrait-footer-tabs.png" })
+})
+
 test("mode buttons stay square and video controls fit a narrow window", async ({ page }) => {
     await page.goto("/desk")
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
     const window = page.locator(".desk_wbox").first()
     const view = window.locator('[data-mode="view"]')
     const edit = window.locator('[data-mode="edit"]')

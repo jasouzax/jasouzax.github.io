@@ -5,8 +5,8 @@
 
 // =====================================================================
 // THEME TOKENS: "Clean Sci-fi" (the default theme)
-// Everything below the tokens reads these custom properties, so another theme
-// (Memory, Fresh, ...) only has to redefine them, e.g. :root[data-theme-name="memory"] { ... }.
+// The compiler extracts geometry into the unnamed inline layout theme. The
+// remaining paint and motion are scoped to Default; other themes supply a skin.
 // Light and dark follow the OS (prefers-color-scheme) unless the Light or Dark radio in the theme menu is checked (CSS only, via :has()).
 // The --bg-valley / --bg-mid / --bg-hill / --bg-primary hex values also drive the WebGL contour map (contour.js reads them).
 // =====================================================================
@@ -444,6 +444,8 @@ background-position: $pos;
 // The Jasouza @font-face is generated from the <font> element in default.xml (no hand-made woff2 here).
 :root {
     --safe_bottom: env(safe-area-inset-bottom, 0px);
+    // Footer: .8em type, 1.4 line-height, .35em vertical padding, and 2px link borders.
+    --site-foot-height: calc(1.68em + 4px);
 }
 
 html {
@@ -461,11 +463,19 @@ html {
 body {
     margin: 2.5em 0 0 0;
     font: 14px Jasouza, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 2.5em);
+}
+
+#main-content {
+    flex-shrink: 0;
 }
 
 @media (orientation: portrait) {
     body {
-        margin: 2.5em 0 calc(3em + var(--safe_bottom)) 0
+        margin: 2.5em 0 calc(3em + var(--safe_bottom)) 0;
+        min-height: calc(100dvh - 5.5em - var(--safe_bottom));
     }
 }
 
@@ -750,11 +760,20 @@ a {
             width: 100%;
             border-top: 1px solid var(--line);
             padding-bottom: var(--safe_bottom);
+            height: calc(3em + var(--safe_bottom));
 
             &>a {
                 flex: 1 0 auto;
+                display: grid;
+                grid-template-rows: minmax(0, 1fr) 1em;
+                align-items: center;
+                justify-items: center;
+                height: 3em;
+                padding-block: 0;
                 text-align: center;
                 line-height: 1em;
+
+                &>.head_tab_name { grid-row: 2; }
 
                 &>span:not(.head_tab_name) {
                     display: block;
@@ -992,62 +1011,81 @@ a {
     }
 
     &_contacts {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .75em;
+        width: max-content;
+        max-width: 100%;
         margin: .75em 0 0 0;
         padding: 0;
         list-style: none;
+
+        > li + li {
+            border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+        }
     }
 
-    &_chip_value {
+    &_contact_value {
+        grid-area: 1 / 3;
         min-width: 0;
         overflow-wrap: anywhere;
     }
 
     @media (max-width: 30em) {
 
-        &_contacts,
         &_actions {
             width: 100%;
         }
 
-        &_contacts>li,
         &_btn {
             flex: 1 1 100%;
         }
-
-        &_chip {
-            width: 100%;
-        }
     }
 
-    &_chip {
+    &_contact {
         display: grid;
-        grid-template: auto auto / auto 1fr;
+        grid-template-columns: 1.6em minmax(5em, 7em) minmax(0, 1fr);
         column-gap: .75em;
         align-items: center;
-        padding: .5em .9em .5em .7em;
-        border: 2px solid var(--edge);
-        background: var(--panel);
+        padding: .85em 1em;
+        border: 0;
+        color: var(--text);
 
-        &:hover {
-            border-color: var(--accent);
-            color: var(--accent);
+        &[href]:hover .landing_contact_value {
+            text-decoration: underline;
+            text-underline-offset: .2em;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: -3px;
+            border-radius: var(--r);
         }
 
         &_icon {
-            grid-row: 1 / span 2;
+            grid-area: 1 / 1;
             font-size: 1.6em;
             line-height: 1;
             text-align: center;
         }
 
         &_type {
+            grid-area: 1 / 2;
+            min-width: 0;
+            overflow-wrap: anywhere;
             font-size: .75em;
             letter-spacing: .12em;
             text-transform: uppercase;
             color: var(--text-dim);
+        }
+
+        @media (max-width: 30em) {
+            grid-template: auto auto / 1.6em minmax(0, 1fr);
+
+            &_icon {
+                grid-row: 1 / span 2;
+            }
+
+            &_value {
+                grid-area: 2 / 2;
+            }
         }
     }
 
@@ -4512,6 +4550,8 @@ body::after {
 // Drawn like the header (glass + one hairline) but short and at 75% opacity; the border is on the side facing the page above.
 .site_foot {
     isolation: isolate;
+    flex-shrink: 0;
+    margin-top: auto;
     padding: .35em 1em;
     font-size: .8em;
     line-height: 1.4;
@@ -4539,10 +4579,14 @@ body::after {
     }
 }
 
-// the fixed bottom tab bar covers the last 3em of the screen: leave that room under the (now short) footer
-@media (orientation: portrait) {
-    .site_foot {
-        margin-bottom: 3em;
+// The final desk shares its viewport with the footer instead of pushing it below the fold.
+#main-content > .desk:last-child {
+    height: calc(100dvh - 2.5em - var(--site-foot-height));
+    min-height: calc(100dvh - 2.5em - var(--site-foot-height));
+
+    @media (orientation: portrait) {
+        height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
+        min-height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
     }
 }
 
@@ -4799,128 +4843,6 @@ body::after {
     filter: drop-shadow(0 0 .35em var(--bg)) drop-shadow(0 0 .9em var(--bg));
 }
 
-// Roles type in, hold (the caret blinks), delete and hand over to the next one: 4s each, 16s loop.
-// Needs a fixed-width face: the text is revealed in steps of one character (clip-path) and the caret moves in ch (translate).
-// Keyframes are generated per length because steps() cannot take a var().
-.landing_role {
-    position: relative;
-    grid-area: 1 / 1;
-    justify-self: start;
-    white-space: nowrap;
-
-    &_text {
-        display: block;
-        clip-path: inset(0 100% 0 0);
-        animation: role_type_17 16s linear infinite 1s;
-    }
-
-    &::after {
-        content: '';
-        position: absolute;
-        inset: 0 auto 0 0;
-        width: .5ch;
-        background: var(--accent);
-        opacity: 0;
-        animation: role_caret_17 16s linear infinite 1s;
-    }
-
-    &:nth-child(2)>&_text {
-        animation-name: role_type_16;
-        animation-delay: 5s;
-    }
-
-    &:nth-child(3)>&_text {
-        animation-name: role_type_19;
-        animation-delay: 9s;
-    }
-
-    &:nth-child(4)>&_text {
-        animation-name: role_type_19;
-        animation-delay: 13s;
-    }
-
-    &:nth-child(2)::after {
-        animation-name: role_caret_16;
-        animation-delay: 5s;
-    }
-
-    &:nth-child(3)::after {
-        animation-name: role_caret_19;
-        animation-delay: 9s;
-    }
-
-    &:nth-child(4)::after {
-        animation-name: role_caret_19;
-        animation-delay: 13s;
-    }
-}
-
-@each $n in (16, 17, 19) {
-    @keyframes role_type_#{$n} {
-        0% {
-            clip-path: inset(0 100% 0 0);
-            animation-timing-function: steps(#{$n}, jump-start);
-        }
-
-        9%,
-        19% {
-            clip-path: inset(0 0 0 0);
-            animation-timing-function: steps(#{$n}, end);
-        }
-
-        24%,
-        100% {
-            clip-path: inset(0 100% 0 0);
-        }
-    }
-
-    @keyframes role_caret_#{$n} {
-        0% {
-            opacity: 1;
-            translate: 0 0;
-            animation-timing-function: steps(#{$n}, jump-start);
-        }
-
-        9% {
-            opacity: 1;
-            translate: #{$n}ch 0;
-            animation-timing-function: step-end;
-        }
-
-        11.5% {
-            opacity: 0;
-            animation-timing-function: step-end;
-        }
-
-        14% {
-            opacity: 1;
-            animation-timing-function: step-end;
-        }
-
-        16.5% {
-            opacity: 0;
-            animation-timing-function: step-end;
-        }
-
-        19% {
-            opacity: 1;
-            translate: #{$n}ch 0;
-            animation-timing-function: steps(#{$n}, end);
-        }
-
-        24% {
-            opacity: 1;
-            translate: 0 0;
-        }
-
-        24.01%,
-        100% {
-            opacity: 0;
-            translate: 0 0;
-        }
-    }
-}
-
 .landing_prompt {
     text-shadow: 0 0 .7em color-mix(in srgb, var(--accent) 55%, transparent);
 }
@@ -4933,20 +4855,13 @@ body::after {
     @include btn-solid;
 }
 
-.landing_chip {
+.landing_contacts {
     @include glass(8px, var(--surface-strong));
     border: 1px solid var(--edge);
     border-radius: var(--r);
-    transition: color .2s, border-color .2s;
-
-    &:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        box-shadow: var(--glow);
-    }
 }
 
-.landing_chip_icon {
+.landing_contact_icon {
     color: var(--accent);
 }
 
@@ -6168,6 +6083,7 @@ body::after {
 // ---- desktop (windows, side panel) -----------------------------------------------------------
 .desk_side {
     background: var(--panel);
+    border-top: 1px solid var(--edge);
     border-right-color: var(--edge);
 
     &_head {
@@ -6634,7 +6550,13 @@ html.desk_dragging {
 }
 
 .desk_side_item_head[data-focused]::before {
+    // Center the focus bar on the parent guide, clear of the item icon.
+    left: calc(.25em - 3px);
     box-shadow: inset 2px 0 var(--accent);
+}
+
+.desk_side_item_head[data-focused] > .desk_side_item_icon::before {
+    visibility: hidden;
 }
 
 // Sticky tree rows must cover the children scrolling under them, including on hover.
@@ -7338,35 +7260,11 @@ html.desk_dragging {
     }
 }
 
-// The scroll range of head_scroll is held in two registered lengths (--r0, --r1) so the menu can change it, see the menu rule below.
-@property --r0 {
-    syntax: '<length>';
-    inherits: false;
-    initial-value: 0px;
-}
-
-@property --r1 {
-    syntax: '<length>';
-    inherits: false;
-    initial-value: 120px;
-}
-
 @supports (animation-timeline: scroll()) {
     #head::before {
         animation: head_scroll linear both, head_fade .9s var(--ease) .1s backwards;
         animation-timeline: scroll(root), auto;
-        animation-range: var(--r0) var(--r1), normal;
-        // closing the menu: the open range is kept for a moment, until the page has its height and scroll position back
-        transition: --r0 0s .15s, --r1 0s .15s;
-    }
-
-    // menu open: the range ends below the top of the page, so the bar is fully on at any scroll position (--hs: 1 covers the case where
-    // the page has become too short to scroll and the scroll timeline is inactive). The animations are not touched, so the intro does not replay.
-    html:has(#head_menu[open]) #head::before {
-        --r0: -2px;
-        --r1: -1px;
-        --hs: 1;
-        transition: none;
+        animation-range: 0px 120px, normal;
     }
 }
 
@@ -7375,8 +7273,7 @@ html.desk_dragging {
         transition: --hs .3s var(--ease);
     }
 
-    html[data-scrolled] #head::before,
-    html:has(#head_menu[open]) #head::before {
+    html[data-scrolled] #head::before {
         --hs: 1;
     }
 }
@@ -7931,50 +7828,6 @@ body:has(#motion_pause:checked) {
 }
 
 
-// ================= PAGE SWAP LOADING (client_spa.ts) =================
-// The old page is blurred while the next one is fetched; the spinner is one div with a round border.
-#head,
-#main-content {
-    transition: filter .25s var(--ease), opacity .25s var(--ease);
-}
-
-// The page being left fades out completely, so it is clear that something is loading; the new content fades back in (the same element, so the
-// transition runs when the class is removed after the swap). The header only stops taking clicks.
-#main-content {
-    @media (prefers-reduced-motion: no-preference) {
-        transition: opacity .25s ease;
-    }
-}
-
-html.spa_loading #head {
-    pointer-events: none;
-}
-
-html.spa_loading #main-content {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.spa_spinner {
-    position: fixed;
-    z-index: 1000;
-    top: 50%;
-    left: 50%;
-    width: 2.6em;
-    height: 2.6em;
-    margin: -1.3em 0 0 -1.3em;
-    border: .28em solid color-mix(in srgb, var(--accent) 25%, transparent);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spa_spin .8s linear infinite;
-}
-
-@keyframes spa_spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 // links installed by client_search.ts replace the state-bound generated ones (.st: hidden unless their own state is the target)
 .expertise.is_searching .dot_a.st,
 .expertise.is_searching .tl_go.st,
@@ -8161,8 +8014,8 @@ html.spa_loading #main-content {
 .desk_wbox_head_navigation {
     display: flex;
     flex: 0 0 auto;
-    position: relative;
-    &::after { content: ''; position: absolute; right: 0; top: 25%; bottom: 25%; border-right: 1px solid var(--edge); }
+    border: 0;
+    background: transparent;
     > button.desk_wbox_head_tool {
         box-sizing: border-box;
         flex: 0 0 1.5rem;
@@ -8184,7 +8037,7 @@ html.spa_loading #main-content {
     flex: 1 1 0;
     min-width: 0;
     height: 1.5rem;
-    border-right: 1px solid var(--edge);
+    border-inline: 1px solid var(--edge);
     > .desk_wbox_head_path {
         position: absolute;
         inset: 0;
@@ -8248,6 +8101,78 @@ html.spa_loading #main-content {
         }
     }
 }
+@media (orientation: portrait) {
+    .desk_wbox_head {
+        display: grid;
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) auto auto auto;
+        grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
+        align-items: center;
+        height: auto;
+        gap: 0;
+
+        > .desk_wbox_head_icon {
+            grid-area: 1 / 1;
+            width: 1.5rem;
+            height: 1.5rem;
+            line-height: 1.5rem;
+            margin: 0;
+            text-align: center;
+        }
+        > .desk_wbox_head_navigation { grid-area: 1 / 2; }
+        > .desk_wbox_head_save { grid-area: 1 / 5; }
+        > .desk_wbox_head_split { grid-area: 1 / 6; }
+        > .desk_wbox_head_drop { grid-area: 1 / 7; }
+        > .desk_wbox_head_tool,
+        > .desk_wbox_head_drop > summary {
+            box-sizing: border-box;
+            width: 1.5rem;
+            min-width: 1.5rem;
+            height: 1.5rem;
+            padding: 0;
+        }
+    }
+
+    // Let the source controls join the header grid, with the URL spanning row two.
+    .desk_wbox_head_source {
+        display: contents;
+
+        > .desk_wbox_head_mime,
+        > .desk_wbox_head_mode {
+            align-self: start;
+            box-sizing: border-box;
+            height: calc(1.5rem + 2px);
+            min-width: 0;
+            max-width: none;
+            border: 1px solid var(--edge);
+            border-bottom: 0;
+            // Overlap the URL's top edge so the two rows share one outline.
+            margin-bottom: -1px;
+            z-index: 1;
+            background: linear-gradient(var(--tint-1), var(--tint-1)), var(--panel-2);
+        }
+        > .desk_wbox_head_mime {
+            grid-area: 1 / 3;
+            border-right: 0;
+            border-radius: var(--r-sm) 0 0 0;
+            > summary { border-radius: var(--r-sm) 0 0 0; }
+        }
+        > .desk_wbox_head_mode {
+            grid-area: 1 / 4;
+            border-radius: 0 var(--r-sm) 0 0;
+            > button.desk_wbox_head_tool:last-child { border-radius: 0 var(--r-sm) 0 0; }
+        }
+        > .desk_wbox_head_address {
+            grid-area: 2 / 1 / 3 / -1;
+            box-sizing: border-box;
+            height: calc(1.5rem + 2px);
+            border: 1px solid var(--edge);
+            border-radius: var(--r-sm);
+            background: linear-gradient(var(--tint-1), var(--tint-1)), var(--panel-2);
+            > .desk_wbox_head_path { border-radius: calc(var(--r-sm) - 1px); }
+        }
+    }
+}
+
 .desk_wbox_body_media_video { grid-area: 2 / 1; }
 .desk_wbox_body_media_head {
     align-items: center;

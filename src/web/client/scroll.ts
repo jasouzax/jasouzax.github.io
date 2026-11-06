@@ -62,7 +62,11 @@ export function init_reveal(): void {
             observer.unobserve(entry.target)
         }
     }, { threshold: [0, 0.25, 0.5] })
-    for (const article of document.querySelectorAll(".article:not(.landing)")) observer.observe(article)
+    for (const article of document.querySelectorAll(".article:not(.landing)")) {
+        const box = article.getBoundingClientRect()
+        if (box.bottom > 0 && box.top < innerHeight) article.classList.add("in", "no_reveal")
+        else observer.observe(article)
+    }
     setTimeout(() => {
         for (const article of document.querySelectorAll(".article:not(.in)")) {
             if (article.getBoundingClientRect().top < innerHeight * 0.75) show(article)

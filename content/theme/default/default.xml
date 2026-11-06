@@ -4,14 +4,6 @@
         /* Japanese: phrase-aware line breaks, and CJK families after the Latin stack (a page declares its language in <html lang>) */
         :root:lang(ja) { line-break: strict; word-break: auto-phrase; }
         :root:lang(ja) body { font-family: Jasouza, ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "DejaVu Sans Mono", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", "Noto Sans CJK JP", "Noto Sans JP", monospace; }
-        #head_tray, #theme_background { display: contents; }
-        .needs_js { display: none; }
-        :root.js .needs_js { display: revert; }
-        .background_entity:nth-of-type(n + 6) { display: none; }
-        .site_foot { scroll-snap-align: end; position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 1em; justify-content: center; }
-        .site_foot a { color: inherit; }
-        .site_foot_note { margin: 0; }
-        .cookie_notice[hidden] { display: none; }
     ]]></style>
     <!-- Jasouza: generated from font.json. Cell 60x100 (letters sit on y=80, descenders reach y=100); icons are 120 wide.
          main_area (the design-grid guide, not a glyph): M 5 10 V 37 H 0 V 45 H 5 L 5 80 L 55 80 V 45 H 60 V 37 H 55 L 55 10 Z  M 67 30 a 4 4 0 1 0 0 0.0001 Z -->

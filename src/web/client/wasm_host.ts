@@ -72,7 +72,7 @@ const norm = (path: string): string => {
 }
 
 export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker_factory = make_worker): Promise<number> {
-    if (typeof SharedArrayBuffer === "undefined") throw new Error("The WASM terminal requires cross-origin isolation. Reload /desk directly using the configured server headers.")
+    if (typeof SharedArrayBuffer === "undefined") throw new Error("The WASM terminal requires cross-origin isolation. Serve the site with its generated COOP and COEP response headers.")
     let active: worker_like | null = null
     let active_control: Int32Array | null = null
     let stopped = false
