@@ -11,7 +11,8 @@ import { available_name, rename_pattern, zip_blob, type zip_entry } from "./desk
 import { can_browse, can_read, can_create, can_move, check_permissions } from "./desk_fs_permissions.ts"
 import { selection_click, type file_selection } from "./desk_selection.ts"
 import { local_file_path } from "./desk_paths.ts"
-import { sync_navigation } from "./desk_navigation.ts"
+import { sync_navigation, remap_navigation } from "./desk_navigation.ts"
+import { home_directory, home_listeners } from "./home_directory.ts"
 
 export type fs_node = {
     name: string
@@ -363,8 +364,12 @@ async function write_blob(handle: file_handle, blob: Blob): Promise<void> {
 }
 
 async function save_file(item: desk_window, handle: file_handle, blob: Blob): Promise<void> {
-    await write_blob(handle, blob)
     const node = await resolve_node(item.path.replace(/^file:\/\//, ""))
+    if (local_file_path(item.path)?.startsWith("/home/user/")) {
+        if (!node?.handle || !can_create(node.parent)) throw new Error(text("files_no_save"))
+        handle = node.handle as file_handle
+    }
+    await write_blob(handle, blob)
     if (node?.parent) await refresh_dir(node.parent)
 }
 
@@ -849,8 +854,9 @@ async function rename_entry(node: fs_node, name: string): Promise<void> {
     if (exists_in(parent, name)) throw new Error(text("files_exists"))
     const handle = node.handle as file_handle | dir_handle
     try {
-        if (typeof handle.move === "function") await handle.move(name)
-        else {
+        let moved = false
+        if (typeof handle.move === "function") try { await handle.move(name); moved = true } catch { /* native folder handles may only support copying */ }
+        if (!moved) {
             await copy_into(handle, parent.handle as dir_handle, name)
             await (parent.handle as dir_handle).removeEntry(node.name, { recursive: true })
         }
@@ -1271,26 +1277,20 @@ function bind_drag(page: HTMLElement): void {
     })
 }
 
-// /home/user is the browser's private file system for this site (OPFS): it is kept between visits, and only this site can see it.
+// Home uses private storage until the visitor connects a local folder.
 async function mount_opfs(root: fs_node): Promise<void> {
     const home = find_node("/home", root)
     const user = find_node("/home/user", root)
     const tmp = find_node("/tmp", root)
-    const storage = navigator.storage as { getDirectory?: () => Promise<dir_handle> } | undefined
     home_node = user
     tmp_node = tmp
     if (tmp) replace_directory(tmp, temporary_files, true)
     if (!home || !user) return
-    if (!storage?.getDirectory) {
-        user.writable = false; user.readable = false; user.children = []
-        redraw()
-        return
-    }
-    user.writable = true
-    user.children = null
     try {
-        const handle = await storage.getDirectory()
-        replace_directory(user, handle, true)
+        const mount = await home_directory()
+        replace_directory(user, mount.handle, mount.writable)
+        user.readable = true; user.content_readable = true; user.write_allowed = mount.writable
+        if (mount.connected) user.info = mount.handle.name
         await load_children(user)
         redraw()
     } catch {
@@ -1300,6 +1300,39 @@ async function mount_opfs(root: fs_node): Promise<void> {
         redraw()
     }
 }
+
+home_listeners.add(async ({ names }) => {
+    if (!shared_root || !home_node) return
+    const remap = (uri: string) => {
+        const path = local_file_path(uri)
+        if (!path?.startsWith("/home/user/")) return uri
+        const [name, ...rest] = path.slice("/home/user/".length).split("/")
+        return `file:///home/user/${names.get(name) ?? name}${rest.length ? "/" + rest.join("/") : ""}`
+    }
+    filesystem_ready = filesystem_ready.then(() => mount_opfs(shared_root!))
+    await filesystem_ready
+    clipboard = []
+    if (tree) {
+        tree.draft = null
+        tree.open = new Set(["/", "/home", "/home/user"])
+        select(home_node, new Set(["/home/user"])); redraw()
+    }
+    for (const item of state.windows) {
+        remap_navigation(item, remap)
+        const path = local_file_path(item.path)
+        if (path !== "/home/user" && !path?.startsWith("/home/user/")) continue
+        item.path = remap(item.path)
+        if (item.file) {
+            const node = await resolve_node(local_file_path(item.path)!)
+            if (node?.kind === "file" && node.handle) {
+                item.name = node.name
+                item.save = blob => save_file(item, node.handle as file_handle, blob)
+            }
+        }
+        sync_navigation(item); item.el.dataset.path = item.path; refresh_tab(item)
+    }
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/home/user" } }))
+})
 
 // A file brought in from outside the tree (dropped on a window) is written to /tmp; the answer is its path in the tree.
 async function store_upload(file: File): Promise<string | null> {

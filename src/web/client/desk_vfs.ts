@@ -233,8 +233,9 @@ export function make_fs(programs: () => string[], uid = 1000): fs_api {
             const target = writable(target_dir)
             const same = target_dir === source.parent
             const handle = source.handle as file_handle | dir_handle
-            if (same && typeof handle.move === "function") await handle.move(name)
-            else {
+            let moved = false
+            if (same && typeof handle.move === "function") try { await handle.move(name); moved = true } catch { /* move is not supported by every native filesystem */ }
+            if (!moved) {
                 const copy = async (from_handle: file_handle | dir_handle, into: dir_handle, new_name: string): Promise<void> => {
                     if (from_handle.kind === "file") {
                         const out = await into.getFileHandle(new_name, { create: true })

@@ -44,6 +44,8 @@ UI translations are string dictionaries at `config.json.languages.en.<id>` (and 
 
 Relative resources resolve from their XML file. Referenced resources are published; arbitrary files under content are not copied. Browser `/home/user` belongs to the visitor. `/srv` contains public published resources. New uploads belong in `/tmp`. Planned server persistence is not implied by a static menu URI.
 
+The account menu's **Connect with Folder** mounts a chosen local folder at `/home/user` through the File System Access API. Existing home entries are copied into it; collisions receive ` (N)` before the extension, and existing directory trees stay intact. Originals remain in private storage as a backup. New files, editor saves, uploads, moves, deletes, shell writes, and preview caches then use the chosen folder directly. Connections are remembered in IndexedDB; a browser may require selecting the folder again to renew access. Missing permission disables file creation instead of falling back to a stale private-storage copy. Browsers without the directory picker show the action disabled. Local folder access requires a secure context, such as HTTPS or localhost.
+
 ## Cloudflare and private nodes
 
 Pages serves generated HTML/CSS/scripts. The central Worker handles `/api`, public R2 media/WASM, subdomain rules and the `/work` shell; public pages continue working if the personal node is offline. The private node currently supports signed health and public Git **read** operations, not pushes, dashboards or agents. Client authentication/chat/receipts remain unchecked in TASKS.md; those APIs return `501` and accept no client data.

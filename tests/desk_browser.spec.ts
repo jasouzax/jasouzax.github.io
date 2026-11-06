@@ -238,7 +238,8 @@ test("window moves preserve the full sidebar and docking previews float above wi
         await expect(preview).toHaveCSS("pointer-events", "none")
         await expect(preview).toHaveCSS("position", "fixed")
         expect(Number(await preview.evaluate(element => getComputedStyle(element).zIndex))).toBeGreaterThan(Number(await second.locator(".desk_wbox_head").evaluate(element => getComputedStyle(element).zIndex)))
-        expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".desk_wbox")?.id, { x, y })).toBe(await second.getAttribute("id"))
+        // Wait for layout and reveal animations before checking pass-through.
+        await expect.poll(() => page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".desk_wbox")?.id, { x, y })).toBe(await second.getAttribute("id"))
         const bounds = (await preview.boundingBox())!
         expect(Math.abs(bounds.width - target.width * (["left", "right"].includes(zone) ? .5 : 1))).toBeLessThanOrEqual(1)
         expect(Math.abs(bounds.height - target.height * (["top", "bottom"].includes(zone) ? .5 : 1))).toBeLessThanOrEqual(1)

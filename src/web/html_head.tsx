@@ -217,6 +217,7 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
         root = chain.find((page) => page.path === "/") ?? ctx.page
     const crumbs = chain.filter((page) => page.path !== "/" || chain.length === 1)
     const account = (
+        <>
         <li class="list_drop_li">
             <button
                 type="button"
@@ -228,6 +229,17 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
                 <span class="sign_text">{t(ctx, "sign_google")}</span>
             </button>
         </li>
+        <li class="list_drop_separator" role="separator" />
+        <li class="list_drop_li needs_js">
+            <button type="button" data-connect-folder="" data-unsupported={t(ctx, "folder_connect_unsupported")}
+                data-connecting={t(ctx, "folder_connecting")} data-connected={t(ctx, "folder_connected")}
+                data-session={t(ctx, "folder_connected_session")} data-failed={t(ctx, "folder_connect_failed")}>
+                {glyph(ctx, "[folder]", "list_drop_icon")}
+                <span>{t(ctx, "folder_connect")}</span>
+            </button>
+        </li>
+        <li class="list_drop_status" data-folder-status="" role="status" aria-live="polite" hidden="true" />
+        </>
     )
     return (
         <header id="head">

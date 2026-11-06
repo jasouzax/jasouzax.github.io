@@ -1,4 +1,5 @@
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
+import { home_directory } from "./home_directory.ts"
 
 const width = 320, height = 200
 const version = "folder-previews-3-dynamic-cards"
@@ -19,7 +20,7 @@ export async function preview_key(path: string, file: File, mime: string): Promi
 
 async function cache_directory(): Promise<FileSystemDirectoryHandle | null> {
     try {
-        const root = await navigator.storage.getDirectory()
+        const root = (await home_directory()).handle as FileSystemDirectoryHandle
         const cache = await root.getDirectoryHandle(".cache", { create: true })
         return await cache.getDirectoryHandle("previews", { create: true })
     } catch { return null }

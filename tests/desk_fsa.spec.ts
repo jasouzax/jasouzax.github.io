@@ -1,0 +1,167 @@
+import { test, expect as base_expect, type Page, type Locator } from "@playwright/test"
+const expect = base_expect.configure({ timeout: 15000 })
+
+// Use native handles in a separate storage bucket so reads, writes, serialization,
+// and restoration exercise the browser API without automating an OS picker.
+async function picker(page: Page) {
+    await page.addInitScript(() => {
+        Object.defineProperty(FileSystemFileHandle.prototype, "move", { configurable: true, value: async () => { throw new DOMException("Native moves unavailable", "NotSupportedError") } })
+        Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: async (options: unknown) => {
+            ;(window as any).picker_options = options
+            return (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        } })
+    })
+}
+async function connect(page: Page) {
+    await page.locator("#head_account > summary").click()
+    await page.getByRole("button", { name: "Connect with Folder", exact: true }).click()
+    await expect(page.locator("[data-folder-status]")).toContainText("Connected to /home/user")
+    await page.locator("#head_account > summary").click()
+}
+async function open(pane: Locator, path: string) {
+    const input = pane.locator(".desk_wbox_head_path")
+    await input.fill(`file://${path}`); await input.press("Enter")
+}
+async function target_text(page: Page, path: string) {
+    return page.evaluate(async path => {
+        let dir = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        const parts = path.split("/")
+        for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part)
+        return (await (await dir.getFileHandle(parts.at(-1))).getFile()).text()
+    }, path)
+}
+
+test("connecting home preserves conflicts, editor drafts, previews and the saved connection", async ({ page }) => {
+    test.setTimeout(120000)
+    await picker(page)
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const original = await navigator.storage.getDirectory()
+        const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        const write = async (dir: FileSystemDirectoryHandle, name: string, data: string) => {
+            const stream = await (await dir.getFileHandle(name, { create: true })).createWritable()
+            await stream.write(data); await stream.close()
+        }
+        await write(original, "notes.txt", "original notes")
+        await write(await original.getDirectoryHandle("project", { create: true }), "main.c", "int x;")
+        await write(chosen, "notes.txt", "existing chosen notes")
+        await write(chosen, "notes (1).txt", "another existing note")
+        await write(await chosen.getDirectoryHandle("project", { create: true }), "README.txt", "existing project")
+    })
+    const pane = page.locator(".desk_wbox").first()
+    await open(pane, "/home/user/notes.txt")
+    await expect(pane.locator(".desk_wbox_body_text_input")).toHaveValue("original notes")
+    await pane.locator('[data-mode="edit"]').click()
+    await pane.locator(".desk_wbox_body_text_input").fill("unsaved draft")
+    await connect(page)
+    expect(await page.evaluate(() => (window as any).picker_options)).toEqual({ id: "jazu-home", mode: "readwrite" })
+    await expect(pane.locator(".desk_wbox_head_path")).toHaveValue("file:///home/user/notes (2).txt")
+    await expect(pane.locator(".desk_wbox_body_text_input")).toHaveValue("unsaved draft")
+    await pane.locator(".desk_wbox_head_save").click()
+    await expect.poll(() => target_text(page, "notes (2).txt")).toBe("unsaved draft")
+    expect(await target_text(page, "notes.txt")).toBe("existing chosen notes")
+    expect(await target_text(page, "notes (1).txt")).toBe("another existing note")
+    expect(await target_text(page, "project (1)/main.c")).toBe("int x;")
+    expect(await target_text(page, "project/README.txt")).toBe("existing project")
+    expect(await page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle("notes.txt")).getFile()).text())).toBe("original notes")
+    await open(pane, "/home/user")
+    await expect(pane.locator('.desk_folder_tile[data-path="/home/user/notes (2).txt"] .desk_folder_text')).toContainText("unsaved draft")
+    await expect.poll(() => page.evaluate(async () => {
+        const root = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        const dir = await (await root.getDirectoryHandle(".cache")).getDirectoryHandle("previews")
+        let count = 0; for await (const file of dir.values()) count++
+        return count
+    })).toBeGreaterThan(0)
+    await page.reload()
+    await open(pane, "/home/user")
+    await expect(pane.locator('.desk_folder_tile[data-path="/home/user/notes (2).txt"]')).toBeVisible()
+    await connect(page)
+    // Selecting the same directory must not re-import stale private storage.
+    await expect(pane.locator('.desk_folder_tile[data-path="/home/user/notes (3).txt"]')).toHaveCount(0)
+    expect(await target_text(page, "notes (2).txt")).toBe("unsaved draft")
+})
+
+test("account connection works outside the desk and all file operations write through", async ({ page }) => {
+    test.setTimeout(120000)
+    await picker(page)
+    await page.goto("/")
+    await page.locator("#head_account > summary").click()
+    await expect(page.locator("#head_account [role=separator]")).toBeVisible()
+    await page.locator("#head_account > summary").click()
+    await connect(page)
+    await page.goto("/desk")
+    const pane = page.locator(".desk_wbox").first()
+    await open(pane, "/home/user")
+    const background = () => pane.locator(".desk_folder_grid").click({ button: "right", position: { x: 8, y: 8 } })
+    const action = (name: string) => page.getByRole("menuitem", { name, exact: true })
+    const form = pane.locator(".desk_folder_form")
+    const tile = (name: string) => pane.locator(`.desk_folder_tile[data-path="/home/user/${name}"]`)
+    await background(); await action("New folder").click()
+    await form.locator("input").fill("created"); await form.locator("input").press("Enter")
+    await expect(tile("created")).toBeVisible()
+    // Use the status background below the tiles for the upload menu.
+    await pane.locator(".desk_folder_status").click({ button: "right" })
+    const chooser = page.waitForEvent("filechooser"); await action("Upload").click()
+    await (await chooser).setFiles({ name: "upload.txt", mimeType: "text/plain", buffer: Buffer.from("uploaded live") })
+    await expect(tile("upload.txt")).toBeVisible()
+    expect(await target_text(page, "upload.txt")).toBe("uploaded live")
+    await tile("upload.txt").click({ button: "right" }); await action("Rename").click()
+    await form.locator("input").fill("renamed.txt"); await form.locator("input").press("Enter")
+    await expect(tile("renamed.txt")).toBeVisible()
+    await tile("renamed.txt").click({ button: "right" }); await action("Cut").click()
+    await tile("created").click({ button: "right" }); await action("Paste").click()
+    await expect(tile("renamed.txt")).toHaveCount(0)
+    expect(await target_text(page, "created/renamed.txt")).toBe("uploaded live")
+    await page.locator("#head_new").click()
+    await page.locator(".desk_wbox").last().getByRole("button", { name: "Open terminal", exact: true }).click()
+    const screen = page.locator(".xterm-rows")
+    await expect(screen).toContainText("user@jasouza:")
+    await page.locator(".xterm-helper-textarea").pressSequentially("echo shell-live > /home/user/shell.txt; rm /home/user/created/renamed.txt; echo FSA_DONE")
+    await page.keyboard.press("Enter")
+    await expect(screen.locator(":scope > div").filter({ hasText: /^FSA_DONE\s*$/ })).toBeVisible({ timeout: 30000 })
+    expect(await target_text(page, "shell.txt")).toBe("shell-live\n")
+    expect(await page.evaluate(async () => {
+        const dir = await (await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()).getDirectoryHandle("created")
+        try { await dir.getFileHandle("renamed.txt"); return true } catch { return false }
+    })).toBe(false)
+    await page.reload(); await open(pane, "/home/user")
+    await expect(tile("shell.txt")).toBeVisible()
+})
+
+test("cancelled and unsupported folder pickers leave home intact", async ({ page }) => {
+    await page.addInitScript(() => Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: async () => { throw new DOMException("Cancelled", "AbortError") } }))
+    await page.goto("/desk")
+    await page.locator("#head_account > summary").click()
+    const button = page.getByRole("button", { name: "Connect with Folder", exact: true })
+    await button.click(); await expect(button).toBeEnabled()
+    await expect(page.locator("[data-folder-status]")).toBeHidden()
+    await page.addInitScript(() => Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: undefined }))
+    await page.reload(); await page.locator("#head_account > summary").click()
+    await expect(button).toBeDisabled()
+    await expect(button).toHaveAttribute("title", /does not support/)
+})
+
+test("revoked connection permissions disable creation without restoring stale private files", async ({ page }) => {
+    await picker(page)
+    await page.addInitScript(() => {
+        const query = (FileSystemDirectoryHandle.prototype as any).queryPermission
+        ;(FileSystemDirectoryHandle.prototype as any).queryPermission = async function(options: unknown) {
+            const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+            if (sessionStorage.getItem("revoke-home") && await this.isSameEntry(chosen)) return "denied"
+            return query.call(this, options)
+        }
+    })
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const stream = await (await (await navigator.storage.getDirectory()).getFileHandle("stale.txt", { create: true })).createWritable()
+        await stream.write("private original"); await stream.close()
+    })
+    await connect(page)
+    await page.evaluate(() => sessionStorage.setItem("revoke-home", "1"))
+    await page.reload()
+    await open(page.locator(".desk_wbox").first(), "/home/user")
+    await expect(page.locator(".desk_folder_status")).toContainText("Access to this folder was not allowed.")
+    await expect(page.locator('.desk_folder_tile[data-path="/home/user/stale.txt"]')).toHaveCount(0)
+    await page.locator("#head_menu > summary").click()
+    for (const name of ["New file", "New folder", "Paste", "Upload"]) await expect(page.locator(".desk_files_bar").getByRole("button", { name, exact: true })).toBeDisabled()
+})

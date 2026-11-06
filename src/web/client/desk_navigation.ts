@@ -6,6 +6,10 @@ type history = { entries: string[], index: number }
 const histories = new WeakMap<desk_window, history>()
 const actions = new WeakMap<desk_window, (action: string) => void>()
 export function navigate_window(item: desk_window, action: "previous" | "refresh" | "forward"): void { actions.get(item)?.(action) }
+export function remap_navigation(item: desk_window, remap: (uri: string) => string): void {
+    const history = histories.get(item)
+    if (history) history.entries = history.entries.map(remap)
+}
 
 export function url_parts(uri: string): { scheme: string, parts: { label: string, uri: string }[] } {
     const match = uri.match(/^([a-z][a-z\d+.-]*:(?:\/\/)?)(.*)$/i)
