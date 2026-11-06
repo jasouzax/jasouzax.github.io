@@ -8254,6 +8254,78 @@ html.spa_loading #main-content {
         }
     }
 }
+@media (orientation: portrait) {
+    .desk_wbox_head {
+        display: grid;
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) auto auto auto;
+        grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
+        align-items: center;
+        height: auto;
+        gap: 0;
+
+        > .desk_wbox_head_icon {
+            grid-area: 1 / 1;
+            width: 1.5rem;
+            height: 1.5rem;
+            line-height: 1.5rem;
+            margin: 0;
+            text-align: center;
+        }
+        > .desk_wbox_head_navigation { grid-area: 1 / 2; }
+        > .desk_wbox_head_save { grid-area: 1 / 5; }
+        > .desk_wbox_head_split { grid-area: 1 / 6; }
+        > .desk_wbox_head_drop { grid-area: 1 / 7; }
+        > .desk_wbox_head_tool,
+        > .desk_wbox_head_drop > summary {
+            box-sizing: border-box;
+            width: 1.5rem;
+            min-width: 1.5rem;
+            height: 1.5rem;
+            padding: 0;
+        }
+    }
+
+    // Let the source controls join the header grid, with the URL spanning row two.
+    .desk_wbox_head_source {
+        display: contents;
+
+        > .desk_wbox_head_mime,
+        > .desk_wbox_head_mode {
+            align-self: start;
+            box-sizing: border-box;
+            height: calc(1.5rem + 2px);
+            min-width: 0;
+            max-width: none;
+            border: 1px solid var(--edge);
+            border-bottom: 0;
+            // Overlap the URL's top edge so the two rows share one outline.
+            margin-bottom: -1px;
+            z-index: 1;
+            background: linear-gradient(var(--tint-1), var(--tint-1)), var(--panel-2);
+        }
+        > .desk_wbox_head_mime {
+            grid-area: 1 / 3;
+            border-right: 0;
+            border-radius: var(--r-sm) 0 0 0;
+            > summary { border-radius: var(--r-sm) 0 0 0; }
+        }
+        > .desk_wbox_head_mode {
+            grid-area: 1 / 4;
+            border-radius: 0 var(--r-sm) 0 0;
+            > button.desk_wbox_head_tool:last-child { border-radius: 0 var(--r-sm) 0 0; }
+        }
+        > .desk_wbox_head_address {
+            grid-area: 2 / 1 / 3 / -1;
+            box-sizing: border-box;
+            height: calc(1.5rem + 2px);
+            border: 1px solid var(--edge);
+            border-radius: var(--r-sm);
+            background: linear-gradient(var(--tint-1), var(--tint-1)), var(--panel-2);
+            > .desk_wbox_head_path { border-radius: calc(var(--r-sm) - 1px); }
+        }
+    }
+}
+
 .desk_wbox_body_media_video { grid-area: 2 / 1; }
 .desk_wbox_body_media_head {
     align-items: center;

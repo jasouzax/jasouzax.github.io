@@ -630,6 +630,45 @@ test("Media connects audio playback, seeking, volume and speed controls", async 
     await expect.poll(() => window.locator("audio").evaluate((media: HTMLAudioElement) => media.playbackRate)).toBe(1.5)
 })
 
+test("portrait window headers keep controls above a full-width joined URL field", async ({ page }) => {
+    await page.goto("/desk")
+    const head = page.locator(".desk_wbox_head").first()
+    const mime = head.locator(".desk_wbox_head_mime")
+    await mime.locator("summary").evaluate(element => { element.textContent = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+    for (const width of [320, 390, 560, 768]) {
+        await page.setViewportSize({ width, height: 1000 })
+        const address = head.locator(".desk_wbox_head_address")
+        const url = (await address.boundingBox())!
+        const bounds = (await head.boundingBox())!
+        const controls = ["icon", "navigation", "mime", "mode", "save", "split", "drop"]
+        let previousRight = url.x
+        for (const name of controls) {
+            const rect = (await head.locator(`.desk_wbox_head_${name}`).boundingBox())!
+            expect(rect.x).toBeGreaterThanOrEqual(previousRight - 1)
+            expect(rect.y + rect.height).toBeLessThanOrEqual(url.y + 1)
+            expect(rect.y).toBeLessThan(url.y)
+            expect(rect.x + rect.width).toBeLessThanOrEqual(url.x + url.width + 1)
+            previousRight = rect.x + rect.width
+        }
+        expect(url.width).toBeGreaterThan(bounds.width - 10)
+        await expect(address).toHaveCSS("border-top-left-radius", "4px")
+        await expect(address).toHaveCSS("border-bottom-right-radius", "4px")
+        for (const name of ["mime", "mode"]) {
+            await expect(head.locator(`.desk_wbox_head_${name}`)).toHaveCSS("border-bottom-width", "0px")
+        }
+        for (const button of await head.locator(".desk_wbox_head_navigation button, .desk_wbox_head_mode button, :scope > button").all()) {
+            const rect = (await button.boundingBox())!
+            expect(rect.width).toBe(24)
+            expect(rect.height).toBe(24)
+        }
+        if (width === 390) await head.screenshot({ path: ".cache/desk-browser-results/portrait-header.png" })
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    const url = (await head.locator(".desk_wbox_head_address").boundingBox())!
+    const type = (await mime.boundingBox())!
+    expect(Math.abs(url.y - type.y)).toBeLessThanOrEqual(1)
+})
+
 test("mode buttons stay square and video controls fit a narrow window", async ({ page }) => {
     await page.goto("/desk")
     const window = page.locator(".desk_wbox").first()
