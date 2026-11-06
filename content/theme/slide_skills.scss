@@ -7,8 +7,14 @@
 .expertise .pin.st { pointer-events: none !important; }
 .expertise .slide:has(> .pin:target) { animation: none !important; }
 
-// Variations share a grid cell inside one carousel slide. Only their paint fades;
-// the outgoing card leaves layout immediately while it finishes fading away.
+// The shared card, heading, role/date and skill tabs stay outside this content grid.
+.expertise .slide_variations {
+    display: grid;
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
 @mixin variant_hidden {
     position: absolute;
     inset: 0;
@@ -25,7 +31,8 @@
 }
 .expertise .slide_variant {
     @include variant_hidden;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     grid-area: 1 / 1;
     min-width: 0;
     min-height: 0;
@@ -46,25 +53,30 @@
 }
 
 .expertise .slide_card:has(.slide_skills) {
+    position: relative;
     padding-inline: .8em;
     padding-bottom: 0;
 }
 
-.expertise .slide_foot:has(.slide_skills) {
+.expertise .slide_card:has(.slide_skills) .slide_foot {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(2.6em, auto);
     align-items: end;
     gap: .4em .6em;
 
     .slide_tags { grid-column: 1 / -1; }
-    .slide_actions { margin: 0 0 .6em; }
+    .slide_actions { grid-column: 2; grid-row: 2; margin: 0 0 .6em; }
 }
 
 .expertise .slide_skills {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     display: flex;
+    max-width: 60%;
     min-width: 0;
     overflow-x: auto;
-    margin-left: -.8em;
     align-self: stretch;
     scrollbar-width: thin;
 }
@@ -86,6 +98,13 @@
 // Highlight the current skill with CSS too, so fragment navigation works without JS.
 @mixin active { color: var(--text); background: transparent; }
 .expertise .slide_skill.is_default { @include active; }
+.expertise.is_searching .slide_skills {
+    .slide_skill {
+        color: var(--text-dim);
+        background: linear-gradient(to bottom, color-mix(in srgb, var(--text) 14%, transparent), transparent 65%);
+    }
+    .slide_skill[aria-current="true"] { @include active; }
+}
 
 @function escaped($value) {
     $index: string.index($value, "/");
@@ -116,9 +135,10 @@
 }
 
 @media (max-width: 480px) {
-    .expertise .slide_foot:has(.slide_skills) {
+    .expertise .slide_card:has(.slide_skills) .slide_foot {
         grid-template-columns: minmax(0, 1fr);
-        .slide_actions { grid-row: 2; justify-self: end; }
-        .slide_skills { grid-row: 3; margin-right: -.8em; }
+        padding-bottom: 2.6em;
+        .slide_actions { grid-column: 1; grid-row: 2; justify-self: end; }
     }
+    .expertise .slide_skills { max-width: 100%; }
 }

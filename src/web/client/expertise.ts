@@ -129,7 +129,10 @@ function update_slide_skills(): void {
     const state = nav_state()
     for (const nav of document.querySelectorAll<HTMLElement>(".slide_skills")) {
         const links = [...nav.querySelectorAll<HTMLAnchorElement>(".slide_skill")]
-        const active = links.find(link => link.dataset.skill === state)
+        const search_variant = nav.closest(".expertise.is_searching")
+            ? nav.closest(".slide")?.querySelector<HTMLElement>(".search_variant") : null
+        const selected = search_variant?.dataset.variantStates?.split(" ")
+        const active = (selected ? links.find(link => selected.includes(link.dataset.skill ?? "")) : links.find(link => link.dataset.skill === state))
             ?? links.find(link => link.dataset.skill === nav.dataset.defaultSkill)
         for (const link of links) {
             if (link === active) link.setAttribute("aria-current", "true")

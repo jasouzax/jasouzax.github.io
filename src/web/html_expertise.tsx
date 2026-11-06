@@ -523,25 +523,18 @@ function render_slide(ctx: render_ctx, data: expertise_model, entry: entry, vari
         )
         return [next, prev]
     })
-    const preferred = variations.find(item => item.states.includes(default_state)) ?? variations[0]
-    const cards = variations.map(item => (
-        <section class={`slide_variant ${item.states.map(state => `variant_in_${state}`).join(" ")}${item === preferred ? " variant_default" : ""}`}
-            data-variant-states={item.states.join(" ")}>
-            {render_slide_card(ctx, data, item)}
-        </section>
-    ))
     return (
         <>
             <article class={`slide ${gate_classes(entry)}`} data-project={entry.id}>
                 {pins}
                 {arrows}
-                {cards}
+                {render_slide_card(ctx, data, entry, variations)}
             </article>
         </>
     )
 }
 
-function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry): html {
+function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry, variations: entry[]): html {
     const open = entry.href ? (
         <>
             <a
@@ -576,23 +569,25 @@ function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry)
             </p>
         </>
     )
-    const foot = (
-        <>
-            <div class={"slide_foot"}>
-                {render_tags(ctx, data, entry)}
-                {render_slide_skills(ctx, data, entry)}
-                {render_actions(ctx, entry)}
+    const preferred = variations.find(item => item.states.includes(default_state)) ?? variations[0]
+    const contents = variations.map(item => (
+        <section class={`slide_variant ${item.states.map(state => `variant_in_${state}`).join(" ")}${item === preferred ? " variant_default" : ""}`}
+            data-variant-states={item.states.join(" ")}>
+            {render_media(ctx, item)}
+            <p class="slide_desc">{item.desc}</p>
+            <div class="slide_foot">
+                {render_tags(ctx, data, item)}
+                {render_actions(ctx, item)}
             </div>
-        </>
-    )
+        </section>
+    ))
     return (
         <>
             <div class={"slide_card"}>
                 {top}
                 {role}
-                {render_media(ctx, entry)}
-                <p class={"slide_desc"}>{entry.desc}</p>
-                {foot}
+                <div class="slide_variations">{contents}</div>
+                {render_slide_skills(ctx, data, preferred)}
             </div>
         </>
     )
