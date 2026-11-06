@@ -33,6 +33,7 @@ for (const mode of ["light", "dark"] as const) {
         expect(await page.locator(".loading_placeholder").evaluateAll(elements => elements.map(element => element.getBoundingClientRect().toJSON()))).toEqual(boxes)
         await expect(page.locator("html")).toHaveCSS("background-color", mode === "dark" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)")
         await expect(page.locator("#head_signature")).toBeVisible()
+        await expect(page.locator("#head_path_logo")).toHaveCSS("filter", mode === "dark" ? /drop-shadow\(rgb\(0, 0, 0\)/ : /drop-shadow\(rgb\(255, 255, 255\)/)
         expect(errors).toEqual([])
         await page.screenshot({ path: `.cache/loading-${mode}.png` })
         release()
@@ -48,6 +49,7 @@ for (const mode of ["light", "dark"] as const) {
         await expect(page.locator(".landing_lead").first()).not.toHaveCSS("color", "rgba(0, 0, 0, 0)")
         await expect(page.locator("h1")).toHaveCSS("background-clip", "text")
         await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
+        await expect(page.locator("#head_path_logo")).toHaveCSS("filter", "none")
     })
 }
 
@@ -256,3 +258,46 @@ for (const theme of ["default", "memory"]) {
         for (const error of samples.errors) expect(error).toBeLessThan(1)
     })
 }
+
+
+test("one signature draws at the center before shrinking into the header", async ({ page }) => {
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route("**/assets/themes/default/*.css", async route => { await gate; await route.continue() })
+    await page.goto("/", { waitUntil: "commit" })
+    const signature = page.locator("#head_path_logo")
+    await expect(signature).toHaveCSS("position", "fixed")
+    await expect(signature).toHaveCount(1)
+    await expect(page.locator("#signature_intro")).toHaveCount(0)
+    await expect(signature).toHaveCSS("transform", "none")
+    await expect.poll(async () => {
+        const rect = (await signature.boundingBox())!
+        return Math.abs(rect.width - 250) + Math.abs(rect.x + rect.width / 2 - 720) + Math.abs(rect.y + rect.height / 2 - 500)
+    }).toBeLessThan(1)
+    await page.evaluate(() => { (window as any).intro_signature = document.getElementById("head_path_logo") })
+    await expect(page.locator(".loading_placeholder").first()).toBeVisible()
+    const drawing = await signature.evaluate(element => {
+        const svg = element as unknown as SVGSVGElement
+        const effects = svg.getAnimations({ subtree: true }).map(animation => animation.effect as KeyframeEffect)
+        const paths = effects.map(effect => effect.getKeyframes()).filter(frames => frames.some(frame => "d" in frame))
+        return { tags: svg.querySelectorAll("animate").length, paths: paths.length,
+            morphs: paths.every(frames => frames[0].d !== frames[frames.length - 1].d) }
+    })
+    expect(drawing.tags).toBeGreaterThan(0)
+    expect(drawing.paths).toBe(drawing.tags)
+    expect(drawing.morphs).toBe(true)
+    release()
+    await expect.poll(() => signature.evaluate(element =>
+        getComputedStyle(element).position !== "fixed" && element.getAnimations().some(animation => animation.playState === "running")), { intervals: [25] }).toBe(true)
+    await ready(page)
+    await expect(signature).toHaveCount(1)
+    const header = (await signature.boundingBox())!
+    expect(header.width).toBeLessThan(100)
+    expect(header.y + header.height).toBeLessThan(40)
+    expect(await page.evaluate(() => (window as any).intro_signature === document.getElementById("head_path_logo"))).toBe(true)
+    await page.locator('.site_foot a[href="/privacy"]').evaluate((link: HTMLAnchorElement) => link.click())
+    await expect(page).toHaveURL(/\/privacy$/)
+    await ready(page)
+    await expect(signature).not.toHaveCSS("position", "fixed")
+    await expect(page.locator("#signature_intro")).toHaveCount(0)
+})

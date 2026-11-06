@@ -1,5 +1,5 @@
 type loading_state = { owners: Set<string>; revision: number }
-type loading_window = Window & { jazu_loading?: loading_state; jazu_boot_css?: Promise<void> }
+type loading_window = Window & { jazu_loading?: loading_state; jazu_boot_css?: Promise<void>; jazu_signature_done?: Promise<void> }
 const state = (): loading_state => (window as loading_window).jazu_loading ??= { owners: new Set(), revision: 0 }
 export const motion_reduced = (): boolean => matchMedia("(prefers-reduced-motion: reduce)").matches || !!document.querySelector("#motion_pause:checked")
 const delay = (ms: number): Promise<void> => new Promise(done => setTimeout(done, ms))
@@ -13,6 +13,66 @@ function busy(value: boolean): void {
 }
 
 const content_targets = "#main-content, #head > :not(#head_signature):not(#head_tray), #head_tray > *, .site_foot"
+
+// Keep the original SVG attached throughout: its drawing timeline and identity
+// survive the switch from fixed center positioning back to the header layout.
+export function start_signature_intro(): void {
+    const source = document.getElementById("head_path_logo")
+    const host = window as loading_window
+    if (!(source instanceof SVGSVGElement) || !document.documentElement.hasAttribute("data-signature-intro") || host.jazu_signature_done) return
+    const seconds = (value: string | null): number => value ? parseFloat(value) * (value.endsWith("ms") ? .001 : 1) : 0
+    const end = Math.max(0, ...Array.from(source.querySelectorAll("animate,set"), animation =>
+        seconds(animation.getAttribute("begin")) + seconds(animation.getAttribute("dur")))) + .05
+    source.pauseAnimations()
+    source.setCurrentTime(0)
+    // Native SMIL clocks stay at zero until window.load in Chromium. Play the
+    // existing tags' frames on their original paths while resources are pending.
+    const drawing: Animation[] = []
+    for (const tag of source.querySelectorAll("animate,set")) {
+        const target = tag.parentElement
+        if (!target) continue
+        const begin = seconds(tag.getAttribute("begin")) * 1000
+        const reduced = motion_reduced()
+        if (tag.getAttribute("attributeName") === "d") {
+            const values = tag.getAttribute("values")?.split(";") ?? []
+            const offsets = tag.getAttribute("keyTimes")?.split(";").map(Number)
+            const frames = values.map((value, index) => ({ d: `path(${JSON.stringify(value)})`, offset: offsets?.[index] ?? index / Math.max(1, values.length - 1) }))
+            if (!frames.length) continue
+            drawing.push(target.animate(reduced ? [frames[frames.length - 1]] : frames, { duration: reduced ? 0 : seconds(tag.getAttribute("dur")) * 1000, delay: reduced ? 0 : begin, fill: "forwards" }))
+        } else if (tag.getAttribute("attributeName") === "visibility") {
+            drawing.push(target.animate([{ visibility: tag.getAttribute("to") ?? "visible" }], { duration: 0, delay: reduced ? 0 : begin, fill: "forwards" }))
+        }
+    }
+    host.jazu_signature_done = Promise.allSettled(drawing.map(animation => animation.finished)).then(() => {})
+    // Once the native clock is available, freeze its completed drawing and drop
+    // the temporary playback effects. The SVG and its animate tags stay intact.
+    const settle = async (): Promise<void> => {
+        await host.jazu_signature_done
+        await new Promise<void>(done => requestAnimationFrame(() => done()))
+        source.setCurrentTime(end)
+        drawing.forEach(animation => animation.cancel())
+    }
+    if (document.readyState === "complete") void settle()
+    else window.addEventListener("load", () => { void settle() }, { once: true })
+}
+
+async function finish_signature_intro(): Promise<void> {
+    const root = document.documentElement
+    if (!root.hasAttribute("data-signature-intro")) return
+    await (window as loading_window).jazu_signature_done
+    const source = document.getElementById("head_path_logo")
+    let shrink: Animation | null = null
+    if (source && !motion_reduced()) {
+        shrink = source.animate([{ transform: "scale(1)" }, { transform: "scale(0)" }], { duration: 280, easing: "ease-in", fill: "forwards" })
+        await shrink.finished
+    }
+    // The completed shrink keeps the SAME SVG at zero while fixed positioning
+    // is removed. Its header entrance starts at zero in the same paint frame.
+    delete root.dataset.signatureIntro
+    const enter = source && !motion_reduced() ? source.animate([{ transform: "scale(0)" }, { transform: "scale(1)" }], { duration: 300, easing: "cubic-bezier(.22,.8,.2,1)", fill: "both" }) : null
+    shrink?.cancel()
+    if (enter) { await enter.finished; enter.cancel() }
+}
 
 export function capture_skeleton(): void {
     if (document.getElementById("loading_overlay")) return
@@ -101,6 +161,7 @@ export async function finish_loading(owner: string): Promise<void> {
     // Fade the neutral canvas into the skin's base color before starting WebGL.
     root.dataset.skeleton = "revealing"
     overlay?.classList.add("background_fade")
+    const signature_intro = finish_signature_intro()
     const animations: Animation[] = []
     if (!motion_reduced()) {
         for (const target of document.querySelectorAll<HTMLElement>(content_targets)) {
@@ -116,7 +177,7 @@ export async function finish_loading(owner: string): Promise<void> {
             { maskImage: "linear-gradient(135deg,transparent 40%,#000 60%)", maskSize: "300% 300%", maskPosition: "0% 0%" }
         ], { duration: 500, fill: "both", easing: "ease-in-out" }))
     }
-    await delay(motion_reduced() ? 0 : 700)
+    await Promise.all([delay(motion_reduced() ? 0 : 700), signature_intro])
     if (revision !== shared.revision) { animations.forEach(animation => animation.cancel()); return }
     animations.forEach(animation => animation.cancel())
     overlay?.remove()

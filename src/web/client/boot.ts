@@ -1,11 +1,13 @@
-import { capture_skeleton } from "./loading.ts"
+import { capture_skeleton, start_signature_intro } from "./loading.ts"
 const root = document.documentElement
 root.classList.add("js")
 root.dataset.skeleton = "loading"
+root.dataset.signatureIntro = ""
 const skeleton_observer = new MutationObserver(() => {
     if (!document.querySelector(".site_foot")) return
     skeleton_observer.disconnect()
     capture_skeleton()
+    start_signature_intro()
 })
 skeleton_observer.observe(document.documentElement, { childList: true, subtree: true })
 const boot_window = window as Window & { jazu_boot_css?: Promise<void> }
@@ -44,6 +46,7 @@ setTimeout(() => root.classList.remove("intro"), 1500)
 setTimeout(() => {
     if (!root.classList.contains("theme_ready")) {
         document.getElementById("loading_overlay")?.remove()
+        delete root.dataset.signatureIntro
         delete root.dataset.skeleton
         const main = document.getElementById("main-content")
         if (main) { main.inert = false; main.setAttribute("aria-busy", "false") }

@@ -16,6 +16,9 @@ export const skeleton_css = `
 :root.js:not(.intro) #head_signature { animation: none !important; }
 .loading_settled :is(.landing_panel > *, .landing_scroll, .expertise_head,.expertise_box,.desk_wbox,.desk_side),
 .article.no_reveal :is(.expertise_head,.expertise_box,.desk_wbox,.desk_side) { animation: none !important; }
+#head_path_logo { transform-box: view-box; transform-origin: center; }
+:root[data-signature-intro] #head_signature::before { content: ''; display: block; width: calc(2em * 19 / 6.4); height: 2em; }
+:root[data-signature-intro] #head_path_logo { position: fixed !important; left: 50vw !important; top: 50vh !important; translate: -50% -50% !important; width: 25vmin !important; height: auto !important; max-width: none !important; z-index: 1003; color: var(--text, var(--loading-ink)); filter: drop-shadow(0 0 2px var(--loading-bg)) drop-shadow(0 0 6px var(--loading-bg)) drop-shadow(0 0 12px var(--loading-bg)) !important; }
 #loading_overlay { position: fixed; inset: 0; z-index: 999; pointer-events: none; overflow: hidden; animation: skeleton_enter .3s ease both; }
 #loading_overlay::before { content: ''; position: absolute; inset: 0; background: var(--loading-bg); transition: opacity .45s ease; }
 #loading_overlay.background_fade::before { opacity: 0; }
@@ -26,6 +29,6 @@ export const skeleton_css = `
 @keyframes skeleton_enter { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { #loading_overlay, .loading_shapes::after { animation: none; } #loading_overlay::before { transition: none; } }
 :root:has(#motion_pause:checked) .loading_shapes::after { animation: none; }
-@media print { #loading_overlay { display: none; } :root[data-skeleton="loading"] :is(#main-content,.site_foot,#head > *,#head_tray > *) { visibility: visible !important; } }
+@media print { :root[data-signature-intro] #head_path_logo { position: static !important; translate: none !important; width: auto !important; height: 2em !important; } #loading_overlay { display: none; } :root[data-skeleton="loading"] :is(#main-content,.site_foot,#head > *,#head_tray > *) { visibility: visible !important; } }
 }
 `
