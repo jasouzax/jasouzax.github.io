@@ -465,6 +465,11 @@ function render_actions(ctx: render_ctx, entry: entry): html {
                 </>
             )
         })
+    buttons.push(...(entry.actions ?? []).map((action, index) => (
+        <a class={`btn${action.primary || (buttons.length === 0 && index === 0) ? " primary" : ""}`} {...link_attrs(ctx, action.link)}>
+            {glyph(ctx, action.icon)}{action.text}
+        </a>
+    )))
     if (buttons.length === 0) return ""
     return (
         <>
@@ -577,7 +582,6 @@ function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry,
             <p class="slide_desc">{item.desc}</p>
             <div class="slide_foot">
                 {render_tags(ctx, data, item)}
-                {render_actions(ctx, item)}
             </div>
         </section>
     ))
@@ -587,7 +591,10 @@ function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry,
                 {top}
                 {role}
                 <div class="slide_variations">{contents}</div>
-                {render_slide_skills(ctx, data, preferred)}
+                <div class="slide_shared_foot">
+                    {render_slide_skills(ctx, data, preferred)}
+                    {render_actions(ctx, entry)}
+                </div>
             </div>
         </>
     )

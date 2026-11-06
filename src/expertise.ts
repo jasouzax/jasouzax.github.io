@@ -22,6 +22,7 @@ export type bar = {
 }
 
 export type entry = {
+    actions?: { text: string, link: string, icon: string, primary: boolean }[]
     id: string, name: string, short: string, note: string, role: string, sub: string, desc: string
     date_label: string, at: number, lane: number, ord: number
     media: string, poster: string, alt: string, website: string, paper: string, event: string, source: string
@@ -200,6 +201,9 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
                 skill: skills.join(","), featured: slide === featured && page.node.attrs.featured === "true" ? "true" : "false" }
             const entry = entry_from_page(model, { ...page, info: attrs.info, node: { ...page.node, attrs } }, lang, state_ids, add_stack)
             if (entry) {
+                entry.actions = child_nodes(object!, "action").map(action => ({
+                    text: action.attrs.text, link: action.attrs.link, icon: action.attrs.icon ?? "", primary: is_true(action.attrs.primary),
+                }))
                 entries.push(entry)
             }
         }

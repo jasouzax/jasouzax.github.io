@@ -17,6 +17,8 @@ import { build_font } from "../src/font_build.ts"
 import { render_expertise } from "../src/web/html_expertise.tsx"
 import { to_html } from "../src/web/vnode.tsx"
 import { parseHTML } from "linkedom"
+import { parse_xml } from "../src/xml.ts"
+import { validate_roots } from "../src/schema.ts"
 
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), "jazu_test_"))
@@ -88,7 +90,7 @@ test("project skill variants preserve distinct descriptions/media and select the
     const f = fixture()
     try {
         f.put("content/anywhere.xml", `<page path="/" name="Home"><hero name="Owner"/><expertise><skill name="web"/><skill name="cloud"/><skill name="iot"/></expertise></page>`)
-        f.put("content/project.xml", `<project id="tracker" name="Tracker" date="2026" featured="true"><slide skill="web, cloud" info="Dashboard" media="web.svg"/><slide skill="iot" info="Sensor hardware" featured="true" media="iot.svg"/></project>`)
+        f.put("content/project.xml", `<project id="tracker" name="Tracker" date="2026" featured="true" website="https://example.com/app" source="https://example.com/source" paper="https://example.com/paper" event="https://example.com/event"><action text="Documentation" link="https://example.com/docs"/><slide skill="web, cloud" info="Dashboard" media="web.svg"/><slide skill="iot" info="Sensor hardware" featured="true" media="iot.svg"/></project>`)
         f.put("content/web.svg", '<svg xmlns="http://www.w3.org/2000/svg"/>')
         f.put("content/iot.svg", '<svg xmlns="http://www.w3.org/2000/svg"><path/></svg>')
         const model = load_site(f.root, await load_config(f.root), new_diagnostics(), new Date("2026-11-04"))
@@ -101,6 +103,13 @@ test("project skill variants preserve distinct descriptions/media and select the
         assert(!web.states.includes("expertise"))
         assert(iot.states.includes("expertise"))
         assert(web.states.includes("cloud"))
+        for (const item of [web, iot]) {
+            assert.equal(item.website, "https://example.com/app")
+            assert.equal(item.source, "https://example.com/source")
+            assert.equal(item.paper, "https://example.com/paper")
+            assert.equal(item.event, "https://example.com/event")
+            assert.equal(item.actions?.[0].link, "https://example.com/docs")
+        }
         assert.equal(model.pages.find(page => page.path === "/projects/tracker")!.info, "Sensor hardware")
         assert.equal((scss_data(data).match(/"tracker":/g) ?? []).length, 1)
         const page = model.pages.find(page => page.path === "/")!
@@ -113,15 +122,31 @@ test("project skill variants preserve distinct descriptions/media and select the
         const slide = slides[0]
         assert.deepEqual([...slide.querySelectorAll(".slide_skill")].map(link => link.getAttribute("href")), ["#web/tracker", "#cloud/tracker", "#iot/tracker"])
         assert.equal(slide.querySelectorAll('.slide_skill[aria-current="true"]').length, 1)
-        for (const name of [".slide_name", ".slide_role", ".slide_date", ".slide_skills"]) {
+        for (const name of [".slide_name", ".slide_role", ".slide_date", ".slide_skills", ".slide_actions"]) {
             assert.equal(slide.querySelectorAll(name).length, 1)
             assert.equal(slide.querySelectorAll(`.slide_variant ${name}`).length, 0)
         }
+        assert.equal(slide.querySelectorAll(".slide_actions a").length, 5)
+        assert.equal(slide.querySelector('.slide_actions a[href="https://example.com/docs"]')!.textContent, "Documentation")
         const pins = [...document.querySelectorAll("[id]")].map(node => node.id)
         assert.equal(new Set(pins).size, pins.length)
         assert.equal(document.querySelectorAll(".dot.d_tracker").length, 1)
         assert.equal(document.querySelectorAll(".tl_pin.p_tracker").length, 1)
     } finally { f.close() }
+})
+
+test("project actions belong to the project rather than its skill variations", () => {
+    const diag = new_diagnostics()
+    validate_roots(parse_xml(`<project id="example" name="Example" date="2026" website="https://example.com"><action text="Docs" link="https://example.com/docs"/><slide skill="web"/></project>`, "project.xml"), diag)
+    assert.deepEqual(diag.errors, [])
+    for (const key of ["website", "source", "paper", "event"]) {
+        const invalid = new_diagnostics()
+        validate_roots(parse_xml(`<project id="example" name="Example" date="2026"><slide skill="web" ${key}="https://example.com"/></project>`, "project.xml"), invalid)
+        assert(invalid.errors.some(message => message.includes(`unknown attribute "${key}"`)))
+    }
+    const invalid = new_diagnostics()
+    validate_roots(parse_xml(`<project id="example" name="Example" date="2026"><slide skill="web"><action text="Docs" link="https://example.com/docs"/></slide></project>`, "project.xml"), invalid)
+    assert(invalid.errors.some(message => message.includes("<action> is not allowed inside <slide>")))
 })
 
 test("temporary filesystem handles write only in memory and do not survive a new session", async () => {
