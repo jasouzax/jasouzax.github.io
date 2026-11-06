@@ -216,6 +216,8 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
     const chain = crumb_chain(ctx.model, ctx.page),
         root = chain.find((page) => page.path === "/") ?? ctx.page
     const crumbs = chain.filter((page) => page.path !== "/" || chain.length === 1)
+    const project = ctx.model.objects.some(node => node.tag === "project" &&
+        ctx.page.path === `/projects/${node.attrs.id}` && ctx.lang === node.attrs.lang)
     const account = (
         <>
         <li class="list_drop_li">
@@ -244,7 +246,7 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
     )
     return (
         <header id="head">
-            <details id="head_menu" class="list" name="sidemenu" hidden={!has_desk}>
+            <details id="head_menu" class="list" name="sidemenu" hidden={!has_desk} open={has_desk && project}>
                 <summary class="list_summ" aria-label={t(ctx, "show_side")}>
                     {glyph(ctx, "[menu]")}
                 </summary>
