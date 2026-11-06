@@ -14,8 +14,9 @@ async function picker(page: Page) {
 }
 async function connect(page: Page) {
     await page.locator("#head_account > summary").click()
-    await page.getByRole("button", { name: "Connect with Folder", exact: true }).click()
-    await expect(page.locator("[data-folder-status]")).toContainText("Connected to /home/user")
+    await page.getByRole("button", { name: "Connect to Folder", exact: true }).click()
+    await expect(page.getByRole("button", { name: /^Disconnect folder/ })).toBeEnabled()
+    await expect(page.locator("[data-folder-status]")).toBeHidden()
     await page.locator("#head_account > summary").click()
 }
 async function open(pane: Locator, path: string) {
@@ -63,7 +64,11 @@ test("connecting home preserves conflicts, editor drafts, previews and the saved
     expect(await target_text(page, "notes (1).txt")).toBe("another existing note")
     expect(await target_text(page, "project (1)/main.c")).toBe("int x;")
     expect(await target_text(page, "project/README.txt")).toBe("existing project")
-    expect(await page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle("notes.txt")).getFile()).text())).toBe("original notes")
+    expect(await page.evaluate(async () => {
+        const names: string[] = []
+        for await (const entry of (await navigator.storage.getDirectory() as any).values()) names.push(entry.name)
+        return names
+    })).toEqual([])
     await open(pane, "/home/user")
     await expect(pane.locator('.desk_folder_tile[data-path="/home/user/notes (2).txt"] .desk_folder_text')).toContainText("unsaved draft")
     await expect.poll(() => page.evaluate(async () => {
@@ -134,7 +139,7 @@ test("cancelled and unsupported folder pickers leave home intact", async ({ page
     await page.addInitScript(() => Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: async () => { throw new DOMException("Cancelled", "AbortError") } }))
     await page.goto("/desk")
     await page.locator("#head_account > summary").click()
-    const button = page.getByRole("button", { name: "Connect with Folder", exact: true })
+    const button = page.getByRole("button", { name: "Connect to Folder", exact: true })
     await button.click(); await expect(button).toBeEnabled()
     await expect(page.locator("[data-folder-status]")).toBeHidden()
     await page.addInitScript(() => Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: undefined }))
@@ -143,13 +148,13 @@ test("cancelled and unsupported folder pickers leave home intact", async ({ page
     await expect(button).toHaveAttribute("title", /does not support/)
 })
 
-test("revoked connection permissions disable creation without restoring stale private files", async ({ page }) => {
+test("revoked connection permissions disconnect without restoring transferred private files", async ({ page }) => {
     await picker(page)
     await page.addInitScript(() => {
         const query = (FileSystemDirectoryHandle.prototype as any).queryPermission
         ;(FileSystemDirectoryHandle.prototype as any).queryPermission = async function(options: unknown) {
             const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
-            if (sessionStorage.getItem("revoke-home") && await this.isSameEntry(chosen)) return "denied"
+            if (sessionStorage.getItem("revoke-home") && await this.isSameEntry(chosen)) return "prompt"
             return query.call(this, options)
         }
     })
@@ -160,12 +165,19 @@ test("revoked connection permissions disable creation without restoring stale pr
     })
     await connect(page)
     await page.evaluate(() => sessionStorage.setItem("revoke-home", "1"))
-    await page.reload()
+    // Revocation in site settings is observed without a reload, even if the
+    // browser reports prompt rather than denied after removing the grant.
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+    await page.locator("#head_account > summary").click()
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
+    await page.locator("#head_account > summary").click()
     await open(page.locator(".desk_wbox").first(), "/home/user")
-    await expect(page.locator(".desk_folder_status")).toContainText("Access to this folder was not allowed.")
     await expect(page.locator('.desk_folder_tile[data-path="/home/user/stale.txt"]')).toHaveCount(0)
     await page.locator("#head_menu > summary").click()
-    for (const name of ["New file", "New folder", "Paste", "Upload"]) await expect(page.locator(".desk_files_bar").getByRole("button", { name, exact: true })).toBeDisabled()
+    for (const name of ["New file", "New folder", "Upload"]) await expect(page.locator(".desk_files_bar").getByRole("button", { name, exact: true })).toBeEnabled()
+    await page.reload()
+    await page.locator("#head_account > summary").click()
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
 })
 
 test("external changes and hidden mode update both folder views, and disconnect persists", async ({ page }) => {
@@ -207,10 +219,10 @@ test("external changes and hidden mode update both folder views, and disconnect 
     await page.reload()
     await page.locator("#head_account > summary").click()
     await page.getByRole("button", { name: /^Disconnect folder/ }).click()
-    await expect(page.getByRole("button", { name: "Connect with Folder", exact: true })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
     await page.reload()
     await page.locator("#head_account > summary").click()
-    await expect(page.getByRole("button", { name: "Connect with Folder", exact: true })).toBeEnabled()
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
     expect(await target_text(page, ".secret")).toBe("")
 })
 
@@ -254,4 +266,92 @@ test("a new tab can authorize its saved folder without picking or copying it aga
     await next.keyboard.press("Enter")
     await expect(screen.locator(":scope > div").filter({ hasText: /^RESTORED_DONE\s*$/ })).toBeVisible({ timeout: 30000 })
     expect(await target_text(next, "hi")).toBe("hi\nagain\n")
+})
+
+test("connecting shows progress and transferred files cannot return after deletion and reconnecting", async ({ page }) => {
+    await picker(page)
+    await page.addInitScript(() => {
+        const choose = (window as any).showDirectoryPicker
+        ;(window as any).showDirectoryPicker = () => new Promise(resolve => {
+            ;(window as any).finish_picker = async () => resolve(await choose())
+        })
+    })
+    await page.goto("/")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const writer = await (await root.getFileHandle("transfer.txt", { create: true })).createWritable()
+        await writer.write("transfer me"); await writer.close()
+        const folder = await root.getDirectoryHandle("nested", { create: true })
+        await folder.getFileHandle("nested.txt", { create: true })
+    })
+    await page.locator("#head_account > summary").click()
+    await page.getByRole("button", { name: "Connect to Folder", exact: true }).click()
+    const connecting = page.getByRole("button", { name: "Connecting folder…", exact: true })
+    await expect(connecting).toBeDisabled()
+    await expect(page.locator("[data-folder-status]")).toBeHidden()
+    await page.evaluate(() => (window as any).finish_picker())
+    await expect(page.getByRole("button", { name: /^Disconnect folder/ })).toBeEnabled()
+    await expect(page.locator("[data-folder-status]")).toBeHidden()
+    expect(await target_text(page, "transfer.txt")).toBe("transfer me")
+    expect(await target_text(page, "nested/nested.txt")).toBe("")
+    expect(await page.evaluate(async () => {
+        const entries = []
+        for await (const entry of (await navigator.storage.getDirectory() as any).values()) entries.push(entry.name)
+        return entries
+    })).toEqual([])
+    await page.evaluate(async () => {
+        const root = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        const names = []
+        for await (const entry of root.values()) names.push(entry.name)
+        for (const name of names) await root.removeEntry(name, { recursive: true })
+    })
+    await page.getByRole("button", { name: /^Disconnect folder/ }).click()
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
+    await page.getByRole("button", { name: "Connect to Folder", exact: true }).click()
+    await expect(connecting).toBeDisabled()
+    await page.evaluate(() => (window as any).finish_picker())
+    await expect(page.getByRole("button", { name: /^Disconnect folder/ })).toBeEnabled()
+    expect(await page.evaluate(async () => {
+        const root = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        const entries = []
+        for await (const entry of root.values()) entries.push(entry.name)
+        return entries
+    })).toEqual([])
+})
+
+test("a failed transfer keeps all OPFS originals and restores the connect label", async ({ page }) => {
+    await picker(page)
+    await page.addInitScript(() => {
+        const get_file = FileSystemDirectoryHandle.prototype.getFileHandle
+        let copies = 0
+        FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+            const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+            if (options?.create && await this.isSameEntry(chosen) && ++copies === 2) throw new DOMException("Transfer failed", "NotAllowedError")
+            return get_file.call(this, name, options)
+        }
+    })
+    await page.goto("/")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        for (const name of ["first.txt", "fail.txt"]) {
+            const writer = await (await root.getFileHandle(name, { create: true })).createWritable()
+            await writer.write(name); await writer.close()
+        }
+    })
+    await page.locator("#head_account > summary").click()
+    await page.getByRole("button", { name: "Connect to Folder", exact: true }).click()
+    await expect(page.locator("[data-folder-status]")).toContainText("Transfer failed")
+    await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
+    expect(await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        return Promise.all(["first.txt", "fail.txt"].map(async name => (await (await root.getFileHandle(name)).getFile()).text()))
+    })).toEqual(["first.txt", "fail.txt"])
+    expect(await page.evaluate(async () => {
+        const root = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+        let count = 0
+        for await (const entry of root.values()) {
+            if (await (await entry.getFile()).text() === entry.name) count++
+        }
+        return count
+    })).toBe(1)
 })

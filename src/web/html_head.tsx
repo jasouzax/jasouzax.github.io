@@ -232,7 +232,7 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
         <li class="list_drop_separator" role="separator" />
         <li class="list_drop_li needs_js">
             <button type="button" data-connect-folder="" data-unsupported={t(ctx, "folder_connect_unsupported")}
-                data-connect={t(ctx, "folder_connect")} data-disconnect={t(ctx, "folder_disconnect")} data-connecting={t(ctx, "folder_connecting")} data-connected={t(ctx, "folder_connected")}
+                data-connect={t(ctx, "folder_connect")} data-disconnect={t(ctx, "folder_disconnect")} data-connecting={t(ctx, "folder_connecting")}
                 data-session={t(ctx, "folder_connected_session")} data-failed={t(ctx, "folder_connect_failed")}>
                 {glyph(ctx, "[folder]", "list_drop_icon")}
                 <span data-folder-label="">{t(ctx, "folder_connect")}</span>

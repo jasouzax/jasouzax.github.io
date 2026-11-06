@@ -61,7 +61,9 @@ export async function connect_home(target: dir_handle): Promise<{ persistent: bo
     connecting = true
     try {
         if (target.queryPermission && await target.queryPermission({ mode: "readwrite" }) !== "granted") throw new Error("Read and write access is required")
-        const source = (await home_directory()).handle as native_directory
+        const previous = await home_directory()
+        const source = previous.handle as native_directory
+        const transferred: string[] = []
         const same = !!await source.isSameEntry?.(target)
         const names = new Map<string, string>()
         if (!same) {
@@ -75,12 +77,16 @@ export async function connect_home(target: dir_handle): Promise<{ persistent: bo
                 occupied.add(name)
                 await copy(entry, target, name)
                 names.set(entry.name, name)
+                if (!previous.connected) transferred.push(entry.name)
             }
         }
         let persistent = true
         try { await record(target) } catch { persistent = false }
         mounted = Promise.resolve({ handle: target, connected: true, writable: true })
         await Promise.all([...home_listeners].map(listener => listener({ names })))
+        // Only clear private storage after every copy and the mount switch succeed.
+        // Connecting another local folder must never delete the original folder.
+        for (const name of transferred) await source.removeEntry(name, { recursive: true })
         document.dispatchEvent(new Event("jazu:home"))
         return { persistent }
     } finally { connecting = false }
@@ -105,4 +111,21 @@ export async function authorize_home(mount: home_mount): Promise<void> {
     mount.writable = true
     await Promise.all([...home_listeners].map(listener => listener({ names: new Map() })))
     document.dispatchEvent(new Event("jazu:home"))
+}
+
+let refreshing: Promise<home_mount> | null = null
+export function refresh_home_directory(): Promise<home_mount> {
+    return refreshing ??= (async () => {
+        const mount = await home_directory()
+        if (!mount.connected || connecting || !mount.handle.queryPermission) return mount
+        let permission = "denied"
+        try { permission = await mount.handle.queryPermission({ mode: "readwrite" }) } catch { /* treat a lost handle as revoked */ }
+        // A saved handle can need authorization in a new tab. Losing an existing
+        // grant (including returning to prompt after revocation) disconnects it.
+        if ((permission === "denied" || (mount.writable && permission !== "granted")) && !connecting) {
+            await disconnect_home()
+            return home_directory()
+        }
+        return mount
+    })().finally(() => { refreshing = null })
 }
