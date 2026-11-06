@@ -7,6 +7,8 @@
 // While a query is active the article gets .is_searching and every matching item gets .hit; default.scss shows exactly those (the
 // state machine's own show/hide rules are overridden there), so the skill / slide fragment does not limit what is found.
 
+import { replace_page_url } from "./spa.ts"
+
 type doc = { text: string[], items: HTMLElement[] }
 
 function input_of(toggle: HTMLElement): HTMLInputElement | null {
@@ -206,6 +208,12 @@ function apply(article: HTMLElement, query: string, keep_hash?: boolean): void {
         hits++
         for (const item of entry.items) item.classList.add("hit")
     }
+    for (const slide of article.querySelectorAll<HTMLElement>(".slide")) {
+        const variants = [...slide.querySelectorAll<HTMLElement>(".slide_variant")]
+        const selected = variants.find(variant => tokens.every(token => token_matches(token, words(variant.textContent ?? ""))))
+            ?? variants.find(variant => variant.classList.contains("variant_default"))
+        for (const variant of variants) variant.classList.toggle("search_variant", variant === selected)
+    }
     article.classList.add("is_searching")
     if (empty) {
         empty.hidden = hits > 0
@@ -223,7 +231,7 @@ function sync_url(query: string): void {
     const url = new URL(location.href)
     if (query.trim()) url.searchParams.set("search", query.trim())
     else url.searchParams.delete("search")
-    history.replaceState(null, "", url)
+    replace_page_url(url)
 }
 
 function is_timeline_hash(hash: string): boolean {
@@ -272,7 +280,7 @@ export function init_search(): void {
     // The default theme hides the tabs while the search is open, but other themes (Memory) keep them visible, so this has to be handled.
     document.addEventListener("click", event => {
         const mouse = event as MouseEvent
-        const tab = (event.target as HTMLElement).closest<HTMLElement>(".expertise_tabs a")
+        const tab = (event.target as HTMLElement).closest<HTMLElement>(".expertise_tabs a, .slide_skills a")
         if (!tab || mouse.button !== 0 || mouse.ctrlKey || mouse.metaKey || mouse.shiftKey) return
         const article = tab.closest<HTMLElement>(".expertise")
         const input = article?.querySelector<HTMLInputElement>(".expertise_search_input")

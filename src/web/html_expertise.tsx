@@ -8,7 +8,7 @@ import { t, glyph, text_of, link_attrs } from "./html_common.tsx"
 import { ui_text, localize } from "../model.ts"
 import { unique } from "../util.ts"
 import type { expertise_model, entry, bar } from "../expertise.ts"
-import { default_state } from "../expertise.ts"
+import { default_state, group_entries } from "../expertise.ts"
 import { resume_format_of, render_rirekisho_body } from "./html_rirekisho.tsx"
 
 type state_ctx = { ctx: render_ctx; data: expertise_model }
@@ -273,7 +273,7 @@ function render_timeline(ctx: render_ctx, data: expertise_model): html {
     )
     const items = [
         ...data.bars.map((bar) => render_bar(ctx, bar)),
-        ...data.entries.filter((entry) => entry.states.length > 0).map(render_pin)
+        ...group_entries(data.entries).map(group => group.entry).filter((entry) => entry.states.length > 0).map(render_pin)
     ]
     return (
         <>
@@ -465,6 +465,11 @@ function render_actions(ctx: render_ctx, entry: entry): html {
                 </>
             )
         })
+    buttons.push(...(entry.actions ?? []).map((action, index) => (
+        <a class={`btn${action.primary || (buttons.length === 0 && index === 0) ? " primary" : ""}`} {...link_attrs(ctx, action.link)}>
+            {glyph(ctx, action.icon)}{action.text}
+        </a>
+    )))
     if (buttons.length === 0) return ""
     return (
         <>
@@ -473,7 +478,25 @@ function render_actions(ctx: render_ctx, entry: entry): html {
     )
 }
 
-function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): html {
+function render_slide_skills(ctx: render_ctx, data: expertise_model, entry: entry): child {
+    if (!entry.href?.includes("/projects/")) return ""
+    const variants = data.entries.filter(item => item.id === entry.id && item.href === entry.href)
+    const ids = unique(variants.flatMap(item => item.states)).filter(id => data.skills.some(skill => skill.id === id))
+    const fallback = ids.find(id => entry.states.includes(id))
+    if (!ids.length) return ""
+    return (
+        <nav class="slide_skills" aria-label={t(ctx, "skills")} data-default-skill={fallback}>
+            {ids.map(id => (
+                <a class={`slide_skill skill_${id}${id === fallback ? " is_default" : ""}`}
+                    href={`#${id}/${entry.id}`} data-skill={id} aria-current={id === fallback ? "true" : undefined}>
+                    {data.skills.find(skill => skill.id === id)!.name}
+                </a>
+            ))}
+        </nav>
+    )
+}
+
+function render_slide(ctx: render_ctx, data: expertise_model, entry: entry, variations: entry[]): html {
     const pins = entry.states.map((state) => (
         <>
             <i class={`pin st st_${state}`} id={`${state}/${entry.id}`}></i>
@@ -505,6 +528,18 @@ function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): htm
         )
         return [next, prev]
     })
+    return (
+        <>
+            <article class={`slide ${gate_classes(entry)}`} data-project={entry.id}>
+                {pins}
+                {arrows}
+                {render_slide_card(ctx, data, entry, variations)}
+            </article>
+        </>
+    )
+}
+
+function render_slide_card(ctx: render_ctx, data: expertise_model, entry: entry, variations: entry[]): html {
     const open = entry.href ? (
         <>
             <a
@@ -539,32 +574,28 @@ function render_slide(ctx: render_ctx, data: expertise_model, entry: entry): htm
             </p>
         </>
     )
-    const foot = (
-        <>
-            <div class={"slide_foot"}>
-                {render_tags(ctx, data, entry)}
-                {render_actions(ctx, entry)}
+    const preferred = variations.find(item => item.states.includes(default_state)) ?? variations[0]
+    const contents = variations.map(item => (
+        <section class={`slide_variant ${item.states.map(state => `variant_in_${state}`).join(" ")}${item === preferred ? " variant_default" : ""}`}
+            data-variant-states={item.states.join(" ")}>
+            {render_media(ctx, item)}
+            <p class="slide_desc">{item.desc}</p>
+            <div class="slide_foot">
+                {render_tags(ctx, data, item)}
             </div>
-        </>
-    )
-    const card = (
+        </section>
+    ))
+    return (
         <>
             <div class={"slide_card"}>
                 {top}
                 {role}
-                {render_media(ctx, entry)}
-                <p class={"slide_desc"}>{entry.desc}</p>
-                {foot}
+                <div class="slide_variations">{contents}</div>
+                <div class="slide_shared_foot">
+                    {render_slide_skills(ctx, data, preferred)}
+                    {render_actions(ctx, entry)}
+                </div>
             </div>
-        </>
-    )
-    return (
-        <>
-            <article class={`slide ${gate_classes(entry)}`}>
-                {pins}
-                {arrows}
-                {card}
-            </article>
         </>
     )
 }
@@ -786,10 +817,9 @@ export function render_expertise(ctx: render_ctx, node: xml_node, data: expertis
     const stacks = data.state_ids
         .map((state) => render_stackset(ctx, data, state))
         .filter((set) => set !== "")
-    const dots = data.entries.filter((entry) => entry.states.length > 0).map(render_dot)
-    const slides = data.entries
-        .filter((entry) => entry.states.length > 0)
-        .map((entry) => render_slide(ctx, data, entry))
+    const groups = group_entries(data.entries).filter(group => group.entry.states.length > 0)
+    const dots = groups.map(group => render_dot(group.entry))
+    const slides = groups.map(group => render_slide(ctx, data, group.entry, group.variations))
     const all_link = (
         <>
             <a class={"btn expertise_all"} href={localize(ctx.model, ctx.lang, "/projects")}>

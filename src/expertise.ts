@@ -22,6 +22,7 @@ export type bar = {
 }
 
 export type entry = {
+    actions?: { text: string, link: string, icon: string, primary: boolean }[]
     id: string, name: string, short: string, note: string, role: string, sub: string, desc: string
     date_label: string, at: number, lane: number, ord: number
     media: string, poster: string, alt: string, website: string, paper: string, event: string, source: string
@@ -190,16 +191,21 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
         const featured = slides.find(node => node.attrs.featured === "true") ?? slides[0]
         const seen = new Set<string>()
         for (const slide of slides) {
-            const skills = split_list(slide.attrs.skill).filter(id => {
+            const skills = unique(split_list(slide.attrs.skill)).filter(id => {
                 if (!skill_ids.includes(id)) { report_warning(model.diag, where_of(slide), `undeclared slide skill "${id}" is omitted`); return false }
                 if (seen.has(id)) { report_error(model.diag, where_of(slide), `project has more than one slide for skill "${id}"`); return false }
                 seen.add(id)
                 return true
             })
-            const attrs = { ...page.node.attrs, ...slide.attrs, info: slide.attrs.description ?? slide.text.trim() ?? page.info,
+            const attrs = { ...page.node.attrs, ...slide.attrs, info: slide.attrs.info ?? slide.attrs.description ?? slide.text.trim(),
                 skill: skills.join(","), featured: slide === featured && page.node.attrs.featured === "true" ? "true" : "false" }
-            const entry = entry_from_page(model, { ...page, info: attrs.info || page.info, node: { ...page.node, attrs } }, lang, state_ids, add_stack)
-            if (entry) entries.push(entry)
+            const entry = entry_from_page(model, { ...page, info: attrs.info, node: { ...page.node, attrs } }, lang, state_ids, add_stack)
+            if (entry) {
+                entry.actions = child_nodes(object!, "action").map(action => ({
+                    text: action.attrs.text, link: action.attrs.link, icon: action.attrs.icon ?? "", primary: is_true(action.attrs.primary),
+                }))
+                entries.push(entry)
+            }
         }
     }
     entries.sort(compare_entries)
@@ -250,6 +256,23 @@ function entry_from_page(model: site_model, page: page, lang: string, state_ids:
         href: page_url(model, page), states, during: [],
         stacks, tags: attrs.tags ? split_list(attrs.tags) : all_stack.slice(0, 3), rank: page.rank,
     }
+}
+
+// A project occupies one carousel position; entries remain its authored variations.
+export function group_entries(entries: entry[]): { entry: entry, variations: entry[] }[] {
+    const groups = new Map<string, { entry: entry, variations: entry[] }>()
+    for (const item of entries) {
+        const key = `${item.href ?? "event"}:${item.id}`
+        const group = groups.get(key)
+        if (!group) groups.set(key, { entry: { ...item }, variations: [item] })
+        else {
+            group.variations.push(item)
+            group.entry.states = unique([...group.entry.states, ...item.states])
+            group.entry.stacks = { ...group.entry.stacks, ...item.stacks }
+            group.entry.during = unique([...group.entry.during, ...item.during])
+        }
+    }
+    return [...groups.values()]
 }
 
 function scss_list(items: string[]): string {

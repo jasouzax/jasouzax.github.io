@@ -17,6 +17,7 @@
 @use "sass:map";
 @use "sass:string";
 @use "jazu:api" as *;
+@use "../slide_skills.scss";
 .list_drop_separator { border-top: 1px solid var(--line); margin: .25em .5em; }
 .list_drop_status { max-width: 24em; padding: .5em .75em; white-space: normal; font-size: .8em; }
 .list_drop button:disabled { opacity: .4; cursor: default; }
@@ -282,6 +283,7 @@
 
     /* film grain stays; add scanlines + a slow flicker */
     & body::after {
+        pointer-events: none;
         opacity: .5;
         mix-blend-mode: soft-light;
     }

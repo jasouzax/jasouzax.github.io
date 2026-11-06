@@ -1,0 +1,140 @@
+@use "sass:list";
+@use "sass:map";
+@use "sass:string";
+@use "jazu:api" as *;
+
+// Scroll anchors cover the slide and must not intercept its controls in any theme.
+.expertise .pin.st { pointer-events: none !important; }
+.expertise .slide:has(> .pin:target) { animation: none !important; }
+
+// Project metadata, skill tabs and actions stay outside this fading content grid.
+.expertise .slide_variations {
+    display: grid;
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+@mixin variant_hidden {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+@mixin variant_visible {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.expertise .slide_variant {
+    @include variant_hidden;
+    display: flex;
+    flex-direction: column;
+    grid-area: 1 / 1;
+    min-width: 0;
+    min-height: 0;
+    transition: opacity .22s ease, visibility .22s;
+}
+.expertise .slide_variant.variant_default { @include variant_visible; }
+.expertise.is_searching .slide_variant { @include variant_hidden; }
+.expertise.is_searching .slide_variant.search_variant { @include variant_visible; }
+
+.expertise .expertise_track.switching_variant {
+    scroll-behavior: auto !important;
+    scroll-snap-type: none !important;
+    .slide { animation: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .expertise .slide_variant { transition: none; }
+}
+
+.expertise .slide_card:has(.slide_skills) {
+    position: relative;
+    padding-inline: .8em;
+    padding-bottom: 0;
+}
+
+.expertise .slide_shared_foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: .4em .6em;
+    .slide_actions { margin: 0 0 .6em auto; }
+}
+.expertise .slide_card:has(.slide_skills) .slide_shared_foot { margin-left: -.8em; }
+
+.expertise .slide_skills {
+    display: flex;
+    max-width: 60%;
+    min-width: 0;
+    overflow-x: auto;
+    align-self: stretch;
+    scrollbar-width: thin;
+}
+
+.expertise .slide_skill {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: .55em .8em;
+    font-size: .85em;
+    white-space: nowrap;
+    color: var(--text-dim);
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--text) 14%, transparent), transparent 65%);
+    text-decoration: none;
+
+    &:hover, &:focus-visible { color: var(--accent); }
+}
+
+// Highlight the current skill with CSS too, so fragment navigation works without JS.
+@mixin active { color: var(--text); background: transparent; }
+.expertise .slide_skill.is_default { @include active; }
+.expertise.is_searching .slide_skills {
+    .slide_skill {
+        color: var(--text-dim);
+        background: linear-gradient(to bottom, color-mix(in srgb, var(--text) 14%, transparent), transparent 65%);
+    }
+    .slide_skill[aria-current="true"] { @include active; }
+}
+
+@function escaped($value) {
+    $index: string.index($value, "/");
+    @if $index {
+        @return string.slice($value, 1, $index - 1) + "\\/" + escaped(string.slice($value, $index + 1));
+    }
+    @return $value;
+}
+
+@each $skill in $skills {
+    $targets: ('##{escaped($skill)}:target', '##{escaped($skill + "/timeline")}:target');
+    @each $project, $slide in $slides {
+        @if list.index(map.get($slide, states), $skill) {
+            $targets: list.append($targets, '##{escaped($skill + "/" + $project)}:target', comma);
+        }
+    }
+    body:has(#{$targets}) .expertise .slide_skills {
+        .slide_skill.is_default {
+            color: var(--text-dim);
+            background: linear-gradient(to bottom, color-mix(in srgb, var(--text) 14%, transparent), transparent 65%);
+        }
+        .slide_skill.skill_#{$skill} { @include active; }
+    }
+    body:has(#{$targets}) .expertise:not(.is_searching) {
+        .slide_variant { @include variant_hidden; }
+        .slide_variant.variant_in_#{$skill} { @include variant_visible; }
+    }
+}
+
+@media (max-width: 480px) {
+    .expertise .slide_shared_foot {
+        flex-direction: column;
+        align-items: stretch;
+        .slide_actions { order: -1; align-self: end; }
+    }
+    .expertise .slide_skills { max-width: 100%; }
+}

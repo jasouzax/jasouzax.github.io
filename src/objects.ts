@@ -13,6 +13,14 @@ export function element(tag: string, attrs: Record<string, string>, source: xml_
     return node
 }
 
+// A project's public summary comes from its featured (or first public) slide.
+export function object_info(node: xml_node): string {
+    if (node.tag !== "project") return node.attrs.info ?? ""
+    const slides = node.children.filter(child => child.tag === "slide" && child.attrs.private !== "true")
+    const slide = slides.find(child => child.attrs.featured === "true") ?? slides[0]
+    return slide ? slide.attrs.info ?? slide.attrs.description ?? slide.text.trim() : ""
+}
+
 function page_of(model: site_model, node: xml_node): page {
     return { path: node.attrs.path, lang: node.attrs.lang ?? model.config.default_language, name: node.attrs.name,
         info: node.attrs.info ?? "", rank: node.attrs.rank === undefined ? null : Number(node.attrs.rank),
@@ -30,6 +38,7 @@ export function expand_objects(model: site_model): void {
             continue
         }
         const path = `/${object.tag}s/${id}`
+        const info = object_info(object)
         const children = object.children.filter(node => ["menu", "window"].includes(node.tag))
         if (object.tag === "event") {
             const entries = (nodes: xml_node[]): xml_node[] => nodes.filter(node => node.tag === "event").map(node =>
@@ -41,10 +50,10 @@ export function expand_objects(model: site_model): void {
             children.push(element("menu", { name: "Version", path: `/api/v1/git/${id}/log` }, object))
         }
         if (!children.some(node => node.tag === "window")) children.push(element("window", {
-            type: "text/markdown", mode: "view", data: object.attrs.info ?? object.attrs.name,
+            type: "text/markdown", mode: "view", data: info || object.attrs.name,
         }, object))
-        const desk = element("desk", { name: object.attrs.name, info: object.attrs.info ?? "", auto: "true" }, object, children)
-        const node = element("page", { ...object.attrs, path }, object, [desk])
+        const desk = element("desk", { name: object.attrs.name, info, auto: "true" }, object, children)
+        const node = element("page", { ...object.attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))
     }
     for (const lang of Object.keys(model.config.languages)) {
@@ -55,7 +64,7 @@ export function expand_objects(model: site_model): void {
             const source = objects[0] ?? model.pages[0]?.node
             if (!source) continue
             const name = kind === "project" ? "Projects" : "Blogs"
-            const entries = objects.map(node => element("entry", { name: node.attrs.name, info: node.attrs.info ?? "",
+            const entries = objects.map(node => element("entry", { name: node.attrs.name, info: object_info(node),
                 type: kind === "blog" ? "Post" : "Folder", link: `${path}/${node.attrs.id}` }, node))
             const map = element("map", { layout: "tree" }, source, objects.map(node => element("node", {
                 id: node.attrs.id, name: node.attrs.name, link: `${path}/${node.attrs.id}`,
