@@ -22,7 +22,6 @@ export type bar = {
 }
 
 export type entry = {
-    variant?: string
     id: string, name: string, short: string, note: string, role: string, sub: string, desc: string
     date_label: string, at: number, lane: number, ord: number
     media: string, poster: string, alt: string, website: string, paper: string, event: string, source: string
@@ -201,7 +200,6 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
                 skill: skills.join(","), featured: slide === featured && page.node.attrs.featured === "true" ? "true" : "false" }
             const entry = entry_from_page(model, { ...page, info: attrs.info, node: { ...page.node, attrs } }, lang, state_ids, add_stack)
             if (entry) {
-                if (slides.length > 1) entry.variant = `${entry.id}--${skills[0] ?? "featured"}`
                 entries.push(entry)
             }
         }
@@ -254,6 +252,23 @@ function entry_from_page(model: site_model, page: page, lang: string, state_ids:
         href: page_url(model, page), states, during: [],
         stacks, tags: attrs.tags ? split_list(attrs.tags) : all_stack.slice(0, 3), rank: page.rank,
     }
+}
+
+// A project occupies one carousel position; entries remain its authored variations.
+export function group_entries(entries: entry[]): { entry: entry, variations: entry[] }[] {
+    const groups = new Map<string, { entry: entry, variations: entry[] }>()
+    for (const item of entries) {
+        const key = `${item.href ?? "event"}:${item.id}`
+        const group = groups.get(key)
+        if (!group) groups.set(key, { entry: { ...item }, variations: [item] })
+        else {
+            group.variations.push(item)
+            group.entry.states = unique([...group.entry.states, ...item.states])
+            group.entry.stacks = { ...group.entry.stacks, ...item.stacks }
+            group.entry.during = unique([...group.entry.during, ...item.during])
+        }
+    }
+    return [...groups.values()]
 }
 
 function scss_list(items: string[]): string {

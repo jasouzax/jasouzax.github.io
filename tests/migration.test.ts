@@ -107,14 +107,17 @@ test("project skill variants preserve distinct descriptions/media and select the
         const node = page.node.children.find(node => node.tag === "expertise")!
         const { document } = parseHTML(to_html(render_expertise({ model, page, lang: "en", expertise: data }, node, data)))
         const slides = [...document.querySelectorAll(".slide")]
-        assert.equal(slides.length, 2)
-        for (const slide of slides) {
+        assert.equal(slides.length, 1)
+        const variants = [...slides[0].querySelectorAll(".slide_variant")]
+        assert.equal(variants.length, 2)
+        for (const slide of variants) {
             assert.deepEqual([...slide.querySelectorAll(".slide_skill")].map(link => link.getAttribute("href")), ["#web/tracker", "#cloud/tracker", "#iot/tracker"])
             assert.equal(slide.querySelectorAll('.slide_skill[aria-current="true"]').length, 1)
         }
         const pins = [...document.querySelectorAll("[id]")].map(node => node.id)
         assert.equal(new Set(pins).size, pins.length)
-        assert.notEqual(slides[0].getAttribute("data-search-id"), slides[1].getAttribute("data-search-id"))
+        assert.equal(document.querySelectorAll(".dot.d_tracker").length, 1)
+        assert.equal(document.querySelectorAll(".tl_pin.p_tracker").length, 1)
     } finally { f.close() }
 })
 

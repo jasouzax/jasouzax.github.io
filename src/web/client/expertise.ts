@@ -149,6 +149,31 @@ function schedule_nav(): void {
 }
 
 const watched = new WeakSet<Element>()
+let active_slide: HTMLElement | null = null
+let variant_timer = 0
+
+function targeted_slide(): HTMLElement | null {
+    return document.getElementById(decodeURIComponent(location.hash.slice(1)))?.closest<HTMLElement>(".slide") ?? null
+}
+
+function keep_slide_in_place(slide: HTMLElement): void {
+    const track = slide.parentElement
+    if (!track?.matches(".expertise_track")) return
+    clearTimeout(variant_timer)
+    quiet_until = performance.now() + snap_time
+    track.classList.add("switching_variant")
+    const align = (): void => {
+        const box = slide.getBoundingClientRect()
+        const viewport = track.getBoundingClientRect()
+        track.scrollTo({ left: track.scrollLeft + box.left + box.width / 2 - viewport.left - viewport.width / 2, behavior: "instant" })
+    }
+    requestAnimationFrame(() => {
+        align()
+        requestAnimationFrame(align)
+    })
+    variant_timer = window.setTimeout(() => track.classList.remove("switching_variant"), 260)
+}
+
 function watch_article(): void {
     const article = document.querySelector<HTMLElement>(".expertise")
     if (article && !watched.has(article)) {
@@ -156,10 +181,23 @@ function watch_article(): void {
         // filters, the search (is_searching, hit) and the states change which slides are shown, always through a class
         new MutationObserver(schedule_nav).observe(article, { subtree: true, attributes: true, attributeFilter: ["class", "hidden"] })
     }
+    active_slide = targeted_slide()
     schedule_nav()
 }
 
 function init_nav(): void {
+    document.addEventListener("click", event => {
+        const mouse = event as MouseEvent
+        if (mouse.button !== 0 || mouse.ctrlKey || mouse.metaKey || mouse.shiftKey || mouse.altKey) return
+        const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(".slide_skill")
+        const slide = link?.closest<HTMLElement>(".slide")
+        if (slide) keep_slide_in_place(slide)
+    }, true)
+    addEventListener("hashchange", () => {
+        const next = targeted_slide()
+        if (next && next === active_slide) keep_slide_in_place(next)
+        active_slide = next
+    })
     document.addEventListener("scroll", event => {
         const track = event.target
         if (track instanceof HTMLElement && track.matches(".expertise_track")) schedule_nav()

@@ -59,7 +59,6 @@ function token_matches(token: string, text: string[]): boolean {
 }
 
 export function slide_id(slide: HTMLElement): string {
-    if (slide.dataset.searchId) return slide.dataset.searchId
     const pin = slide.querySelector<HTMLElement>(".pin")
     return pin ? pin.id.slice(pin.id.indexOf("/") + 1) : ""
 }
@@ -208,6 +207,12 @@ function apply(article: HTMLElement, query: string, keep_hash?: boolean): void {
         if (!tokens.every(token => token_matches(token, entry.text))) continue
         hits++
         for (const item of entry.items) item.classList.add("hit")
+    }
+    for (const slide of article.querySelectorAll<HTMLElement>(".slide")) {
+        const variants = [...slide.querySelectorAll<HTMLElement>(".slide_variant")]
+        const selected = variants.find(variant => tokens.every(token => token_matches(token, words(variant.textContent ?? ""))))
+            ?? variants.find(variant => variant.classList.contains("variant_default"))
+        for (const variant of variants) variant.classList.toggle("search_variant", variant === selected)
     }
     article.classList.add("is_searching")
     if (empty) {

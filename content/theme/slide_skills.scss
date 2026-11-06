@@ -5,6 +5,45 @@
 
 // Scroll anchors cover the slide and must not intercept its controls in any theme.
 .expertise .pin.st { pointer-events: none !important; }
+.expertise .slide:has(> .pin:target) { animation: none !important; }
+
+// Variations share a grid cell inside one carousel slide. Only their paint fades;
+// the outgoing card leaves layout immediately while it finishes fading away.
+@mixin variant_hidden {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+@mixin variant_visible {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.expertise .slide_variant {
+    @include variant_hidden;
+    display: grid;
+    grid-area: 1 / 1;
+    min-width: 0;
+    min-height: 0;
+    transition: opacity .22s ease, visibility .22s;
+}
+.expertise .slide_variant.variant_default { @include variant_visible; }
+.expertise.is_searching .slide_variant { @include variant_hidden; }
+.expertise.is_searching .slide_variant.search_variant { @include variant_visible; }
+
+.expertise .expertise_track.switching_variant {
+    scroll-behavior: auto !important;
+    scroll-snap-type: none !important;
+    .slide { animation: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .expertise .slide_variant { transition: none; }
+}
 
 .expertise .slide_card:has(.slide_skills) {
     padding-inline: .8em;
@@ -69,6 +108,10 @@
             background: linear-gradient(to bottom, color-mix(in srgb, var(--text) 14%, transparent), transparent 65%);
         }
         .slide_skill.skill_#{$skill} { @include active; }
+    }
+    body:has(#{$targets}) .expertise:not(.is_searching) {
+        .slide_variant { @include variant_hidden; }
+        .slide_variant.variant_in_#{$skill} { @include variant_visible; }
     }
 }
 
