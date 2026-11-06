@@ -6634,7 +6634,13 @@ html.desk_dragging {
 }
 
 .desk_side_item_head[data-focused]::before {
+    // Center the focus bar on the parent guide, clear of the item icon.
+    left: calc(.25em - 3px);
     box-shadow: inset 2px 0 var(--accent);
+}
+
+.desk_side_item_head[data-focused] > .desk_side_item_icon::before {
+    visibility: hidden;
 }
 
 // Sticky tree rows must cover the children scrolling under them, including on hover.
@@ -8161,8 +8167,8 @@ html.spa_loading #main-content {
 .desk_wbox_head_navigation {
     display: flex;
     flex: 0 0 auto;
-    position: relative;
-    &::after { content: ''; position: absolute; right: 0; top: 25%; bottom: 25%; border-right: 1px solid var(--edge); }
+    border: 0;
+    background: transparent;
     > button.desk_wbox_head_tool {
         box-sizing: border-box;
         flex: 0 0 1.5rem;

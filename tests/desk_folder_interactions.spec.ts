@@ -77,8 +77,11 @@ test("window headers navigate history and breadcrumbs while text covers follow t
             await expect(button).toHaveCSS("border-right-width", "0px")
         }
         expect(await window.locator(".desk_wbox_head_navigation").evaluate(element => {
-            const style = getComputedStyle(element, "::after")
-            return Math.abs(parseFloat(style.top) * 4 - element.getBoundingClientRect().height) < 1
+            const style = getComputedStyle(element)
+            return element.previousElementSibling?.classList.contains("desk_wbox_head_icon")
+                && element.nextElementSibling?.classList.contains("desk_wbox_head_source")
+                && style.borderWidth === "0px" && style.backgroundColor === "rgba(0, 0, 0, 0)"
+                && getComputedStyle(element, "::after").content === "none"
         })).toBe(true)
     }
     await page.setViewportSize({ width: 1440, height: 1000 })

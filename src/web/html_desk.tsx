@@ -177,6 +177,12 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
         <span class="desk_wbox_head_icon" aria-hidden="true">
             {icon(ctx, info.icon)}
         </span>,
+        <div class="desk_wbox_head_navigation" role="group" aria-label={t(ctx, "folder_navigation")}>
+            {[["previous", "previous", "[arrow_left]"], ["refresh", "folder_refresh", "[refresh]"], ["forward", "forward", "[arrow_right]"]].map(([action, key, mark]) =>
+                <button type="button" class={`desk_wbox_head_tool desk_wbox_head_${action}`} data-navigation={action}
+                    title={t(ctx, key)} aria-label={t(ctx, key)} disabled={action !== "refresh"}>{glyph(ctx, mark)}</button>
+            )}
+        </div>,
         <div class="desk_wbox_head_source">
             {head_list(
                 ctx,
@@ -186,12 +192,6 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
                 mimes,
                 t(ctx, "filter_mimes")
             )}
-            <div class="desk_wbox_head_navigation" role="group" aria-label={t(ctx, "folder_navigation")}>
-                {[["previous", "previous", "[arrow_left]"], ["refresh", "folder_refresh", "[refresh]"], ["forward", "forward", "[arrow_right]"]].map(([action, key, mark]) =>
-                    <button type="button" class={`desk_wbox_head_tool desk_wbox_head_${action}`} data-navigation={action}
-                        title={t(ctx, key)} aria-label={t(ctx, key)} disabled={action !== "refresh"}>{glyph(ctx, mark)}</button>
-                )}
-            </div>
             <div class="desk_wbox_head_address">
                 <input
                     class={"desk_wbox_head_path"}
