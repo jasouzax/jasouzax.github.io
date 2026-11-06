@@ -20,11 +20,11 @@ export const skeleton_css = `
 #loading_overlay.background_fade::before { opacity: 0; }
 .loading_shapes { position: absolute; inset: 0; }
 .loading_placeholder { position: absolute; overflow: hidden; border: 1px solid rgb(var(--loading-gray) / .25); background: rgb(var(--loading-gray) / .14); border-radius: 3px; }
-.loading_placeholder::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 20%, rgb(var(--loading-gray) / .28) 50%, transparent 80%); transform: translateX(-110%); animation: skeleton_shine 1.6s ease-in-out infinite; }
+.loading_shapes::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 20%, rgb(var(--loading-gray) / .28) 50%, transparent 80%); transform: translateX(-110%); animation: skeleton_shine 1.6s ease-in-out infinite; }
 @keyframes skeleton_shine { to { transform: translateX(110%); } }
 @keyframes skeleton_enter { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { #loading_overlay, .loading_placeholder::after { animation: none; } #loading_overlay::before { transition: none; } }
-:root:has(#motion_pause:checked) .loading_placeholder::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { #loading_overlay, .loading_shapes::after { animation: none; } #loading_overlay::before { transition: none; } }
+:root:has(#motion_pause:checked) .loading_shapes::after { animation: none; }
 @media print { #loading_overlay { display: none; } :root[data-skeleton="loading"] :is(#main-content,.site_foot,#head > *,#head_tray > *) { visibility: visible !important; } }
 }
 `

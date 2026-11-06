@@ -23,6 +23,7 @@ export function capture_skeleton(): void {
     const shapes = document.createElement("div")
     shapes.className = "loading_shapes"
     overlay.append(shapes)
+    const shine_bounds: string[] = []
     const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
     for (const element of document.querySelectorAll<HTMLElement>(selector)) {
         if (element.closest("#head_signature, [hidden]")) continue
@@ -33,8 +34,11 @@ export function capture_skeleton(): void {
         const placeholder = document.createElement("div")
         placeholder.className = "loading_placeholder"
         Object.assign(placeholder.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px`, boxSizing: "border-box" })
+        shine_bounds.push(`M${box.left},${box.top}h${box.width}v${box.height}h${-box.width}Z`)
         shapes.append(placeholder)
     }
+    // One viewport-sized light layer, clipped to the union of all boxes.
+    shapes.style.clipPath = `path("${shine_bounds.join(" ")}")`
     document.body.append(overlay)
 }
 
