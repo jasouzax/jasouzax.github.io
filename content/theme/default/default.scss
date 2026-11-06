@@ -8190,7 +8190,7 @@ html.spa_loading #main-content {
     flex: 1 1 0;
     min-width: 0;
     height: 1.5rem;
-    border-right: 1px solid var(--edge);
+    border-inline: 1px solid var(--edge);
     > .desk_wbox_head_path {
         position: absolute;
         inset: 0;
