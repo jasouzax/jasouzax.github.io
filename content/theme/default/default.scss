@@ -444,6 +444,8 @@ background-position: $pos;
 // The Jasouza @font-face is generated from the <font> element in default.xml (no hand-made woff2 here).
 :root {
     --safe_bottom: env(safe-area-inset-bottom, 0px);
+    // Footer: .8em type, 1.4 line-height, .35em vertical padding, and 2px link borders.
+    --site-foot-height: calc(1.68em + 4px);
 }
 
 html {
@@ -750,11 +752,20 @@ a {
             width: 100%;
             border-top: 1px solid var(--line);
             padding-bottom: var(--safe_bottom);
+            height: calc(3em + var(--safe_bottom));
 
             &>a {
                 flex: 1 0 auto;
+                display: grid;
+                grid-template-rows: minmax(0, 1fr) 1em;
+                align-items: center;
+                justify-items: center;
+                height: 3em;
+                padding-block: 0;
                 text-align: center;
                 line-height: 1em;
+
+                &>.head_tab_name { grid-row: 2; }
 
                 &>span:not(.head_tab_name) {
                     display: block;
@@ -4536,6 +4547,17 @@ body::after {
 
     a:hover {
         color: var(--accent);
+    }
+}
+
+// The final desk shares its viewport with the footer instead of pushing it below the fold.
+#main-content > .desk:last-child {
+    height: calc(100dvh - 2.5em - var(--site-foot-height));
+    min-height: calc(100dvh - 2.5em - var(--site-foot-height));
+
+    @media (orientation: portrait) {
+        height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
+        min-height: calc(100dvh - 5.5em - var(--safe_bottom) - var(--site-foot-height));
     }
 }
 
