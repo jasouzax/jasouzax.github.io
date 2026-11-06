@@ -232,12 +232,13 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
         <li class="list_drop_separator" role="separator" />
         <li class="list_drop_li needs_js">
             <button type="button" data-connect-folder="" data-unsupported={t(ctx, "folder_connect_unsupported")}
-                data-connecting={t(ctx, "folder_connecting")} data-connected={t(ctx, "folder_connected")}
+                data-connect={t(ctx, "folder_connect")} data-disconnect={t(ctx, "folder_disconnect")} data-connecting={t(ctx, "folder_connecting")} data-connected={t(ctx, "folder_connected")}
                 data-session={t(ctx, "folder_connected_session")} data-failed={t(ctx, "folder_connect_failed")}>
                 {glyph(ctx, "[folder]", "list_drop_icon")}
-                <span>{t(ctx, "folder_connect")}</span>
+                <span data-folder-label="">{t(ctx, "folder_connect")}</span>
             </button>
         </li>
+        <li class="list_drop_li needs_js" hidden="true"><button type="button" data-folder-authorize="" data-failed={t(ctx, "folder_connect_failed")}>{t(ctx, "folder_authorize")}</button></li>
         <li class="list_drop_status" data-folder-status="" role="status" aria-live="polite" hidden="true" />
         </>
     )

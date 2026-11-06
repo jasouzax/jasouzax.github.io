@@ -1,7 +1,7 @@
 import type { desk_window } from "./desk.ts"
 import { state, text, new_window } from "./desk.ts"
 import { open_source } from "./desk_view.ts"
-import { folder_action_enabled, perform_folder_action, type folder_action, type fs_node } from "./desk_fs.ts"
+import { hiding_dotfiles, toggle_hidden, folder_action_enabled, perform_folder_action, type folder_action, type fs_node } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
 import { can_browse, can_read, check_permissions } from "./desk_fs_permissions.ts"
 import { import_entries } from "./desk_folder_drop.ts"
@@ -78,6 +78,11 @@ export function bind_folder_context(item: desk_window, body: HTMLElement, status
             if (window) void open_source(window, `file://${(entry ?? dir).path}`)
         })
         popup.append(open)
+        const hidden = document.createElement("button")
+        hidden.type = "button"; hidden.setAttribute("role", "menuitemcheckbox"); hidden.setAttribute("aria-checked", String(hiding_dotfiles()))
+        hidden.textContent = text("files_toggle_hidden")
+        hidden.addEventListener("click", () => { close(); toggle_hidden() })
+        popup.append(hidden)
         const first_separator = document.createElement("div"); first_separator.setAttribute("role", "separator"); popup.append(first_separator)
         const groups: folder_action[][] = []
         if (!entry || entry.kind === "dir") groups.push(["new_file", "new_folder", "paste", "upload"])

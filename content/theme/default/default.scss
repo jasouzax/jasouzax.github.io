@@ -8329,3 +8329,5 @@ html.spa_loading #main-content {
 }
 .desk_wbox_body_media_time { justify-content: center; }
 .desk_wbox_body_media:fullscreen { background: var(--panel, black); padding: 1em; }
+
+#head_account .list_drop_li[hidden] { display: none !important; }

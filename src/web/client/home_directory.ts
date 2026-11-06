@@ -7,7 +7,7 @@ export const home_listeners = new Set<(change: home_change) => Promise<void>>()
 let mounted: Promise<home_mount> | null = null
 let connecting = false
 
-async function record(handle?: dir_handle): Promise<dir_handle | null> {
+async function record(handle?: dir_handle | null): Promise<dir_handle | null> {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open("jazu_home", 1)
         request.onupgradeneeded = () => request.result.createObjectStore("connection")
@@ -16,9 +16,9 @@ async function record(handle?: dir_handle): Promise<dir_handle | null> {
     })
     try {
         return await new Promise((resolve, reject) => {
-            const transaction = db.transaction("connection", handle ? "readwrite" : "readonly")
+            const transaction = db.transaction("connection", handle !== undefined ? "readwrite" : "readonly")
             const store = transaction.objectStore("connection")
-            const request = handle ? store.put(handle.native_handle ?? handle, "home") : store.get("home")
+            const request = handle === null ? store.delete("home") : handle ? store.put(handle.native_handle ?? handle, "home") : store.get("home")
             transaction.oncomplete = () => resolve(handle ?? request.result ?? null)
             transaction.onerror = transaction.onabort = () => reject(transaction.error ?? new Error("Folder connection could not be saved"))
         })
@@ -84,4 +84,25 @@ export async function connect_home(target: dir_handle): Promise<{ persistent: bo
         document.dispatchEvent(new Event("jazu:home"))
         return { persistent }
     } finally { connecting = false }
+}
+
+export async function disconnect_home(): Promise<void> {
+    if (connecting) throw new Error("A folder connection is already in progress")
+    connecting = true
+    try {
+        const handle = await navigator.storage.getDirectory()
+        await record(null)
+        mounted = Promise.resolve({ handle, connected: false, writable: true })
+        await Promise.all([...home_listeners].map(listener => listener({ names: new Map() })))
+        document.dispatchEvent(new Event("jazu:home"))
+    } finally { connecting = false }
+}
+
+// Call from a user gesture: browsers may require a fresh grant in a new tab.
+export async function authorize_home(mount: home_mount): Promise<void> {
+    const permission = mount.handle.requestPermission?.({ mode: "readwrite" })
+    if (permission && await permission !== "granted") throw new Error("Read and write access is required")
+    mount.writable = true
+    await Promise.all([...home_listeners].map(listener => listener({ names: new Map() })))
+    document.dispatchEvent(new Event("jazu:home"))
 }

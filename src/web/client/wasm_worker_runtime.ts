@@ -96,6 +96,14 @@ export async function run_worker_runtime(start: worker_start, send: (value: unkn
         FS.nameTable = new Array(4096)
         FS.streams = []
         FS.mount({ mount: () => make_node(null, "/", 0o40755) }, {}, "/")
+        // A long-running shell can cache /home/user before a folder is connected
+        // or authorized. Built-in redirection must use the current mount's mode,
+        // just as a newly started utility (such as touch) does.
+        const node_permissions = FS.nodePermissions.bind(FS)
+        FS.nodePermissions = (node: em_object, permissions: string) => {
+            node.mode = attributes(path_of(node)).mode
+            return node_permissions(node, permissions)
+        }
         FS.currentPath = start.cwd
         const original_chdir = FS.chdir.bind(FS)
         FS.chdir = (path: string) => { original_chdir(path); call("chdir", { path: FS.cwd() }) }

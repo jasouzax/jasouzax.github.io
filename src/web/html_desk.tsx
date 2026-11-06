@@ -523,6 +523,7 @@ const runtime_keys = [
     "open_terminal",
     "open_folder",
     "open_new_window",
+    "files_toggle_hidden",
     "window_source",
     "previous",
     "forward",

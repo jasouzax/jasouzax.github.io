@@ -1,6 +1,6 @@
 import type { desk_window } from "./desk.ts"
 import { state, text } from "./desk.ts"
-import { load_children, redraw, type fs_node, type file_handle } from "./desk_fs.ts"
+import { load_children, redraw, visible_entries, type fs_node, type file_handle } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
 import { open_source } from "./desk_view.ts"
 import { can_browse, can_read, check_permissions } from "./desk_fs_permissions.ts"
@@ -66,7 +66,7 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
             }
             if (node.kind === "dir") {
                 await load_children(node)
-                const plan = folder_cover_plan(node.children ?? [])
+                const plan = folder_cover_plan(visible_entries(node.children ?? []))
                 const files: { node: fs_node, file: File, mime: string, key: string }[] = []
                 for (const child of plan.files) {
                     await check_permissions([child])
@@ -158,7 +158,7 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
             if (signal.aborted || current !== revision) return
             if (!can_browse(dir)) throw new Error(text("files_denied"))
             directory = dir; redraw()
-            const children = dir.children ?? [], paths = new Set(children.map(node => node.path))
+            const children = visible_entries(dir.children ?? []), paths = new Set(children.map(node => node.path))
             for (const [path, entry] of tiles) if (!paths.has(path)) { dispose(entry); tiles.delete(path) }
             let cursor = grid.firstElementChild
             for (const node of children) {
@@ -190,7 +190,9 @@ export function folder_body(item: desk_window, signal: AbortSignal): HTMLElement
     bind_folder_drag(item, body, status, () => directory, entry_at, signal)
     let timer: ReturnType<typeof setTimeout> | undefined
     const changed = (event: Event) => {
-        const path = (event as CustomEvent<{ path: string }>).detail.path
+        const { path, listing } = (event as CustomEvent<{ path: string, listing?: boolean }>).detail
+        // A parent's entry list changing does not invalidate this directory's contents.
+        if (listing && path !== path_of() && path_of().startsWith(path === "/" ? "/" : `${path}/`)) return
         const kind = folder_change(path_of(), path)
         if (kind === "contents") { clearTimeout(timer); timer = setTimeout(() => void refresh(), 80) }
         else if (kind === "cover") { const entry = tiles.get(path); if (entry) schedule(entry) }

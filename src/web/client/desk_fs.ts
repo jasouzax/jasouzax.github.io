@@ -47,6 +47,14 @@ type tree_state = file_selection & {
 
 let tree: tree_state | null = null
 let shared_root: fs_node | null = null
+let hidden_mode = false
+export function hiding_dotfiles(): boolean { return hidden_mode }
+export function visible_entries(nodes: fs_node[]): fs_node[] { return hidden_mode ? nodes.filter(node => !node.name.startsWith(".")) : nodes }
+export function toggle_hidden(): void {
+    hidden_mode = !hidden_mode
+    redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
+}
 
 // Uploads stay in a memory directory until explicitly saved into /home/user.
 const temporary_files = memory_directory("tmp")
@@ -257,7 +265,7 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
                 row.append(render_draft(current.draft))
                 list.append(row)
             }
-            for (const child of node.children) {
+            for (const child of visible_entries(node.children)) {
                 const row = document.createElement("li")
                 row.append(render_node(child, current))
                 list.append(row)
@@ -341,7 +349,7 @@ export async function load_children(node: fs_node): Promise<void> {
     try {
         for await (const entry of handle.values()) if (!(node === home_node && entry.name === ".jazu_tmp")) {
             const old = previous.get(entry.name)
-            if (old && (old.kind === "dir") === (entry.kind === "directory")) { old.handle = entry; list.push(old) }
+            if (old && (old.kind === "dir") === (entry.kind === "directory")) { old.handle = entry; old.writable = node.writable; list.push(old) }
             else list.push(child_of(node, entry))
         }
         node.readable = true
@@ -1290,7 +1298,7 @@ async function mount_opfs(root: fs_node): Promise<void> {
         const mount = await home_directory()
         replace_directory(user, mount.handle, mount.writable)
         user.readable = true; user.content_readable = true; user.write_allowed = mount.writable
-        if (mount.connected) user.info = mount.handle.name
+        user.info = mount.connected ? mount.handle.name : ""
         await load_children(user)
         redraw()
     } catch {
@@ -1352,7 +1360,9 @@ let uri_bound = false
 export function init_fs(desk: HTMLElement): void {
     if (!uri_bound) {
         uri_bound = true
-        window.addEventListener("focus", () => void refresh_permissions())
+        window.addEventListener("focus", () => { void refresh_permissions(); void refresh_external() })
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) void refresh_external() })
+        window.setInterval(() => { if (!document.hidden) void refresh_external() }, 1500)
         uri_handlers.push(async (item, uri, current = () => true) => {
             const path = local_file_path(uri)
             if (path === null) return false
@@ -1403,4 +1413,29 @@ export function init_fs(desk: HTMLElement): void {
         page.addEventListener("toggle", on_toggle, true)
         bind_drag(page)
     }
+}
+
+let external_refresh = false
+async function refresh_external(): Promise<void> {
+    if (external_refresh || !shared_root) return
+    external_refresh = true
+    try {
+        await filesystem_ready
+        const visit = async (node: fs_node): Promise<void> => {
+            if (node.kind !== "dir") return
+            if ((node === home_node || node.mount || node.path.startsWith("/home/user/")) && node.children !== null && node.handle) {
+                const permissions = JSON.stringify([node.readable, node.write_allowed])
+                const before = JSON.stringify(node.children.map(child => [child.name, child.kind]))
+                await load_children(node)
+                const permission_changed = permissions !== JSON.stringify([node.readable, node.write_allowed])
+                const after = JSON.stringify(node.children?.map(child => [child.name, child.kind]))
+                if (permission_changed || before !== after) {
+                    redraw()
+                    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: node.path, listing: !permission_changed } }))
+                }
+            }
+            for (const child of node.children ?? []) if (child.kind === "dir" && child.children !== null) await visit(child)
+        }
+        await visit(shared_root)
+    } finally { external_refresh = false }
 }

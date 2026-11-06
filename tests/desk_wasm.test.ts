@@ -23,13 +23,14 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     }
     const files = new Map<string, Uint8Array>([["/home/user/input", new Uint8Array([0,255,1,128,10])]])
     const dirs = new Set(["/", "/home", "/home/user", "/tmp", "/bin", "/dev", "/proc"])
+    let home_writable = true
     const fs: fs_api = {
-        async stat(path) { return dirs.has(path) ? { kind: "dir", size: 0, writable: path !== "/bin" } : files.has(path) || path.startsWith("/bin/") ? { kind: "file", size: files.get(path)?.length ?? 0, writable: !path.startsWith("/bin/") } : null },
+        async stat(path) { return dirs.has(path) ? { kind: "dir", size: 0, writable: path !== "/bin" && (path !== "/home/user" || home_writable) } : files.has(path) || path.startsWith("/bin/") ? { kind: "file", size: files.get(path)?.length ?? 0, writable: !path.startsWith("/bin/") } : null },
         async list(path) { return [...dirs, ...files.keys()].filter(p => p !== path && p.startsWith(path.replace(/\/$/, "") + "/") && !p.slice(path.replace(/\/$/, "").length + 1).includes("/")).map(p => ({ name: p.split("/").pop()!, kind: dirs.has(p) ? "dir" : "file" })) },
         async read(path) { return new TextDecoder().decode(await fs.read_bytes!(path)) },
         async write(path, text) { await fs.write_bytes!(path, new TextEncoder().encode(text)) },
         async read_bytes(path) { const bytes = files.get(path); if (!bytes) throw new Error("ENOENT"); return bytes.slice() },
-        async write_bytes(path, bytes) { if (!dirs.has(path.slice(0, path.lastIndexOf("/")) || "/")) throw new Error("ENOENT"); files.set(path, bytes.slice()) },
+        async write_bytes(path, bytes) { if (!dirs.has(path.slice(0, path.lastIndexOf("/")) || "/")) throw new Error("ENOENT"); files.set(path, bytes.slice()); if (path === "/tmp/unlock-home") home_writable = true },
         async mkdir(path) { if (dirs.has(path)) throw new Error("EEXIST"); dirs.add(path) },
         async remove(path) { if (!files.delete(path) && !dirs.delete(path)) throw new Error("ENOENT") },
         async rename(from, to) { files.set(to, await fs.read_bytes!(from)); files.delete(from) },
@@ -50,6 +51,13 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const result = await run("v=world; f() { echo hello-$v; }; f > /tmp/greeting; cat /tmp/greeting; touch /tmp/new; rm /tmp/new")
         assert.deepEqual(result, { stdout: "hello-world\n", stderr: "", code: 0 })
         assert.equal(files.has("/tmp/new"), false)
+    })
+    await t.test("an existing shell redirects after its home mount becomes writable", async () => {
+        home_writable = false
+        try {
+            const result = await run("ls /home/user >/dev/null; touch /tmp/unlock-home; touch /home/user/hi; echo hi > /home/user/hi; echo again >> /home/user/hi; cat /home/user/hi")
+            assert.deepEqual(result, { stdout: "hi\nagain\n", stderr: "", code: 0 })
+        } finally { home_writable = true }
     })
     await t.test("copies binary files without text conversion", async () => {
         const result = await run("cp /home/user/input /tmp/copy")
