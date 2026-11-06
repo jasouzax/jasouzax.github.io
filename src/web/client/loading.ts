@@ -12,12 +12,40 @@ function busy(value: boolean): void {
     }
 }
 
+const content_targets = "#main-content, #head > :not(#head_signature):not(#head_tray), #head_tray > *, .site_foot"
+
+export function capture_skeleton(): void {
+    if (document.getElementById("loading_overlay")) return
+    const overlay = document.createElement("div")
+    overlay.id = "loading_overlay"
+    overlay.dataset.started = String(performance.now())
+    overlay.setAttribute("aria-hidden", "true")
+    const shapes = document.createElement("div")
+    shapes.className = "loading_shapes"
+    overlay.append(shapes)
+    const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+        if (element.closest("#head_signature, [hidden]")) continue
+        const box = element.getBoundingClientRect()
+        if (!box.width || !box.height || box.bottom < 0 || box.top > innerHeight || box.right < 0) continue
+        // Nested labels are covered by their enclosing control.
+        if (element.parentElement?.closest("button,.landing_contact,.landing_btn")) continue
+        const placeholder = document.createElement("div")
+        placeholder.className = "loading_placeholder"
+        Object.assign(placeholder.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px`, boxSizing: "border-box" })
+        shapes.append(placeholder)
+    }
+    document.body.append(overlay)
+}
+
 export function begin_loading(owner: string): void {
     const shared = state()
     shared.revision++
     shared.owners.add(owner)
     document.documentElement.dataset.skeleton = "loading"
+    document.documentElement.dataset.backgroundWait = ""
     document.documentElement.classList.remove("theme_ready")
+    capture_skeleton()
     busy(true)
 }
 
@@ -25,13 +53,41 @@ export async function finish_loading(owner: string): Promise<void> {
     const shared = state()
     shared.owners.delete(owner)
     if (shared.owners.size) return
-    const revision = ++shared.revision
-    const root = document.documentElement
-    root.dataset.skeleton = "revealing"
-    root.classList.add("theme_ready")
-    await delay(motion_reduced() ? 0 : 340)
+    const revision = ++shared.revision, root = document.documentElement
+    // Suppress entrances for the content the visitor is already looking at.
+    for (const article of document.querySelectorAll<HTMLElement>(".article")) {
+        const box = article.getBoundingClientRect()
+        if (box.bottom > 0 && box.top < innerHeight) article.classList.add("loading_settled", "in", "no_reveal")
+    }
+    const overlay = document.getElementById("loading_overlay")
+    await delay(motion_reduced() ? 0 : Math.max(0, 350 - (performance.now() - Number(overlay?.dataset.started ?? 0))))
     if (revision !== shared.revision) return
+    // Fade the neutral canvas into the skin's base color before starting WebGL.
+    root.dataset.skeleton = "revealing"
+    overlay?.classList.add("background_fade")
+    const animations: Animation[] = []
+    if (!motion_reduced()) {
+        for (const target of document.querySelectorAll<HTMLElement>(content_targets)) {
+            const rect = target.getBoundingClientRect()
+            animations.push(target.animate([
+                { maskImage: "linear-gradient(135deg,#000 40%,transparent 60%)", maskSize: "300vw 300vh", maskPosition: `${-2 * innerWidth - rect.left}px ${-2 * innerHeight - rect.top}px` },
+                { maskImage: "linear-gradient(135deg,#000 40%,transparent 60%)", maskSize: "300vw 300vh", maskPosition: `${-rect.left}px ${-rect.top}px` }
+            ], { duration: 500, fill: "both", easing: "ease-in-out" }))
+        }
+        const shapes = overlay?.querySelector<HTMLElement>(".loading_shapes")
+        if (shapes) animations.push(shapes.animate([
+            { maskImage: "linear-gradient(135deg,transparent 40%,#000 60%)", maskSize: "300% 300%", maskPosition: "100% 100%" },
+            { maskImage: "linear-gradient(135deg,transparent 40%,#000 60%)", maskSize: "300% 300%", maskPosition: "0% 0%" }
+        ], { duration: 500, fill: "both", easing: "ease-in-out" }))
+    }
+    await delay(motion_reduced() ? 0 : 700)
+    if (revision !== shared.revision) { animations.forEach(animation => animation.cancel()); return }
+    animations.forEach(animation => animation.cancel())
+    overlay?.remove()
     delete root.dataset.skeleton
+    delete root.dataset.backgroundWait
+    root.classList.add("theme_ready")
+    document.dispatchEvent(new Event("jazu:background-ready"))
     busy(false)
 }
 

@@ -148,11 +148,13 @@ export async function navigate(url: URL, push: boolean): Promise<void> {
         return
     }
     begin_loading("page")
+    document.getElementById("loading_overlay")?.remove()
     const styles = swap_page(payload)
     clear_outgoing()
     current_path = url.pathname
     if (push) history.pushState({}, "", url)
     scroll_to_hash(url.hash)
+    begin_loading("page")
     const incoming = wipe_page("in")
     // Resources can finish during the incoming wipe, but the skeleton must be
     // painted at least once before the content is revealed.

@@ -63,6 +63,8 @@ begin_loading("boot")
 void (async () => {
     try {
         await boot_css_ready()
+        const initial_css = document.getElementById("theme_css") as HTMLLinkElement | null
+        if (initial_css) initial_css.media = "all"
         const theme = stored_theme()
         if (theme && theme !== document.documentElement.dataset.theme) {
             const api = await load_theme_switch()

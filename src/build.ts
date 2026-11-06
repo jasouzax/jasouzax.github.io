@@ -116,9 +116,8 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
     // Executable registration is small; WASM bytes remain lazy until a process starts.
     const desk_shell = await bundle_script(root, "desk_shell", files, mode)
-    const boot_source = readFileSync(join(root, "src", "web", "client", "boot.ts"), "utf8")
-    const boot = await transform(boot_source, { loader: "ts", minify: true })
-    return { page, theme_switch, desk_shell, boot: boot.code.trim() }
+    const boot = await esbuild_build({ entryPoints: [join(root, "src", "web", "client", "boot.ts")], bundle: true, write: false, format: "iife", minify: true, logLevel: "silent" })
+    return { page, theme_switch, desk_shell, boot: boot.outputFiles[0].text.trim() }
 }
 
 function disk_hash(file: string): string | null {
