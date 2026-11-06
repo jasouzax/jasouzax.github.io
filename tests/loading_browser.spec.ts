@@ -180,3 +180,43 @@ test("inline boot paints placeholders before the page runtime downloads", async 
     release()
     await ready(page)
 })
+
+
+for (const theme of ["default", "memory"]) {
+    test(`${theme} mode changes never enter skeleton loading`, async ({ page }) => {
+        await page.goto("/privacy")
+        await ready(page)
+        if (theme === "memory") {
+            await choose(page, "theme_name_memory")
+            await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
+            await ready(page)
+        }
+        await page.evaluate(() => {
+            const records: string[] = []
+            const background = document.getElementById("theme_background")
+            const observer = new MutationObserver(changes => {
+                for (const change of changes) {
+                    if (change.type === "attributes") records.push("skeleton-state")
+                    for (const node of change.addedNodes) {
+                        if (node instanceof Element && node.id === "loading_overlay") records.push("overlay")
+                    }
+                }
+            })
+            observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-skeleton"] })
+            observer.observe(document.body, { childList: true })
+            ;(window as any).mode_check = { records, background, observer }
+        })
+        for (const mode of ["light", "dark", "auto"]) {
+            await choose(page, `theme_state_${mode}`)
+            await expect(page.locator("html")).toHaveAttribute("data-mode", mode)
+            await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
+        }
+        const result = await page.evaluate(() => {
+            const check = (window as any).mode_check
+            check.observer.disconnect()
+            return { records: check.records, sameBackground: check.background === document.getElementById("theme_background") }
+        })
+        expect(result).toEqual({ records: [], sameBackground: true })
+        await expect(page.locator("#loading_overlay")).toHaveCount(0)
+    })
+}

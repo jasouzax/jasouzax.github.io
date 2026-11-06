@@ -84,21 +84,21 @@ async function apply_theme(name: string, mode: string): Promise<void> {
     const root = document.documentElement
     const previous_name = root.dataset.theme ?? "default", previous_mode = root.dataset.mode ?? "auto"
     if (name === previous_name && mode === previous_mode) return
+    // Modes use the current theme's loaded resources and running renderer.
+    // Keep this outside the loading lifecycle, including its finally block.
+    if (name === previous_name) {
+        root.dataset.mode = mode
+        sync_theme_radios()
+        save_choice(name, mode)
+        announce(`Mode changed to ${mode}`)
+        return
+    }
     begin_loading("theme")
     const previous_background = document.getElementById("theme_background")!
     const previous_links = [...document.querySelectorAll<HTMLLinkElement>("link[data-theme-css]")]
     let next_link: HTMLLinkElement | null = null
     let swapped = false
     try {
-        // A mode-only change keeps the renderer attached to its original layer.
-        if (name === previous_name) {
-            root.dataset.mode = mode
-            sync_theme_radios()
-            await wait_resources()
-            save_choice(name, mode)
-            announce(`Mode changed to ${mode}`)
-            return
-        }
         const manifest = await load_manifest(), next = manifest[name], previous = manifest[previous_name]
         if (!next) throw new Error("Unknown theme")
         if (!current && previous?.js) {
