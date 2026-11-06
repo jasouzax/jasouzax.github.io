@@ -1,6 +1,6 @@
 // Roles type in, hold (the caret blinks), delete and hand over to the next one: 4s each, 16s loop.
 // Shared component behavior: each theme gets one role at a time in the grid.
-// Needs a fixed-width face: the text is revealed in steps of one character (clip-path) and the caret moves in ch (translate).
+// Needs a fixed-width face: the text is revealed in steps of one character (clip-path) and the caret follows the same percentage of the text width.
 // Keyframes are generated per length because steps() cannot take a var().
 .landing_role {
     position: relative;
@@ -86,13 +86,13 @@ body:has(#motion_pause:checked) { @include still_roles; }
     @keyframes role_caret_#{$n} {
         0% {
             opacity: 1;
-            translate: 0 0;
+            left: 0;
             animation-timing-function: steps(#{$n}, jump-start);
         }
 
         9% {
             opacity: 1;
-            translate: #{$n}ch 0;
+            left: 100%;
             animation-timing-function: step-end;
         }
 
@@ -113,19 +113,19 @@ body:has(#motion_pause:checked) { @include still_roles; }
 
         19% {
             opacity: 1;
-            translate: #{$n}ch 0;
+            left: 100%;
             animation-timing-function: steps(#{$n}, end);
         }
 
         24% {
             opacity: 1;
-            translate: 0 0;
+            left: 0;
         }
 
         24.01%,
         100% {
             opacity: 0;
-            translate: 0 0;
+            left: 0;
         }
     }
 }

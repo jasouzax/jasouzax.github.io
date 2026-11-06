@@ -220,3 +220,39 @@ for (const theme of ["default", "memory"]) {
         await expect(page.locator("#loading_overlay")).toHaveCount(0)
     })
 }
+
+
+for (const theme of ["default", "memory"]) {
+    test(`${theme} typing and cursor start together after skeleton loading`, async ({ page }) => {
+        let release!: () => void
+        const gate = new Promise<void>(done => { release = done })
+        await page.route("**/assets/themes/default/*.css", async route => { await gate; await route.continue() })
+        await page.goto("/", { waitUntil: "domcontentloaded" })
+        expect(await page.locator(".landing_role").first().evaluate(element => getComputedStyle(element, "::after").animationName)).toBe("none")
+        await expect(page.locator(".landing_role_text").first()).toHaveCSS("animation-name", "none")
+        release()
+        await ready(page)
+        if (theme === "memory") {
+            await choose(page, "theme_name_memory")
+            await expect(page.locator("html")).toHaveAttribute("data-theme", "memory")
+            await ready(page)
+        }
+        const samples = await page.locator(".landing_role").first().evaluate(element => {
+            const animations = element.getAnimations({ subtree: true }).filter(animation =>
+                animation instanceof CSSAnimation && /^role_(type|caret)_/.test(animation.animationName))
+            const starts = animations.map(animation => Number(animation.startTime))
+            const errors = [1800, 2800, 4300].map(time => {
+                animations.forEach(animation => { animation.pause(); animation.currentTime = time })
+                const text = element.querySelector(".landing_role_text")!
+                const clip = getComputedStyle(text).clipPath
+                const hidden = Number(clip.match(/([\d.]+)%/)?.[1] ?? 0) / 100
+                const expected = text.getBoundingClientRect().width * (1 - hidden)
+                return Math.abs(parseFloat(getComputedStyle(element, "::after").left) - expected)
+            })
+            return { count: animations.length, startDifference: Math.max(...starts) - Math.min(...starts), errors }
+        })
+        expect(samples.count).toBe(2)
+        expect(samples.startDifference).toBeLessThanOrEqual(1)
+        for (const error of samples.errors) expect(error).toBeLessThan(1)
+    })
+}

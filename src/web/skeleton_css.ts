@@ -11,6 +11,7 @@ export const skeleton_css = `
 :root[data-skeleton="loading"] #head::before { opacity: 0 !important; }
 :root[data-skeleton] body::before, :root[data-skeleton] body::after { opacity: 0 !important; }
 :root[data-skeleton] :is(#main-content,#head,.site_foot) * { animation: none !important; }
+:root[data-skeleton] .landing_role::after { animation: none !important; }
 :root.theme_ready #head > * { animation: none !important; }
 :root.js:not(.intro) #head_signature { animation: none !important; }
 .loading_settled :is(.landing_panel > *, .landing_scroll, .expertise_head,.expertise_box,.desk_wbox,.desk_side),
