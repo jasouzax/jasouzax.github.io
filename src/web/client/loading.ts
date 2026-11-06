@@ -13,6 +13,65 @@ function busy(value: boolean): void {
 }
 
 const content_targets = "#main-content, #head > :not(#head_signature):not(#head_tray), #head_tray > *, .site_foot"
+const page_targets = "#main-content, #head > :not(#head_signature):not(#head_tray), .site_foot"
+
+// Navigation may finish at any point in the signature's entrance. Every effect
+// belongs to this navigation so a subsequent click can cancel it synchronously.
+export function page_signature(): { show(): Promise<void>; finish(): Promise<void>; cancel(): void } {
+    const source = document.getElementById("head_path_logo") as SVGSVGElement | null
+    const root = document.documentElement
+    const effects = new Set<Animation>()
+    let stopped = false, centered = false
+    const animate = async (from: number, to: number, duration: number): Promise<void> => {
+        if (!source || motion_reduced()) return
+        const effect = source.animate([{ transform: `scale(${from})` }, { transform: `scale(${to})` }],
+            { duration, easing: "ease-in-out", fill: "both" })
+        effects.add(effect)
+        await effect.finished.catch(() => {})
+    }
+    const clear = (): void => { effects.forEach(effect => effect.cancel()); effects.clear() }
+    const complete_drawing = (): void => {
+        if (!source) return
+        const seconds = (value: string | null): number => value ? parseFloat(value) * (value.endsWith("ms") ? .001 : 1) : 0
+        source.pauseAnimations()
+        source.setCurrentTime(Math.max(0, ...Array.from(source.querySelectorAll("animate,set"), tag =>
+            seconds(tag.getAttribute("begin")) + seconds(tag.getAttribute("dur")))) + .05)
+    }
+    return {
+        async show() {
+            await animate(1, 0, 180)
+            if (stopped || !source) return
+            centered = true
+            root.dataset.signatureIntro = ""
+            // Reuse the initial loader's drawing, on the original SVG paths.
+            delete (window as loading_window).jazu_signature_done
+            start_signature_intro()
+            for (const effect of source.getAnimations({ subtree: true })) effects.add(effect)
+            await animate(0, 1, 220)
+        },
+        async finish() {
+            stopped = true
+            clear()
+            if (centered) {
+                await animate(1, 0, 160)
+                if (!centered) return
+            }
+            complete_drawing()
+            delete root.dataset.signatureIntro
+            centered = false
+            clear()
+            await animate(0, 1, 180)
+            clear()
+        },
+        cancel() {
+            stopped = true
+            centered = false
+            complete_drawing()
+            clear()
+            delete root.dataset.signatureIntro
+        }
+    }
+}
 
 // Keep the original SVG attached throughout: its drawing timeline and identity
 // survive the switch from fixed center positioning back to the header layout.
@@ -115,6 +174,7 @@ export function capture_skeleton(): void {
         ["expertise-dots", "#expertise .expertise_dots", false]
     ]
     for (const [name, selector, combine] of groups) {
+        if (name === "head-tray" && document.documentElement.hasAttribute("data-spa")) continue
         const elements = Array.from(document.querySelectorAll(selector))
         const sets = combine ? [elements] : elements.map(element => [element])
         for (const members of sets) {
@@ -145,6 +205,7 @@ export function capture_skeleton(): void {
     const selector = "h1,h2,h3,p,button,input,textarea,summary,.landing_contact,.landing_btn,#head_path > a,#head_tabs > a,.site_foot > a"
     for (const element of document.querySelectorAll<HTMLElement>(selector)) {
         if (element.closest("#head_signature, [hidden]")) continue
+        if (document.documentElement.hasAttribute("data-spa") && element.closest("#head_tray")) continue
         let parent: Element | null = element
         while (parent && !covered.has(parent)) parent = parent.parentElement
         if (parent) continue
@@ -162,8 +223,10 @@ export function begin_loading(owner: string): void {
     shared.revision++
     shared.owners.add(owner)
     document.documentElement.dataset.skeleton = "loading"
-    document.documentElement.dataset.backgroundWait = ""
-    document.documentElement.classList.remove("theme_ready")
+    if (owner !== "page") {
+        document.documentElement.dataset.backgroundWait = ""
+        document.documentElement.classList.remove("theme_ready")
+    }
     capture_skeleton()
     busy(true)
 }
@@ -179,6 +242,21 @@ export async function finish_loading(owner: string): Promise<void> {
         if (box.bottom > 0 && box.top < innerHeight) article.classList.add("loading_settled", "in", "no_reveal")
     }
     const overlay = document.getElementById("loading_overlay")
+    if (owner === "page") {
+        root.dataset.skeleton = "revealing"
+        const effects = motion_reduced() ? [] : [
+            ...Array.from(document.querySelectorAll<HTMLElement>(page_targets), target =>
+                target.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, fill: "both" })),
+            ...(overlay ? [overlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "both" })] : [])
+        ]
+        await Promise.allSettled(effects.map(effect => effect.finished))
+        effects.forEach(effect => effect.cancel())
+        if (revision !== shared.revision) return
+        overlay?.remove()
+        delete root.dataset.skeleton
+        busy(false)
+        return
+    }
     await delay(motion_reduced() ? 0 : Math.max(0, 350 - (performance.now() - Number(overlay?.dataset.started ?? 0))))
     if (revision !== shared.revision) return
     // Fade the neutral canvas into the skin's base color before starting WebGL.
@@ -211,9 +289,19 @@ export async function finish_loading(owner: string): Promise<void> {
     busy(false)
 }
 
+export function cancel_page_loading(): void {
+    const shared = state()
+    shared.owners.delete("page")
+    shared.revision++
+    if (shared.owners.size) return
+    document.getElementById("loading_overlay")?.remove()
+    delete document.documentElement.dataset.skeleton
+    busy(false)
+}
+
 // Bound every optional resource: broken fonts/media must not trap a visitor in a
 // skeleton. Lazy images, videos and below-the-fold media remain lazy.
-export async function wait_resources(scope: ParentNode = document): Promise<void> {
+export async function wait_resources(scope: ParentNode = document, paint = true): Promise<void> {
     const pending: Promise<unknown>[] = []
     // Applying a new skin may request a different font only during layout.
     document.documentElement.getBoundingClientRect()
@@ -236,23 +324,28 @@ export async function wait_resources(scope: ParentNode = document): Promise<void
     }
     await Promise.race([Promise.allSettled(pending), delay(4000)])
     // Give styles and fonts a layout/paint opportunity before removing the cover.
-    await new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+    // View-transition updates suspend painting until their callback returns.
+    // Waiting for animation frames inside that callback would force even a
+    // fully cached destination through the slow-loading path.
+    if (paint) await new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done())))
 }
 
 export function boot_css_ready(): Promise<void> {
     return (window as loading_window).jazu_boot_css ?? Promise.resolve()
 }
 
-export async function wipe_page(direction: "out" | "in"): Promise<() => void> {
-    if (motion_reduced()) return () => {}
-    const targets = document.querySelectorAll<HTMLElement>("#main-content, #head > :not(#head_signature):not(#head_tray), #head_tray > *, .site_foot")
+export function wipe_page(direction: "out" | "in"): { finished: Promise<unknown>; cancel(): void } {
+    if (motion_reduced()) return { finished: Promise.resolve(), cancel() {} }
+    const targets = document.querySelectorAll<HTMLElement>(page_targets + (direction === "in" ? ", #loading_overlay" : ""))
     const gradient = direction === "out"
         ? "linear-gradient(135deg, transparent 40%, #000 60%)"
         : "linear-gradient(135deg, #000 40%, transparent 60%)"
-    const animations = Array.from(targets, target => target.animate([
-        { maskImage: gradient, maskSize: "300% 300%", maskPosition: "100% 100%", maskRepeat: "no-repeat" },
-        { maskImage: gradient, maskSize: "300% 300%", maskPosition: "0% 0%", maskRepeat: "no-repeat" }
-    ], { duration: 360, easing: "ease-in-out", fill: "forwards" }))
-    await Promise.allSettled(animations.map(animation => animation.finished))
-    return () => animations.forEach(animation => animation.cancel())
+    const animations = Array.from(targets, target => {
+        const rect = target.getBoundingClientRect()
+        return target.animate([
+            { maskImage: gradient, maskSize: "300vw 300vh", maskPosition: `${-2 * innerWidth - rect.left}px ${-2 * innerHeight - rect.top}px`, maskRepeat: "no-repeat" },
+            { maskImage: gradient, maskSize: "300vw 300vh", maskPosition: `${-rect.left}px ${-rect.top}px`, maskRepeat: "no-repeat" }
+        ], { duration: 360, easing: "ease-in-out", fill: "both" })
+    })
+    return { finished: Promise.allSettled(animations.map(animation => animation.finished)), cancel: () => animations.forEach(animation => animation.cancel()) }
 }

@@ -1,6 +1,20 @@
 import { test, expect, type Page } from "@playwright/test"
 
 const ready = (page: Page) => expect(page.locator("html")).not.toHaveAttribute("data-skeleton", /.+/, { timeout: 12000 })
+const navigated = async (page: Page) => {
+    await expect(page.locator("html")).not.toHaveAttribute("data-spa", "", { timeout: 12000 })
+    await ready(page)
+}
+const spa_ready = async (page: Page) => {
+    await ready(page)
+    // Keep shader rendering from consuming the transition's timing budget in
+    // headless software WebGL. The actual background DOM stays in place.
+    await page.evaluate(() => {
+        const layer = document.querySelector<HTMLElement>("#theme_background .background")
+        const theme = (window as any).jazu_theme_modules?.default
+        if (layer && theme) theme.mount(layer, { name: "default", mode: "auto" }).pause()
+    })
+}
 const choose = (page: Page, id: string) => page.locator(`#${id}`).evaluate((input: HTMLInputElement) => {
     input.checked = true
     input.dispatchEvent(new Event("change", { bubbles: true }))
@@ -55,24 +69,249 @@ for (const mode of ["light", "dark"] as const) {
 
 test("SPA wipes through a skeleton and keeps the exact signature node", async ({ page }) => {
     await page.goto("/")
-    await ready(page)
-    await page.evaluate(() => { (window as any).original_signature = document.getElementById("head_signature") })
+    await spa_ready(page)
+    await page.evaluate(() => {
+        (window as any).original_signature = document.getElementById("head_signature")
+        ;(window as any).original_logo = document.getElementById("head_path_logo")
+        ;(window as any).original_background = document.getElementById("theme_background")
+        ;(window as any).original_tray = document.getElementById("head_tray")
+    })
     let release!: () => void
     const gate = new Promise<void>(done => { release = done })
-    await page.route("**/privacy/index.json", async route => { await gate; await route.continue() })
+    let release_image!: () => void
+    const image = new Promise<void>(done => { release_image = done })
+    await page.route("**/spa-resource.svg", async route => {
+        await image
+        await route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>' })
+    })
+    await page.route("**/privacy/index.json", async route => {
+        const response = await route.fetch(), json = await response.json()
+        json.main.push(["img", { src: "/spa-resource.svg", width: 100, height: 100, style: "position:fixed;top:100px;left:200px" }])
+        await gate
+        await route.fulfill({ json })
+    })
     await page.locator('.site_foot a[href="/privacy"]').evaluate((link: HTMLAnchorElement) => link.click())
     await expect.poll(() => page.locator("#main-content").evaluate(element => getComputedStyle(element).maskImage)).toContain("linear-gradient")
+    await expect(page.locator("#head_path_logo")).toHaveCSS("position", "fixed")
+    await expect(page.locator("#head_tray")).toBeVisible()
+    await expect(page.locator("#theme_background")).toBeVisible()
     release()
     await expect(page.locator("html")).toHaveAttribute("data-skeleton", "loading")
+    await expect(page.locator('[data-skeleton-group="head-tray"]')).toHaveCount(0)
+    await expect(page.locator("#head_theme")).toBeVisible()
+    await expect(page.locator("#head_theme > summary")).toHaveCSS("visibility", "visible")
     expect(await page.evaluate(() => (window as any).original_signature === document.getElementById("head_signature"))).toBe(true)
-    await ready(page)
+    release_image()
+    await navigated(page)
     await expect(page).toHaveURL(/\/privacy$/)
     await expect(page.locator("#main-content")).toBeFocused()
     await expect(page.locator("#spa_spinner")).toHaveCount(0)
     await page.goBack()
-    await ready(page)
+    await navigated(page)
     await expect(page.locator("h1")).toContainText("Jason")
     expect(await page.evaluate(() => (window as any).original_signature === document.getElementById("head_signature"))).toBe(true)
+    expect(await page.evaluate(() => ["logo", "background", "tray"].every(name =>
+        (window as any)[`original_${name}`] === document.getElementById({ logo: "head_path_logo", background: "theme_background", tray: "head_tray" }[name]!)))).toBe(true)
+})
+
+test("warm SPA navigation pairs diagonal masks without a skeleton or centered signature", async ({ page }) => {
+    await page.goto("/")
+    await spa_ready(page)
+    const payload = await (await page.request.get("/privacy/index.json")).json()
+    payload.styles = []
+    // Keep this path deterministic: this case has no destination resources.
+    payload.main = [null, {}, ["h1", {}, "Warm destination"]]
+    await page.evaluate(payload => {
+        // Model an already cached JSON response without automation transport
+        // latency accidentally selecting the slow-request branch.
+        const original_fetch = window.fetch
+        window.fetch = (input, init) => {
+            if (input === "/privacy/index.json?fast=1") {
+                window.fetch = original_fetch
+                return Promise.resolve(new Response(JSON.stringify(payload), { headers: { "Content-Type": "application/json" } }))
+            }
+            return original_fetch(input, init)
+        }
+        const records: string[] = []
+        const observer = new MutationObserver(changes => {
+            for (const change of changes) if (change.attributeName) records.push(change.attributeName)
+        })
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-skeleton", "data-signature-intro"] })
+        ;(window as any).spa_check = { records, observer, document }
+        const link = document.createElement("a")
+        link.href = "/privacy/index.html?fast=1"
+        document.body.append(link)
+        link.click()
+    }, payload)
+    await expect(page).toHaveURL(/privacy\/index.html\?fast=1$/)
+    await expect.poll(() => page.evaluate(() => document.getAnimations().filter(animation =>
+        animation instanceof CSSAnimation && animation.animationName === "spa_wipe").length), { intervals: [10] }).toBe(2)
+    await navigated(page)
+    await expect(page.locator("h1")).toHaveText("Warm destination")
+    expect(await page.evaluate(() => {
+        const check = (window as any).spa_check
+        check.observer.disconnect()
+        return { sameDocument: document === check.document, records: check.records }
+    })).toEqual({ sameDocument: true, records: [] })
+})
+
+test("a superseded JSON request cannot replace the newer page", async ({ page }) => {
+    await page.goto("/")
+    await spa_ready(page)
+    let release!: () => void
+    const gate = new Promise<void>(done => { release = done })
+    await page.route(url => url.pathname === "/privacy/index.json", async route => {
+        const response = await route.fetch()
+        await gate
+        await route.fulfill({ response }).catch(() => {})
+    })
+    await page.locator('.site_foot a[href="/privacy"]').evaluate((link: HTMLAnchorElement) => link.click())
+    await expect(page.locator("#head_path_logo")).toHaveCSS("position", "fixed")
+    await page.evaluate(() => {
+        const link = document.createElement("a")
+        link.href = "/ja/privacy"
+        document.body.append(link)
+        link.click()
+    })
+    await expect(page).toHaveURL(/\/ja\/privacy$/)
+    await navigated(page)
+    release()
+    await page.waitForTimeout(200)
+    await expect(page.locator("html")).toHaveAttribute("lang", "ja")
+    await expect(page.locator(".site_foot a").first()).toHaveAttribute("href", "/ja/privacy")
+    await expect(page.locator("#head_path_logo")).not.toHaveCSS("position", "fixed")
+    await expect(page.locator("#main-content")).toHaveAttribute("aria-busy", "false")
+})
+
+test("SPA fallback and reduced motion reveal failed resources without trapping the loader", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.addInitScript(() => { document.startViewTransition = undefined as any })
+    await page.goto("/")
+    await spa_ready(page)
+    await page.route("**/privacy/index.json", async route => {
+        const response = await route.fetch(), json = await response.json()
+        json.main.push(["img", { src: "/missing-spa.svg", style: "position:fixed;top:100px;left:200px" }])
+        await route.fulfill({ json })
+    })
+    await page.route("**/missing-spa.svg", route => route.abort())
+    await page.locator('.site_foot a[href="/privacy"]').evaluate((link: HTMLAnchorElement) => link.click())
+    await expect(page).toHaveURL(/\/privacy$/)
+    await navigated(page)
+    await expect(page.locator("#head_path_logo")).not.toHaveCSS("position", "fixed")
+    await expect(page.locator("#loading_overlay")).toHaveCount(0)
+    await expect(page.locator("#main-content")).toBeFocused()
+})
+
+test("SPA leaves modified clicks, new tabs, downloads and local fragments to the browser", async ({ page }) => {
+    await page.goto("/")
+    await spa_ready(page)
+    const intercepted = await page.evaluate(() => {
+        const results: boolean[] = []
+        // This listener runs after the router; suppress native actions after
+        // recording whether the router claimed each click.
+        const observe = (event: MouseEvent): void => { results.push(event.defaultPrevented); event.preventDefault() }
+        document.addEventListener("click", observe)
+        const cases = [
+            { href: "/privacy", ctrlKey: true }, { href: "/privacy", metaKey: true },
+            { href: "/privacy", shiftKey: true }, { href: "/privacy", altKey: true },
+            { href: "/privacy", button: 1 }, { href: "/privacy", button: 2 },
+            { href: "/privacy", target: "_blank" }, { href: "/privacy", download: "privacy.html" },
+            { href: "https://example.com/privacy" }, { href: "mailto:test@example.com" },
+            { href: "/assets/example.pdf" }, { href: "/work" }, { href: "/api/status" },
+            { href: "#expertise" }, { href: "#" }
+        ]
+        for (const item of cases) {
+            const link = document.createElement("a")
+            link.href = item.href
+            if ("target" in item) link.target = item.target!
+            if ("download" in item) link.download = item.download!
+            document.body.append(link)
+            link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ...item }))
+            link.remove()
+        }
+        document.removeEventListener("click", observe)
+        return results
+    })
+    expect(intercepted).toEqual(Array(15).fill(false))
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.locator("html")).not.toHaveAttribute("data-spa", "")
+})
+
+for (const prefix of ["", "/ja"]) {
+    test(`desktop ${prefix || "English"} uses JSON navigation and runs its terminal without reloading`, async ({ page }) => {
+        test.setTimeout(60000)
+        const documents: string[] = [], errors: string[] = []
+        page.on("request", request => {
+            if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents.push(request.url())
+        })
+        page.on("pageerror", error => errors.push(error.message))
+        page.on("console", message => {
+            if (/Content Security Policy|requires cross-origin isolation/i.test(message.text())) errors.push(message.text())
+        })
+        await page.goto(`${prefix}/`)
+        await spa_ready(page)
+        expect(await page.evaluate(() => crossOriginIsolated && typeof SharedArrayBuffer !== "undefined")).toBe(true)
+        await page.evaluate(() => {
+            ;(window as any).desktop_navigation = {
+                document, signature: document.getElementById("head_path_logo"), background: document.getElementById("theme_background")
+            }
+        })
+        const desktop = `${prefix}/desk`
+        await page.locator("#head_div > summary").click()
+        await Promise.all([
+            page.waitForRequest(request => new URL(request.url()).pathname === `${desktop}/index.json`),
+            page.locator(`#head_div a[href="${desktop}"]`).click()
+        ])
+        await expect(page).toHaveURL(new RegExp(`${desktop}$`))
+        await navigated(page)
+        await expect(page.locator(".desk[data-runtime]")).toBeVisible()
+        const address = page.locator(".desk_wbox_head_path").first()
+        await address.fill("pid:")
+        await address.press("Enter")
+        const screen = page.locator(".xterm-rows")
+        await expect(screen).toContainText("user@jasouza:/home/user$", { timeout: 15000 })
+        await page.locator(".xterm-helper-textarea").pressSequentially("echo SPA_DESK_OK")
+        await page.keyboard.press("Enter")
+        await expect(screen.locator(":scope > div").filter({ hasText: /^SPA_DESK_OK\s*$/ })).toBeVisible({ timeout: 10000 })
+        await page.locator("#head_signature").click()
+        await expect(page).toHaveURL(new RegExp(`${prefix || "/"}$`))
+        await navigated(page)
+        await expect(page.locator("#home h1")).toBeVisible()
+        await page.goBack()
+        await expect(page).toHaveURL(new RegExp(`${desktop}$`))
+        await navigated(page)
+        await expect(page.locator(".desk[data-runtime]")).toBeVisible()
+        expect(documents).toHaveLength(1)
+        expect(await page.evaluate(() => {
+            const original = (window as any).desktop_navigation
+            return original?.document === document && original.signature === document.getElementById("head_path_logo") &&
+                original.background === document.getElementById("theme_background") && crossOriginIsolated
+        })).toBe(true)
+        expect(errors).toEqual([])
+    })
+}
+
+test("isolated homepage still accepts a sign-in popup callback", async ({ page, context }) => {
+    test.setTimeout(45000)
+    await context.route("https://accounts.google.com/o/oauth2/v2/auth?**", route =>
+        route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Mock sign-in</title>" }))
+    await page.goto("/")
+    await spa_ready(page)
+    const button = page.locator('button[data-sign="google"]')
+    await button.evaluate((button: HTMLButtonElement) => { button.dataset.client = "test-client" })
+    await page.locator("#head_account > summary").click()
+    const opened = context.waitForEvent("page")
+    await button.click()
+    const popup = await opened
+    await popup.waitForURL("https://accounts.google.com/**")
+    expect(await popup.evaluate(() => window.opener === null)).toBe(true)
+    const nonce = new URL(popup.url()).searchParams.get("nonce")
+    const payload = Buffer.from(JSON.stringify({ nonce, name: "SPA User", email: "spa@example.com", exp: Math.floor(Date.now() / 1000) + 300 })).toString("base64url")
+    const origin = new URL(page.url()).origin
+    await popup.goto(`${origin}/#id_token=e30.${payload}.test`)
+    await expect(button).toHaveAttribute("data-signed", "out", { timeout: 15000 })
+    await expect(button).toContainText("SPA User")
+    await popup.close()
 })
 
 test("Memory uses the inline intermediary and switches back without Default skin inheritance", async ({ page }) => {

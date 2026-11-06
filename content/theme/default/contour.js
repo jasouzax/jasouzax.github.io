@@ -634,7 +634,7 @@ gl_FragColor = vec4(mix(valley_color, globe_glow(dither_color(strength, CONTOUR_
         if (now - this.last_frame < 1000 / this.config.max_fps - 1) return;
         const dt = Math.min((now - this.last_frame) / 1000, 0.05);
         this.last_frame = now;
-        if (document.documentElement.hasAttribute("data-background-wait") || document.documentElement.hasAttribute("data-skeleton")) return;
+        if (document.documentElement.hasAttribute("data-background-wait") || (document.documentElement.hasAttribute("data-skeleton") && !document.documentElement.hasAttribute("data-spa"))) return;
         this.step(dt);
         this.draw();
     };

@@ -193,6 +193,7 @@ export function render_page(
             head: serialize(managed),
             header: serialize(head),
             main: serialize(main.body),
+            footer: serialize(footer(ctx)),
             styles,
             tabs: main.tabs.map((item) => ({ href: item.href, label: item.label })),
             hreflang: model.pages

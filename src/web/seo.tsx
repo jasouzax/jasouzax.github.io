@@ -345,6 +345,9 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         `script-src 'self' 'wasm-unsafe-eval' ${script_hashes}`.trim(),
         `style-src 'self' ${style_hashes.map(hash => `'sha256-${hash}'`).join(" ")}`.trim(),
         "style-src-attr 'unsafe-inline'",
+        // Any page can enter the desktop through the SPA. xterm generates
+        // dimension/theme style elements when a terminal is opened there.
+        "style-src-elem 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "font-src 'self'",
         "media-src 'self' blob:",
@@ -362,6 +365,10 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "  X-Content-Type-Options: nosniff",
         "  Referrer-Policy: strict-origin-when-cross-origin",
         "  Strict-Transport-Security: max-age=31536000; includeSubDomains",
+        // Isolation belongs to the document, so enable it before an SPA visit
+        // to the desktop instead of requiring a new document at /desk.
+        "  Cross-Origin-Opener-Policy: same-origin",
+        "  Cross-Origin-Embedder-Policy: require-corp",
         `  Content-Security-Policy: ${csp}`,
         "/work",
         "  Referrer-Policy: no-referrer",
@@ -370,12 +377,6 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "/work/*",
         "  Referrer-Policy: no-referrer",
         "  X-Robots-Tag: noindex",
-        ...["/desk", "/desk/*", "/ja/desk", "/ja/desk/*"].flatMap(path => [path,
-            "  Cross-Origin-Opener-Policy: same-origin", "  Cross-Origin-Embedder-Policy: require-corp",
-            // xterm's DOM renderer generates its dimension/theme style elements.
-            `  Content-Security-Policy: ${csp}; style-src-elem 'self' 'unsafe-inline'`]),
-        "/assets/runtime/wasm_worker*.js",
-        "  Cross-Origin-Embedder-Policy: require-corp",
         "/assets/*",
         "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/wasm/manifest.json",
