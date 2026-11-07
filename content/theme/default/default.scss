@@ -6599,6 +6599,10 @@ html.desk_dragging {
     box-shadow: none;
 }
 
+.desk_side:not(:has(> .desk_side_head .desk_side_tabs_drop[data-path="file:///"][open])) > .desk_files_bar {
+    display: none;
+}
+
 .desk_files_bar {
     flex: 0 0 auto;
     min-width: 20em;

@@ -443,7 +443,7 @@ function render_side_head(ctx: render_ctx, desk: xml_node): html {
     const tabs = sides.map((side, index) => (
         <>
             <li>
-                <details class={"desk_side_tabs_drop"} name={"desk_side_tab"} open={index === 0}>
+                <details class={"desk_side_tabs_drop"} name={"desk_side_tab"} data-path={side.attrs.path} open={index === 0}>
                     <summary>
                         {glyph(ctx, side.attrs.icon ?? "[file]")}
                         {side.attrs.name ?? ""}

@@ -16,6 +16,12 @@ const page_attrs = [
     "keywords", "canonical", "robots", "lastmod", "cover", "print",
 ]
 
+export const research_sections: Record<string, string> = {
+    terminology: "Terminology", problem: "Problem", solution: "Solution", significance: "Significance",
+    objectives: "Objectives", literature_review: "Literature Review", frameworks: "Frameworks",
+    methodology: "Methodology", results: "Results",
+}
+
 export const rules: Record<string, rule> = {
     page: { attrs: page_attrs, required: ["path", "name"], children: ["hero", "expertise", "desk", "style"], bools: ["featured", "noindex", "menu"] },
     landing: { attrs: ["greet", "name", "family", "role", "info", "status", "tab", "icon"], required: [], children: ["action", "contact"] },
@@ -51,7 +57,9 @@ export const rules: Record<string, rule> = {
 Object.assign(rules, {
     hero: { attrs: ["status", "name", "tab", "tags", "info", "profile"], required: [], children: ["item", "action"] },
     item: { attrs: ["icon", "name", "text", "link", "print"], required: [], children: [] },
-    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window", "action"], bools: ["featured", "private"] },
+    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window", "action", "research"], bools: ["featured", "private"] },
+    research: { attrs: [], required: [], children: Object.keys(research_sections) },
+    point: { attrs: ["name"], required: ["name"], children: ["point"] },
     slide: { attrs: ["media", "poster", "alt", "info", "description", "skill", "stack", "feature_stack", "hashtags", "tags", "featured", "private"], required: ["skill"], children: [], bools: ["featured", "private"] },
     event: { attrs: [...page_attrs, "id", "type", "lang", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
     blog: { attrs: ["id", "name", "date", "icon", "info", "lang"], required: ["id", "name"], children: ["menu", "window"] },
@@ -63,6 +71,7 @@ Object.assign(rules, {
     plugin: { attrs: ["id", "name", "icon", "version", "mime", "path", "mode", "from", "to", "flow", "wasm", "sha256", "script", "options"], required: ["id", "version"], children: ["case"] },
     case: { attrs: ["file", "error", "view", "edit", "mime", "url", "host", "script"], required: [], children: [], bools: ["file", "error", "view", "edit"] },
 } satisfies Record<string, rule>)
+for (const name of Object.keys(research_sections)) rules[name] = { attrs: [], required: [], children: name === "terminology" ? [] : ["point"] }
 export const root_tags = ["page", "theme", "project", "event", "blog", "print", "plugin"]
 
 function check_node(node: xml_node, diag: diagnostics): void {
@@ -70,6 +79,15 @@ function check_node(node: xml_node, diag: diagnostics): void {
     if (!rule) {
         report_error(diag, where_of(node), `unknown element <${node.tag}>`)
         return
+    }
+    if (node.tag === "project" && node.children.filter(child => child.tag === "research").length > 1)
+        report_error(diag, where_of(node), "project may contain only one <research>")
+    if (node.tag === "research") {
+        const sections = new Set<string>()
+        for (const child of node.children) {
+            if (sections.has(child.tag)) report_error(diag, where_of(child), `duplicate research section <${child.tag}>`)
+            sections.add(child.tag)
+        }
     }
     if (node.tag === "page" && (!node.attrs.path?.startsWith("/") || /[\\?#%]/.test(node.attrs.path) || node.attrs.path.split("/").some(part => part === "." || part === ".."))) report_error(diag, where_of(node), "page path must be an absolute URL path without traversal, query or fragment")
     for (const [name, value] of Object.entries(node.attrs)) {

@@ -1,6 +1,30 @@
 import { test, expect } from "@playwright/test"
 import { execFileSync } from "node:child_process"
 
+test("project research Overview expands explanations without opening windows or file actions", async ({ page }) => {
+    await page.goto("/projects/stesis")
+    await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "")
+    const windows = await page.locator(".desk_wbox").count()
+    await page.locator(".desk_side_tabs_drop > summary").filter({ hasText: "Overview" }).click()
+    const panel = page.locator(".desk_side_page").nth(1)
+    await expect(panel).toBeVisible()
+    await expect(page.locator(".desk_files_bar")).toBeHidden()
+    await expect(panel.locator(":scope > .desk_side_item > details > summary > h3")).toHaveText([
+        "Terminology", "Problem", "Solution", "Significance", "Objectives", "Literature Review", "Frameworks", "Methodology", "Results",
+    ])
+    await expect(panel.locator("a,button")).toHaveCount(0)
+    await panel.getByText("Terminology", { exact: true }).click()
+    await expect(panel.locator(".desk_side_item_body").first()).toContainText("No logo or motto is finalized")
+    await expect(panel.locator(".desk_side_item_body").first()).toBeVisible()
+    await panel.getByText("Problem", { exact: true }).click()
+    await panel.getByText("Environmental awareness", { exact: true }).click()
+    await panel.getByText("Information gaps", { exact: true }).click()
+    await expect(panel.getByText(/Identify situations that existing mobility aids/)).toBeVisible()
+    await expect(page.locator(".desk_wbox")).toHaveCount(windows)
+    await page.locator(".desk_side_tabs_drop > summary").filter({ hasText: "Files" }).click()
+    await expect(page.locator(".desk_files_bar")).toBeVisible()
+})
+
 test("home folder loads with an older registry and accepts either file URI spelling", async ({ page }) => {
     await page.route("**/assets/plugins.json", async route => {
         const response = await route.fetch()
