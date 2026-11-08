@@ -17,7 +17,7 @@ npm run serve -- --port 8080
 
 Open http://localhost:8080. `serve` builds first. For content edits run `npm run watch` in another terminal. Pin a build date with `npm run build -- --date 2026-11-04`. `npm run check -- --strict` also fails on editorial warnings. `npm run clean` removes only generated output and caches. No gen-11 checkout or dependencies are needed at runtime.
 
-The supplied media was ignored by gen-11's Git repository. It has been copied locally into `content/media`, which stays ignored except for `signature.svg`. A fresh clone needs the owner's media archive restored there; missing files are reported by `check`. Never place private documents in public content. See `PLACEHOLDER.md` before publishing.
+The supplied media was ignored by gen-11's Git repository. It has been copied locally into `content/media`, which stays ignored. Website-specific SVG assets are tracked in `content/assets`. A fresh clone needs the owner's media archive restored there; missing files are reported by `check`. Never place private documents in public content. See `PLACEHOLDER.md` before publishing.
 
 ## Find and edit things
 
@@ -25,7 +25,8 @@ The supplied media was ignored by gen-11's Git repository. It has been copied lo
 |---|---|
 | `config.json` | Public owner/site settings, languages, theme selection, icon registry, deployment names |
 | `content/` | Page XML and page resources directly here; language variants share one XML file |
-| `content/blogs/`, `content/media/`, `content/theme/` | Blog roots/resources, shared media and themes respectively |
+| `content/blogs/`, `content/media/`, `content/theme/` | Blog roots/resources, local shared media and themes respectively |
+| `content/assets/` | Tracked website assets: animated header signature, static signature for generated icons/covers, and browser favicon |
 | `src/main.ts`, `src/commands.ts` | TSX loader entry point and CLI commands |
 | `src/model.ts`, `objects.ts`, `schema.ts`, `xml.ts` | Discovery, object generators, validation and parsing |
 | `src/build.ts`, `cache.ts`, `graph.ts` | Build orchestration and incremental output |

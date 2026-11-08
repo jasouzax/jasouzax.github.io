@@ -67,7 +67,7 @@ export function tier_report(css: string): string[] {
 export function check_seo(model: site_model): void {
     const base = model.config.base_url
     if (!/^https:\/\/[^/\s]+$/.test(base)) report_warning(model.diag, "config.json", `base_url "${base}" should be the site's https origin with no path (canonical, sitemap, manifest and Open Graph URLs are built from it)`)
-    if (!has_icon(model)) report_warning(model.diag, "content", "no content/icon.svg (or content/media/signature.svg): favicon, touch icon and manifest icons are not generated")
+    if (!has_icon(model)) report_warning(model.diag, "content", "no content/assets/signature.svg (or signature_animation.svg or favicon.svg): favicon, touch icon and manifest icons are not generated")
     if (security_txt(model) === null) report_warning(model.diag, "config.json", "no security contact (seo.security.contact or owner.email): security.txt is not generated")
     const titles = new Map<string, string>()
     const infos = new Map<string, string>()

@@ -412,7 +412,6 @@ function make_zip(entries: { name: string, data: Buffer, mtime: Date }[]): Buffe
 function pack_command(project: string, file_name: string, additions:string[] = []): void {
     const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "wrangler.jsonc", "wrangler.local.jsonc", "wrangler.bindings.example.json", "tsconfig.json", ...additions]
     const media_dir = join(project, "content", "media")
-    const media_keep = join(media_dir, "signature.svg")
     const out = join(project, file_name)
     const files: string[] = []
     for (const target of targets) {
@@ -423,11 +422,10 @@ function pack_command(project: string, file_name: string, additions:string[] = [
         }
         collect_files(path, files)
     }
-    if (!existsSync(media_keep)) console.warn("warning: content/media/signature.svg not found, skipping")
-    // content/media/ is excluded entirely, except content/media/signature.svg
+    // The local media archive is excluded; website assets in content/assets are included.
     const entries = files
         .filter(path => path !== out)
-        .filter(path => path === media_keep || !path.startsWith(media_dir + sep))
+        .filter(path => !path.startsWith(media_dir + sep))
         .map(path => ({
             name: relative(project, path).split(sep).join("/"),
             data: readFileSync(path),

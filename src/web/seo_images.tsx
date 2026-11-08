@@ -26,10 +26,9 @@ export type brand = { background: string; foreground: string }
 
 export function icon_source(model: site_model): string | null {
     for (const file of [
-        join(model.content_dir, "icon.svg"),
-        join(model.content_dir, "media", "icon.svg"),
-        join(model.content_dir, "media", "signature.svg"),
-        join(model.content_dir, "favicon.svg")
+        join(model.content_dir, "assets", "signature.svg"),
+        join(model.content_dir, "assets", "signature_animation.svg"),
+        join(model.content_dir, "assets", "favicon.svg")
     ]) {
         if (existsSync(file)) return file
     }
@@ -143,7 +142,7 @@ export async function icon_files(model: site_model, colors: brand, files: output
         [16, 32, 48].map(async (size) => ({ size, png: await png(size, size <= 16 ? 0.92 : 0.84) }))
     )
     files.set("favicon.ico", build_ico(ico))
-    const favicon = join(model.content_dir, "favicon.svg")
+    const favicon = join(model.content_dir, "assets", "favicon.svg")
     if (existsSync(favicon)) {
         const svg = freeze_svg(readFileSync(favicon, "utf8"))
         files.set("icon.svg", svg)

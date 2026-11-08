@@ -9,11 +9,9 @@ dist/
 jazu_icons_*/
 
 content/media/*
-!content/media/signature.svg
-
-!content/media/icon.svg
 
 wasmbox
 src/desk/**/.build/
 gen-11
 .claude
+codebase.zip

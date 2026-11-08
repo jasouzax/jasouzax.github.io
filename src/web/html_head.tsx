@@ -18,7 +18,7 @@ export function theme_choices(ctx: render_ctx): theme_choice[] {
         }))
 }
 function signature(ctx: render_ctx): child {
-    const file = join(ctx.model.content_dir, "media", "signature.svg")
+    const file = join(ctx.model.content_dir, "assets", "signature_animation.svg")
     if (!existsSync(file)) return <span id="head_path_logo">{ctx.model.config.site_name}</span>
     return raw(readFileSync(file, "utf8").replace(/<svg\b/, '<svg id="head_path_logo"'))
 }
