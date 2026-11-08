@@ -410,7 +410,7 @@ function make_zip(entries: { name: string, data: Buffer, mtime: Date }[]): Buffe
 }
 
 async function pack_command(project: string, file_name: string, additions:string[] = []): Promise<void> {
-    const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "wrangler.jsonc", "wrangler.local.jsonc", "wrangler.bindings.example.json", "tsconfig.json", ...additions]
+    const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "terraform", "wrangler.local.jsonc", "tsconfig.json", ...additions]
     const config = await load_config(project)
     const excluded = config.pack.exclude.map(path => {
         const target = resolve(project, path)

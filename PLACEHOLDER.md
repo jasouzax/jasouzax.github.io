@@ -19,10 +19,10 @@ The inherited sample birth date, phone numbers, postal code, family/commute fiel
 
 | Deployment input | Replace before cloud use |
 |---|---|
-| `wrangler.jsonc` | Pages origin, domain, account/zone routes and optional production bindings |
-| `wrangler.bindings.example.json` | Copy required binding sections into wrangler.jsonc and replace example IDs/names |
+| `terraform/terraform.tfvars` | Copy from `terraform.tfvars.example`; account id, zone id, R2 S3 keys, optional resource names and Worker secrets (git-ignored) |
+| `CLOUDFLARE_API_TOKEN` | Environment variable used by Terraform and D1 migrations; never commit |
 | `.env.example` | Copy to ignored .env, generate HMAC key, explicitly map only public repositories |
-| Cloudflare Worker secrets | HMAC key and Access service token id/secret; never commit actual values |
+| Worker secrets | HMAC key and Access service token id/secret as Terraform variables; never commit actual values |
 | KV registry | Explicit external HTTPS origins for each approved demo/work subdomain |
 | `wrangler.local.jsonc` | Local-only synthetic binding identifiers; never deploy this config |
 

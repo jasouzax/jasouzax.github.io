@@ -21,6 +21,9 @@
     "test:loading:browser": "playwright test --config tests/loading_browser.config.ts",
     "test:expertise:browser": "playwright test --config tests/expertise_browser.config.ts",
     "deploy:dry": "node src/main.ts deploy --dry_run",
+    "deploy": "node src/main.ts deploy",
+    "tf:fmt": "terraform -chdir=terraform fmt",
+    "tf:validate": "terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate",
     "cloud:dev": "wrangler dev --config wrangler.local.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
     "node": "node --env-file=.env src/main.ts node"

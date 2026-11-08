@@ -100,36 +100,38 @@ npm run cloud:dev
 
 In a separate terminal run `npm run serve`. Wrangler exposes the Worker at http://localhost:8787 and proxies public HTML to http://127.0.0.1:8080. Inspect http://localhost:8787/api/v1/health. Local D1/R2/KV data is in ignored `.wrangler/`. Local migrations have no production effect.
 
-Prepare a deployable site and validate the Worker bundle, without uploading:
+Prepare a deployable site and bundle the Worker, without uploading or applying anything:
 
 ```powershell
 npm run deploy:dry -- --date 2026-11-04
 ```
 
-This builds `dist` and writes `.cache/deploy/latest.json`, which points to the generated Pages/Worker configurations and an R2 upload list. Files over 25 MiB are excluded from the Pages staging directory and uploaded to R2 by the real deploy command. XML media URLs are content-hashed under `/assets/media/`; the Worker serves large files with range support and falls back to Pages for small assets. Six supplied videos need R2. Deploy using this staging flow, not `wrangler pages deploy dist`, which would include oversized media. Referenced media is copied locally; unreferenced media is not published.
+This builds `dist`, bundles the Worker to a single ES module with esbuild and writes `.cache/deploy/latest.json`, which points to the Pages staging folder, the Worker bundle, a generated Terraform var-file and the R2 upload list. Files over 25 MiB are excluded from the Pages staging directory and uploaded to R2 by Terraform. XML media URLs are content-hashed under `/assets/media/`; the Worker serves large files with range support and falls back to Pages for small assets. Six supplied videos need R2. Referenced media is copied locally; unreferenced media is not published.
 
-Provision Cloudflare once, using the owner's account:
+### Infrastructure as code (Terraform)
 
-```powershell
-npx wrangler login
-npx wrangler pages project create jazu --production-branch master
-npx wrangler r2 bucket create jazu-assets
-npx wrangler kv namespace create REGISTRY
-npx wrangler d1 create jazu
-```
+All Cloudflare infrastructure lives in `terraform/`: the Pages project, R2 assets bucket, KV registry, D1 database, the Worker script with its bindings and secrets, the apex and wildcard routes, the `workers.dev` subdomain, large-media R2 objects, and D1 migrations. Wrangler is no longer used to provision or deploy these.
 
-Use the project/Worker names in `config.json`. Merge the bindings from `wrangler.bindings.example.json` into `wrangler.jsonc`, replacing database/KV IDs, bucket names, domain/zone routes and `vars.PAGES_ORIGIN` with real values. Do not use example IDs in production. Connect the domain in the Cloudflare zone; attach the apex and wildcard Worker routes. Set Pages to its distinct `.pages.dev` hostname so Worker fallback cannot loop. For an existing Pages project, download its actual configuration before replacing settings.
+One-time setup:
 
-The migration branch deploys as a Pages preview. While testing, point `PAGES_ORIGIN` at the preview deployment URL returned by Wrangler; use the production Pages origin only after the owner merges and deploys master. The Worker generated config includes **only public project ids** for subdomain redirects. KV records `host:<name>-demo` and `host:<name>-work` contain explicit external HTTPS origins; unknown hosts return 404. Those registry origins cannot point back into the same public domain because that would loop through the Worker.
+1. Install Terraform >= 1.6.
+2. Create a Cloudflare API token with edit permission for Workers Scripts, Workers Routes, Workers KV, D1, R2, Pages and Zone read, and export it as `CLOUDFLARE_API_TOKEN`. D1 migrations reuse the same token.
+3. Create an R2 S3 API token (R2 > Manage API tokens) for uploading large media.
+4. Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars` and fill in `account_id`, `zone_id` and the R2 keys. Set the Worker secrets (`origin_hmac_secret`, `access_client_id`, `access_client_secret`) there when the personal node exists. This file is git-ignored; never commit it or the state.
+5. For an existing, already-provisioned account, import resources before the first apply (for example `terraform import cloudflare_pages_project.site <account_id>/jazu`) so Terraform adopts them instead of creating duplicates. Download an existing Pages project's actual settings first.
 
-After provisioning and reviewing the dry-run artifacts, an operator can run:
+Plan, then deploy:
 
 ```powershell
-npx wrangler d1 migrations apply DB --remote --config wrangler.jsonc
+npm run deploy:dry -- --date 2026-11-04
+terraform -chdir=terraform init
+terraform -chdir=terraform plan -var-file=<var_file from .cache/deploy/latest.json>
 node src/main.ts deploy --target all
 ```
 
-`--target pages` uploads large media to R2 then Pages; `--target worker` deploys the Worker only; `all` does both in that order. No resources are created, migrations applied remotely or deployments triggered during this refactor. D1 is a schema foundation; provisioning it does not enable the unfinished Work APIs. Deleting old R2 objects is an owner retention task; deployments do not delete them.
+`--target pages` applies the Pages project and large R2 objects, then uploads the Pages content; `--target worker` applies the Worker, routes and D1 migrations (using Terraform `-target`, which also applies required dependencies such as the bucket, KV namespace and database); `all` applies everything, then uploads the Pages content. Do not set `PAGES_ORIGIN` by hand: Terraform derives it from the Pages project, or use `pages_origin` in `terraform.tfvars` to point at a preview deployment while testing. The generated Worker variables include **only public project ids** for subdomain redirects. KV records `host:<name>-demo` and `host:<name>-work` contain explicit external HTTPS origins; unknown hosts return 404. Those registry origins cannot point back into the same public domain because that would loop through the Worker.
+
+Known limitation: Terraform has no resource for Pages direct-upload deployments, so the final Pages content upload still shells out to `wrangler pages deploy` (the only wrangler call left in the deploy path). Local development also still uses `wrangler dev` with `wrangler.local.jsonc`. D1 is a schema foundation; provisioning it does not enable the unfinished Work APIs. Deleting old R2 objects is an owner retention task; Terraform only manages the objects listed in the current build, so removed media is left in the bucket until you delete it.
 
 Set up a personal node:
 
@@ -137,12 +139,12 @@ Set up a personal node:
 2. Copy `.env.example` to `.env`. Generate a high-entropy `ORIGIN_HMAC_SECRET` of at least 32 characters. Set `JAZU_REPOSITORIES_JSON` to an explicit map of **public** project ids to local repository paths. Never include a private/client repository in this public read adapter.
 3. Run `npm run node -- --port 8788`. It binds loopback only. Unsigned requests, including `/health`, return 401. The Git adapters support refs/tree/blob/log (100 log entries; blobs capped at 16 MiB). Ref/path queries cannot invoke arbitrary Git commands.
 4. Create a Cloudflare Tunnel with a private origin hostname pointing to `http://127.0.0.1:8788`. Protect that hostname with a Cloudflare Access **Service Auth** policy and a service token. Keep it distinct from the central Worker's wildcard public domain routes.
-5. Set `config.json.personal_server` to that HTTPS origin. Store the same HMAC key in the Worker using `npx wrangler secret put ORIGIN_HMAC_SECRET`; likewise set `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` from the Access service token. Rebuild the deployment configuration and deploy the Worker.
+5. Set `config.json.personal_server` to that HTTPS origin. Store the same HMAC key in the Worker by setting `origin_hmac_secret` in `terraform/terraform.tfvars`; likewise set `access_client_id` and `access_client_secret` from the Access service token. Then run `node src/main.ts deploy --target worker`.
 6. Supervise the node and cloudflared with the operating system's service manager. The HMAC covers method, path/query, timestamp, nonce, client and body hash; the origin rejects expired/replayed signatures. If it is offline the public Git API returns 503. Snapshot dashboards and native Git clone/push transport are future tasks.
 
 For `GET /api/v1/git/<public_id>/{refs|tree|blob|log}`, use `?ref=HEAD&path=readme.md` as needed. Browser cookies/tokens are never forwarded to this node. `/desk` is browser-local and does not upload visitor files to it.
 
-Cloudflare references: [Pages commands and configuration](https://developers.cloudflare.com/workers/wrangler/commands/pages/), [Pages configuration migration](https://developers.cloudflare.com/pages/functions/wrangler-configuration/), [Pages limits](https://developers.cloudflare.com/pages/platform/limits/), [R2 uploads](https://developers.cloudflare.com/r2/objects/upload-objects/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), [Access service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
+Cloudflare references: [Cloudflare Terraform provider](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs), [Pages commands and configuration](https://developers.cloudflare.com/workers/wrangler/commands/pages/), [Pages limits](https://developers.cloudflare.com/pages/platform/limits/), [R2 uploads](https://developers.cloudflare.com/r2/objects/upload-objects/), [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/), [Access service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
 
 ## Development and review
 
