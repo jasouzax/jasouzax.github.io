@@ -2,13 +2,60 @@ import { test, expect as base_expect, type Page } from "@playwright/test"
 const expect = base_expect.configure({ timeout: 30000 })
 
 async function terminal(page: Page) {
-    await page.getByRole("button", { name: "Open terminal", exact: true }).click()
+    await page.locator(".desk_wbox").last().getByRole("button", { name: "Open terminal", exact: true }).click()
     const screen = page.locator(".xterm-rows")
     await expect(screen).toContainText("user@jasouza:")
     const send = async (command: string) => { await page.locator(".xterm-helper-textarea").pressSequentially(command); await page.keyboard.press("Enter") }
     const line = (value: string) => page.locator(".xterm-rows > div").filter({ hasText: new RegExp(`^${value}\\s*$`) }).last()
     return { screen, send, line }
 }
+
+test("project desks focus their project directory and share commands and the visitor home", async ({ page }) => {
+    test.setTimeout(120000)
+    await page.goto("/projects/galactic-strike")
+    const directory = page.locator('.desk_side_item[data-path="/srv/projects/galactic-strike"]')
+    await expect(page.locator("#head_menu")).toHaveAttribute("open", "")
+    await expect(directory.locator(":scope > details")).toHaveAttribute("open", "")
+    await expect(directory.locator(":scope > details > summary")).toHaveAttribute("data-focused", "")
+    await expect(directory).toBeVisible()
+    await expect(page.locator(".desk_wbox_head_path").first()).toHaveValue("file:///srv/projects/galactic-strike")
+    await page.evaluate(async () => {
+        const writer = await (await (await navigator.storage.getDirectory()).getFileHandle("project-home.txt", { create: true })).createWritable()
+        await writer.write("visitor storage\n"); await writer.close()
+    })
+    await page.keyboard.press("Control+Enter")
+    const window = page.locator(".desk_wbox").last()
+    await window.getByRole("button", { name: "Open folder", exact: true }).click()
+    await expect(window.locator(".desk_wbox_head_path")).toHaveValue("file:///srv/projects/galactic-strike")
+    await page.keyboard.press("Control+Enter")
+    const { screen, send, line } = await terminal(page)
+    await expect(screen).toContainText("user@jasouza:/srv/projects/galactic-strike$")
+    await send("pwd; ls; echo LIST_STATUS_$?; cat /home/user/project-home.txt; cd; pwd; echo PROJECT_HOME_OK")
+    await expect(line("PROJECT_HOME_OK")).toBeVisible()
+    await expect(line("/srv/projects/galactic-strike")).toBeVisible()
+    await expect(line("LIST_STATUS_0")).toBeVisible()
+    await expect(screen).toContainText("visitor storage")
+    await expect(line("/home/user")).toBeVisible()
+    await expect(screen).not.toContainText("ls: not found")
+    await send("echo written-from-project > /home/user/from-project.txt; echo HOME_WRITE_OK")
+    await expect(line("HOME_WRITE_OK")).toBeVisible()
+    expect(await page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle("from-project.txt")).getFile()).text())).toBe("written-from-project\n")
+    await page.evaluate(() => {
+        const link = document.createElement("a")
+        link.href = "/projects/hypro"; link.textContent = "Next project"; link.id = "next-project"
+        document.body.append(link)
+        link.click()
+    })
+    await expect(page.locator("#desk")).toHaveAttribute("data-cwd", "/srv/projects/hypro")
+    await expect(page.locator('.desk_side_item[data-path="/srv/projects/hypro"] > details > summary')).toHaveAttribute("data-focused", "")
+    await expect(page.locator(".desk_wbox_head_path").first()).toHaveValue("file:///srv/projects/hypro")
+    await page.keyboard.press("Control+Enter")
+    const next = await terminal(page)
+    await expect(next.screen).toContainText("user@jasouza:/srv/projects/hypro$")
+    await next.send("ls; echo NEXT_LIST_STATUS_$?; cat /home/user/from-project.txt")
+    await expect(next.screen).toContainText("NEXT_LIST_STATUS_0")
+    await expect(next.screen).toContainText("written-from-project")
+})
 
 test("real additional WASMs run against the shared browser kernel and filesystem", async ({ page }) => {
     test.setTimeout(180000)

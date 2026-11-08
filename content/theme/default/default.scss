@@ -588,14 +588,10 @@ a {
 
     &.crumb>&_summ {
         padding: 0 0.125em;
-
-        &::before {
-            content: '\f054'
-        }
     }
 
-    &.crumb[open]>&_summ::before {
-        content: '\f107'
+    &.crumb[open]>&_summ>span {
+        transform: rotate(90deg);
     }
 
     &[open]:has(> .list_drop)>&_summ::after {
@@ -6305,6 +6301,16 @@ body::after {
 .desk[data-runtime] {
     @media (orientation: landscape) {
         padding-block: .25em;
+        // Reserve the runtime's tracks before its scripts initialize the windows.
+        grid-template-columns: var(--desk-initial-columns);
+        grid-template-rows: var(--desk-initial-rows);
+    }
+
+    @media (orientation: portrait) {
+        // init_desk focuses the last initial window; earlier ones stay hidden.
+        > .desk_wbox:not([data-window]):has(~ .desk_wbox) {
+            display: none;
+        }
     }
 
     .desk_side {
@@ -6591,6 +6597,10 @@ html.desk_dragging {
     border: 0 !important;
     outline: none;
     box-shadow: none;
+}
+
+.desk_side:not(:has(> .desk_side_head .desk_side_tabs_drop[data-path="file:///"][open])) > .desk_files_bar {
+    display: none;
 }
 
 .desk_files_bar {

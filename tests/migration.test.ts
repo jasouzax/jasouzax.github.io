@@ -19,6 +19,8 @@ import { to_html } from "../src/web/vnode.tsx"
 import { parseHTML } from "linkedom"
 import { parse_xml } from "../src/xml.ts"
 import { validate_roots } from "../src/schema.ts"
+import { research_sections } from "../src/schema.ts"
+import { render_desk } from "../src/web/html_desk.tsx"
 
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), "jazu_test_"))
@@ -147,6 +149,45 @@ test("project actions belong to the project rather than its skill variations", (
     const invalid = new_diagnostics()
     validate_roots(parse_xml(`<project id="example" name="Example" date="2026"><slide skill="web"><action text="Docs" link="https://example.com/docs"/></slide></project>`, "project.xml"), invalid)
     assert(invalid.errors.some(message => message.includes("<action> is not allowed inside <slide>")))
+})
+
+test("project research compiles to ordered, nested explanations without actions", async () => {
+    const f = fixture()
+    try {
+        f.put("content/research.xml", `<project id="study" name="Study" date="2026"><research><results>No findings yet.</results><terminology>Working name &amp; motto.</terminology><problem>Problem body.<point name="Access">Access body.<point name="Cost">Cost body.</point></point></problem></research></project>`)
+        const diag = new_diagnostics()
+        const model = load_site(f.root, await load_config(f.root), diag, new Date("2026-11-07"))
+        assert.deepEqual(diag.errors, [])
+        const page = model.pages.find(page => page.path === "/projects/study")!
+        const desk = page.node.children[0]
+        assert.deepEqual(desk.children.filter(node => node.tag === "menu").map(node => node.attrs.name), ["Files", "Overview", "Version"])
+        const overview = desk.children.find(node => node.attrs.name === "Overview")!
+        assert.deepEqual(overview.children.map(node => node.attrs.name), Object.values(research_sections))
+        assert.equal(overview.children[0].attrs.data, "Working name & motto.")
+        assert.equal(overview.children[0].children.length, 0)
+        assert.equal(overview.children[1].children[0].children[0].attrs.data, "Cost body.")
+        const { document } = parseHTML(to_html(render_desk({ model, page, lang: page.lang, expertise: null }, desk)))
+        const panel = document.querySelectorAll(".desk_side_page")[1]
+        assert.equal(panel.querySelectorAll(":scope > .desk_side_item").length, 9)
+        assert.equal(panel.querySelectorAll("a,button,[data-path]").length, 0)
+        assert.match(panel.textContent!, /Problem body/)
+        assert.match(panel.textContent!, /Cost body/)
+        assert(!model.pages.find(page => page.path === "/projects")!.node.children[0].children.some(node => node.attrs.name === "Overview"))
+    } finally { f.close() }
+})
+
+test("research validates section structure, nesting and display-only content", () => {
+    for (const research of [
+        '<research><terminology><point name="Invalid">No children here.</point></terminology></research>',
+        '<research><problem link="/desk">No links.</problem></research>',
+        '<research><solution><point name="Invalid" acts="Open">No actions.</point></solution></research>',
+        '<research><problem>One</problem><problem>Two</problem></research>',
+        '<research/><research/>',
+    ]) {
+        const diag = new_diagnostics()
+        validate_roots(parse_xml(`<project id="study" name="Study" date="2026">${research}</project>`, "research.xml"), diag)
+        assert(diag.errors.length > 0, research)
+    }
 })
 
 test("temporary filesystem handles write only in memory and do not survive a new session", async () => {

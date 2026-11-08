@@ -16,3 +16,4 @@ content/media/*
 wasmbox
 src/desk/**/.build/
 gen-11
+.claude

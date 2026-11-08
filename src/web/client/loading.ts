@@ -160,6 +160,8 @@ export function capture_skeleton(): void {
         return Array.from(element.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0)
     }
     const groups: [string, string, boolean][] = [
+        ["window", ".desk_wbox", false],
+        ["footer", ".site_foot", false],
         ["hero-items", ".landing_contacts", false],
         ["hero-actions", ".landing_actions", false],
         ["head-tray", "#head_tray", false],

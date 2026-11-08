@@ -6,6 +6,7 @@ import type { site_model, page } from "./model.ts"
 import { report_error, report_warning } from "./diag.ts"
 import { split_list, short_hash } from "./util.ts"
 import { inside } from "./paths.ts"
+import { research_sections } from "./schema.ts"
 
 export function element(tag: string, attrs: Record<string, string>, source: xml_node, children: xml_node[] = []): xml_node {
     const node: xml_node = { tag, attrs, children, text: "", file: source.file, line: source.line, parent: null }
@@ -46,13 +47,35 @@ export function expand_objects(model: site_model): void {
             children.unshift(element("menu", { name: "Events" }, object, entries(object.children)))
         }
         if (object.tag === "project") {
-            children.unshift(element("menu", { name: "Files", path: `file:///srv/repo/${id}` }, object))
+            const folder = (name: string, children: xml_node[] = []): xml_node =>
+                element("entry", { name, type: "Folder" }, object, children)
+            const root = folder("/", ["bin", "boot", "dev", "etc", "home", "lib", "media", "mnt", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"].map(name =>
+                folder(name, name === "home" ? [folder("user")] : name === "srv" ? [folder("projects", [folder(id)])] : [])))
+            children.unshift(element("menu", { name: "Files", path: "file:///" }, object, [root]))
+            const research = object.children.find(node => node.tag === "research")
+            if (research) {
+                const point = (node: xml_node, name = node.attrs.name): xml_node => element("entry", {
+                    name, type: "Post", data: node.text.trim(),
+                }, node, node.children.filter(child => child.tag === "point").map(child => point(child)))
+                const sections = Object.entries(research_sections).map(([tag, name]) => {
+                    const section = research.children.find(node => node.tag === tag)
+                    return section ? point(section, name) : element("entry", { name, type: "Post" }, research)
+                })
+                children.splice(1, 0, element("menu", { name: "Overview" }, research, sections))
+            }
             children.push(element("menu", { name: "Version", path: `/api/v1/git/${id}/log` }, object))
         }
-        if (!children.some(node => node.tag === "window")) children.push(element("window", {
+        if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
+            type: "inode/directory", mode: "view", path: `file:///srv/projects/${id}`,
+        } : {
             type: "text/markdown", mode: "view", data: info || object.attrs.name,
         }, object))
-        const desk = element("desk", { name: object.attrs.name, info, auto: "true" }, object, children)
+        const desk = element("desk", {
+            name: object.tag === "project" ? object.attrs.short ?? object.attrs.name : object.attrs.name,
+            info: object.tag === "project" ? object.attrs.note ?? "" : info,
+            auto: "true",
+            ...(object.tag === "project" ? { cwd: `/srv/projects/${id}` } : {}),
+        }, object, children)
         const node = element("page", { ...object.attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))
     }

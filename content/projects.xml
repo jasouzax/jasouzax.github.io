@@ -7,6 +7,108 @@
     </project>
 
 <project name="World Navigation Hat: Wearable AIoT Aid" rank="100" short="Thesis Stesis" date="Apr 2026" note="Thesis" icon="[project]" featured="true" role="Thesis" sub="Leader, developer and researcher" feature_stack="python, rpi" id="stesis" paper="https://www.researchgate.net/publication/404788658_World_Navigation_Hat_Development_of_a_Wearable_Navigation_Aid_Using_Aiot_for_the_Visually_Impaired">
+        <!-- Reference authoring example. All research below is placeholder content, not verified study findings. -->
+        <research>
+            <terminology>
+                Placeholder: World Navigation Hat is the working project name; Stesis is its short label.
+                AIoT means Artificial Intelligence of Things. Describe the final name's origin, approved acronym,
+                logo symbolism, brand colors and motto here. A sample motto to review is "Awareness through sound."
+                No logo or motto is finalized by this example.
+            </terminology>
+            <problem>
+                Placeholder: Explain the navigation barriers this wearable aims to address and establish the study's scope.
+                <point name="Environmental awareness">
+                    Describe which nearby obstacles or scene details users need to recognize.
+                    <point name="Information gaps">
+                        Identify situations that existing mobility aids do not fully describe; replace this prompt with observed needs.
+                    </point>
+                </point>
+                <point name="Access and practicality">
+                    Document constraints such as cost, connectivity, comfort and the effort needed to interpret feedback.
+                </point>
+            </problem>
+            <solution>
+                Placeholder: Describe the proposed wearable and how each part responds to a stated problem.
+                <point name="Spatial audio feedback">
+                    Explain the idea of converting nearby scene information into directional audio cues.
+                    <point name="Obstacle prioritization">
+                        Specify which obstacles should trigger cues and how urgency would be communicated.
+                    </point>
+                </point>
+                <point name="Edge and phone coordination">
+                    Explain which tasks run on the hat, which run on the phone and what requires a network connection.
+                </point>
+            </solution>
+            <significance>
+                Placeholder: Explain why the work matters and distinguish intended benefits from benefits demonstrated by evidence.
+                <point name="People with visual impairments">
+                    Define the intended participants, mobility experience and settings; avoid treating all visual impairments as identical.
+                </point>
+                <point name="Caregivers and accessibility researchers">
+                    Describe potential uses for voluntary caregiver coordination and future assistive technology research.
+                </point>
+            </significance>
+            <objectives>
+                Placeholder: Replace these example objectives and hypotheses with the approved research questions and measurable targets.
+                <point name="Evaluate obstacle awareness">
+                    Measure whether participants can identify predefined obstacle conditions using the proposed cues.
+                    <point name="Example hypothesis">
+                        Test whether the proposed feedback improves the selected awareness measure relative to the chosen baseline.
+                    </point>
+                </point>
+                <point name="Evaluate usability and response time">
+                    Define acceptable cue latency, task completion measures and participant-reported comfort before testing.
+                </point>
+            </objectives>
+            <literature_review>
+                Placeholder: Add verified citations, methods and findings here. The entries below are categories to investigate, not references.
+                <point name="Study A: wearable obstacle detection">
+                    Insert author, year and title; summarize sensors, participants and evaluation conditions.
+                    <point name="Difference from this project">
+                        Compare the feedback channel, deployment setting and limitations without claiming novelty before reviewing evidence.
+                    </point>
+                </point>
+                <point name="Study B: spatial audio navigation">
+                    Insert a verified study and explain what it suggests about cue learnability, workload and accessibility.
+                </point>
+            </literature_review>
+            <frameworks>
+                Placeholder: Identify the conceptual or theoretical frameworks actually adopted and cite their original sources.
+                <point name="Conceptual input-process-output model">
+                    Map scene sensing inputs through perception and cue generation to user feedback outputs.
+                </point>
+                <point name="Human-centered design framework">
+                    Explain how participant needs, iterative prototypes and usability evidence inform design decisions.
+                </point>
+            </frameworks>
+            <methodology>
+                Placeholder: Specify a reproducible evaluation plan and map every method to an objective.
+                <point name="Participants and study procedure">
+                    Define recruitment, consent, accessibility accommodations and controlled task conditions.
+                    <point name="Baseline and comparison">
+                        State the comparison condition, task order and steps used to reduce learning effects.
+                    </point>
+                </point>
+                <point name="Measurements and analysis">
+                    Define obstacle detection measures, cue latency, task outcomes and usability questions; choose an analysis appropriate to the data.
+                </point>
+            </methodology>
+            <results>
+                Placeholder: No findings are reported in this example. Replace these prompts only after collecting and analyzing data.
+                <point name="Findings">
+                    Report the sample size, measured outcomes and uncertainty for each objective, including negative findings.
+                </point>
+                <point name="Discussion">
+                    Interpret the evidence against the hypotheses and reviewed literature.
+                    <point name="Limitations">
+                        Explain sampling, environment and device limitations and how they restrict the conclusions.
+                    </point>
+                </point>
+                <point name="Conclusion and future work">
+                    State only conclusions supported by the results and identify unresolved questions for future studies.
+                </point>
+            </results>
+        </research>
         <slide media="/media/stesis_demo.mp4" alt="Demo video of the World Navigation Hat in use" stack="python, kotlin, nodejs, mediapipe, rpi, aiot, stereo, sensory" tags="aiot, stereo, mediapipe" skill="ai-ml, iot, embedded, cloud" info="Edge-fog-cloud AIoT smart hat for the visually impaired: stereo-vision depth maps become spatial audio pings (Edge), gestures replace visual controls (AI) and a phone bridges GPS telemetry to caregivers (Cloud). Runs on a Raspberry Pi 4 across Python, Kotlin and Node.js; I led the thesis and wrote the code. Source code is confidential." />
     </project>
 
