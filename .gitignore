@@ -5,6 +5,9 @@ dist/
 .wrangler/
 node_modules/
 .claude/
+*.tar.gz
+*.tar.bz2
+*.wasm
 
 # Secrets and local config
 .env
