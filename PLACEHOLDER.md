@@ -19,8 +19,8 @@ The inherited sample birth date, phone numbers, postal code, family/commute fiel
 
 | Deployment input | Replace before cloud use |
 |---|---|
-| `terraform/terraform.tfvars` | Copy from `terraform.tfvars.example`; account id, zone id, R2 S3 keys, optional resource names and Worker secrets (git-ignored) |
-| `CLOUDFLARE_API_TOKEN` | Environment variable used by Terraform and D1 migrations; never commit |
+| `.env` `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TF_VAR_*` | Deployment credentials and Terraform inputs; loaded by `deploy`; never commit |
+| `terraform/terraform.tfvars` | Optional alternative to `TF_VAR_*` in `.env` (git-ignored) |
 | `.env.example` | Copy to ignored .env, generate HMAC key, explicitly map only public repositories |
 | Worker secrets | HMAC key and Access service token id/secret as Terraform variables; never commit actual values |
 | KV registry | Explicit external HTTPS origins for each approved demo/work subdomain |

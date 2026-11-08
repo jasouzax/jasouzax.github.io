@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 // Applies migrations/*.sql through the D1 HTTP API, recording them in the same
 // `d1_migrations` table layout wrangler used, so existing databases stay compatible.
+if (existsSync(".env")) process.loadEnvFile(".env")
 const token = process.env.CLOUDFLARE_API_TOKEN
 const account = process.env.CLOUDFLARE_ACCOUNT_ID
 const database = process.env.D1_DATABASE_ID

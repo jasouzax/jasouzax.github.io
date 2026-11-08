@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { build as esbuild_build } from "esbuild"
@@ -46,6 +46,16 @@ export async function prepare_deploy(root: string, out: string, result: build_re
     return { pages_dir: pages, worker_bundle, var_file, uploads }
 }
 
+// Loads <root>/.env (variables already set in the shell win) and maps the personal-node secrets to Terraform
+// variables, so each value is written once. Anything else prefixed TF_VAR_ is read by Terraform directly.
+export function load_env(root: string): void {
+    const file = join(root, ".env")
+    if (existsSync(file)) process.loadEnvFile(file)
+    for (const [name, variable] of [["ORIGIN_HMAC_SECRET", "TF_VAR_origin_hmac_secret"], ["ACCESS_CLIENT_ID", "TF_VAR_access_client_id"], ["ACCESS_CLIENT_SECRET", "TF_VAR_access_client_secret"]]) {
+        if (process.env[name] && !process.env[variable]) process.env[variable] = process.env[name]
+    }
+}
+
 function run(root: string, command: string, args: string[], env: NodeJS.ProcessEnv = {}): void {
     const result = spawnSync(command, args, { cwd: root, stdio: "inherit", env: { ...process.env, ...env } })
     if (result.status !== 0) throw new Error(`${command} ${args[0] ?? ""} failed (${result.status ?? result.error?.message})`)
@@ -63,12 +73,14 @@ const targets: Record<string, string[]> = {
 
 export async function deploy(root: string, out: string, result: build_result, target: string, dry_run: boolean): Promise<void> {
     if (!["pages", "worker", "all"].includes(target)) throw new Error("target must be pages, worker or all")
+    load_env(root)
     const stage = await prepare_deploy(root, out, result)
     console.log(`Prepared Pages files, Worker bundle and Terraform variables; ${stage.uploads.length} large assets go to R2. See .cache/deploy/latest.json`)
     if (dry_run) {
         console.log(`Dry run: nothing applied. To preview the infrastructure changes run:\n  terraform -chdir=terraform plan -var-file=${stage.var_file}`)
         return
     }
+    if (!process.env.CLOUDFLARE_API_TOKEN) throw new Error("CLOUDFLARE_API_TOKEN is not set (shell or .env)")
     const flags = target === "all" ? [] : targets[target].map(item => `-target=${item}`)
     terraform(root, ["init", "-input=false"])
     terraform(root, ["apply", "-input=false", `-var-file=${stage.var_file}`, ...flags])

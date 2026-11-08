@@ -115,10 +115,11 @@ All Cloudflare infrastructure lives in `terraform/`: the Pages project, R2 asset
 One-time setup:
 
 1. Install Terraform >= 1.6.
-2. Create a Cloudflare API token with edit permission for Workers Scripts, Workers Routes, Workers KV, D1, R2, Pages and Zone read, and export it as `CLOUDFLARE_API_TOKEN`. D1 migrations reuse the same token.
+2. Create a Cloudflare API token with edit permission for Workers Scripts, Workers Routes, Workers KV, D1, R2, Pages and Zone read, and put it in `.env` as `CLOUDFLARE_API_TOKEN` (see `.env.example`). `deploy` loads `.env` itself, so no shell exports are needed; a variable already exported in the shell takes precedence. D1 migrations and the Pages upload reuse the same token.
 3. Create an R2 S3 API token (R2 > Manage API tokens) for uploading large media.
-4. Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars` and fill in `account_id`, `zone_id` and the R2 keys. Set the Worker secrets (`origin_hmac_secret`, `access_client_id`, `access_client_secret`) there when the personal node exists. This file is git-ignored; never commit it or the state.
+4. Supply `account_id`, `zone_id` and the R2 keys either as `TF_VAR_*` entries in `.env` or in `terraform/terraform.tfvars` (copy the `.example`); both are git-ignored. `ORIGIN_HMAC_SECRET`, `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` from `.env` are passed to the Worker automatically. Never commit `.env`, tfvars or state.
 5. For an existing, already-provisioned account, import resources before the first apply (for example `terraform import cloudflare_pages_project.site <account_id>/jazu`) so Terraform adopts them instead of creating duplicates. Download an existing Pages project's actual settings first.
+6. If you run `deploy` from a different machine (for example the personal server), that machine needs Node, Terraform, `npm ci`, the same `.env`, **and the Terraform state**. State is local by default, so configure a remote backend in `terraform/versions.tf` before deploying from more than one machine.
 
 Plan, then deploy:
 
@@ -139,7 +140,7 @@ Set up a personal node:
 2. Copy `.env.example` to `.env`. Generate a high-entropy `ORIGIN_HMAC_SECRET` of at least 32 characters. Set `JAZU_REPOSITORIES_JSON` to an explicit map of **public** project ids to local repository paths. Never include a private/client repository in this public read adapter.
 3. Run `npm run node -- --port 8788`. It binds loopback only. Unsigned requests, including `/health`, return 401. The Git adapters support refs/tree/blob/log (100 log entries; blobs capped at 16 MiB). Ref/path queries cannot invoke arbitrary Git commands.
 4. Create a Cloudflare Tunnel with a private origin hostname pointing to `http://127.0.0.1:8788`. Protect that hostname with a Cloudflare Access **Service Auth** policy and a service token. Keep it distinct from the central Worker's wildcard public domain routes.
-5. Set `config.json.personal_server` to that HTTPS origin. Store the same HMAC key in the Worker by setting `origin_hmac_secret` in `terraform/terraform.tfvars`; likewise set `access_client_id` and `access_client_secret` from the Access service token. Then run `node src/main.ts deploy --target worker`.
+5. Set `config.json.personal_server` to that HTTPS origin. Store the same HMAC key in the Worker by keeping the same `ORIGIN_HMAC_SECRET` in `.env` (deploy pushes it to the Worker); likewise set `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` from the Access service token. Then run `node src/main.ts deploy --target worker`.
 6. Supervise the node and cloudflared with the operating system's service manager. The HMAC covers method, path/query, timestamp, nonce, client and body hash; the origin rejects expired/replayed signatures. If it is offline the public Git API returns 503. Snapshot dashboards and native Git clone/push transport are future tasks.
 
 For `GET /api/v1/git/<public_id>/{refs|tree|blob|log}`, use `?ref=HEAD&path=readme.md` as needed. Browser cookies/tokens are never forwarded to this node. `/desk` is browser-local and does not upload visitor files to it.

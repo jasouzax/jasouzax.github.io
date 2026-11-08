@@ -1,9 +1,33 @@
+# Generated / local
+codebase*.zip
+.cache/
+dist/
+.wrangler/
+node_modules/
+.claude/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.dev.vars*
+
+# Terraform (state contains secrets; commit .terraform.lock.hcl)
 .terraform/
 *.tfstate
 *.tfstate.*
 terraform/terraform.tfvars
-.cache/
-.wrangler/
-node_modules/
-dist/
-.env
+crash.log
+
+# Tests, logs, coverage
+test-results/
+playwright-report/
+coverage
+*.log
+*.tsbuildinfo
+*.tgz
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
