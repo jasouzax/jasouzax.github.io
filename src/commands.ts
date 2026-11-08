@@ -2,6 +2,7 @@
 import { resolve, join, dirname, relative, sep } from "node:path"
 import { watch, rmSync, rmdirSync, mkdtempSync, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
+import { spawnSync } from "node:child_process"
 import { deflateRawSync } from "node:zlib"
 import { fileURLToPath } from "node:url"
 import { build_site } from "./build.ts"
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
     if (command === "pack") {
         // project dir is the parent of src/ (where this file lives), unless --root is given
         const project = flags.root ? root : dirname(dirname(fileURLToPath(import.meta.url)))
-        await pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
+        await pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1), Boolean(flags.tracked_only))
         return
     }
     console.error(`unknown command "${command}". commands: build, check, serve, watch, clean, icons, graph, pack, deploy, node`)
@@ -409,8 +410,17 @@ function make_zip(entries: { name: string, data: Buffer, mtime: Date }[]): Buffe
     return Buffer.concat([...parts, ...central, end])
 }
 
-async function pack_command(project: string, file_name: string, additions:string[] = []): Promise<void> {
-    const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "terraform", "wrangler.local.jsonc", "tsconfig.json", ...additions]
+// Files git considers part of the current codebase: tracked files, plus (unless tracked_only) new files that are
+// not gitignored. Ignored files, .git and history are never listed, so secrets and heavy artifacts stay out.
+function git_files(project: string, tracked_only: boolean): string[] {
+    const args = ["-C", project, "ls-files", "-z", "--cached", ...(tracked_only ? [] : ["--others", "--exclude-standard"])]
+    const result = spawnSync("git", args, { maxBuffer: 256 * 1024 * 1024 })
+    if (result.error) throw new Error(`pack needs git on PATH: ${result.error.message}`)
+    if (result.status !== 0) throw new Error(`pack needs a git repository at ${project}: ${result.stderr.toString("utf8").trim()}`)
+    return result.stdout.toString("utf8").split("\0").filter(Boolean)
+}
+
+async function pack_command(project: string, file_name: string, additions: string[] = [], tracked_only = false): Promise<void> {
     const config = await load_config(project)
     const excluded = config.pack.exclude.map(path => {
         const target = resolve(project, path)
@@ -418,17 +428,24 @@ async function pack_command(project: string, file_name: string, additions:string
         return target
     })
     const out = join(project, file_name)
-    const files: string[] = []
-    for (const target of targets) {
-        const path = join(project, target)
-        if (!existsSync(path)) {
-            console.warn(`warning: ${target} not found, skipping`)
+    const files = new Set<string>()
+    for (const name of git_files(project, tracked_only)) {
+        const path = resolve(project, name)
+        // Tracked files deleted from the working tree, submodule directories and escaping paths are skipped.
+        if (!inside(project, path) || !existsSync(path) || !statSync(path).isFile()) continue
+        files.add(path)
+    }
+    // Paths given on the command line are explicit opt-ins, even if git ignores them.
+    for (const target of additions) {
+        const path = resolve(project, target)
+        if (!inside(project, path) || !existsSync(path)) {
+            console.warn(`warning: ${target} not found or outside the project, skipping`)
             continue
         }
-        collect_files(path, files)
+        for (const file of collect_files(path)) files.add(file)
     }
     // Content-owned packaging exclusions come from config, independent of folder names.
-    const entries = files
+    const entries = [...files].sort()
         .filter(path => path !== out)
         .filter(path => !excluded.some(target => inside(target, path)))
         .map(path => ({
@@ -437,7 +454,8 @@ async function pack_command(project: string, file_name: string, additions:string
             mtime: statSync(path).mtime,
         }))
     writeFileSync(out, make_zip(entries))
-    console.log(`packed ${entries.length} files into ${out}`)
+    const megabytes = entries.reduce((sum, entry) => sum + entry.data.length, 0) / 1024 / 1024
+    console.log(`packed ${entries.length} files (${megabytes.toFixed(1)} MiB uncompressed) into ${out}`)
 }
 
 main().catch(error => {
