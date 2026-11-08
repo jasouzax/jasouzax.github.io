@@ -6,6 +6,7 @@ import { crumb_chain, menu_pages, page_url } from "./model.ts"
 import { sha256 } from "./util.ts"
 import { page_style_text } from "./web/page_style.tsx"
 import { icon_source } from "./web/seo_images.tsx"
+import { configured_resource } from "./resources.ts"
 
 export function serialize_node(node: xml_node): string {
     const children = node.children.map(serialize_node).join("")
@@ -28,7 +29,7 @@ function window_sources(model: site_model, page: page): string {
 
 // The signature is inlined in every header and the icon source feeds every favicon, touch icon and cover, so both count as shared input.
 function signature_text(model: site_model): string {
-    const files = [join(model.content_dir, "assets", "signature_animation.svg"), icon_source(model) ?? "", join(model.content_dir, "assets", "favicon.svg")]
+    const files = [configured_resource(model, "signature"), icon_source(model), configured_resource(model, "favicon")]
     const home = model.pages.filter(page => page.path === "/").map(page => `${page.lang}:${page.info}`).join("|")
     return files.map(file => (file && existsSync(file) ? readFileSync(file, "utf8") : "")).join("\u0002") + home
 }

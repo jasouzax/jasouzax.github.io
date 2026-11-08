@@ -1,7 +1,7 @@
 import { jsx, fragment, type child } from "./vnode.tsx"
 import { raw } from "./markup.tsx"
-import { readFileSync, existsSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync } from "node:fs"
+import { configured_resource } from "../resources.ts"
 import type { render_ctx } from "./html_common.tsx"
 import { t, glyph } from "./html_common.tsx"
 import { crumb_chain, menu_pages, page_url, ui_text, localize, type page } from "../model.ts"
@@ -18,8 +18,8 @@ export function theme_choices(ctx: render_ctx): theme_choice[] {
         }))
 }
 function signature(ctx: render_ctx): child {
-    const file = join(ctx.model.content_dir, "assets", "signature_animation.svg")
-    if (!existsSync(file)) return <span id="head_path_logo">{ctx.model.config.site_name}</span>
+    const file = configured_resource(ctx.model, "signature")
+    if (!file) return <span id="head_path_logo">{ctx.model.config.site_name}</span>
     return raw(readFileSync(file, "utf8").replace(/<svg\b/, '<svg id="head_path_logo"'))
 }
 function search_row(ctx: render_ctx, label: string): child {

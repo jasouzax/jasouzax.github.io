@@ -7,7 +7,7 @@ These are public-content or operator inputs, not implemented product features. S
 | `config.json` | Inherited Jason D’Souza identity and jasouza.com origin | Confirm owner name, contact details, GitHub account, domain, deployment project names and languages |
 | `content/portfolio.xml` (English and Japanese roots) | Inherited public biography, roles, contact links and timeline | Review accuracy and translations before publication |
 | `content/projects.xml` (English and Japanese roots) | Inherited project descriptions, demos, dates and source links; converted slide variants initially share the same description | Supply distinct skill-specific media/descriptions where useful; confirm permission to publish |
-| `content/media/` | Local-only inherited media archive, ignored by Git; website assets are tracked in `content/assets/` | Restore archive on new machines/CI, or replace references with owner-managed assets |
+| `content/media/` | Local-only inherited media archive, currently ignored by Git and excluded by `config.json.pack.exclude`; website artwork paths are declared in `config.json.resources` | Restore archive on new machines/CI, or replace references with owner-managed assets |
 | `/media/hypro_editor.png` | Referenced by the Hypro slides, missing from the supplied archive | Add the image or replace/remove the reference in both languages |
 | `<print>` roots in portfolio XML | Existing resume/rirekisho layouts and styles; missing personal fields stay blank | Add only personal fields intentionally published as landing hero `<item print="..." text="...">` values |
 | `content/privacy*.md` | Inherited privacy wording | Update to match the enabled deployment, storage, sign-in and retention behavior |

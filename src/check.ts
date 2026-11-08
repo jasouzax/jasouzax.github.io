@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { content_file, published_resource } from "./resources.ts"
 import type { site_model } from "./model.ts"
 import { page_url, find_page } from "./model.ts"
 import { report_error, report_warning } from "./diag.ts"
@@ -26,7 +26,7 @@ export function check_links(model: site_model): void {
             for (const name of ["link", "href"]) {
                 const target = node.attrs[name]
                 if (!target || !target.startsWith("/") || target.startsWith("//")) continue
-                if (target.startsWith("/media/") || target.startsWith("/assets/") || target.startsWith("/api/")) continue
+                if (published_resource(model, target) || content_file(model.content_dir, target, node.file) || target.startsWith("/assets/") || target.startsWith("/api/")) continue
                 const path = normalize_path(target.split("#")[0])
                 if (path === "/work" || find_page(model, path, page.lang) || find_page(model, path, model.config.default_language)) continue
                 report_warning(model.diag, where_of(node), `link ${target} does not match any page`)
@@ -36,17 +36,9 @@ export function check_links(model: site_model): void {
 }
 
 export function check_media(model: site_model): void {
-    for (const page of model.pages) {
-        for (const name of ["media", "poster", "image"]) {
-            const value = page.node.attrs[name]
-            if (!value || !value.startsWith("/media/")) continue
-            if (!existsSync(join(model.content_dir, value.slice(1)))) report_warning(model.diag, where_of(page.node), `media file ${value} is not in content/media`)
-        }
-        // the photo printed on a rirekisho
-        for (const resume of page.node.children.filter(child => child.tag === "resume")) {
-            const photo = resume.attrs.photo
-            if (photo?.startsWith("/media/") && !existsSync(join(model.content_dir, photo.slice(1)))) report_warning(model.diag, where_of(resume), `resume photo ${photo} is not in content/media (the form prints its "put a photo here" box instead)`)
-        }
+    // XML resource collection validates all declared local paths, independent of folder names.
+    for (const [url, source] of model.resources) {
+        if (!existsSync(source)) report_warning(model.diag, url, `published resource is missing: ${source}`)
     }
 }
 
@@ -67,7 +59,7 @@ export function tier_report(css: string): string[] {
 export function check_seo(model: site_model): void {
     const base = model.config.base_url
     if (!/^https:\/\/[^/\s]+$/.test(base)) report_warning(model.diag, "config.json", `base_url "${base}" should be the site's https origin with no path (canonical, sitemap, manifest and Open Graph URLs are built from it)`)
-    if (!has_icon(model)) report_warning(model.diag, "content", "no content/assets/signature.svg (or signature_animation.svg or favicon.svg): favicon, touch icon and manifest icons are not generated")
+    if (!has_icon(model)) report_warning(model.diag, "content", "no configured resources.icon, resources.signature or resources.favicon: favicon, touch icon and manifest icons are not generated")
     if (security_txt(model) === null) report_warning(model.diag, "config.json", "no security contact (seo.security.contact or owner.email): security.txt is not generated")
     const titles = new Map<string, string>()
     const infos = new Map<string, string>()
@@ -76,7 +68,7 @@ export function check_seo(model: site_model): void {
         const attrs = page.node.attrs
         if (attrs.lastmod && !/^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:\d{2}))?$/.test(attrs.lastmod)) report_warning(model.diag, where, `lastmod "${attrs.lastmod}" must be YYYY-MM-DD or an ISO 8601 date-time`)
         if (attrs.cover && /\.(svg|avif)(\?|$)/i.test(attrs.cover)) report_warning(model.diag, where, `cover ${attrs.cover}: most link-preview scrapers cannot read SVG or AVIF, use PNG or JPEG`)
-        if (attrs.cover?.startsWith("/") && !existsSync(join(model.content_dir, attrs.cover.slice(1)))) report_warning(model.diag, where, `cover ${attrs.cover} does not exist under content/`)
+        if (attrs.cover?.startsWith("/") && !published_resource(model, attrs.cover)) report_warning(model.diag, where, `cover ${attrs.cover} does not resolve to a published resource`)
         if (attrs.canonical && /^https?:\/\//.test(attrs.canonical) && !attrs.canonical.startsWith(base)) report_warning(model.diag, where, `canonical points to another site (${attrs.canonical}); this page is left out of the sitemap`)
         if (!indexable(model, page)) continue
         const title = page_title(model, page)

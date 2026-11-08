@@ -513,7 +513,7 @@ function render_map(ctx: render_ctx, node: xml_node): html {
     )
 }
 
-// Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are the strings in content/strings.
+// Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
     "new_window",
     "no_mime",

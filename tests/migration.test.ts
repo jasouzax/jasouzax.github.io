@@ -1,10 +1,13 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, rmSync, unlinkSync, symlinkSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync, rmSync, unlinkSync, symlinkSync, renameSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
 import { load_config } from "../src/config.ts"
+import { shared_hash } from "../src/graph.ts"
+import { configured_resource } from "../src/resources.ts"
+import { icon_source } from "../src/web/seo_images.tsx"
 import { load_site } from "../src/model.ts"
 import { new_diagnostics } from "../src/diag.ts"
 import { select_print, print_person } from "../src/prints.ts"
@@ -277,5 +280,92 @@ test("builds repair JSON, invalidate inline layout and article changes, and prun
             assert.match(await response.text(), /Published Name/)
             assert.equal((await fetch(`http://127.0.0.1:${address.port}/missing`)).status, 404)
         } finally { await new Promise<void>((done, fail) => server.close(error => error ? fail(error) : done())) }
+    } finally { f.close() }
+})
+
+
+test("content folders can be renamed using only XML and config changes", async () => {
+    const f = fixture()
+    try {
+        cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M1 1L19 19" stroke="currentColor"/></svg>'
+        f.put("content/assets/drawing.svg", svg)
+        f.put("content/assets/mark.svg", svg.replace('M1 1L19 19', 'M1 19L19 1'))
+        f.put("content/assets/tab.svg", svg.replace('M1 1L19 19', 'M1 1L19 1L19 19Z'))
+        f.put("content/media/photo.svg", svg)
+        f.put("content/media/unpublished.txt", "local archive")
+        f.put("content/blogs/post.xml", '<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>')
+        f.put("content/blogs/article.md", "# Department-managed article")
+        const write_home = (folder: string) => f.put("content/sections/nested/home.xml", `<page path="/" name="Home" image="/${folder}/photo.svg"><hero name="Owner"/></page>`)
+        unlinkSync(join(f.root, "content/anywhere.xml"))
+        write_home("media")
+        const config = JSON.parse(readFileSync(join(f.root, "config.json"), "utf8"))
+        const write_config = (assets: string, media: string) => {
+            config.resources = { signature: `/${assets}/drawing.svg`, icon: `${assets}/mark.svg`, favicon: `/${assets}/tab.svg` }
+            config.pack = { exclude: [`content/${media}`] }
+            f.put("config.json", JSON.stringify(config))
+        }
+        write_config("assets", "media")
+        const options = { root: f.root, out: join(f.root, "dist"), mode: "production" as const, force: false, build_date: new Date("2026-11-09"), only_check: false }
+        const first = await build_site(options)
+        assert.deepEqual(first.diag.errors, [])
+        const icons = ["icon.svg", "favicon.ico", "apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"]
+        const before = icons.map(name => readFileSync(join(options.out, name)))
+        for (const [old, next] of [["assets", "signatures"], ["media", "medias"], ["blogs", "articles"], ["theme", "skins"]]) {
+            renameSync(join(f.root, "content", old), join(f.root, "content", next))
+        }
+        write_home("medias")
+        write_config("signatures", "medias")
+        const second = await build_site(options)
+        assert.deepEqual(second.diag.errors, [])
+        assert(!second.diag.warnings.some(warning => /missing|belong|unsafe/.test(warning)), second.diag.warnings.join("\n"))
+        icons.forEach((name, index) => assert(readFileSync(join(options.out, name)).equals(before[index]), name))
+        const { document } = parseHTML(readFileSync(join(options.out, "index.html"), "utf8"))
+        assert.equal(document.querySelector("#head_path_logo")?.localName, "svg")
+        assert.match(readFileSync(join(options.out, "blogs/post/index.html"), "utf8"), /Department-managed article/)
+        assert.match(readFileSync(join(options.out, "llms-full.txt"), "utf8"), /Department-managed article/)
+        const image = second.model.pages.find(page => page.path === "/")!.node.attrs.image
+        assert(second.model.resources.get(image)?.endsWith(join("medias", "photo.svg")))
+        assert(existsSync(join(options.out, image.slice(1))))
+        let hash = shared_hash(second.model, "")
+        for (const name of ["drawing.svg", "mark.svg", "tab.svg"]) {
+            const file = join(f.root, "content/signatures", name)
+            writeFileSync(file, readFileSync(file, "utf8").replace("</svg>", "<!-- updated artwork --></svg>"))
+            const next = shared_hash(second.model, "")
+            assert.notEqual(next, hash, `${name} changes invalidate page output`)
+            hash = next
+        }
+        execFileSync(process.execPath, [resolve("src/main.ts"), "pack", "--root", f.root, "--out_file", "source.zip"], { stdio: "pipe", windowsHide: true })
+        const archive = readFileSync(join(f.root, "source.zip"))
+        assert(archive.includes(Buffer.from("content/signatures/mark.svg")))
+        assert(archive.includes(Buffer.from("content/articles/article.md")))
+        assert(!archive.includes(Buffer.from("content/medias/unpublished.txt")))
+
+    } finally { f.close() }
+})
+
+
+test("website artwork uses configured paths and rejects resources outside content", async () => {
+    const f = fixture()
+    try {
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"/>'
+        f.put("content/assets/signature.svg", svg)
+        const config = await load_config(f.root)
+        let model = load_site(f.root, config, new_diagnostics(), new Date())
+        assert.equal(icon_source(model), null, "conventional filenames are never discovered implicitly")
+        config.resources.icon = "/assets/signature.svg"
+        model = load_site(f.root, config, new_diagnostics(), new Date())
+        assert.equal(icon_source(model), join(f.root, "content/assets/signature.svg"))
+        f.put("private/secret.svg", svg)
+        config.resources.icon = "../private/secret.svg"
+        model = load_site(f.root, config, new_diagnostics(), new Date())
+        assert.equal(configured_resource(model, "icon"), null)
+        assert(model.diag.warnings.some(warning => warning.includes("resources.icon")))
+        symlinkSync(join(f.root, "private"), join(f.root, "content/linked"), process.platform === "win32" ? "junction" : "dir")
+        config.resources.icon = "/linked/secret.svg"
+        model = load_site(f.root, config, new_diagnostics(), new Date())
+        assert.equal(configured_resource(model, "icon"), null)
+        assert(model.diag.warnings.some(warning => warning.includes("resources.icon")))
     } finally { f.close() }
 })

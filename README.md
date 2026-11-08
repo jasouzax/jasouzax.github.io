@@ -19,14 +19,37 @@ Open http://localhost:8080. `serve` builds first. For content edits run `npm run
 
 The supplied media was ignored by gen-11's Git repository. It has been copied locally into `content/media`, which stays ignored. Website-specific SVG assets are tracked in `content/assets`. A fresh clone needs the owner's media archive restored there; missing files are reported by `check`. Never place private documents in public content. See `PLACEHOLDER.md` before publishing.
 
+## Content ownership and resource paths
+
+The content team controls all folders inside `content/`. The engine recursively discovers XML by root tag, so pages, blogs, themes, plugins and other roots can live together or anywhere in that tree. No source changes are needed when these folders are renamed. Relative XML resource references resolve from the XML file that declares them; references beginning with `/` resolve from the content root. Theme styles and plugin inputs also follow their declaring XML files.
+
+Website-wide artwork is declared in `config.json`, with paths relative to `content/` (a leading `/` is optional):
+
+```json
+{
+  "resources": {
+    "signature": "/assets/signature_animation.svg",
+    "icon": "/assets/signature.svg",
+    "favicon": "/assets/favicon.svg"
+  },
+  "pack": {
+    "exclude": ["content/media"]
+  }
+}
+```
+
+`signature` is the animated header/loading artwork. `icon` supplies Apple/PWA icons and generated link-preview covers; it falls back to the configured signature, then favicon. `favicon` overrides the generated browser-tab SVG and ICO. Empty paths disable that input; there are no implicit filename or folder searches. Files must remain inside `content/`, including symlink targets. Configured paths participate in rebuild tracking.
+
+`pack.exclude` contains project-relative files or directories to omit from source archives; it defaults to an empty list. When renaming a folder, update its XML references, any matching config paths/exclusions, and the content team's `content/.gitignore` entries. Generated URLs such as `/assets/media/…`, `/icon.svg` and `/srv/blogs/…` belong to the website's output protocol and do not depend on source folder names. Unreferenced content files remain unpublished.
+
 ## Find and edit things
 
 | Location | Purpose |
 |---|---|
 | `config.json` | Public owner/site settings, languages, theme selection, icon registry, deployment names |
-| `content/` | Page XML and page resources directly here; language variants share one XML file |
-| `content/blogs/`, `content/media/`, `content/theme/` | Blog roots/resources, local shared media and themes respectively |
-| `content/assets/` | Tracked website assets: animated header signature, static signature for generated icons/covers, and browser favicon |
+| `content/` | XML roots and resources in any folder layout; language variants may share one XML file |
+| `content/blogs/`, `content/media/`, `content/theme/` | Current content-team conventions for articles, local media and themes; names are not engine requirements |
+| `content/assets/` | Current location of tracked website artwork, selected through `config.json.resources` |
 | `src/main.ts`, `src/commands.ts` | TSX loader entry point and CLI commands |
 | `src/model.ts`, `objects.ts`, `schema.ts`, `xml.ts` | Discovery, object generators, validation and parsing |
 | `src/build.ts`, `cache.ts`, `graph.ts` | Build orchestration and incremental output |

@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     if (command === "pack") {
         // project dir is the parent of src/ (where this file lives), unless --root is given
         const project = flags.root ? root : dirname(dirname(fileURLToPath(import.meta.url)))
-        pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
+        await pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
         return
     }
     console.error(`unknown command "${command}". commands: build, check, serve, watch, clean, icons, graph, pack, deploy, node`)
@@ -256,8 +256,8 @@ async function icons_audit(root: string, flags: flags): Promise<void> {
             const unknown = warning.match(/unknown icon token \[([^\]]+)\]/)
             if (unknown) unregistered.add(unknown[1])
         }
-        const skipped = [join(temp, "assets", "home_jason") + sep, join(temp, "media") + sep]
-        const files = collect_files(temp).filter(file => !skipped.some(prefix => file.startsWith(prefix)))
+        const published = new Set([...model.resources.keys()].map(path => join(temp, path.replace(/^\/+/, ""))))
+        const files = collect_files(temp).filter(file => !published.has(file))
         scan_icon_files(files, usage, [".html", ".json"])
     } catch (error) {
         console.warn(`warning: temporary build failed (${error instanceof Error ? error.message.split("\n")[0] : error}), scanning sources instead`)
@@ -409,9 +409,14 @@ function make_zip(entries: { name: string, data: Buffer, mtime: Date }[]): Buffe
     return Buffer.concat([...parts, ...central, end])
 }
 
-function pack_command(project: string, file_name: string, additions:string[] = []): void {
+async function pack_command(project: string, file_name: string, additions:string[] = []): Promise<void> {
     const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "wrangler.jsonc", "wrangler.local.jsonc", "wrangler.bindings.example.json", "tsconfig.json", ...additions]
-    const media_dir = join(project, "content", "media")
+    const config = await load_config(project)
+    const excluded = config.pack.exclude.map(path => {
+        const target = resolve(project, path)
+        if (!inside(project, target) || target === resolve(project)) throw new Error(`Unsafe pack exclusion: ${path}`)
+        return target
+    })
     const out = join(project, file_name)
     const files: string[] = []
     for (const target of targets) {
@@ -422,10 +427,10 @@ function pack_command(project: string, file_name: string, additions:string[] = [
         }
         collect_files(path, files)
     }
-    // The local media archive is excluded; website assets in content/assets are included.
+    // Content-owned packaging exclusions come from config, independent of folder names.
     const entries = files
         .filter(path => path !== out)
-        .filter(path => !path.startsWith(media_dir + sep))
+        .filter(path => !excluded.some(target => inside(target, path)))
         .map(path => ({
             name: relative(project, path).split(sep).join("/"),
             data: readFileSync(path),

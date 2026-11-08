@@ -115,12 +115,8 @@ export function collect_resources(model: site_model): void {
         if (model.resources.has(value.replace(/^file:\/\//, ""))) return value
         let source: string
         let url: string
-        if (value.startsWith("file:///home/jason/")) {
-            const tail = value.slice("file:///home/jason/".length)
-            source = resolve(base, "home_jason", tail)
-            url = `/srv/${tail.startsWith("blogs/") ? tail : `pages/${tail}`}`
-        } else if (value.startsWith("file:///srv/")) return value
-        else if (value.startsWith("/")) { source = resolve(base, value.slice(1)); url = value }
+        if (value.startsWith("file:///srv/")) return value
+        if (value.startsWith("/")) { source = resolve(base, value.slice(1)); url = value }
         else { source = resolve(dirname(node.file), value); url = `${owner}/${basename(value)}` }
         const rel = relative(base, source)
         if (rel === ".." || rel.startsWith(`..${sep}`) || resolve(source) === base) {
@@ -143,7 +139,7 @@ export function collect_resources(model: site_model): void {
     for (const page of [...model.pages, ...model.objects.map(node => ({ path: `/${node.tag}s/${node.attrs.id}`, node }))]) {
         const owner = `/srv/${page.path === "/" ? "pages/home" : page.path.slice(1)}`
         walk_nodes(page.node, node => {
-            for (const key of ["media", "poster", "image", "profile", "cover"]) {
+            for (const key of ["media", "poster", "image", "profile", "cover", "photo"]) {
                 if (node.attrs[key]) node.attrs[key] = publish(node, node.attrs[key], owner, false)
             }
             if (node.tag === "window" && node.attrs.path) node.attrs.path = publish(node, node.attrs.path, owner, true)

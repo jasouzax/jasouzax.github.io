@@ -8,8 +8,6 @@ dist/
 *.log
 jazu_icons_*/
 
-content/media/*
-
 wasmbox
 src/desk/**/.build/
 gen-11

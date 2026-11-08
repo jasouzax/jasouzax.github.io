@@ -54,7 +54,7 @@ Boolean attributes may omit their value: `<window full save/>` means `full="true
 
 **Objective.** Let the owner maintain a large website by editing plain files in a predictable content layout.
 
-**Solution.** The engine scans every file under `content` and identifies how to interpret it from its type and root tag. Page roots live directly in `content`, blog roots/resources in `content/blogs`, shared media in `content/media`, tracked website assets in `content/assets`, and themes in `content/theme`. The page's address comes from its attributes. Putting all XML into one file produces the same website as splitting it, apart from relative resource paths. A large media file is only copied into the output if an XML file references it. Keep language variants of the same page or blog together in one XML file, with one root per language; the engine wraps it in a synthetic `<jazu>` element before parsing.
+**Solution.** The engine scans every file under `content` and identifies how to interpret it from its type and root tag. All XML root types may live anywhere under `content`, with no required folder names or placement rules. The content team owns that layout; website-wide artwork paths and source-packaging exclusions are declared in `config.json.resources` and `config.json.pack.exclude`. The page's address comes from its attributes. Putting all XML into one file produces the same website as splitting it, apart from relative resource paths. A large media file is only copied into the output if an XML file references it. Keep language variants of the same page or blog together in one XML file, with one root per language; the engine wraps it in a synthetic `<jazu>` element before parsing.
 
 **Interface.**
 
@@ -542,7 +542,7 @@ Each page also emits `index.json` containing title, head tags marked for swappin
 **Solution.** Derived entirely from `base_url`, the owner config, the pages and the default theme:
 
 - **Head**: description, keywords (legacy), author, robots, canonical, `hreflang` with `x-default`, Open Graph, Twitter card, JSON-LD (`WebPage`, `ProfilePage`, `BlogPosting`, `SoftwareApplication`, `WebSite`, `BreadcrumbList`, owner `Person` or `Organization`), browser chrome (theme color for light and dark, color scheme, viewport with `viewport-fit=cover`, mobile web app tags, format detection, tile color, manifest, icons). Page-specific tags are marked so SPA navigation swaps exactly those.
-- **Icons**: from `content/assets/signature.svg` (falling back to `signature_animation.svg`, then `favicon.svg` in that directory): Apple touch icon, 192, 512 and maskable 512 PNGs, plus generated link-preview cover artwork. `content/assets/favicon.svg` overrides the generated browser-tab `icon.svg` and `favicon.ico`. `content/assets/signature_animation.svg` is inlined in the header and loading animation.
+- **Icons**: from `config.json.resources.icon` (falling back to configured `signature`, then `favicon`): Apple touch icon, 192, 512 and maskable 512 PNGs, plus generated link-preview cover artwork. `resources.favicon` overrides the generated browser-tab `icon.svg` and `favicon.ico`. `resources.signature` is inlined in the header and loading animation. All paths are content-relative; no directory or filename is implied.
 - **Cover images**: every page gets a 1200x630 image drawn with the default theme's own glyph paths; cached; the `og:image` URL carries a content hash.
 - **Root files**: `sitemap.xml` (canonical pages, language alternates, `lastmod`), `robots.txt`, `manifest.json` (installable, shortcuts from top pages), `llms.txt` and `llms-full.txt`, `security.txt`, `_headers` (types, caching, CSP hashes), `_redirects`.
 - **Lint**: `check` warns on title and description length, duplicates, missing icons or security contact, invalid `lastmod`.
@@ -804,7 +804,7 @@ If the server goes down, git pull and push stop and live dashboards show their l
   config.json             site, owner, languages, icons, slots, themes, seo, deploy (no secrets)
   .env                    tokens and vulnerable values
   .cache/                 incremental build state (2.3)
-  content/                page XML/resources; blogs/, media/, theme/ (see 1.0)
+  content/                XML/resources in a content-team-managed folder layout (see 1.0)
   src/
     main.ts               command wrapper (2.1)
     *.ts                  engine core: xml, schema, model, cache, graph, icons, check, seo
