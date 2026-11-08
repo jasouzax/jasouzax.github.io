@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync
 import { join, extname } from "node:path"
 import type { site_model, page } from "../model.ts"
 import { page_url } from "../model.ts"
+import { configured_resource, published_resource } from "../resources.ts"
 import { child_nodes } from "../xml.ts"
 import { decode_char } from "../font_build.ts"
 import type { output_files } from "../theme_css.ts"
@@ -25,13 +26,9 @@ export type brand = { background: string; foreground: string }
 // ---------- the icon source ----------
 
 export function icon_source(model: site_model): string | null {
-    for (const file of [
-        join(model.content_dir, "icon.svg"),
-        join(model.content_dir, "media", "icon.svg"),
-        join(model.content_dir, "media", "signature.svg"),
-        join(model.content_dir, "favicon.svg")
-    ]) {
-        if (existsSync(file)) return file
+    for (const name of ["icon", "signature", "favicon"] as const) {
+        const file = configured_resource(model, name)
+        if (file) return file
     }
     return null
 }
@@ -143,8 +140,8 @@ export async function icon_files(model: site_model, colors: brand, files: output
         [16, 32, 48].map(async (size) => ({ size, png: await png(size, size <= 16 ? 0.92 : 0.84) }))
     )
     files.set("favicon.ico", build_ico(ico))
-    const favicon = join(model.content_dir, "favicon.svg")
-    if (existsSync(favicon)) {
+    const favicon = configured_resource(model, "favicon")
+    if (favicon) {
         const svg = freeze_svg(readFileSync(favicon, "utf8"))
         files.set("icon.svg", svg)
         files.set("favicon.ico", build_ico(await Promise.all([16, 32, 48].map(async size => ({ size, png: await svg_to_png(svg, size) })))))
@@ -379,13 +376,13 @@ const image_types: Record<string, string> = {
     ".avif": "image/avif"
 }
 
-// A page may name its own cover (`cover="/media/x.png"` or a full URL); everything else gets a generated one.
+// A page may name its own cover (`cover="./x.png"` or a full URL); everything else gets a generated one.
 export function cover_of(model: site_model, page: page, theme_colors: [string, string]): cover {
     const alt = `${page.name} | ${model.config.site_name}`
     const custom = page.node.attrs.cover
     if (custom) {
         const absolute = /^https?:\/\//.test(custom)
-        const file = absolute ? "" : join(model.content_dir, custom.replace(/^\/+/, ""))
+        const file = absolute ? null : published_resource(model, custom)
         const bytes =
             file && existsSync(file) && extname(file).toLowerCase() === ".png" ? readFileSync(file) : null
         const size = bytes ? png_size(bytes) : null

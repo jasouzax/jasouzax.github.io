@@ -1,0 +1,16 @@
+# Copy to terraform/terraform.tfvars (git-ignored) and fill in.
+account_id           = "REPLACE_WITH_ACCOUNT_ID"
+zone_id              = "REPLACE_WITH_ZONE_ID"
+r2_access_key_id     = "REPLACE_WITH_R2_ACCESS_KEY_ID"
+r2_secret_access_key = "REPLACE_WITH_R2_SECRET_ACCESS_KEY"
+
+# Optional; defaults shown in variables.tf
+# assets_bucket_name = "jazu-assets"
+# kv_namespace_title = "jazu-registry"
+# d1_database_name   = "jazu"
+# pages_origin       = "https://<preview>.jazu.pages.dev"
+
+# Personal node secrets (leave unset until the node and Access policy exist)
+# origin_hmac_secret   = "..."
+# access_client_id     = "..."
+# access_client_secret = "..."

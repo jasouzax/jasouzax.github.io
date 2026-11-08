@@ -1,4 +1,12 @@
 {
+  "resources": {
+    "signature": "/assets/signature_animation.svg",
+    "icon": "/assets/signature.svg",
+    "favicon": "/assets/favicon.svg"
+  },
+  "pack": {
+    "exclude": ["content/media"]
+  },
   "base_url": "https://jasouza.com",
   "site_name": "Jasouza",
   "owner": {

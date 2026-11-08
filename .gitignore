@@ -1,19 +1,36 @@
-node_modules/
-dist/
+# Generated / local
+codebase*.zip
 .cache/
+dist/
 .wrangler/
+node_modules/
+.claude/
+*.tar.gz
+*.tar.bz2
+*.wasm
+
+# Secrets and local config
 .env
 .env.*
 !.env.example
+.dev.vars*
+
+# Terraform (state contains secrets; commit .terraform.lock.hcl)
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform/terraform.tfvars
+crash.log
+
+# Tests, logs, coverage
+test-results/
+playwright-report/
+coverage
 *.log
-jazu_icons_*/
+*.tsbuildinfo
+*.tgz
 
-content/media/*
-!content/media/signature.svg
-
-!content/media/icon.svg
-
-wasmbox
-src/desk/**/.build/
-gen-11
-.claude
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

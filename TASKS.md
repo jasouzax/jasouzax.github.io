@@ -79,7 +79,8 @@ Ordered dependency checklist. `[x]` means implemented and verified, `[ ]` means 
 
 ## 5. Cloud and personal nodes
 
-- [x] Pages and Worker Wrangler configurations plus local/dry-run deployment validation (4.1–4.2).
+- [x] Terraform infrastructure (Pages, Worker, R2, KV, D1, routes) replacing Wrangler provisioning/deploy, plus dry-run staging (4.1–4.2).
+  - [ ] Validate `terraform validate/plan/apply` against a real account and import any existing resources.
 - [x] Central routing: project redirects, registry subdomains, assets/API/work and Pages fallback.
 - [x] Public health API; fail closed on unimplemented private resources (4.3).
 - [ ] Complete cloud data stores (4.4).

@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync, existsSync, lstatSync } from "node:fs"
-import { join, relative, dirname } from "node:path"
+import { join, relative } from "node:path"
 import type { xml_node } from "./xml.ts"
 import { parse_xml, where_of, walk_nodes } from "./xml.ts"
 import { validate_roots, is_true } from "./schema.ts"
@@ -11,7 +11,7 @@ import { load_icons, icon_chars } from "./icons.ts"
 import { year_fraction } from "./dates.ts"
 import { normalize_path, parent_path, path_depth } from "./util.ts"
 import { expand_objects, collect_resources } from "./objects.ts"
-import { inside } from "./paths.ts"
+import { configured_resource } from "./resources.ts"
 
 export type page = {
     path: string
@@ -92,9 +92,6 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
         const roots = parse_xml(readFileSync(file, "utf8"), file)
         validate_roots(roots, diag)
         for (const node of roots) {
-            if (node.tag === "page" && dirname(file) !== content_dir) report_error(diag, where_of(node), "<page> files belong directly under content")
-            if (node.tag === "blog" && !inside(join(content_dir, "blogs"), file)) report_error(diag, where_of(node), "<blog> files belong under content/blogs")
-            if (node.tag === "theme" && !inside(join(content_dir, "theme"), file)) report_error(diag, where_of(node), "<theme> files belong under content/theme")
             walk_nodes(node, child => {
                 for (const name of ["text", "name", "info", "data"]) if (child.attrs[name]) {
                     child.attrs[name] = icon_chars(child.attrs[name], model.icons, token => report_warning(diag, where_of(child), `unknown icon token [${token}]`)).replace(/\ufdd0/g, "[")
@@ -107,6 +104,9 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
             if (node.tag === "print") model.prints.push(node)
             if (node.tag === "plugin") model.plugins.push(node)
         }
+    }
+    for (const name of ["signature", "icon", "favicon"] as const) {
+        if (config.resources[name] && !configured_resource(model, name)) report_warning(diag, "config.json", `resources.${name}: missing or unsafe content resource ${config.resources[name]}`)
     }
     expand_objects(model)
     collect_resources(model)

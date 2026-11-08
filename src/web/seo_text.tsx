@@ -1,12 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { published_resource } from "../resources.ts"
 import type { site_model, page } from "../model.ts"
 import { pages_in, order_pages, find_page } from "../model.ts"
 import type { xml_node } from "../xml.ts"
 import { child_nodes } from "../xml.ts"
 import { page_description, canonical_url, indexable, site_summary, link_target } from "./seo_common.tsx"
-
-const home_prefix = "file:///home/jason/"
 
 function title_case(text: string): string {
     return text.replace(/[-_]+/g, " ").replace(/\b[a-z]/g, (char) => char.toUpperCase())
@@ -134,9 +132,9 @@ function contact_lines(model: site_model, lang: string, node: xml_node): string[
     return lines
 }
 
-function read_home_file(model: site_model, path: string): string | null {
-    if (!path.startsWith(home_prefix) || !/\.(md|markdown|txt)$/i.test(path)) return null
-    const file = join(model.content_dir, "home_jason", path.slice(home_prefix.length))
+function read_window_file(model: site_model, path: string): string | null {
+    const file = published_resource(model, path)
+    if (!file || !/\.(md|markdown|txt)$/i.test(file)) return null
     return existsSync(file) ? readFileSync(file, "utf8").trim() : null
 }
 
@@ -187,7 +185,7 @@ function node_lines(model: site_model, page: page, node: xml_node, names: names)
                 )
         }
         for (const window of child_nodes(node, "window")) {
-            const text = read_home_file(model, window.attrs.path ?? "")
+            const text = read_window_file(model, window.attrs.path ?? "")
             if (text) out.push("", text, "")
         }
     }

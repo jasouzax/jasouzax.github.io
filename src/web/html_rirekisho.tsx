@@ -1,7 +1,6 @@
+import { published_resource } from "../resources.ts"
 import { jsx, fragment, type child } from "./vnode.tsx"
 import { raw } from "./markup.tsx"
-import { existsSync } from "node:fs"
-import { join } from "node:path"
 import type { xml_node } from "../xml.ts"
 import { child_nodes, where_of } from "../xml.ts"
 import type { html } from "../util.ts"
@@ -168,7 +167,7 @@ function yes_no(ctx: render_ctx, value: string | undefined): string {
 function photo_url(ctx: render_ctx, resume: xml_node): string {
     const source = field(resume.attrs.photo)
     if (!source) return ""
-    if (source.startsWith("/media/") && !existsSync(join(ctx.model.content_dir, source.slice(1)))) return ""
+    if (!/^(?:https?:)?\/\//.test(source) && !published_resource(ctx.model, source)) return ""
     return source
 }
 

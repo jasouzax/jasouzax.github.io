@@ -21,6 +21,8 @@ export type seo_config = {
 
 export type site_config = {
     base_url: string
+    resources: { signature: string, icon: string, favicon: string }
+    pack: { exclude: string[] }
     languages: Record<string, Record<string, string>>
     default_language: string
     slots: Record<string, number>
@@ -43,6 +45,8 @@ export type site_config = {
 
 export const default_config: site_config = {
     base_url: "https://example.com",
+    resources: { signature: "", icon: "", favicon: "" },
+    pack: { exclude: [] },
     languages: { en: {}, ja: {} },
     default_language: "en",
     slots: { background_entity: 10, foreground_entity: 10 },
@@ -84,10 +88,14 @@ export async function load_config(root: string): Promise<site_config> {
     if (!existsSync(file)) throw new Error("Missing config.json; see README.md")
     const given = JSON.parse(readFileSync(file, "utf8"))
     const merged: site_config = { ...default_config, ...given,
+        resources: { ...default_config.resources, ...given.resources },
+        pack: { ...default_config.pack, ...given.pack },
         owner: { ...default_config.owner, ...given.owner },
         deploy: { ...default_config.deploy, ...given.deploy },
         render: { ...default_config.render, ...given.render }, seo: merge_seo(given.seo) }
     if (!merged.languages || Array.isArray(merged.languages) || typeof merged.languages !== "object" || Object.values(merged.languages).some(strings => !strings || typeof strings !== "object" || Array.isArray(strings) || Object.values(strings).some(value => typeof value !== "string"))) throw new Error("languages must map language ids to string dictionaries")
+    if (Object.values(merged.resources).some(value => typeof value !== "string")) throw new Error("resources must contain content-relative file paths")
+    if (!Array.isArray(merged.pack.exclude) || merged.pack.exclude.some(value => typeof value !== "string" || !value)) throw new Error("pack.exclude must be an array of project-relative paths")
     merged.base_url = String(merged.base_url).trim().replace(/\/+$/, "")
     const origin = new URL(merged.base_url)
     if (origin.origin !== merged.base_url || !["https:", "http:"].includes(origin.protocol)) throw new Error("config.base_url must be an HTTP(S) origin")

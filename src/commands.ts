@@ -18,6 +18,7 @@ import { cache_file } from "./cache.ts"
 import { output_directory, inside } from "./paths.ts"
 import { realpathSync } from "node:fs"
 import { dependency_graph } from "./graph.ts"
+import { collect_unignored } from "./gitignore.ts"
 import { deploy } from "./node/deploy.ts"
 import { personal_server } from "./node/personal.ts"
 
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
     if (command === "pack") {
         // project dir is the parent of src/ (where this file lives), unless --root is given
         const project = flags.root ? root : dirname(dirname(fileURLToPath(import.meta.url)))
-        pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
+        await pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
         return
     }
     console.error(`unknown command "${command}". commands: build, check, serve, watch, clean, icons, graph, pack, deploy, node`)
@@ -256,8 +257,8 @@ async function icons_audit(root: string, flags: flags): Promise<void> {
             const unknown = warning.match(/unknown icon token \[([^\]]+)\]/)
             if (unknown) unregistered.add(unknown[1])
         }
-        const skipped = [join(temp, "assets", "home_jason") + sep, join(temp, "media") + sep]
-        const files = collect_files(temp).filter(file => !skipped.some(prefix => file.startsWith(prefix)))
+        const published = new Set([...model.resources.keys()].map(path => join(temp, path.replace(/^\/+/, ""))))
+        const files = collect_files(temp).filter(file => !published.has(file))
         scan_icon_files(files, usage, [".html", ".json"])
     } catch (error) {
         console.warn(`warning: temporary build failed (${error instanceof Error ? error.message.split("\n")[0] : error}), scanning sources instead`)
@@ -409,32 +410,34 @@ function make_zip(entries: { name: string, data: Buffer, mtime: Date }[]): Buffe
     return Buffer.concat([...parts, ...central, end])
 }
 
-function pack_command(project: string, file_name: string, additions:string[] = []): void {
-    const targets = ["src", "content", "tools", "package.json", "package-lock.json", "README.md", "COMPONENTS.md", "PLACEHOLDER.md", "TASKS.md", "config.json", "migrations", "wrangler.jsonc", "wrangler.local.jsonc", "wrangler.bindings.example.json", "tsconfig.json", ...additions]
-    const media_dir = join(project, "content", "media")
-    const media_keep = join(media_dir, "signature.svg")
+async function pack_command(project: string, file_name: string, additions: string[] = []): Promise<void> {
+    const config = await load_config(project)
+    const excluded = config.pack.exclude.map(path => {
+        const target = resolve(project, path)
+        if (!inside(project, target) || target === resolve(project)) throw new Error(`Unsafe pack exclusion: ${path}`)
+        return target
+    })
     const out = join(project, file_name)
-    const files: string[] = []
-    for (const target of targets) {
-        const path = join(project, target)
-        if (!existsSync(path)) {
-            console.warn(`warning: ${target} not found, skipping`)
+    // The whole working tree minus whatever the root and nested .gitignore files exclude. Git is not consulted,
+    // so this works without git or a .git folder, and tracked-but-ignored files are still left out.
+    const files = new Set(collect_unignored(project, path => path === out || excluded.some(target => inside(target, path))))
+    // Paths given on the command line are explicit opt-ins, even if a .gitignore excludes them.
+    for (const target of additions) {
+        const path = resolve(project, target)
+        if (!inside(project, path) || !existsSync(path)) {
+            console.warn(`warning: ${target} not found or outside the project, skipping`)
             continue
         }
-        collect_files(path, files)
+        for (const file of collect_files(path)) files.add(file)
     }
-    if (!existsSync(media_keep)) console.warn("warning: content/media/signature.svg not found, skipping")
-    // content/media/ is excluded entirely, except content/media/signature.svg
-    const entries = files
-        .filter(path => path !== out)
-        .filter(path => path === media_keep || !path.startsWith(media_dir + sep))
-        .map(path => ({
-            name: relative(project, path).split(sep).join("/"),
-            data: readFileSync(path),
-            mtime: statSync(path).mtime,
-        }))
+    const entries = [...files].sort().map(path => ({
+        name: relative(project, path).split(sep).join("/"),
+        data: readFileSync(path),
+        mtime: statSync(path).mtime,
+    }))
     writeFileSync(out, make_zip(entries))
-    console.log(`packed ${entries.length} files into ${out}`)
+    const megabytes = entries.reduce((sum, entry) => sum + entry.data.length, 0) / 1024 / 1024
+    console.log(`packed ${entries.length} files (${megabytes.toFixed(1)} MiB uncompressed) into ${out}`)
 }
 
 main().catch(error => {

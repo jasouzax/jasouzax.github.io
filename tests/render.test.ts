@@ -36,17 +36,13 @@ test("trusted build markup becomes serializable nodes rather than raw browser HT
     assert(Array.isArray(serialize(tree)))
 })
 
-test("content layout and config language dictionaries follow the migration contract", async () => {
+test("config language dictionaries and XML language variants follow the migration contract", async () => {
     const config = await load_config(process.cwd())
     assert(!Array.isArray(config.languages))
-    for (const dir of ["blogs", "media", "theme"]) assert(existsSync(join("content", dir)))
-    for (const dir of ["pages", "files", "file", "partials", "strings", "themes"]) assert(!existsSync(join("content", dir)), dir)
     assert(!existsSync("tools"))
     const model = load_site(process.cwd(), config, new_diagnostics(), new Date("2026-11-05"))
     assert.equal(ui_text(model, "en", "home"), config.languages.en.home)
     assert.equal(ui_text(model, "missing", "home"), config.languages.en.home)
-    assert(model.objects.filter(node => node.tag === "blog").every(node => node.file.includes(join("content", "blogs"))))
-    assert(model.themes.every(node => node.file.includes(join("content", "theme"))))
     for (const page of model.pages) {
         const variants = model.pages.filter(other => other.path === page.path)
         assert(variants.every(other => other.node.file === page.node.file), `Language variants share a file: ${page.path}`)
