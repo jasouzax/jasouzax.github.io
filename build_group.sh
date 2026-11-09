@@ -209,5 +209,16 @@ if [[ "$TARGET" == "group18" || "$TARGET" == "18" || "$TARGET" == "all" ]]; then
     echo "Group 18 done"
 fi
 
+if [[ "$TARGET" == "group19" || "$TARGET" == "19" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 19 ==="
+    echo "Building make..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group19/make.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/make.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group19/LICENSE" "$ARTIFACTS/make-LICENSE"
+    rm -f "$ARTIFACTS/make-source.tar.gz"
+    tar -czf "$ARTIFACTS/make-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group19" make.c LICENSE
+    echo "Group 19 done"
+fi
+
+
 
 

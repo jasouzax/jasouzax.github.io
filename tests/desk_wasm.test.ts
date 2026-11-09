@@ -79,6 +79,8 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
     await register_program("linux_suite", ["file", "readelf"])
     await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
+    await register_program("tcc", ["tcc", "gcc", "g++", "cc", "cpp"])
+    await register_program("make", ["make"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -606,6 +608,23 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const wine_help = await run("win-exec --help")
         assert.equal(wine_help.code, 0)
         assert.match(wine_help.stdout, /Executes 32-bit Windows PE console applications/)
+    })
+    await t.test("native group 19 c and cpp toolchain compiles code and executes make build rules", async () => {
+        const tcc_ver = await run("tcc -v")
+        assert.equal(tcc_ver.code, 0)
+        assert.match(tcc_ver.stdout, /tcc version 0\.9\.27/)
+
+        const gcc_ver = await run("gcc -v")
+        assert.equal(gcc_ver.code, 0)
+        assert.match(gcc_ver.stdout, /tcc version 0\.9\.27/)
+
+        const make_ver = await run("make --version")
+        assert.equal(make_ver.code, 0)
+        assert.match(make_ver.stdout, /GNU Make 4\.4\.1/)
+
+        const make_run = await run("printf 'all:\\n\\t@echo Build Completed Successfully\\n' > /tmp/Makefile; make -f /tmp/Makefile")
+        assert.equal(make_run.code, 0)
+        assert.match(make_run.stdout, /Build Completed Successfully/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

@@ -513,4 +513,12 @@ emcc -Os exec_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/exec
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/exec_suite.d.ts"
 echo "Group 18 tools done"
 
+echo "=== 30. Building Group 19 Make Tool (make) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group19"
+tar czf "$ARTIFACTS/make-source.tar.gz" make.c LICENSE
+cp LICENSE "$ARTIFACTS/make-LICENSE"
+emcc -Os make.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/make.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/make.d.ts"
+echo "Group 19 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
