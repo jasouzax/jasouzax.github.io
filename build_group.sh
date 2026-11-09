@@ -102,3 +102,15 @@ if [[ "$TARGET" == "group10" || "$TARGET" == "10" || "$TARGET" == "all" ]]; then
     done
     echo "Group 10 done"
 fi
+
+if [[ "$TARGET" == "group11" || "$TARGET" == "11" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 11 ==="
+    for tool in encoding_suite; do
+        echo "Building $tool..."
+        emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group11/$tool.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/$tool.js"
+        cp "$SCRIPT_DIR/src/desk/programs/sources/group11/LICENSE" "$ARTIFACTS/$tool-LICENSE"
+        rm -f "$ARTIFACTS/$tool-source.tar.gz"
+        tar -czf "$ARTIFACTS/$tool-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group11" "$tool.c" LICENSE
+    done
+    echo "Group 11 done"
+fi

@@ -110,8 +110,8 @@
 
 11. **Text & Character Encodings**
     - [x] `dos2unix`, `unix2dos`, `mac2unix`: Line ending conversion (provided by BusyBox WASM)
-    - [ ] `iconv`: Multi-encoding converter (UTF-8, ISO-8859-1, Windows-1252, UTF-16, ASCII)
-    - [ ] `recode`: Format and character set surface transformation
+    - [x] `iconv`: Multi-encoding converter (UTF-8, ISO-8859-1, Windows-1252, UTF-16, ASCII) (`encoding_suite.wasm`)
+    - [x] `recode`: Format and character set surface transformation (`encoding_suite.wasm`)
 
 12. **Data Transformation & Query Suite**
     - [x] `jq`: JSON query filter, slicing, projection, formatting (`-r`, `-c`) (jq.wasm)

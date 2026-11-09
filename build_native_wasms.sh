@@ -430,5 +430,12 @@ cp LICENSE "$ARTIFACTS/tools_catalog-LICENSE"
 emcc -Os tools_catalog.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/tools_catalog.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/tools_catalog.d.ts"
 echo "Group 10 tools done"
+echo "=== 22. Building Group 11 Text & Character Encodings (encoding_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group11"
+tar czf "$ARTIFACTS/encoding_suite-source.tar.gz" encoding_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/encoding_suite-LICENSE"
+emcc -Os encoding_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/encoding_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/encoding_suite.d.ts"
+echo "Group 11 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

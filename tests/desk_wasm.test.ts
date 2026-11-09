@@ -67,6 +67,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("string_helpers", ["escape-string", "unescape-string", "count-tokens"])
     await register_program("markup_tools", ["md2html", "html2text"])
     await register_program("tools_catalog", ["tools"])
+    await register_program("encoding_suite", ["iconv", "recode"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -406,6 +407,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const tools_res = await run("tools search json")
         assert.equal(tools_res.code, 0)
         assert.match(tools_res.stdout, /json-flatten/)
+    })
+    await t.test("native group 11 text encoding wasms convert character sets with iconv and recode", async () => {
+        const iconv_res = await run("printf 'hello world' | iconv -f utf-8 -t ascii")
+        assert.equal(iconv_res.code, 0)
+        assert.equal(iconv_res.stdout, "hello world")
+
+        const recode_res = await run("printf 'hello world' | recode utf8..latin1")
+        assert.equal(recode_res.code, 0)
+        assert.equal(recode_res.stdout, "hello world")
+
+        const list_res = await run("iconv -l")
+        assert.equal(list_res.code, 0)
+        assert.match(list_res.stdout, /UTF-8/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
