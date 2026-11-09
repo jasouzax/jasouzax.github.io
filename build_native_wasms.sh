@@ -413,5 +413,22 @@ cp LICENSE "$ARTIFACTS/file_analysis-LICENSE"
 emcc -Os file_analysis.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/file_analysis.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/file_analysis.d.ts"
 echo "Group 9 tools done"
+echo "=== 21. Building Group 10 Code Helpers, Regex & Markup (string_helpers, markup_tools, tools_catalog) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group10"
+tar czf "$ARTIFACTS/string_helpers-source.tar.gz" string_helpers.c LICENSE
+cp LICENSE "$ARTIFACTS/string_helpers-LICENSE"
+emcc -Os string_helpers.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/string_helpers.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/string_helpers.d.ts"
+
+tar czf "$ARTIFACTS/markup_tools-source.tar.gz" markup_tools.c LICENSE
+cp LICENSE "$ARTIFACTS/markup_tools-LICENSE"
+emcc -Os markup_tools.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/markup_tools.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/markup_tools.d.ts"
+
+tar czf "$ARTIFACTS/tools_catalog-source.tar.gz" tools_catalog.c LICENSE
+cp LICENSE "$ARTIFACTS/tools_catalog-LICENSE"
+emcc -Os tools_catalog.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/tools_catalog.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/tools_catalog.d.ts"
+echo "Group 10 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

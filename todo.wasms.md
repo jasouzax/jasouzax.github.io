@@ -100,13 +100,13 @@
 10. **Code Helpers, Regex & Markup**
     - [x] `regex-test`: Filters matching lines by regular expression (provided by BusyBox `grep -E` WASM)
     - [x] `regex-replace`: Replaces pattern matches in text (provided by BusyBox `sed -E` WASM)
-    - [ ] `escape-string` & `unescape-string`: Escape / unescape for JSON, JavaScript, regex, and SQL
+    - [x] `escape-string` & `unescape-string`: Escape / unescape for JSON, JavaScript, regex, and SQL (`string_helpers.wasm`)
     - [x] `line-endings`: Line-ending detector and converter (provided by BusyBox `dos2unix` / `unix2dos` WASM)
     - [x] `indent`: Indentation style converter (provided by BusyBox `expand` / `unexpand` WASM)
-    - [ ] `count-tokens`: Token estimator for LLMs (~4 chars/token)
-    - [ ] `md2html`: Markdown to HTML converter
-    - [ ] `html2text`: HTML stripper to plain readable text
-    - [ ] `tools`: Integrated help directory listing all available tools
+    - [x] `count-tokens`: Token estimator for LLMs (`string_helpers.wasm`)
+    - [x] `md2html`: Markdown to HTML converter (`markup_tools.wasm`)
+    - [x] `html2text`: HTML stripper to plain readable text (`markup_tools.wasm`)
+    - [x] `tools`: Integrated help directory listing all available tools (`tools_catalog.wasm`)
 
 11. **Text & Character Encodings**
     - [x] `dos2unix`, `unix2dos`, `mac2unix`: Line ending conversion (provided by BusyBox WASM)

@@ -64,6 +64,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("qr", ["qr"])
     await register_program("net_tools", ["url-parse", "http-status", "mime-type"])
     await register_program("file_analysis", ["entropy", "detect-encoding", "file-info"])
+    await register_program("string_helpers", ["escape-string", "unescape-string", "count-tokens"])
+    await register_program("markup_tools", ["md2html", "html2text"])
+    await register_program("tools_catalog", ["tools"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -381,6 +384,28 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const enc_res = await run("printf 'Hello World' | detect-encoding")
         assert.equal(enc_res.code, 0)
         assert.match(enc_res.stdout, /US-ASCII/)
+    })
+    await t.test("native group 10 code helpers, markup, and tools wasms escape strings, parse markdown, strip html, and search catalog", async () => {
+        const esc_res = await run("printf 'hello\\t\"world\"\\n' | escape-string")
+        assert.equal(esc_res.code, 0)
+        assert.match(esc_res.stdout, /hello\\t\\"world\\"/)
+
+        const tokens_res = await run("printf 'hello world test string' | count-tokens")
+        assert.equal(tokens_res.code, 0)
+        assert.match(tokens_res.stdout, /Estimated Tokens:\s*[0-9]+/)
+
+        const md_res = await run("printf '# Title\\n\\n**bold**\\n' | md2html")
+        assert.equal(md_res.code, 0)
+        assert.match(md_res.stdout, /<h1>Title<\/h1>/)
+        assert.match(md_res.stdout, /<strong>bold<\/strong>/)
+
+        const html_res = await run("printf '<h1>Title</h1><p>Hello &amp; world</p>' | html2text")
+        assert.equal(html_res.code, 0)
+        assert.match(html_res.stdout, /Title\nHello & world/)
+
+        const tools_res = await run("tools search json")
+        assert.equal(tools_res.code, 0)
+        assert.match(tools_res.stdout, /json-flatten/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
