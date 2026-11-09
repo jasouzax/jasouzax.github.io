@@ -209,7 +209,7 @@
     - [x] `perl`: Practical Extraction and Reporting Language 5 interpreter (`perl_suite.wasm`)
 
 24. **Dynamic & Embedded Languages (Lua, Lisp, BASIC)**
-    - [ ] `lua`: Lua 5.4 embeddable scripting engine
-    - [ ] `lisp`: Minimal Lisp / Scheme evaluator
-    - [ ] `basic`: Classic BASIC language interpreter
+    - [x] `lua`: Lua 5.4 embeddable scripting engine (`lang_suite.wasm`)
+    - [x] `lisp`: Minimal Lisp / Scheme evaluator (`lang_suite.wasm`)
+    - [x] `basic`: Classic BASIC language interpreter (`lang_suite.wasm`)
 

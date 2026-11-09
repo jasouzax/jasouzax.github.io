@@ -259,6 +259,17 @@ if [[ "$TARGET" == "group23" || "$TARGET" == "23" || "$TARGET" == "all" ]]; then
     echo "Group 23 done"
 fi
 
+if [[ "$TARGET" == "group24" || "$TARGET" == "24" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 24 ==="
+    echo "Building lang_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group24/lang_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/lang_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group24/LICENSE" "$ARTIFACTS/lang_suite-LICENSE"
+    rm -f "$ARTIFACTS/lang_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/lang_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group24" lang_suite.c LICENSE
+    echo "Group 24 done"
+fi
+
+
 
 
 

@@ -553,4 +553,12 @@ emcc -Os perl_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/perl
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/perl_suite.d.ts"
 echo "Group 23 tools done"
 
+echo "=== 35. Building Group 24 Language Suite (lang_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group24"
+tar czf "$ARTIFACTS/lang_suite-source.tar.gz" lang_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/lang_suite-LICENSE"
+emcc -Os lang_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/lang_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/lang_suite.d.ts"
+echo "Group 24 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

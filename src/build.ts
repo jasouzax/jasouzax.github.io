@@ -165,6 +165,7 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["rust_suite", "1.0.0-jazu.1", "tar.gz", ["rustc", "rust-runner", "cargo"]],
         ["jvm_suite", "1.0.0-jazu.1", "tar.gz", ["java", "javac"]],
         ["perl_suite", "1.0.0-jazu.1", "tar.gz", ["perl"]],
+        ["lang_suite", "1.0.0-jazu.1", "tar.gz", ["lua", "lisp", "basic"]],
     ] as [string, string, string, string[]?][]) {
         const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`

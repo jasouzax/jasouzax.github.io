@@ -85,6 +85,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
     await register_program("jvm_suite", ["java", "javac"])
     await register_program("perl_suite", ["perl"])
+    await register_program("lang_suite", ["lua", "lisp", "basic"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -703,6 +704,27 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const perl_calc = await run("perl -e '$a = 18; $b = 24; print $a + $b, \"\\n\"'")
         assert.equal(perl_calc.code, 0)
         assert.equal(perl_calc.stdout.trim(), "42")
+    })
+    await t.test("native group 24 dynamic languages suite evaluates lua, lisp, and basic programs", async () => {
+        const lua_ver = await run("lua -v")
+        assert.equal(lua_ver.code, 0)
+        assert.match(lua_ver.stdout, /Lua 5\.4\.6/)
+
+        const lua_print = await run("lua -e 'print(\"Hello from Lua WASM!\")'")
+        assert.equal(lua_print.code, 0)
+        assert.equal(lua_print.stdout.trim(), "Hello from Lua WASM!")
+
+        const lua_calc = await run("lua -e 'local a = 15; local b = 27; print(a + b)'")
+        assert.equal(lua_calc.code, 0)
+        assert.equal(lua_calc.stdout.trim(), "42")
+
+        const lisp_calc = await run("lisp -e '(+ 19 23)'")
+        assert.equal(lisp_calc.code, 0)
+        assert.equal(lisp_calc.stdout.trim(), "42")
+
+        const basic_print = await run("basic -e '10 PRINT \"Hello from BASIC WASM!\"'")
+        assert.equal(basic_print.code, 0)
+        assert.equal(basic_print.stdout.trim(), "Hello from BASIC WASM!")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
