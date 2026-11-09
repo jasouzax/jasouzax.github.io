@@ -9,6 +9,7 @@ as BusyBox. The sources and license notices accompany the published WASMs.
 | Fastfetch | 2.40.4 | Linux/proc detectors backed by the browser kernel; inaccessible hardware modules remain unavailable. |
 | Htop | 3.4.1, Ncurses 6.5 | Portable platform backend populated from the actual browser process table. Keyboard input, refresh, filtering, and process termination use the shared terminal and kernel. |
 | TinyCC | 0.9.27 | i386 cross-compiler running in WASM, with bundled C headers. Produces native ELF objects; it does **not** generate runnable WebAssembly or support native `-run` in the browser. |
+| Jq | 1.7.1 | Portable JSON query processor and filter compiled to WASM with Oniguruma regular expression engine. |
 
 For example:
 

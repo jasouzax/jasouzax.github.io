@@ -101,7 +101,7 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
     const images = [{ id: "busybox", version: "1.36.1-jazu.2", worker, wasm: "/" + wasm_path, sha256: hash,
         commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
     const programs = join(root, "src", "desk", "programs", "artifacts")
-    for (const [name, version, extension] of [["fastfetch", "2.40.4-jazu.1", "tar.gz"], ["htop", "3.4.1-jazu.1", "tar.gz"], ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"]]) {
+    for (const [name, version, extension] of [["fastfetch", "2.40.4-jazu.1", "tar.gz"], ["htop", "3.4.1-jazu.1", "tar.gz"], ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"], ["jq", "1.7.1-jazu.1", "tar.gz"]]) {
         const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`
         files.set(path, bytes)

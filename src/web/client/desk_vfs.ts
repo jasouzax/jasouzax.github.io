@@ -105,6 +105,8 @@ function virtual_stat(path: string, programs: string[]): stat_info | null {
         const text = proc_file(pid, proc_match[2])
         return text === null ? null : { kind: "file", size: text.length, writable: false }
     }
+    const bin = /^\/bin\/([^/]+)$/.exec(clean)
+    if (bin && (programs.includes(bin[1]) || (typeof window !== "undefined" && (window as any).jazu_desk_shell?.programs?.[bin[1]]))) return { kind: "file", size: 0, writable: false }
     return null
 }
 
@@ -168,6 +170,12 @@ export function make_fs(programs: () => string[], uid = 1000): fs_api {
             if (!node && clean !== "/bin" && clean !== "/dev") throw new Error("No such file or directory")
             if (node && node.kind !== "dir") throw new Error("Not a directory")
             for (const child of node ? await list_node(node) : []) out.set(child.name, child.kind)
+            if (clean === "/bin") {
+                for (const name of programs()) out.set(name, "file")
+                if (typeof window !== "undefined" && (window as any).jazu_desk_shell?.programs) {
+                    for (const name of Object.keys((window as any).jazu_desk_shell.programs)) out.set(name, "file")
+                }
+            }
             if (clean === "/dev") out.set("null", "file")
             return [...out].map(([name, kind]) => ({ name, kind }))
         },

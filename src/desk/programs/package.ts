@@ -8,6 +8,7 @@ for (const [name, source, archive, extension, license] of [
     ["fastfetch", "fastfetch-2.40.4", "fastfetch.tar.gz", "tar.gz", "LICENSE"],
     ["htop", "htop-3.4.1", "htop.tar.gz", "tar.gz", "COPYING"],
     ["tcc", "tcc-0.9.27", "tcc.tar.bz2", "tar.bz2", "COPYING"],
+    ["jq", "jq-1.7.1", "jq.tar.gz", "tar.gz", "COPYING"],
 ]) {
     if (!existsSync(join(artifact, `${name}.wasm`))) throw new Error(`Missing compiled program: ${name}`)
     copyFileSync(join(work, archive), join(artifact, `${name}-source.${extension}`))
@@ -36,4 +37,4 @@ const target: Record<string, string> = {
 for (const name of ["bits/alltypes.h", "bits/stdint.h"]) for (const [macro, value] of Object.entries(target)) files[name] = files[name].replaceAll(macro, value)
 writeFileSync(join(artifact, "tcc-sysroot.json"), JSON.stringify(files))
 writeFileSync(join(artifact, "tcc-sysroot-LICENSE"), readFileSync(join(sdk, "upstream/emscripten/system/lib/libc/musl/COPYRIGHT"), "utf8") + "\nTinyCC headers:\n" + readFileSync(join(work, "tcc-0.9.27/COPYING"), "utf8"))
-console.log(`Packaged 3 native WASM programs and ${Object.keys(files).length} compiler headers`)
+console.log(`Packaged 4 native WASM programs and ${Object.keys(files).length} compiler headers`)

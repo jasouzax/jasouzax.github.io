@@ -109,13 +109,14 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
     async function stat(path: string): Promise<any> {
         path = norm(path)
         const device = /^\/dev\/(null|zero|random|urandom|tty|stdin|stdout|stderr)$/.test(path)
+        const is_bin = path.startsWith("/bin/") && (executables.has(path) || registered_programs[path.slice(5)] !== undefined)
         const record = proc_record(p.list_procs(), path)
         const proc_dir = /^\/proc\/(\d+)$/.exec(path)
-        const info: stat_info | null = device ? { kind: "file", size: 0, writable: true } : record !== null ? { kind: "file", size: encoder.encode(record).length, writable: false } : proc_dir && p.list_procs().some(item => item.pid === Number(proc_dir[1])) ? { kind: "dir", size: 0, writable: false } : await p.fs.stat(path)
+        const info: stat_info | null = device ? { kind: "file", size: 0, writable: true } : is_bin ? { kind: "file", size: 0, writable: false } : record !== null ? { kind: "file", size: encoder.encode(record).length, writable: false } : proc_dir && p.list_procs().some(item => item.pid === Number(proc_dir[1])) ? { kind: "dir", size: 0, writable: false } : await p.fs.stat(path)
         if (!info) throw new Error("ENOENT")
         if (!inode.has(path)) inode.set(path, inode.size + 1)
         const saved = metadata.get(path)
-        return { size: info.size, ino: inode.get(path), uid: info.uid ?? 1000, gid: info.gid ?? 1000, mode: saved?.mode ?? (device ? 0o20666 : info.kind === "dir" ? (info.writable ? 0o40755 : 0o40555) : executables.has(path) ? 0o100755 : info.writable ? 0o100644 : 0o100444), mtime: saved?.mtime ?? Date.now() }
+        return { size: info.size, ino: inode.get(path), uid: info.uid ?? 1000, gid: info.gid ?? 1000, mode: saved?.mode ?? (device ? 0o20666 : info.kind === "dir" ? (info.writable ? 0o40755 : 0o40555) : (executables.has(path) || (path.startsWith("/bin/") && registered_programs[path.slice(5)])) ? 0o100755 : info.writable ? 0o100644 : 0o100444), mtime: saved?.mtime ?? Date.now() }
     }
     async function read(h: handle, length: number): Promise<Uint8Array> {
         if (h.kind === "null") return new Uint8Array()
@@ -318,9 +319,17 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                 const path = paths.find((path: string) => executables.has(path) || (path.startsWith("/bin/") && registered_programs[path.slice(5)]))
                 if (!path) return -errno.ENOENT
                 for (const d of a.descriptors) get(d.handle).refs++
-                const child = p.spawn([path.split("/").pop()!, ...a.argv.slice(1)], { cwd: a.cwd, env, wasm: { descriptors: a.descriptors } })
+                const is_wasm = executables.has(path)
+                const bridge = is_wasm ? {} : bridge_descriptors(a.descriptors)
+                const child = p.spawn([path.split("/").pop()!, ...a.argv.slice(1)], {
+                    cwd: a.cwd,
+                    env,
+                    ...(bridge.stdin ? { stdin: bridge.stdin } : {}),
+                    ...(bridge.stdout ? { stdout: bridge.stdout } : {}),
+                    wasm: { descriptors: a.descriptors }
+                })
                 const entry: { done: Promise<number>, code?: number } = { done: child.done }
-                children.set(child.pid, entry); child.done.then(code => { entry.code = code })
+                children.set(child.pid, entry); child.done.then(code => { bridge.close?.(); entry.code = code })
                 return child.pid
             }
             case "wait": {
@@ -340,6 +349,81 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
             }
             default: throw new Error("ENOSYS")
         }
+    }
+
+    function bridge_descriptors(ds: descriptor[] | undefined): { stdin?: proc_api["stdin"], stdout?: proc_api["stdout"], close?: () => void } {
+        if (!ds) return {}
+        let stdin: proc_api["stdin"] | undefined
+        let stdout: proc_api["stdout"] | undefined
+        let close_pipes: (() => void) | undefined
+        const d0 = ds.find(d => d.fd === 0)
+        if (d0) {
+            const h0 = handles.get(d0.handle)
+            if (h0?.kind === "pipe_read") {
+                const stream = p.pipe()
+                stdin = stream
+                ;(async () => {
+                    const q = h0.queue!
+                    while (!stopped) {
+                        while (!q.chunks.length && q.writers && !stopped) {
+                            await new Promise<void>(resolve => {
+                                q.readers.push(resolve)
+                                controller.signal.addEventListener("abort", () => resolve(), { once: true })
+                            })
+                        }
+                        if (stopped || (!q.chunks.length && !q.writers)) {
+                            stream.eof()
+                            break
+                        }
+                        const chunk = q.chunks.shift()!
+                        q.size -= chunk.length
+                        stream.write(new TextDecoder().decode(chunk))
+                    }
+                })()
+            } else if (h0?.kind === "file") {
+                const stream = p.pipe()
+                stdin = stream
+                ;(async () => {
+                    const bytes = await fs_read(h0.path)
+                    stream.write(new TextDecoder().decode(bytes))
+                    stream.eof()
+                })()
+            }
+        }
+        const d1 = ds.find(d => d.fd === 1)
+        if (d1) {
+            const h1 = handles.get(d1.handle)
+            if (h1?.kind === "pipe_write") {
+                stdout = {
+                    write(text: string) {
+                        const bytes = new TextEncoder().encode(text)
+                        h1.queue!.chunks.push(bytes)
+                        h1.queue!.size += bytes.length
+                        for (const wake of h1.queue!.readers.splice(0)) wake()
+                    },
+                    eof() {
+                        h1.queue!.writers--
+                        for (const wake of h1.queue!.readers.splice(0)) wake()
+                    }
+                } as any
+                close_pipes = () => { (stdout as any)?.eof?.() }
+            } else if (h1?.kind === "file") {
+                stdout = {
+                    write(text: string) {
+                        const bytes = new TextEncoder().encode(text)
+                        void with_file(h1.path, async () => {
+                            const old = await fs_read(h1.path)
+                            const offset = h1.flags & 1024 ? old.length : h1.offset
+                            const next = new Uint8Array(Math.max(old.length, offset + bytes.length))
+                            next.set(old); next.set(bytes, offset); await fs_write(h1.path, next)
+                            h1.offset = offset + bytes.length
+                        })
+                    },
+                    eof() {}
+                } as any
+            }
+        }
+        return { stdin, stdout, close: close_pipes }
     }
 
     return new Promise<number>((resolve, reject) => {
@@ -387,8 +471,17 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                         worker.terminate()
                         if (!next) {
                             active = null
-                            const child = p.spawn([path.slice(5), ...a.argv.slice(1)], { cwd: p.cwd, env: p.env, wasm: { descriptors: descriptors! } })
-                            finish(await child.done)
+                            const bridge = bridge_descriptors(descriptors)
+                            const child = p.spawn([path.slice(5), ...a.argv.slice(1)], {
+                                cwd: p.cwd,
+                                env: p.env,
+                                ...(bridge.stdin ? { stdin: bridge.stdin } : {}),
+                                ...(bridge.stdout ? { stdout: bridge.stdout } : {}),
+                                wasm: { descriptors: descriptors! }
+                            })
+                            const code = await child.done
+                            bridge.close?.()
+                            finish(code)
                             return
                         }
                         await launch(next, [path.split("/").pop()!, ...a.argv.slice(1)], p.env).catch(error => finish(1, error))

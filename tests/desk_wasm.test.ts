@@ -7,6 +7,7 @@ import { Worker } from "node:worker_threads"
 import { build } from "esbuild"
 import { register_wasm, registered_programs } from "../src/web/client/wasm_host.ts"
 import type { worker_factory } from "../src/web/client/wasm_host.ts"
+import { tool_programs } from "../src/web/client/desk_tools.ts"
 import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web/client/kernel.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
@@ -14,8 +15,8 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     const worker_file = resolve(".cache/desk-test-worker.cjs")
     mkdirSync(resolve(".cache"), { recursive: true })
     await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
-    const factory: worker_factory = () => {
-        const node = new Worker(worker_file)
+    const factory: worker_factory = (url: string) => {
+        const node = new Worker(url)
         const adapter: ReturnType<worker_factory> = { postMessage: value => node.postMessage(value), terminate: () => node.terminate(), onmessage: null, onerror: null }
         node.on("message", data => adapter.onmessage?.({ data } as MessageEvent))
         node.on("error", error => adapter.onerror?.(error))
@@ -37,6 +38,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     }
     const wasm = readFileSync(resolve("src/desk/busybox/artifacts/busybox.wasm"))
     register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
+    const jq_worker_file = resolve(".cache/desk-test-jq-worker.cjs")
+    await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker_jq.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: jq_worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
+    const jq_wasm = readFileSync(resolve("src/desk/programs/artifacts/jq.wasm"))
+    register_wasm({ id: "jq", version: "1.7.1", worker: jq_worker_file, wasm: "data:application/wasm;base64," + jq_wasm.toString("base64"), sha256: createHash("sha256").update(jq_wasm).digest("hex"), commands: ["jq"] }, factory)
+    Object.assign(registered_programs, tool_programs)
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -51,6 +57,12 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const result = await run("v=world; f() { echo hello-$v; }; f > /tmp/greeting; cat /tmp/greeting; touch /tmp/new; rm /tmp/new")
         assert.deepEqual(result, { stdout: "hello-world\n", stderr: "", code: 0 })
         assert.equal(files.has("/tmp/new"), false)
+    })
+    await t.test("compiled BusyBox applets encode base32, convert line endings, dump hex and compute hashes", async () => {
+        const result = await run("printf 'hello\\r\\n' > /tmp/crlf; dos2unix /tmp/crlf; cat /tmp/crlf; printf 'hello' | base32; printf 'hi' | xxd -p; printf 'test' | sha512sum | cut -c1-16")
+        assert.equal(result.code, 0)
+        assert.equal(result.stderr, "")
+        assert.equal(result.stdout, "hello\nNBSWY3DP\n6869\nee26b0dd4af7e749\n")
     })
     await t.test("an existing shell redirects after its home mount becomes writable", async () => {
         home_writable = false
@@ -110,6 +122,18 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(result.code, 0)
         assert.equal(result.stdout.trim(), "10")
         assert.equal(result.stderr, "")
+    })
+    await t.test("native jq wasm filters JSON input in kernel shell", async () => {
+        const result = await run("echo '{\"name\":\"jazu\",\"count\":42}' > /tmp/sample.json; jq -r .name /tmp/sample.json")
+        assert.equal(result.code, 0)
+        assert.equal(result.stderr, "")
+        assert.equal(result.stdout, "jazu\n")
+    })
+    await t.test("desktop tool suite encodes urls, calculates math and formats tokens", async () => {
+        const result = await run("urlencode 'hello world'; calc '6 * 7'; printf 'test string\\n' > /tmp/rot.txt; rot13 /tmp/rot.txt")
+        assert.equal(result.code, 0)
+        assert.equal(result.stderr, "")
+        assert.equal(result.stdout, "hello%20world\n42\ngrfg fgevat\n")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

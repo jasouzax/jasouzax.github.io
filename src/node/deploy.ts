@@ -28,7 +28,8 @@ export async function prepare_deploy(root: string, out: string, result: build_re
     }
     // Terraform uploads a single ES module, so bundle the Worker (and its local imports) here.
     const worker_bundle = join(stage, "worker.js")
-    await esbuild_build({ entryPoints: [join(root, "src/node/worker.ts")], outfile: worker_bundle, bundle: true, format: "esm", platform: "neutral", target: "es2022", minify: false, logLevel: "silent" })
+    const worker_entry = existsSync(join(root, "src/node/worker.ts")) ? join(root, "src/node/worker.ts") : resolve("src/node/worker.ts")
+    await esbuild_build({ entryPoints: [worker_entry], outfile: worker_bundle, bundle: true, format: "esm", platform: "neutral", target: "es2022", minify: false, logLevel: "silent" })
     const projects = [...new Set(result.model.objects.filter(node => node.tag === "project").map(node => node.attrs.id))]
     const var_file = join(stage, "deploy.auto.tfvars.json")
     writeFileSync(var_file, JSON.stringify({

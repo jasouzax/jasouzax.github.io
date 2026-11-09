@@ -18,8 +18,9 @@ fetch https://codeload.github.com/fastfetch-cli/fastfetch/tar.gz/refs/tags/2.40.
 fetch https://codeload.github.com/htop-dev/htop/tar.gz/refs/tags/3.4.1 htop.tar.gz af9ec878f831b7c27d33e775c668ec79d569aa781861c995a0fbadc1bdb666cf
 fetch https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2 tcc.tar.bz2 de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c
 fetch https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz ncurses.tar.gz 136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6
+fetch https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-1.7.1.tar.gz jq.tar.gz 478c9ca129fd2e3443fe27314b455e211e0d8c60bc8ff7df703873deeee580c2
 if [[ "${1:-all}" != relink ]]; then
-  for archive in fastfetch.tar.gz htop.tar.gz tcc.tar.bz2 ncurses.tar.gz; do tar xf "$archive"; done
+  for archive in fastfetch.tar.gz htop.tar.gz tcc.tar.bz2 ncurses.tar.gz jq.tar.gz; do tar xf "$archive"; done
   python3 "$ROOT/port.py" "$WORK"
 fi
 FLAGS='-Wl,--wrap=getpwuid,--wrap=getpwnam,--wrap=getpwent -Os -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createProgram -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sFORCE_FILESYSTEM=1 -sENVIRONMENT=web,worker -sEXPORTED_RUNTIME_METHODS=callMain,FS,ENV,TTY,PIPEFS,stackSave,stackRestore -sEXPORTED_FUNCTIONS=_main,_emscripten_resize_heap -sSTACK_SIZE=1048576 -sINITIAL_MEMORY=16777216 -sERROR_ON_UNDEFINED_SYMBOLS=0'
@@ -57,6 +58,15 @@ if [[ "${1:-all}" == htop || "${1:-all}" == all || "${1:-all}" == relink ]]; the
   cp htop "$ROOT/artifacts/htop.js"
   cp htop.wasm "$ROOT/artifacts/htop.wasm"
 fi
-if [[ -f "$ROOT/artifacts/fastfetch.wasm" && -f "$ROOT/artifacts/htop.wasm" && -f "$ROOT/artifacts/tcc.wasm" ]]; then
+if [[ "${1:-all}" == jq || "${1:-all}" == all || "${1:-all}" == relink ]]; then
+  cd "$WORK/jq-1.7.1"
+  if [[ "${1:-all}" != relink ]]; then
+    emconfigure ./configure --host=wasm32-unknown-emscripten --disable-docs --disable-valgrind --with-oniguruma=builtin --enable-static --disable-shared CFLAGS='-Os'
+  fi
+  emmake make -j4
+  emcc -Os src/main.o .libs/libjq.a modules/oniguruma/src/.libs/libonig.a "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ROOT/artifacts/jq.js"
+  cd "$WORK"
+fi
+if [[ -f "$ROOT/artifacts/fastfetch.wasm" && -f "$ROOT/artifacts/htop.wasm" && -f "$ROOT/artifacts/tcc.wasm" && -f "$ROOT/artifacts/jq.wasm" ]]; then
   node "$ROOT/package.ts" "$WORK" "$SDK"
 fi

@@ -64,7 +64,7 @@ test("real additional WASMs run against the shared browser kernel and filesystem
     page.on("request", request => { if (request.url().endsWith(".wasm")) wasm.push(request.url()) })
     await page.goto("/desk")
     const registry = await (await page.request.get("/assets/wasm/manifest.json")).json()
-    expect(registry.map((image: { id: string }) => image.id)).toEqual(["busybox", "fastfetch", "htop", "tcc"])
+    expect(registry.map((image: { id: string }) => image.id)).toEqual(["busybox", "fastfetch", "htop", "tcc", "jq"])
     for (const image of registry) expect((await page.request.get(image.worker)).headers()["cross-origin-embedder-policy"]).toBe("require-corp")
     expect(wasm).toHaveLength(0)
     const { screen, send, line } = await terminal(page)
