@@ -84,13 +84,13 @@
 9. **Network, Web & File Analysis**
    - ~~`myip`: Public IP query~~ *(Cannot be done: Browser WASM environment blocks raw socket / external network access)*
    - ~~`nslookup-js`: DNS query via DoH~~ *(Cannot be done: Browser WASM sandbox restricts arbitrary UDP/DNS sockets)*
-   - [ ] `url-parse`: URL parser showing protocol, host, port, path, query parameters
-   - [ ] `qr`: QR URL & text data previewer
-   - [ ] `http-status`: HTTP status code dictionary
-   - [ ] `mime-type`: MIME type lookup by extension
-   - [ ] `entropy`: Shannon entropy calculator (detects encrypted/compressed data)
-   - [ ] `detect-encoding`: Character encoding and BOM detector (UTF-8, UTF-16, ASCII)
-   - [ ] `file-info`: File metadata summary
+   - [x] `url-parse`: URL parser showing protocol, host, port, path, query parameters (`net_tools.wasm`)
+   - [x] `qr`: QR URL & text data previewer (`qr.wasm`)
+   - [x] `http-status`: HTTP status code dictionary (`net_tools.wasm`)
+   - [x] `mime-type`: MIME type lookup by extension (`net_tools.wasm`)
+   - [x] `entropy`: Shannon entropy calculator (`file_analysis.wasm`)
+   - [x] `detect-encoding`: Character encoding and BOM detector (`file_analysis.wasm`)
+   - [x] `file-info`: File metadata summary (`file_analysis.wasm`)
    - [x] `wc-bytes`: Accurate byte length counter (provided by BusyBox `wc -c` WASM)
    - [x] `extract-urls`: Regex extractor for HTTP(S) URLs (provided by BusyBox `grep -oE` WASM)
    - [x] `extract-emails`: Regex extractor for email addresses (provided by BusyBox `grep -oE` WASM)

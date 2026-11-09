@@ -61,6 +61,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("uuid_token", ["uuidgen", "uuidgen-js", "nanoid"])
     await register_program("color_tools", ["hex2rgb", "rgb2hex", "color-mix"])
     await register_program("date_units", ["date-diff", "bytes-human", "temp", "unit"])
+    await register_program("qr", ["qr"])
+    await register_program("net_tools", ["url-parse", "http-status", "mime-type"])
+    await register_program("file_analysis", ["entropy", "detect-encoding", "file-info"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -349,6 +352,35 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const unit_res = await run("unit 1000 m km")
         assert.equal(unit_res.code, 0)
         assert.equal(unit_res.stdout.trim(), "1 km")
+    })
+    await t.test("native group 9 web, network, and file analysis wasms parse urls, generate qr, lookup http status and mime, and analyze files", async () => {
+        const url_res = await run("url-parse 'https://user:pass@example.com:8080/path/test?foo=bar&baz=1#section'")
+        assert.equal(url_res.code, 0)
+        assert.match(url_res.stdout, /Protocol:\s*https/)
+        assert.match(url_res.stdout, /Host:\s*example\.com/)
+        assert.match(url_res.stdout, /Port:\s*8080/)
+        assert.match(url_res.stdout, /Path:\s*\/path\/test/)
+        assert.match(url_res.stdout, /foo = bar/)
+
+        const qr_res = await run("qr -a 'https://jazu.app'")
+        assert.equal(qr_res.code, 0)
+        assert.match(qr_res.stdout, /##/)
+
+        const status_res = await run("http-status 404")
+        assert.equal(status_res.code, 0)
+        assert.match(status_res.stdout, /404 Not Found/)
+
+        const mime_res = await run("mime-type wasm")
+        assert.equal(mime_res.code, 0)
+        assert.equal(mime_res.stdout.trim(), "application/wasm")
+
+        const entropy_res = await run("printf 'AAAAABBBCC' | entropy")
+        assert.equal(entropy_res.code, 0)
+        assert.match(entropy_res.stdout, /Entropy:\s*[0-9\.]+ bits\/byte/)
+
+        const enc_res = await run("printf 'Hello World' | detect-encoding")
+        assert.equal(enc_res.code, 0)
+        assert.match(enc_res.stdout, /US-ASCII/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

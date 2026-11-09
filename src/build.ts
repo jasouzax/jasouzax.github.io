@@ -141,6 +141,9 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["uuid_token", "1.0.0-jazu.1", "tar.gz", ["uuidgen", "uuidgen-js", "nanoid"]],
         ["color_tools", "1.0.0-jazu.1", "tar.gz", ["hex2rgb", "rgb2hex", "color-mix"]],
         ["date_units", "1.0.0-jazu.1", "tar.gz", ["date-diff", "bytes-human", "temp", "unit"]],
+        ["qr", "1.0.0-jazu.1", "tar.gz", ["qr"]],
+        ["net_tools", "1.0.0-jazu.1", "tar.gz", ["url-parse", "http-status", "mime-type"]],
+        ["file_analysis", "1.0.0-jazu.1", "tar.gz", ["entropy", "detect-encoding", "file-info"]],
     ] as [string, string, string, string[]?][]) {
         const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`

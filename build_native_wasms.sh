@@ -396,5 +396,22 @@ cp LICENSE "$ARTIFACTS/date_units-LICENSE"
 emcc -Os date_units.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/date_units.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/date_units.d.ts"
 echo "Group 8 tools done"
+echo "=== 20. Building Group 9 Network, Web & File Analysis (qr, net_tools, file_analysis) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group9"
+tar czf "$ARTIFACTS/qr-source.tar.gz" qr_main.c qrcodegen.c qrcodegen.h LICENSE
+cp LICENSE "$ARTIFACTS/qr-LICENSE"
+emcc -Os qr_main.c qrcodegen.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/qr.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/qr.d.ts"
+
+tar czf "$ARTIFACTS/net_tools-source.tar.gz" net_tools.c LICENSE
+cp LICENSE "$ARTIFACTS/net_tools-LICENSE"
+emcc -Os net_tools.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/net_tools.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/net_tools.d.ts"
+
+tar czf "$ARTIFACTS/file_analysis-source.tar.gz" file_analysis.c LICENSE
+cp LICENSE "$ARTIFACTS/file_analysis-LICENSE"
+emcc -Os file_analysis.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/file_analysis.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/file_analysis.d.ts"
+echo "Group 9 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

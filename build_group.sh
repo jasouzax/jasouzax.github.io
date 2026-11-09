@@ -72,3 +72,21 @@ if [[ "$TARGET" == "group8" || "$TARGET" == "8" || "$TARGET" == "all" ]]; then
     done
     echo "Group 8 done"
 fi
+
+if [[ "$TARGET" == "group9" || "$TARGET" == "9" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 9 ==="
+    echo "Building qr..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group9/qr_main.c" "$SCRIPT_DIR/src/desk/programs/sources/group9/qrcodegen.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/qr.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group9/LICENSE" "$ARTIFACTS/qr-LICENSE"
+    rm -f "$ARTIFACTS/qr-source.tar.gz"
+    tar -czf "$ARTIFACTS/qr-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group9" qr_main.c qrcodegen.c qrcodegen.h LICENSE
+
+    for tool in net_tools file_analysis; do
+        echo "Building $tool..."
+        emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group9/$tool.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/$tool.js"
+        cp "$SCRIPT_DIR/src/desk/programs/sources/group9/LICENSE" "$ARTIFACTS/$tool-LICENSE"
+        rm -f "$ARTIFACTS/$tool-source.tar.gz"
+        tar -czf "$ARTIFACTS/$tool-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group9" "$tool.c" LICENSE
+    done
+    echo "Group 9 done"
+fi
