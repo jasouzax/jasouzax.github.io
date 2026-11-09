@@ -178,3 +178,38 @@
     - [x] `tree`: Recursively renders directory hierarchies with depth limiters and size summaries (Steve Baker tree.wasm)
     - [x] `binutils` (`strings`): Extracts readable strings from compiled binaries (provided by BusyBox `strings` WASM)
     - [x] `readelf`: Decodes ELF headers and lists exported symbols from shared libraries (`linux_suite.wasm`)
+
+18. **Binary Executers & Emulators (Linux & Windows)**
+    - [x] `box86` / `linux-exec`: User-mode Linux x86 binary loader and system call emulator (`exec_suite.wasm`)
+    - [x] `wine` / `win-exec`: Windows PE executable (.exe) loader and environment simulator (`exec_suite.wasm`)
+    - ~~`qemu-system-x86_64`: Full PC system emulator~~ *(Cannot be done: Requires bare-metal hardware virtualization / KVM hypervisor)*
+
+19. **C & C++ Toolchain**
+    - [ ] `tcc`: Tiny C Compiler (compiles ISO C99 code directly to executable machine code / bytecode)
+    - [ ] `gcc` / `g++`: GNU Compiler Collection (preprocessor, compiler frontend, and driver)
+    - [ ] `cpp`: C Preprocessor (macro expansion and conditional compilation)
+    - [ ] `make`: Dependency tracker and build automation tool
+
+20. **Python Runtime & Environment**
+    - [ ] `python` / `python3`: Native Python 3 interpreter and interactive REPL
+    - [ ] `pip`: Python package installer and dependency resolver
+    - [ ] `venv`: Python virtual environment manager
+
+21. **Rust Toolchain**
+    - ~~`rustc`: Official LLVM-backed Rust compiler~~ *(Cannot be done: Requires multi-gigabyte LLVM 18+ backend and multi-threaded JIT codegen)*
+    - [ ] `rustc` / `rust-runner`: Lightweight Rust compiler / syntax evaluator and interpreter
+    - [ ] `cargo`: Rust build system and package manager CLI
+
+22. **Java & JVM Runtime**
+    - ~~`openjdk` / `hotspot`: Full enterprise Java runtime~~ *(Cannot be done: Multi-gigabyte JVM requiring OS signals, thread suspension, and memory mapping)*
+    - [ ] `java`: Embedded Java virtual machine executing compiled `.class` bytecode
+    - [ ] `javac`: Java source code compiler producing JVM bytecode
+
+23. **Perl & System Scripting**
+    - [ ] `perl`: Practical Extraction and Reporting Language 5 interpreter
+
+24. **Dynamic & Embedded Languages (Lua, Lisp, BASIC)**
+    - [ ] `lua`: Lua 5.4 embeddable scripting engine
+    - [ ] `lisp`: Minimal Lisp / Scheme evaluator
+    - [ ] `basic`: Classic BASIC language interpreter
+

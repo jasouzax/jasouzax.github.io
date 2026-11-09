@@ -505,4 +505,12 @@ emcc -Os linux_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/lin
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/linux_suite.d.ts"
 echo "Group 17 tools done"
 
+echo "=== 29. Building Group 18 Exec Suite (exec_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group18"
+tar czf "$ARTIFACTS/exec_suite-source.tar.gz" exec_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/exec_suite-LICENSE"
+emcc -Os exec_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/exec_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/exec_suite.d.ts"
+echo "Group 18 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

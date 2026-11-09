@@ -78,6 +78,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("audio_suite", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"])
     await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
     await register_program("linux_suite", ["file", "readelf"])
+    await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -592,6 +593,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.match(readelf_res.stdout, /Type:\s+EXEC \(Executable file\)/)
         assert.match(readelf_res.stdout, /Machine:\s+Advanced Micro Devices X86-64/)
         assert.match(readelf_res.stdout, /Entry point address:\s+0x401000/)
+    })
+    await t.test("native group 18 binary executers emulate linux x86 user-mode and windows pe execution", async () => {
+        const box_ver = await run("box86 --version")
+        assert.equal(box_ver.code, 0)
+        assert.match(box_ver.stdout, /Box86 v0\.3\.2/)
+
+        const wine_ver = await run("wine --version")
+        assert.equal(wine_ver.code, 0)
+        assert.match(wine_ver.stdout, /wine-9\.0/)
+
+        const wine_help = await run("win-exec --help")
+        assert.equal(wine_help.code, 0)
+        assert.match(wine_help.stdout, /Executes 32-bit Windows PE console applications/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
