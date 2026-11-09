@@ -297,4 +297,13 @@ emcc -Os base64_helper.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/b
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/btoa.d.ts"
 echo "Group 1 tools done"
 
+echo "=== 13. Building Group 2 Hashing (sha384sum) ==="
+G2="$SCRIPT_DIR/src/desk/programs/sources/group2"
+cd "$G2"
+tar czf "$ARTIFACTS/sha384sum-source.tar.gz" sha384sum.c sha384-512.c sha.h sha-private.h LICENSE
+cp LICENSE "$ARTIFACTS/sha384sum-LICENSE"
+emcc -Os sha384sum.c sha384-512.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/sha384sum.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/sha384sum.d.ts"
+echo "Group 2 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

@@ -11,7 +11,7 @@
 
 2. **Hashing & Checksums**
    - [x] `sha512sum`: SHA-512 calculation (provided by BusyBox WASM)
-   - [ ] `sha384sum`: SHA-384 calculation
+   - [x] `sha384sum`: SHA-384 calculation (RFC 6234 sha384sum.wasm)
    - [x] `md5sum`, `sha1sum`, `sha256sum`, `cksum`, `crc32` (provided by BusyBox WASM)
 
 3. **Data & File Format Conversion (JSON / CSV / TSV / YAML / INI / ENV)**

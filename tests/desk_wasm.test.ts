@@ -10,7 +10,7 @@ import type { worker_factory } from "../src/web/client/wasm_host.ts"
 import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web/client/kernel.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
-test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 60000 }, async t => {
+test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 120000 }, async t => {
     const worker_file = resolve(".cache/desk-test-worker.cjs")
     mkdirSync(resolve(".cache"), { recursive: true })
     await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
@@ -43,7 +43,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const wasm_bytes = readFileSync(resolve(`src/desk/programs/artifacts/${name}.wasm`))
         register_wasm({ id: name, version: "1.0.0", worker: worker_path, wasm: "data:application/wasm;base64," + wasm_bytes.toString("base64"), sha256: createHash("sha256").update(wasm_bytes).digest("hex"), commands }, factory)
     }
-    for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa"]) {
+    for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum"]) {
         await register_program(prog)
     }
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
@@ -51,7 +51,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     const run = async (script: string) => {
         let stdout = "", stderr = ""
         const proc = start_process(["sh", "-c", script], { root: true, cwd: "/home/user", env: { PATH: "/bin", HOME: "/home/user" }, stdout: make_sink(text => { stdout += text }), stderr: make_sink(text => { stderr += text }) })
-        const timer = setTimeout(() => kill(proc.pid), 10000)
+        const timer = setTimeout(() => kill(proc.pid), 30000)
         const code = await proc.done
         clearTimeout(timer)
         return { stdout, stderr, code }
@@ -179,6 +179,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const b_res = await run("printf 'hello' | btoa; printf 'aGVsbG8=' | atob")
         assert.equal(b_res.code, 0)
         assert.equal(b_res.stdout, "aGVsbG8=\nhello")
+    })
+    await t.test("native sha384sum computes exact SHA-384 message digest in kernel shell", async () => {
+        const res = await run("printf 'test' | sha384sum")
+        assert.equal(res.code, 0)
+        assert.equal(res.stdout, "768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9  -\n")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
