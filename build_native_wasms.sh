@@ -529,4 +529,12 @@ emcc -Os python_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACT
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/python_suite.d.ts"
 echo "Group 20 tools done"
 
+echo "=== 32. Building Group 21 Rust Suite (rust_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group21"
+tar czf "$ARTIFACTS/rust_suite-source.tar.gz" rust_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/rust_suite-LICENSE"
+emcc -Os rust_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/rust_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/rust_suite.d.ts"
+echo "Group 21 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

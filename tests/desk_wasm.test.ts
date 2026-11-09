@@ -82,6 +82,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("tcc", ["tcc", "gcc", "g++", "cc", "cpp"])
     await register_program("make", ["make"])
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
+    await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -647,6 +648,26 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const venv_res = await run("venv /tmp/testenv; cat /tmp/testenv/pyvenv.cfg")
         assert.equal(venv_res.code, 0)
         assert.match(venv_res.stdout, /version = 3\.12\.0/)
+    })
+    await t.test("native group 21 rust toolchain compiles and executes rust packages with cargo", async () => {
+        const rust_ver = await run("rustc --version")
+        assert.equal(rust_ver.code, 0)
+        assert.match(rust_ver.stdout, /rustc 1\.77\.0/)
+
+        const cargo_ver = await run("cargo --version")
+        assert.equal(cargo_ver.code, 0)
+        assert.match(cargo_ver.stdout, /cargo 1\.77\.0/)
+
+        const make_rs = await run("printf 'fn main() {\\n    println!(\"Hello from Rust WASM!\");\\n}\\n' > /tmp/hello.rs")
+        assert.equal(make_rs.code, 0)
+
+        const run_rs = await run("rustc --run /tmp/hello.rs")
+        assert.equal(run_rs.code, 0)
+        assert.match(run_rs.stdout, /Hello from Rust WASM!/)
+
+        const cargo_new = await run("cargo new /tmp/rustapp; cd /tmp/rustapp; cargo run")
+        assert.equal(cargo_new.code, 0)
+        assert.match(cargo_new.stdout, /Hello, world!/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

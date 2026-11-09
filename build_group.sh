@@ -229,6 +229,17 @@ if [[ "$TARGET" == "group20" || "$TARGET" == "20" || "$TARGET" == "all" ]]; then
     echo "Group 20 done"
 fi
 
+if [[ "$TARGET" == "group21" || "$TARGET" == "21" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 21 ==="
+    echo "Building rust_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group21/rust_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/rust_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group21/LICENSE" "$ARTIFACTS/rust_suite-LICENSE"
+    rm -f "$ARTIFACTS/rust_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/rust_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group21" rust_suite.c LICENSE
+    echo "Group 21 done"
+fi
+
+
 
 
 

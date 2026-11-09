@@ -197,8 +197,8 @@
 
 21. **Rust Toolchain**
     - ~~`rustc`: Official LLVM-backed Rust compiler~~ *(Cannot be done: Requires multi-gigabyte LLVM 18+ backend and multi-threaded JIT codegen)*
-    - [ ] `rustc` / `rust-runner`: Lightweight Rust compiler / syntax evaluator and interpreter
-    - [ ] `cargo`: Rust build system and package manager CLI
+    - [x] `rustc` / `rust-runner`: Lightweight Rust compiler / syntax evaluator and interpreter (`rust_suite.wasm`)
+    - [x] `cargo`: Rust build system and package manager CLI (`rust_suite.wasm`)
 
 22. **Java & JVM Runtime**
     - ~~`openjdk` / `hotspot`: Full enterprise Java runtime~~ *(Cannot be done: Multi-gigabyte JVM requiring OS signals, thread suspension, and memory mapping)*
