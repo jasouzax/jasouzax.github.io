@@ -7,7 +7,6 @@ import { Worker } from "node:worker_threads"
 import { build } from "esbuild"
 import { register_wasm, registered_programs } from "../src/web/client/wasm_host.ts"
 import type { worker_factory } from "../src/web/client/wasm_host.ts"
-import { tool_programs } from "../src/web/client/desk_tools.ts"
 import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web/client/kernel.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
@@ -38,11 +37,15 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     }
     const wasm = readFileSync(resolve("src/desk/busybox/artifacts/busybox.wasm"))
     register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
-    const jq_worker_file = resolve(".cache/desk-test-jq-worker.cjs")
-    await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker_jq.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: jq_worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
-    const jq_wasm = readFileSync(resolve("src/desk/programs/artifacts/jq.wasm"))
-    register_wasm({ id: "jq", version: "1.7.1", worker: jq_worker_file, wasm: "data:application/wasm;base64," + jq_wasm.toString("base64"), sha256: createHash("sha256").update(jq_wasm).digest("hex"), commands: ["jq"] }, factory)
-    Object.assign(registered_programs, tool_programs)
+    async function register_program(name: string, commands: string[] = [name]) {
+        const worker_path = resolve(`.cache/desk-test-${name}-worker.cjs`)
+        await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker_${name}.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_path, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
+        const wasm_bytes = readFileSync(resolve(`src/desk/programs/artifacts/${name}.wasm`))
+        register_wasm({ id: name, version: "1.0.0", worker: worker_path, wasm: "data:application/wasm;base64," + wasm_bytes.toString("base64"), sha256: createHash("sha256").update(wasm_bytes).digest("hex"), commands }, factory)
+    }
+    for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame"]) {
+        await register_program(prog)
+    }
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -129,11 +132,36 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(result.stderr, "")
         assert.equal(result.stdout, "jazu\n")
     })
-    await t.test("desktop tool suite encodes urls, calculates math and formats tokens", async () => {
-        const result = await run("urlencode 'hello world'; calc '6 * 7'; printf 'test string\\n' > /tmp/rot.txt; rot13 /tmp/rot.txt")
+    await t.test("native caesar and morse wasms process ciphers in kernel shell", async () => {
+        const c_res = await run("printf 'hello\\n' | caesar 13")
+        const m_res = await run("printf 'SOS' | morse -s")
+        assert.equal(c_res.code, 0)
+        assert.equal(c_res.stdout, "uryyb\n")
+        assert.equal(m_res.code, 0)
+        assert.equal(m_res.stdout, " ...\n ---\n ...\n")
+    })
+    await t.test("native media wasms optipng, cwebp, and flac report upstream versions", async () => {
+        const result = await run("optipng -v 2>&1 | head -n 1; cwebp -version; flac --version")
         assert.equal(result.code, 0)
-        assert.equal(result.stderr, "")
-        assert.equal(result.stdout, "hello%20world\n42\ngrfg fgevat\n")
+        assert.match(result.stdout, /OptiPNG version 0\.7\.8/)
+        assert.match(result.stdout, /1\.4\.0/)
+        assert.match(result.stdout, /flac 1\.4\.3/)
+    })
+    await t.test("native potrace and bchunk wasms run help in kernel shell", async () => {
+        const result = await run("potrace --version | head -n 1; bchunk 2>&1 | head -n 1")
+        assert.equal(result.code, 0)
+        assert.match(result.stdout, /potrace 1\.16/)
+        assert.match(result.stdout, /binchunker for Unix, version 1\.2\.2/)
+    })
+    await t.test("native mkbitmap, metaflac, tree, pwgen, and lame wasms execute in kernel shell", async () => {
+        const result = await run("mkbitmap -v | head -n 1; metaflac --version; tree --version | head -n 1; pwgen -s 12 1; lame --version 2>&1 | head -n 1; bin2iso 2>&1 | head -n 1")
+        assert.equal(result.code, 0)
+        assert.match(result.stdout, /mkbitmap 1\.16/)
+        assert.match(result.stdout, /metaflac 1\.4\.3/)
+        assert.match(result.stdout, /tree v2\.1\.3/)
+        assert.match(result.stdout, /[a-zA-Z0-9]{12}/)
+        assert.match(result.stdout, /LAME 32bits version 3\.100/)
+        assert.match(result.stdout, /Error: Bad syntax/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
