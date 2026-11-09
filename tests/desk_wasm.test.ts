@@ -58,6 +58,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("numbase", ["numbase", "dec2bin", "dec2hex", "dec2oct", "hex2dec"])
     await register_program("random_bytes", ["random-bytes"])
     await register_program("math_suite", ["fib", "fibonacci", "gcd", "lcm", "stats", "matrix"])
+    await register_program("uuid_token", ["uuidgen", "uuidgen-js", "nanoid"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -302,6 +303,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const det_res = await run("printf '1 2\\n3 4\\n' | matrix det")
         assert.equal(det_res.code, 0)
         assert.equal(det_res.stdout.trim(), "-2")
+    })
+    await t.test("native group 6 uuid and nanoid wasms generate compliant tokens in kernel shell", async () => {
+        const uuid_res = await run("uuidgen")
+        assert.equal(uuid_res.code, 0)
+        assert.match(uuid_res.stdout.trim(), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+
+        const uuid_js_res = await run("uuidgen-js -u")
+        assert.equal(uuid_js_res.code, 0)
+        assert.match(uuid_js_res.stdout.trim(), /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/)
+
+        const nanoid_res = await run("nanoid 21")
+        assert.equal(nanoid_res.code, 0)
+        assert.match(nanoid_res.stdout.trim(), /^[A-Za-z0-9_-]{21}$/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

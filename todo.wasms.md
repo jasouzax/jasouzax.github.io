@@ -63,8 +63,8 @@
    - [x] `matrix`: Matrix operations (transpose, trace, determinant) (`math_suite.wasm`)
 
 6. **UUIDs, Tokens & Security**
-   - [ ] `uuidgen-js`: UUID v4 generator
-   - [ ] `nanoid`: NanoID-style random token generator
+   - [x] `uuidgen-js`: UUID v4 generator (`uuid_token.wasm`)
+   - [x] `nanoid`: NanoID-style random token generator (`uuid_token.wasm`)
    - [x] `pwgen`: Configurable secure password generator (Theodore Ts'o pwgen.wasm)
 
 7. **Color Conversion & Manipulation**

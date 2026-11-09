@@ -375,5 +375,12 @@ cp LICENSE "$ARTIFACTS/math_suite-LICENSE"
 emcc -Os math_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/math_suite.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/math_suite.d.ts"
 echo "Group 5 tools done"
+echo "=== 17. Building Group 6 UUIDs & Tokens (uuid_token) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group6"
+tar czf "$ARTIFACTS/uuid_token-source.tar.gz" uuid_token.c LICENSE
+cp LICENSE "$ARTIFACTS/uuid_token-LICENSE"
+emcc -Os uuid_token.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/uuid_token.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/uuid_token.d.ts"
+echo "Group 6 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
