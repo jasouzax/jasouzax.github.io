@@ -690,6 +690,20 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(py_loop.code, 0)
         assert.equal(py_loop.stdout.trim(), "0\n1\n2")
 
+        const py_repl = await run("printf '15 + 27\\nx = 10\\nx * 3\\nexit()\\n' | python -i")
+        assert.equal(py_repl.code, 0)
+        assert.match(py_repl.stdout, /Python 3\.12\.0/)
+        assert.match(py_repl.stdout, />>> 42/)
+        assert.match(py_repl.stdout, />>> 30/)
+
+        const py_input = await run("printf 'Jasouza\\n' | python -c 'name = input(\"Enter: \"); print(\"Hello \" + name)'")
+        assert.equal(py_input.code, 0)
+        assert.match(py_input.stdout, /Enter: Hello Jasouza/)
+
+        const py_func = await run("printf 'def add(a, b): return a + b\\nprint(add(21, 21))\\n' | python")
+        assert.equal(py_func.code, 0)
+        assert.equal(py_func.stdout.trim(), "42")
+
         const pip_ver = await run("pip --version")
         assert.equal(pip_ver.code, 0)
         assert.match(pip_ver.stdout, /pip 24\.0/)
