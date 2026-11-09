@@ -481,4 +481,12 @@ emcc -Os -I"$SCRIPT_DIR/src/desk/programs/sources/group14" image_suite.c "$WORK/
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/image_suite.d.ts"
 echo "Group 14 tools done"
 
+echo "=== 26. Building Group 15 Audio Suite (audio_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group15"
+tar czf "$ARTIFACTS/audio_suite-source.tar.gz" audio_suite.c stb_vorbis.h LICENSE
+cp LICENSE "$ARTIFACTS/audio_suite-LICENSE"
+emcc -Os -I"$SCRIPT_DIR/src/desk/programs/sources/group15" audio_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/audio_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/audio_suite.d.ts"
+echo "Group 15 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

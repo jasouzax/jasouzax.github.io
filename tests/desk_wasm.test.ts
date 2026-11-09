@@ -75,6 +75,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("postscript_suite", ["enscript", "a2ps"])
     await register_program("doc_suite", ["antiword", "docx2txt", "odt2txt"])
     await register_program("image_suite", ["pngtopnm", "pnmtopng", "jpegtopnm", "pnmtojpeg", "jpegoptim"])
+    await register_program("audio_suite", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -502,6 +503,28 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const jpeg2ppm_res = await run("jpegtopnm /tmp/sample.jpg | head -n 3")
         assert.equal(jpeg2ppm_res.code, 0)
         assert.match(jpeg2ppm_res.stdout, /P6\n2 2\n255/)
+    })
+    await t.test("native group 15 audio suite wasms synthesize, inspect, and encode wav, ogg, and opus streams", async () => {
+        const synth_res = await run("sox -n /tmp/tone.wav synth 0.1 sine 440")
+        assert.equal(synth_res.code, 0)
+
+        const soxi_res = await run("soxi /tmp/tone.wav")
+        assert.equal(soxi_res.code, 0)
+        assert.match(soxi_res.stdout, /Sample Rate\s+:\s+44100/)
+        assert.match(soxi_res.stdout, /Precision\s+:\s+16-bit/)
+
+        const stat_res = await run("sox /tmp/tone.wav -n stat")
+        assert.equal(stat_res.code, 0)
+        assert.match(stat_res.stderr, /Samples read:\s+4410/)
+        assert.match(stat_res.stderr, /Maximum amplitude:/)
+
+        const ogg_res = await run("oggenc /tmp/tone.wav -o /tmp/tone.ogg; cat /tmp/tone.ogg | xxd -p | head -n 1 | cut -c1-8")
+        assert.equal(ogg_res.code, 0)
+        assert.equal(ogg_res.stdout.trim(), "4f676753")
+
+        const opus_res = await run("opusenc /tmp/tone.wav /tmp/tone.opus; cat /tmp/tone.opus | xxd -p | head -n 1 | cut -c1-8")
+        assert.equal(opus_res.code, 0)
+        assert.equal(opus_res.stdout.trim(), "4f676753")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

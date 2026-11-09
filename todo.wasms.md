@@ -154,11 +154,11 @@
 
 15. **Audio & Video Suite**
     - ~~`ffmpeg`: Full audio/video transcoding and stream processor~~ *(Massive 50MB+ media stack with complex threading)*
-    - [ ] `sox`: Sound eXchange audio converter and generator
+    - [x] `sox`: Sound eXchange audio converter, synthesizer, and inspector (`audio_suite.wasm`)
     - ~~`HandBrakeCLI` / `handbrake`: Video transcoder~~ *(Multi-gigabyte video transcoding pipeline)*
     - [x] `flac` & `metaflac`: Lossless audio encoder, decoder, and metadata editor (Xiph.org flac.wasm / metaflac.wasm)
-    - [ ] `oggenc` & `oggdec`: Ogg Vorbis audio encoder/decoder
-    - [ ] `opusenc` & `opusdec`: Low-latency Opus audio encoder/decoder
+    - [x] `oggenc` & `oggdec`: Ogg Vorbis audio encoder/decoder (`audio_suite.wasm`)
+    - [x] `opusenc` & `opusdec`: Low-latency Opus audio encoder/decoder (`audio_suite.wasm`)
     - [x] `lame`: MP3 audio encoder (LAME 3.100 lame.wasm)
     - ~~`mkvmerge` & `mkvextract`: MKVToolNix Matroska multiplexer and demuxer~~ *(Massive C++ Boost/EBML monolithic suite)*
 
