@@ -59,6 +59,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("random_bytes", ["random-bytes"])
     await register_program("math_suite", ["fib", "fibonacci", "gcd", "lcm", "stats", "matrix"])
     await register_program("uuid_token", ["uuidgen", "uuidgen-js", "nanoid"])
+    await register_program("color_tools", ["hex2rgb", "rgb2hex", "color-mix"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -316,6 +317,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const nanoid_res = await run("nanoid 21")
         assert.equal(nanoid_res.code, 0)
         assert.match(nanoid_res.stdout.trim(), /^[A-Za-z0-9_-]{21}$/)
+    })
+    await t.test("native group 7 color tools wasm converts hex, rgb, and mixes colors in kernel shell", async () => {
+        const rgb_res = await run("hex2rgb '#ff8800'")
+        assert.equal(rgb_res.code, 0)
+        assert.equal(rgb_res.stdout.trim(), "rgb(255, 136, 0)")
+
+        const hex_res = await run("rgb2hex '255 136 0'")
+        assert.equal(hex_res.code, 0)
+        assert.equal(hex_res.stdout.trim(), "#ff8800")
+
+        const mix_res = await run("color-mix '#ff0000' '#0000ff' 0.5")
+        assert.equal(mix_res.code, 0)
+        assert.equal(mix_res.stdout.trim(), "#800080")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

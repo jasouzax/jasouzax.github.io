@@ -68,9 +68,9 @@
    - [x] `pwgen`: Configurable secure password generator (Theodore Ts'o pwgen.wasm)
 
 7. **Color Conversion & Manipulation**
-   - [ ] `hex2rgb`: Hex color `#RRGGBB` to `rgb(r, g, b)`
-   - [ ] `rgb2hex`: RGB values to `#hex`
-   - [ ] `color-mix`: Hex color interpolation with custom ratios
+   - [x] `hex2rgb`: Hex color `#RRGGBB` to `rgb(r, g, b)` (`color_tools.wasm`)
+   - [x] `rgb2hex`: RGB values to `#hex` (`color_tools.wasm`)
+   - [x] `color-mix`: Hex color interpolation with custom ratios (`color_tools.wasm`)
 
 8. **Date, Time & Unit Conversion**
    - [x] `timestamp`: Unix timestamp generator and date-string converter (provided by BusyBox `date` WASM)

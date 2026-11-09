@@ -382,5 +382,12 @@ cp LICENSE "$ARTIFACTS/uuid_token-LICENSE"
 emcc -Os uuid_token.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/uuid_token.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/uuid_token.d.ts"
 echo "Group 6 tools done"
+echo "=== 18. Building Group 7 Color Conversion & Manipulation (color_tools) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group7"
+tar czf "$ARTIFACTS/color_tools-source.tar.gz" color_tools.c LICENSE
+cp LICENSE "$ARTIFACTS/color_tools-LICENSE"
+emcc -Os color_tools.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/color_tools.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/color_tools.d.ts"
+echo "Group 7 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
