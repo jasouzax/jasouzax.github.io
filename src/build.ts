@@ -79,6 +79,7 @@ async function bundle_script(root: string, entry: string, files: output_files, m
     const result = await esbuild_build({
         entryPoints: [{ in: join(root, "src", "web", "client", `${entry}.ts`), out: entry }], outdir, write: false, bundle: true, format: "iife",
         minify: mode === "production", entryNames: "assets/runtime/[name].[hash]", target: "es2020", logLevel: "silent",
+        external: ["node:*", "ws"],
     })
     const output = result.outputFiles[0]
     const rel = relative(outdir, output.path).replace(/\\/g, "/")
@@ -175,7 +176,10 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
         images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: cmd_list ?? [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
     }
-    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE"]) files.set(`assets/wasm/${name}`, readFileSync(join(programs, name)))
+    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE", "python_stdlib.zip", "pyodide.asm.js", "pyodide-lock.json"]) {
+        const p = join(programs, name)
+        if (existsSync(p)) files.set(`assets/wasm/${name}`, readFileSync(p))
+    }
     for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
     files.set("assets/wasm/manifest.json", JSON.stringify(images))
     const page = await bundle_script(root, "page", files, mode)

@@ -680,7 +680,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await t.test("native group 20 python runtime interprets expressions, loops, and manages environments", async () => {
         const py_ver = await run("python3 --version")
         assert.equal(py_ver.code, 0)
-        assert.match(py_ver.stdout, /Python 3\.12\.0/)
+        assert.match(py_ver.stdout, /Python 3\.12\.[07]/)
 
         const py_calc = await run("python -c 'print(15 + 27)'")
         assert.equal(py_calc.code, 0)
@@ -692,7 +692,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
 
         const py_repl = await run("printf '15 + 27\\nx = 10\\nx * 3\\nexit()\\n' | python -i")
         assert.equal(py_repl.code, 0)
-        assert.match(py_repl.stdout, /Python 3\.12\.0/)
+        assert.match(py_repl.stdout, /Python 3\.12\.[07]/)
         assert.match(py_repl.stdout, />>> 42/)
         assert.match(py_repl.stdout, />>> 30/)
 
@@ -703,6 +703,10 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const py_func = await run("printf 'def add(a, b): return a + b\\nprint(add(21, 21))\\n' | python")
         assert.equal(py_func.code, 0)
         assert.equal(py_func.stdout.trim(), "42")
+
+        const py_np = await run("python -c 'import numpy as np; print(np.array([1, 2, 3]) * 2)'")
+        assert.equal(py_np.code, 0)
+        assert.match(py_np.stdout, /\[2 4 6\]/)
 
         const pip_ver = await run("pip --version")
         assert.equal(pip_ver.code, 0)
