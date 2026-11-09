@@ -148,6 +148,9 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["markup_tools", "1.0.0-jazu.1", "tar.gz", ["md2html", "html2text"]],
         ["tools_catalog", "1.0.0-jazu.1", "tar.gz", ["tools"]],
         ["encoding_suite", "1.0.0-jazu.1", "tar.gz", ["iconv", "recode"]],
+        ["xml_suite", "1.0.0-jazu.1", "tar.gz", ["xmlstarlet", "xq"]],
+        ["yq", "1.0.0-jazu.1", "tar.gz", ["yq"]],
+        ["csv_suite", "1.0.0-jazu.1", "tar.gz", ["csvsql", "csvformat", "xlsx2csv", "csvjson", "in2csv"]],
     ] as [string, string, string, string[]?][]) {
         const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`

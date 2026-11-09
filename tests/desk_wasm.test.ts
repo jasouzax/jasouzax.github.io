@@ -68,6 +68,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("markup_tools", ["md2html", "html2text"])
     await register_program("tools_catalog", ["tools"])
     await register_program("encoding_suite", ["iconv", "recode"])
+    await register_program("xml_suite", ["xmlstarlet", "xq"])
+    await register_program("yq", ["yq"])
+    await register_program("csv_suite", ["csvsql", "csvformat", "xlsx2csv", "csvjson", "in2csv"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -420,6 +423,25 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const list_res = await run("iconv -l")
         assert.equal(list_res.code, 0)
         assert.match(list_res.stdout, /UTF-8/)
+    })
+    await t.test("native group 12 data transformation wasms process xml, yq queries, and csv sql schemas", async () => {
+        const xml_res = await run("printf '<note><to>User</to><msg>Hello</msg></note>' | xmlstarlet fo")
+        assert.equal(xml_res.code, 0)
+        assert.match(xml_res.stdout, /<note>/)
+        assert.match(xml_res.stdout, /<to>User<\/to>/)
+
+        const xq_res = await run("printf '<root><val>42</val></root>' | xq")
+        assert.equal(xq_res.code, 0)
+        assert.match(xq_res.stdout, /"_tag":\s*"root"/)
+
+        const yq_res = await run("printf 'name: Jazu\\ncount: 10\\n' | yq .name")
+        assert.equal(yq_res.code, 0)
+        assert.match(yq_res.stdout, /Jazu/)
+
+        const sql_res = await run("printf 'id,name\\n1,Alice\\n' | csvsql --table users")
+        assert.equal(sql_res.code, 0)
+        assert.match(sql_res.stdout, /CREATE TABLE users/)
+        assert.match(sql_res.stdout, /INSERT INTO users VALUES \('1', 'Alice'\);/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

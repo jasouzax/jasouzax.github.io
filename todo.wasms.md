@@ -115,13 +115,13 @@
 
 12. **Data Transformation & Query Suite**
     - [x] `jq`: JSON query filter, slicing, projection, formatting (`-r`, `-c`) (jq.wasm)
-    - [ ] `yq`: YAML / JSON / XML / Properties converter and query tool
-    - [ ] `xq`: XML to JSON converter and jq query tool
-    - [ ] `xmlstarlet`: XML format (`fo`) and value selection (`sel -t -v`)
-    - [ ] `csvjson` / `in2csv`: CSV to JSON converter
-    - [ ] `csvsql`: CSV to SQL table schema and insert script generator
-    - [ ] `csvformat`: Custom CSV delimiter and tab formatter
-    - [ ] `xlsx2csv`: Excel workbook XML sheet to CSV converter
+    - [x] `yq`: YAML / JSON / XML converter and query tool (`yq.wasm`)
+    - [x] `xq`: XML to JSON converter and query tool (`xml_suite.wasm`)
+    - [x] `xmlstarlet`: XML format (`fo`) and value selection (`sel -t -v`) (`xml_suite.wasm`)
+    - [x] `csvjson` / `in2csv`: CSV to JSON converter (`csv_suite.wasm`)
+    - [x] `csvsql`: CSV to SQL table schema and insert script generator (`csv_suite.wasm`)
+    - [x] `csvformat`: Custom CSV delimiter and tab formatter (`csv_suite.wasm`)
+    - [x] `xlsx2csv`: Excel workbook XML sheet to CSV converter (`csv_suite.wasm`)
 
 13. **PDF, PostScript & Office Document Suite**
     - [ ] `pdftotext`: Plaintext extractor from PDF streams

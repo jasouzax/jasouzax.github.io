@@ -114,3 +114,25 @@ if [[ "$TARGET" == "group11" || "$TARGET" == "11" || "$TARGET" == "all" ]]; then
     done
     echo "Group 11 done"
 fi
+
+if [[ "$TARGET" == "group12" || "$TARGET" == "12" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 12 ==="
+    echo "Building xml_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group12/xml_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/xml_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group12/LICENSE" "$ARTIFACTS/xml_suite-LICENSE"
+    rm -f "$ARTIFACTS/xml_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/xml_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group12" xml_suite.c LICENSE
+
+    echo "Building yq..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group12/yq.c" "$SCRIPT_DIR/src/desk/programs/sources/group12/cJSON.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/yq.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group12/LICENSE" "$ARTIFACTS/yq-LICENSE"
+    rm -f "$ARTIFACTS/yq-source.tar.gz"
+    tar -czf "$ARTIFACTS/yq-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group12" yq.c cJSON.c cJSON.h LICENSE
+
+    echo "Building csv_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group12/csv_suite.c" "$SCRIPT_DIR/src/desk/programs/sources/group12/cJSON.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/csv_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group12/LICENSE" "$ARTIFACTS/csv_suite-LICENSE"
+    rm -f "$ARTIFACTS/csv_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/csv_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group12" csv_suite.c cJSON.c cJSON.h LICENSE
+    echo "Group 12 done"
+fi

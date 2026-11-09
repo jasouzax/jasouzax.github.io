@@ -437,5 +437,22 @@ cp LICENSE "$ARTIFACTS/encoding_suite-LICENSE"
 emcc -Os encoding_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/encoding_suite.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/encoding_suite.d.ts"
 echo "Group 11 tools done"
+echo "=== 23. Building Group 12 Data Transformation & Query Suite (xml_suite, yq, csv_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group12"
+tar czf "$ARTIFACTS/xml_suite-source.tar.gz" xml_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/xml_suite-LICENSE"
+emcc -Os xml_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/xml_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/xml_suite.d.ts"
+
+tar czf "$ARTIFACTS/yq-source.tar.gz" yq.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/yq-LICENSE"
+emcc -Os yq.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/yq.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/yq.d.ts"
+
+tar czf "$ARTIFACTS/csv_suite-source.tar.gz" csv_suite.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/csv_suite-LICENSE"
+emcc -Os csv_suite.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/csv_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/csv_suite.d.ts"
+echo "Group 12 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
