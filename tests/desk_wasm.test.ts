@@ -55,6 +55,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("text_gen", ["lorem", "str-repeat"])
     await register_program("banner", ["banner", "banner-js"])
     await register_program("word_games", ["pig-latin", "anagram", "palindrome"])
+    await register_program("numbase", ["numbase", "dec2bin", "dec2hex", "dec2oct", "hex2dec"])
+    await register_program("random_bytes", ["random-bytes"])
+    await register_program("math_suite", ["fib", "fibonacci", "gcd", "lcm", "stats", "matrix"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -249,6 +252,56 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const palin_res = await run("palindrome 'racecar'")
         assert.equal(palin_res.code, 0)
         assert.equal(palin_res.stdout, "true\n")
+    })
+    await t.test("native group 5 math and number computation wasms handle base conversions, random bytes, fib, gcd, lcm, stats, and matrix", async () => {
+        const bin_res = await run("dec2bin 42")
+        assert.equal(bin_res.code, 0)
+        assert.equal(bin_res.stdout.trim(), "101010")
+
+        const hex_res = await run("dec2hex 255")
+        assert.equal(hex_res.code, 0)
+        assert.equal(hex_res.stdout.trim(), "ff")
+
+        const oct_res = await run("dec2oct 64")
+        assert.equal(oct_res.code, 0)
+        assert.equal(oct_res.stdout.trim(), "100")
+
+        const dec_res = await run("hex2dec ff")
+        assert.equal(dec_res.code, 0)
+        assert.equal(dec_res.stdout.trim(), "255")
+
+        const numbase_res = await run("numbase -f 16 -t 2 2a")
+        assert.equal(numbase_res.code, 0)
+        assert.equal(numbase_res.stdout.trim(), "101010")
+
+        const rand_bytes_res = await run("random-bytes 8")
+        assert.equal(rand_bytes_res.code, 0)
+        assert.match(rand_bytes_res.stdout.trim(), /^[0-9a-f]{16}$/)
+
+        const fib_res = await run("fib -s 10")
+        assert.equal(fib_res.code, 0)
+        assert.equal(fib_res.stdout.trim(), "55")
+
+        const gcd_res = await run("gcd 48 18")
+        assert.equal(gcd_res.code, 0)
+        assert.equal(gcd_res.stdout.trim(), "6")
+
+        const lcm_res = await run("lcm 12 18")
+        assert.equal(lcm_res.code, 0)
+        assert.equal(lcm_res.stdout.trim(), "36")
+
+        const stats_res = await run("printf '10\\n20\\n30\\n' | stats")
+        assert.equal(stats_res.code, 0)
+        assert.match(stats_res.stdout, /Mean:\s*20/)
+        assert.match(stats_res.stdout, /Median:\s*20/)
+
+        const mat_res = await run("printf '1 2\\n3 4\\n' | matrix transpose")
+        assert.equal(mat_res.code, 0)
+        assert.equal(mat_res.stdout, "1 3\n2 4\n")
+
+        const det_res = await run("printf '1 2\\n3 4\\n' | matrix det")
+        assert.equal(det_res.code, 0)
+        assert.equal(det_res.stdout.trim(), "-2")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

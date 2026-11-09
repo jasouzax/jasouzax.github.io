@@ -358,5 +358,22 @@ cp LICENSE "$ARTIFACTS/word_games-LICENSE"
 emcc -Os word_games.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/word_games.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/word_games.d.ts"
 echo "Group 4 tools done"
+echo "=== 16. Building Group 5 Numbers, Math & Advanced Computation (numbase, random_bytes, math_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group5"
+tar czf "$ARTIFACTS/numbase-source.tar.gz" numbase.c LICENSE
+cp LICENSE "$ARTIFACTS/numbase-LICENSE"
+emcc -Os numbase.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/numbase.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/numbase.d.ts"
+
+tar czf "$ARTIFACTS/random_bytes-source.tar.gz" random_bytes.c LICENSE
+cp LICENSE "$ARTIFACTS/random_bytes-LICENSE"
+emcc -Os random_bytes.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/random_bytes.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/random_bytes.d.ts"
+
+tar czf "$ARTIFACTS/math_suite-source.tar.gz" math_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/math_suite-LICENSE"
+emcc -Os math_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/math_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/math_suite.d.ts"
+echo "Group 5 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

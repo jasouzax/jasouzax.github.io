@@ -51,16 +51,16 @@
    - [x] `palindrome`: Validates palindromes (`word_games.wasm`)
 
 5. **Numbers, Math & Advanced Computation**
-   - [ ] `numbase`: Arbitrary base conversion between bases 2–36 (`-f`, `-t`)
-   - [ ] `dec2bin`, `dec2hex`, `dec2oct`, `hex2dec`: Quick numeral conversions
+   - [x] `numbase`: Arbitrary base conversion between bases 2–36 (`-f`, `-t`) (`numbase.wasm`)
+   - [x] `dec2bin`, `dec2hex`, `dec2oct`, `hex2dec`: Quick numeral conversions (`numbase.wasm`)
    - [x] `calc`: Math expression evaluator (provided by BusyBox `bc` / `dc` WASM)
    - [x] `rand`: Random integer generator with ranges (provided by BusyBox `shuf` WASM)
-   - [ ] `random-bytes`: Cryptographic random byte generator in hex
+   - [x] `random-bytes`: Cryptographic random byte generator in hex (`random_bytes.wasm`)
    - [x] `is-prime` / `factor-js`: Prime factorizer and primality tester (provided by BusyBox `factor` WASM)
-   - [ ] `fib` (`fibonacci`): Generates Fibonacci sequences
-   - [ ] `gcd` & `lcm`: Greatest common divisor and least common multiple
-   - [ ] `stats`: Full summary statistics (count, min, max, sum, mean, median, stddev)
-   - [ ] `matrix`: Matrix operations (transpose, trace, determinant)
+   - [x] `fib` (`fibonacci`): Generates Fibonacci sequences (`math_suite.wasm`)
+   - [x] `gcd` & `lcm`: Greatest common divisor and least common multiple (`math_suite.wasm`)
+   - [x] `stats`: Full summary statistics (count, min, max, sum, mean, median, stddev) (`math_suite.wasm`)
+   - [x] `matrix`: Matrix operations (transpose, trace, determinant) (`math_suite.wasm`)
 
 6. **UUIDs, Tokens & Security**
    - [ ] `uuidgen-js`: UUID v4 generator

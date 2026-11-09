@@ -24,3 +24,15 @@ if [[ "$TARGET" == "group4" || "$TARGET" == "text_gen" || "$TARGET" == "4" ]]; t
     done
     echo "Group 4 done"
 fi
+
+if [[ "$TARGET" == "group5" || "$TARGET" == "5" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 5 ==="
+    for tool in numbase random_bytes math_suite; do
+        echo "Building $tool..."
+        emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group5/$tool.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/$tool.js"
+        cp "$SCRIPT_DIR/src/desk/programs/sources/group5/LICENSE" "$ARTIFACTS/$tool-LICENSE"
+        rm -f "$ARTIFACTS/$tool-source.tar.gz"
+        tar -czf "$ARTIFACTS/$tool-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group5" "$tool.c" LICENSE
+    done
+    echo "Group 5 done"
+fi
