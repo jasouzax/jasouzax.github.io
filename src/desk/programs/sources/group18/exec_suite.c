@@ -103,6 +103,7 @@ static uint32_t cpu_pop32(x86_cpu_t *cpu) {
 /* ModR/M & SIB helper */
 typedef struct {
     int is_reg;
+    int reg_num;
     uint32_t *reg_ptr;
     uint32_t mem_addr;
 } operand_t;
@@ -121,6 +122,33 @@ static uint32_t *get_reg32(x86_cpu_t *cpu, int reg) {
     }
 }
 
+static inline uint8_t read_reg8(x86_cpu_t *cpu, int reg) {
+    switch (reg & 7) {
+        case 0: return (uint8_t)(cpu->eax & 0xFF);
+        case 1: return (uint8_t)(cpu->ecx & 0xFF);
+        case 2: return (uint8_t)(cpu->edx & 0xFF);
+        case 3: return (uint8_t)(cpu->ebx & 0xFF);
+        case 4: return (uint8_t)((cpu->eax >> 8) & 0xFF);
+        case 5: return (uint8_t)((cpu->ecx >> 8) & 0xFF);
+        case 6: return (uint8_t)((cpu->edx >> 8) & 0xFF);
+        case 7: return (uint8_t)((cpu->ebx >> 8) & 0xFF);
+        default: return 0;
+    }
+}
+
+static inline void write_reg8(x86_cpu_t *cpu, int reg, uint8_t val) {
+    switch (reg & 7) {
+        case 0: cpu->eax = (cpu->eax & ~0xFF) | val; break;
+        case 1: cpu->ecx = (cpu->ecx & ~0xFF) | val; break;
+        case 2: cpu->edx = (cpu->edx & ~0xFF) | val; break;
+        case 3: cpu->ebx = (cpu->ebx & ~0xFF) | val; break;
+        case 4: cpu->eax = (cpu->eax & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 5: cpu->ecx = (cpu->ecx & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 6: cpu->edx = (cpu->edx & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 7: cpu->ebx = (cpu->ebx & ~0xFF00) | ((uint32_t)val << 8); break;
+    }
+}
+
 static operand_t decode_modrm(x86_cpu_t *cpu, uint8_t modrm) {
     operand_t op;
     int mod = (modrm >> 6) & 3;
@@ -128,12 +156,14 @@ static operand_t decode_modrm(x86_cpu_t *cpu, uint8_t modrm) {
 
     if (mod == 3) {
         op.is_reg = 1;
+        op.reg_num = rm;
         op.reg_ptr = get_reg32(cpu, rm);
         op.mem_addr = 0;
         return op;
     }
 
     op.is_reg = 0;
+    op.reg_num = -1;
     op.reg_ptr = NULL;
     uint32_t base = 0;
 
@@ -183,7 +213,7 @@ static void op_write32(x86_cpu_t *cpu, operand_t op, uint32_t val) {
 }
 
 static uint8_t op_read8(x86_cpu_t *cpu, operand_t op) {
-    if (op.is_reg) return (uint8_t)(*op.reg_ptr & 0xFF);
+    if (op.is_reg) return read_reg8(cpu, op.reg_num);
     return mem_read8(cpu, op.mem_addr);
 }
 
@@ -193,35 +223,26 @@ static uint16_t op_read16(x86_cpu_t *cpu, operand_t op) {
 }
 
 static void op_write8(x86_cpu_t *cpu, operand_t op, uint8_t val) {
-    if (op.is_reg) *op.reg_ptr = (*op.reg_ptr & ~0xFF) | val;
+    if (op.is_reg) write_reg8(cpu, op.reg_num, val);
     else mem_write8(cpu, op.mem_addr, val);
 }
 
-static inline uint8_t read_reg8(x86_cpu_t *cpu, int reg) {
-    switch (reg) {
-        case 0: return (uint8_t)(cpu->eax & 0xFF);
-        case 1: return (uint8_t)(cpu->ecx & 0xFF);
-        case 2: return (uint8_t)(cpu->edx & 0xFF);
-        case 3: return (uint8_t)(cpu->ebx & 0xFF);
-        case 4: return (uint8_t)((cpu->eax >> 8) & 0xFF);
-        case 5: return (uint8_t)((cpu->ecx >> 8) & 0xFF);
-        case 6: return (uint8_t)((cpu->edx >> 8) & 0xFF);
-        case 7: return (uint8_t)((cpu->ebx >> 8) & 0xFF);
-        default: return 0;
-    }
+static inline void set_flags_sub32(x86_cpu_t *cpu, uint32_t a, uint32_t b) {
+    uint32_t res = a - b;
+    int zf = (res == 0);
+    int sf = ((res & 0x80000000) != 0);
+    int cf = (a < b);
+    int of = (((a ^ b) & (a ^ res) & 0x80000000) != 0);
+    cpu->eflags = (zf ? 0x40 : 0) | (sf ? 0x80 : 0) | (cf ? 0x01 : 0) | (of ? 0x800 : 0);
 }
 
-static inline void write_reg8(x86_cpu_t *cpu, int reg, uint8_t val) {
-    switch (reg) {
-        case 0: cpu->eax = (cpu->eax & ~0xFF) | val; break;
-        case 1: cpu->ecx = (cpu->ecx & ~0xFF) | val; break;
-        case 2: cpu->edx = (cpu->edx & ~0xFF) | val; break;
-        case 3: cpu->ebx = (cpu->ebx & ~0xFF) | val; break;
-        case 4: cpu->eax = (cpu->eax & ~0xFF00) | ((uint32_t)val << 8); break;
-        case 5: cpu->ecx = (cpu->ecx & ~0xFF00) | ((uint32_t)val << 8); break;
-        case 6: cpu->edx = (cpu->edx & ~0xFF00) | ((uint32_t)val << 8); break;
-        case 7: cpu->ebx = (cpu->ebx & ~0xFF00) | ((uint32_t)val << 8); break;
-    }
+static inline void set_flags_sub8(x86_cpu_t *cpu, uint8_t a, uint8_t b) {
+    uint8_t res = (uint8_t)(a - b);
+    int zf = (res == 0);
+    int sf = ((res & 0x80) != 0);
+    int cf = (a < b);
+    int of = (((a ^ b) & (a ^ res) & 0x80) != 0);
+    cpu->eflags = (zf ? 0x40 : 0) | (sf ? 0x80 : 0) | (cf ? 0x01 : 0) | (of ? 0x800 : 0);
 }
 
 static inline int check_condition(x86_cpu_t *cpu, int cond) {
@@ -504,16 +525,18 @@ static void cpu_step(x86_cpu_t *cpu) {
             uint32_t b = *get_reg32(cpu, reg);
             uint32_t res = a - b;
             op_write32(cpu, dst, res);
-            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            set_flags_sub32(cpu, a, b);
             break;
         }
         case 0x2B: { /* SUB r32, r/m32 */
             uint8_t modrm = mem_read8(cpu, cpu->eip++);
             int reg = (modrm >> 3) & 7;
             operand_t src = decode_modrm(cpu, modrm);
-            uint32_t res = *get_reg32(cpu, reg) - op_read32(cpu, src);
+            uint32_t a = *get_reg32(cpu, reg);
+            uint32_t b = op_read32(cpu, src);
+            uint32_t res = a - b;
             *get_reg32(cpu, reg) = res;
-            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            set_flags_sub32(cpu, a, b);
             break;
         }
         case 0x31: { /* XOR r/m32, r32 */
@@ -534,22 +557,45 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->eflags = (res == 0 ? 0x40 : 0);
             break;
         }
+        case 0x38: { /* CMP r/m8, r8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            set_flags_sub8(cpu, op_read8(cpu, dst), read_reg8(cpu, reg));
+            break;
+        }
         case 0x39: { /* CMP r/m32, r32 */
             uint8_t modrm = mem_read8(cpu, cpu->eip++);
             int reg = (modrm >> 3) & 7;
             operand_t dst = decode_modrm(cpu, modrm);
             uint32_t a = op_read32(cpu, dst);
             uint32_t b = *get_reg32(cpu, reg);
-            uint32_t res = a - b;
-            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            set_flags_sub32(cpu, a, b);
+            break;
+        }
+        case 0x3A: { /* CMP r8, r/m8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            set_flags_sub8(cpu, read_reg8(cpu, reg), op_read8(cpu, src));
             break;
         }
         case 0x3B: { /* CMP r32, r/m32 */
             uint8_t modrm = mem_read8(cpu, cpu->eip++);
             int reg = (modrm >> 3) & 7;
             operand_t src = decode_modrm(cpu, modrm);
-            uint32_t res = *get_reg32(cpu, reg) - op_read32(cpu, src);
-            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            set_flags_sub32(cpu, *get_reg32(cpu, reg), op_read32(cpu, src));
+            break;
+        }
+        case 0x3C: { /* CMP AL, imm8 */
+            uint8_t imm = mem_read8(cpu, cpu->eip++);
+            set_flags_sub8(cpu, (uint8_t)(cpu->eax & 0xFF), imm);
+            break;
+        }
+        case 0x3D: { /* CMP EAX, imm32 */
+            uint32_t imm = mem_read32(cpu, cpu->eip);
+            cpu->eip += 4;
+            set_flags_sub32(cpu, cpu->eax, imm);
             break;
         }
         case 0x81: { /* Group 1 r/m32, imm32 */
@@ -563,11 +609,15 @@ static void cpu_step(x86_cpu_t *cpu) {
             if (op_sub == 0) res = a + imm; /* ADD */
             else if (op_sub == 1) res = a | imm; /* OR */
             else if (op_sub == 4) res = a & imm; /* AND */
-            else if (op_sub == 5) res = a - imm; /* SUB */
+            else if (op_sub == 5) { /* SUB */
+                res = a - imm;
+                set_flags_sub32(cpu, a, imm);
+                op_write32(cpu, dst, res);
+                break;
+            }
             else if (op_sub == 6) res = a ^ imm; /* XOR */
             else if (op_sub == 7) { /* CMP */
-                res = a - imm;
-                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+                set_flags_sub32(cpu, a, imm);
                 break;
             }
             op_write32(cpu, dst, res);
@@ -609,21 +659,46 @@ static void cpu_step(x86_cpu_t *cpu) {
                 int32_t rel = (int32_t)mem_read32(cpu, cpu->eip);
                 cpu->eip += 4;
                 if (check_condition(cpu, op2 & 0x0F)) cpu->eip += rel;
+            } else if (op2 >= 0x90 && op2 <= 0x9F) { /* SETcc r/m8 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                operand_t dst = decode_modrm(cpu, modrm);
+                uint8_t val = check_condition(cpu, op2 & 0x0F) ? 1 : 0;
+                op_write8(cpu, dst, val);
+            } else if (op2 >= 0x40 && op2 <= 0x4F) { /* CMOVcc r32, r/m32 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                if (check_condition(cpu, op2 & 0x0F)) {
+                    *get_reg32(cpu, reg) = op_read32(cpu, src);
+                }
             } else if (op2 == 0xB6) { /* MOVZX r32, r/m8 */
                 uint8_t modrm = mem_read8(cpu, cpu->eip++);
                 int reg = (modrm >> 3) & 7;
                 operand_t src = decode_modrm(cpu, modrm);
                 *get_reg32(cpu, reg) = (uint32_t)op_read8(cpu, src);
+            } else if (op2 == 0xB7) { /* MOVZX r32, r/m16 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                *get_reg32(cpu, reg) = (uint32_t)op_read16(cpu, src);
             } else if (op2 == 0xBE) { /* MOVSX r32, r/m8 */
                 uint8_t modrm = mem_read8(cpu, cpu->eip++);
                 int reg = (modrm >> 3) & 7;
                 operand_t src = decode_modrm(cpu, modrm);
                 *get_reg32(cpu, reg) = (uint32_t)(int32_t)(int8_t)op_read8(cpu, src);
+            } else if (op2 == 0xBF) { /* MOVSX r32, r/m16 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                *get_reg32(cpu, reg) = (uint32_t)(int32_t)(int16_t)op_read16(cpu, src);
             } else if (op2 == 0xAF) { /* IMUL r32, r/m32 */
                 uint8_t modrm = mem_read8(cpu, cpu->eip++);
                 int reg = (modrm >> 3) & 7;
                 operand_t src = decode_modrm(cpu, modrm);
                 *get_reg32(cpu, reg) = (uint32_t)((int32_t)*get_reg32(cpu, reg) * (int32_t)op_read32(cpu, src));
+            } else {
+                fprintf(stderr, "[box86] unknown op 0x0F 0x%02X at eip 0x%08X\n", op2, cpu->eip - 2);
+                cpu->halted = 1;
             }
             break;
         }
@@ -635,10 +710,14 @@ static void cpu_step(x86_cpu_t *cpu) {
             uint32_t a = op_read32(cpu, dst);
             uint32_t res = a;
             if (op_sub == 0) res = a + imm; /* ADD */
-            else if (op_sub == 5) res = a - imm; /* SUB */
+            else if (op_sub == 5) { /* SUB */
+                res = a - (uint32_t)imm;
+                set_flags_sub32(cpu, a, (uint32_t)imm);
+                op_write32(cpu, dst, res);
+                break;
+            }
             else if (op_sub == 7) { /* CMP */
-                res = a - imm;
-                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+                set_flags_sub32(cpu, a, (uint32_t)imm);
                 break;
             }
             op_write32(cpu, dst, res);
@@ -681,11 +760,15 @@ static void cpu_step(x86_cpu_t *cpu) {
             if (op_sub == 0) res = a + imm;
             else if (op_sub == 1) res = a | imm;
             else if (op_sub == 4) res = a & imm;
-            else if (op_sub == 5) res = a - imm;
+            else if (op_sub == 5) {
+                res = a - imm;
+                set_flags_sub8(cpu, a, imm);
+                op_write8(cpu, dst, res);
+                break;
+            }
             else if (op_sub == 6) res = a ^ imm;
             else if (op_sub == 7) { /* CMP */
-                res = a - imm;
-                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+                set_flags_sub8(cpu, a, imm);
                 break;
             }
             op_write8(cpu, dst, res);

@@ -541,10 +541,10 @@ static void print_num(int fd, unsigned long num, int base, int sign) {
         write(fd, "0", 1);
         return;
     }
+    static const char digits[] = "0123456789abcdef";
     while (num > 0) {
-        int rem = num % base;
-        buf[i++] = (rem < 10) ? ('0' + rem) : ('a' + rem - 10);
-        num /= base;
+        buf[i++] = digits[num % (unsigned long)base];
+        num /= (unsigned long)base;
     }
     while (i > 0) {
         write(fd, &buf[--i], 1);

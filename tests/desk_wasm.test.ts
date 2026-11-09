@@ -662,6 +662,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(user_c.code, 0)
         assert.match(user_c.stdout, /Enter name:/)
         assert.match(user_c.stdout, /Hello Jasouza!/)
+
+        const user_age = await run("printf '#include <stdio.h>\\nint main() {\\n    int age;\\n    printf(\"Enter your age: \");\\n    scanf(\"%%d\", &age);\\n    printf(\"Your age is: %%d\\\\n\", age);\\n    return 0;\\n}\\n' > /home/user/main_age.c; cd /home/user; gcc main_age.c -o age_app; printf '23\\n' | ./age_app")
+        assert.equal(user_age.code, 0)
+        assert.match(user_age.stdout, /Enter your age: /)
+        assert.match(user_age.stdout, /Your age is: 23/)
     })
     await t.test("native group 20 python runtime interprets expressions, loops, and manages environments", async () => {
         const py_ver = await run("python3 --version")
