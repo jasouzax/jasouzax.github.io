@@ -158,3 +158,13 @@ if [[ "$TARGET" == "group13" || "$TARGET" == "13" || "$TARGET" == "all" ]]; then
     tar -czf "$ARTIFACTS/doc_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group13" doc_suite.c LICENSE
     echo "Group 13 done"
 fi
+
+if [[ "$TARGET" == "group14" || "$TARGET" == "14" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 14 ==="
+    echo "Building image_suite..."
+    emcc -Os -I"$SCRIPT_DIR/src/desk/programs/sources/group14" "$SCRIPT_DIR/src/desk/programs/sources/group14/image_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/image_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group14/LICENSE" "$ARTIFACTS/image_suite-LICENSE"
+    rm -f "$ARTIFACTS/image_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/image_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group14" image_suite.c stb_image.h stb_image_write.h LICENSE
+    echo "Group 14 done"
+fi

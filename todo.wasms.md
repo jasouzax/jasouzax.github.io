@@ -143,14 +143,14 @@
     - ~~`magick` / `convert`: ImageMagick conversion and processing engine~~ *(Too massive for client bundle; covered by focused native tools below)*
     - ~~`gm`: GraphicsMagick CLI~~ *(Monolithic multi-megabyte engine; covered by focused tools below)*
     - ~~`inkscape`: Vector SVG exporter and renderer~~ *(Cannot be done: Requires GTK3/GIO GUI desktop subsystem)*
-    - [ ] `rsvg-convert`: SVG to vector/raster output
-    - [ ] `pngtopnm`, `jpegtopnm`, `pnmtojpeg`, `pnmtopng`: Netpbm suite
+    - ~~`rsvg-convert`: SVG to vector/raster output~~ *(Cannot be done: Requires Rust librsvg and GNOME Cairo/Pango/GObject/Fontconfig desktop subsystem)*
+    - [x] `pngtopnm`, `jpegtopnm`, `pnmtojpeg`, `pnmtopng`: Netpbm suite (`image_suite.wasm`)
     - [x] `cwebp` & `dwebp`: WebP encoder/decoder (Google libwebp.wasm)
-    - [ ] `avifenc` & `avifdec`: AVIF encoder/decoder
-    - [ ] `cjxl` & `djxl`: JPEG XL encoder/decoder
+    - ~~`avifenc` & `avifdec`: AVIF encoder/decoder~~ *(Cannot be done: Requires multi-threaded libaom/dav1d video encoder engine)*
+    - ~~`cjxl` & `djxl`: JPEG XL encoder/decoder~~ *(Cannot be done: Requires monolithic C++20 Highway SIMD vector architecture)*
     - [x] `potrace` & `mkbitmap`: Raster to vector SVG tracing and bitmap thresholding (Peter Selinger potrace.wasm / mkbitmap.wasm)
     - [x] `optipng`: Lossless PNG optimizer (optipng.wasm)
-    - [ ] `jpegoptim`: Lossless JPEG optimizer
+    - [x] `jpegoptim`: Lossless JPEG optimizer (`image_suite.wasm`)
 
 15. **Audio & Video Suite**
     - ~~`ffmpeg`: Full audio/video transcoding and stream processor~~ *(Massive 50MB+ media stack with complex threading)*

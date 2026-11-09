@@ -74,6 +74,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("pdf_suite", ["pdfinfo", "pdftotext", "pdfimages", "img2pdf", "qpdf"])
     await register_program("postscript_suite", ["enscript", "a2ps"])
     await register_program("doc_suite", ["antiword", "docx2txt", "odt2txt"])
+    await register_program("image_suite", ["pngtopnm", "pnmtopng", "jpegtopnm", "pnmtojpeg", "jpegoptim"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -477,6 +478,30 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const antiword_res = await run("printf '{\\\\rtf1\\\\ansi Hello MS Word Document\\\\par}' | antiword -")
         assert.equal(antiword_res.code, 0)
         assert.match(antiword_res.stdout, /Hello MS Word Document/)
+    })
+    await t.test("native group 14 image suite wasms convert and optimize png, jpeg, and pnm images", async () => {
+        const create_ppm = await run("printf 'P3\\n2 2\\n255\\n255 0 0  0 255 0\\n0 0 255  255 255 255\\n' > /tmp/sample.ppm")
+        assert.equal(create_ppm.code, 0)
+
+        const png_res = await run("pnmtopng /tmp/sample.ppm > /tmp/sample.png; cat /tmp/sample.png | xxd -p | head -n 1 | cut -c1-16")
+        assert.equal(png_res.code, 0)
+        assert.equal(png_res.stdout.trim(), "89504e470d0a1a0a")
+
+        const ppm_res = await run("pngtopnm /tmp/sample.png | head -n 3")
+        assert.equal(ppm_res.code, 0)
+        assert.match(ppm_res.stdout, /P6\n2 2\n255/)
+
+        const jpg_res = await run("pnmtojpeg /tmp/sample.ppm > /tmp/sample.jpg; cat /tmp/sample.jpg | xxd -p | head -n 1 | cut -c1-4")
+        assert.equal(jpg_res.code, 0)
+        assert.equal(jpg_res.stdout.trim(), "ffd8")
+
+        const opt_res = await run("jpegoptim /tmp/sample.jpg")
+        assert.equal(opt_res.code, 0)
+        assert.match(opt_res.stdout, /optimized/)
+
+        const jpeg2ppm_res = await run("jpegtopnm /tmp/sample.jpg | head -n 3")
+        assert.equal(jpeg2ppm_res.code, 0)
+        assert.match(jpeg2ppm_res.stdout, /P6\n2 2\n255/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

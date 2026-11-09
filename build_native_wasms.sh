@@ -473,4 +473,12 @@ emcc -Os -sUSE_ZLIB=1 doc_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$AR
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/doc_suite.d.ts"
 echo "Group 13 tools done"
 
+echo "=== 25. Building Group 14 Image Suite (image_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group14"
+tar czf "$ARTIFACTS/image_suite-source.tar.gz" image_suite.c stb_image.h stb_image_write.h LICENSE
+cp LICENSE "$ARTIFACTS/image_suite-LICENSE"
+emcc -Os -I"$SCRIPT_DIR/src/desk/programs/sources/group14" image_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/image_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/image_suite.d.ts"
+echo "Group 14 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
