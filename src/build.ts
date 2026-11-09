@@ -176,7 +176,7 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
         images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: cmd_list ?? [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
     }
-    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE", "python_stdlib.zip", "pyodide.asm.js", "pyodide-lock.json"]) {
+    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE", "python_stdlib.zip", "pyodide.asm.js", "pyodide-lock.json", "pyodide.asm.wasm", "numpy-2.0.2-cp312-cp312-pyodide_2024_0_wasm32.whl"]) {
         const p = join(programs, name)
         if (existsSync(p)) files.set(`assets/wasm/${name}`, readFileSync(p))
     }

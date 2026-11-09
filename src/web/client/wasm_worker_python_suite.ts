@@ -236,14 +236,30 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
                     indexURL = resolve("node_modules/pyodide")
                 } catch {}
             } else if (typeof location !== "undefined") {
-                indexURL = new URL("/assets/pyodide/", location.href).href
+                const base = (location.origin && location.origin !== "null") ? location.origin : location.href
+                indexURL = new URL("/assets/wasm/", base).href
             }
-            pyodideInstance = await loadPyodide({
+
+            const opts = {
                 indexURL,
                 stdout: (text: string) => write_stdout(text + "\n"),
                 stderr: (text: string) => write_stderr(text + "\n"),
                 stdin: () => read_line_stdin(),
-            })
+            }
+
+            try {
+                pyodideInstance = await loadPyodide(opts)
+            } catch (err) {
+                // If local assets fail to load in browser, fall back to upstream CDN
+                if (typeof location !== "undefined" && indexURL !== "https://cdn.jsdelivr.net/pyodide/v0.27.8/full/") {
+                    pyodideInstance = await loadPyodide({
+                        ...opts,
+                        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.8/full/",
+                    })
+                } else {
+                    throw err
+                }
+            }
         }
         const pyodide = pyodideInstance
 
