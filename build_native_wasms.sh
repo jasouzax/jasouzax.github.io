@@ -489,4 +489,12 @@ emcc -Os -I"$SCRIPT_DIR/src/desk/programs/sources/group15" audio_suite.c "$WORK/
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/audio_suite.d.ts"
 echo "Group 15 tools done"
 
+echo "=== 27. Building Group 16 Disk Archive Suite (disk_archive_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group16"
+tar czf "$ARTIFACTS/disk_archive_suite-source.tar.gz" disk_archive_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/disk_archive_suite-LICENSE"
+emcc -Os disk_archive_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/disk_archive_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/disk_archive_suite.d.ts"
+echo "Group 16 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

@@ -178,3 +178,14 @@ if [[ "$TARGET" == "group15" || "$TARGET" == "15" || "$TARGET" == "all" ]]; then
     tar -czf "$ARTIFACTS/audio_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group15" audio_suite.c stb_vorbis.h LICENSE
     echo "Group 15 done"
 fi
+
+if [[ "$TARGET" == "group16" || "$TARGET" == "16" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 16 ==="
+    echo "Building disk_archive_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group16/disk_archive_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/disk_archive_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group16/LICENSE" "$ARTIFACTS/disk_archive_suite-LICENSE"
+    rm -f "$ARTIFACTS/disk_archive_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/disk_archive_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group16" disk_archive_suite.c LICENSE
+    echo "Group 16 done"
+fi
+

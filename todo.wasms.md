@@ -166,9 +166,9 @@
     - ~~`qemu-img`: Virtual machine disk image converter~~ *(Cannot be done: Requires OS block device kernel ioctls and virtualization primitives)*
     - [x] `bchunk`: CD/DVD image converter to ISO 9660 (bchunk.wasm)
     - [x] `bin2iso`: CD/DVD image converter to ISO 9660 (bin2iso.wasm)
-    - [ ] `iat`: Iso9660 Analyzer Tool
+    - [x] `iat`: Iso9660 Analyzer Tool (`disk_archive_suite.wasm`)
     - ~~`alien`: Linux package converter~~ *(Cannot be done: Requires Perl RPM/Debian dpkg package manager host environment)*
-    - [ ] `7z` / `p7zip`: 7-Zip archiver
+    - [x] `7z` / `p7zip`: 7-Zip archiver (`disk_archive_suite.wasm`)
     - ~~`assimp`: 3D model importer and exporter~~ *(Massive monolithic C++ CAD engine)*
     - ~~`meshlabserver`: 3D mesh batch processor~~ *(Cannot be done: Qt OpenGL GUI dependency)*
     - ~~`openscad`: Solid 3D CAD CSG script compiler~~ *(Cannot be done: CGAL / Qt desktop GUI dependency)*

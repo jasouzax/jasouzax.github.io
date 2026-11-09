@@ -76,6 +76,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("doc_suite", ["antiword", "docx2txt", "odt2txt"])
     await register_program("image_suite", ["pngtopnm", "pnmtopng", "jpegtopnm", "pnmtojpeg", "jpegoptim"])
     await register_program("audio_suite", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"])
+    await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -525,6 +526,32 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const opus_res = await run("opusenc /tmp/tone.wav /tmp/tone.opus; cat /tmp/tone.opus | xxd -p | head -n 1 | cut -c1-8")
         assert.equal(opus_res.code, 0)
         assert.equal(opus_res.stdout.trim(), "4f676753")
+    })
+    await t.test("native group 16 disk and archive suite wasms analyze disk images and create/extract 7z archives", async () => {
+        const iat_help = await run("iat --help")
+        assert.equal(iat_help.code, 0)
+        assert.match(iat_help.stdout, /Iso9660 Analyzer Tool/)
+
+        const make_file = await run("printf 'Hello 7z Compressed World\\n' > /tmp/hello.txt")
+        assert.equal(make_file.code, 0)
+
+        const z_add = await run("7z a /tmp/hello.7z /tmp/hello.txt")
+        assert.equal(z_add.code, 0)
+        assert.match(z_add.stdout, /Creating archive/)
+        assert.match(z_add.stdout, /Everything is Ok/)
+
+        const z_sig = await run("cat /tmp/hello.7z | xxd -p | head -n 1 | cut -c1-12")
+        assert.equal(z_sig.code, 0)
+        assert.equal(z_sig.stdout.trim(), "377abcaf271c")
+
+        const z_list = await run("7z l /tmp/hello.7z")
+        assert.equal(z_list.code, 0)
+        assert.match(z_list.stdout, /Listing archive/)
+        assert.match(z_list.stdout, /\/tmp\/hello\.txt/)
+
+        const z_extract = await run("rm /tmp/hello.txt; 7z x /tmp/hello.7z; cat /tmp/hello.txt")
+        assert.equal(z_extract.code, 0)
+        assert.match(z_extract.stdout, /Hello 7z Compressed World/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
