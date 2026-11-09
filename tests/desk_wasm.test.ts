@@ -71,6 +71,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("xml_suite", ["xmlstarlet", "xq"])
     await register_program("yq", ["yq"])
     await register_program("csv_suite", ["csvsql", "csvformat", "xlsx2csv", "csvjson", "in2csv"])
+    await register_program("pdf_suite", ["pdfinfo", "pdftotext", "pdfimages", "img2pdf", "qpdf"])
+    await register_program("postscript_suite", ["enscript", "a2ps"])
+    await register_program("doc_suite", ["antiword", "docx2txt", "odt2txt"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -442,6 +445,38 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(sql_res.code, 0)
         assert.match(sql_res.stdout, /CREATE TABLE users/)
         assert.match(sql_res.stdout, /INSERT INTO users VALUES \('1', 'Alice'\);/)
+    })
+    await t.test("native group 13 pdf, postscript, and document tools parse and format streams", async () => {
+        const create_pdf = await run("printf '%s\\n' '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 33 >>\nstream\nBT /F1 12 Tf (Hello PDF) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000206 00000 n \ntrailer\n<< /Size 5 /Root 1 0 R /Info << /Title (TestDoc) >> >>\nstartxref\n289\n%%EOF' > /tmp/sample.pdf")
+        assert.equal(create_pdf.code, 0)
+
+        const info_res = await run("pdfinfo /tmp/sample.pdf")
+        assert.equal(info_res.code, 0)
+        assert.match(info_res.stdout, /Title:\s+TestDoc/)
+        assert.match(info_res.stdout, /Pages:\s+1/)
+        assert.match(info_res.stdout, /PDF version:\s+1\.4/)
+
+        const txt_res = await run("pdftotext /tmp/sample.pdf -")
+        assert.equal(txt_res.code, 0)
+        assert.match(txt_res.stdout, /Hello PDF/)
+
+        const qpdf_res = await run("qpdf --show-npages /tmp/sample.pdf")
+        assert.equal(qpdf_res.code, 0)
+        assert.equal(qpdf_res.stdout.trim(), "1")
+
+        const ps_res = await run("printf 'Hello PostScript World\\n' | enscript -p /tmp/out.ps; cat /tmp/out.ps")
+        assert.equal(ps_res.code, 0)
+        assert.match(ps_res.stdout, /%!PS-Adobe-3\.0/)
+        assert.match(ps_res.stdout, /Hello PostScript World/)
+
+        const a2ps_res = await run("printf 'Line 1\\nLine 2\\n' | a2ps -o /tmp/a2ps.ps; cat /tmp/a2ps.ps")
+        assert.equal(a2ps_res.code, 0)
+        assert.match(a2ps_res.stdout, /%!PS-Adobe-3\.0/)
+        assert.match(a2ps_res.stdout, /Line 1/)
+
+        const antiword_res = await run("printf '{\\\\rtf1\\\\ansi Hello MS Word Document\\\\par}' | antiword -")
+        assert.equal(antiword_res.code, 0)
+        assert.match(antiword_res.stdout, /Hello MS Word Document/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

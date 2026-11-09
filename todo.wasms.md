@@ -124,17 +124,18 @@
     - [x] `xlsx2csv`: Excel workbook XML sheet to CSV converter (`csv_suite.wasm`)
 
 13. **PDF, PostScript & Office Document Suite**
-    - [ ] `pdftotext`: Plaintext extractor from PDF streams
-    - [ ] `pdfinfo`: PDF metadata and page count inspector
+    - [x] `pdftotext`: Plaintext extractor from PDF streams (`pdf_suite.wasm`)
+    - [x] `pdfinfo`: PDF metadata and page count inspector (`pdf_suite.wasm`)
     - ~~`pdftk`: PDF merge and document builder~~ *(Cannot be done: Requires GCJ / full Java Virtual Machine runtime in browser)*
-    - [ ] `qpdf`: PDF linearizer and transform engine
+    - [x] `qpdf`: PDF linearizer, syntax checker, and transform engine (`pdf_suite.wasm`)
     - ~~`gs` / `ghostscript`: PostScript & PDF rasterization~~ *(Cannot be done: Requires massive monolithic Ghostscript native host runtime)*
-    - [ ] `img2pdf`: Direct image to PDF page generator
-    - [ ] `pdfimages` & `pdftoppm`: PDF image and page rendering tools
+    - [x] `img2pdf`: Direct image to PDF page generator (`pdf_suite.wasm`)
+    - [x] `pdfimages`: PDF embedded image extractor and inspector (`pdf_suite.wasm`)
+    - ~~`pdftoppm`: PDF page rasterizer~~ *(Cannot be done: Requires full Splash/Cairo vector graphics rendering engine and FreeType font subsystem; raster image extraction covered by pdfimages)*
     - ~~`pandoc`: Universal markup converter~~ *(Cannot be done: Requires GHC Haskell runtime / Haskell WASM not supported by Emscripten)*
     - ~~`wkhtmltopdf` & `weasyprint`: HTML/CSS document to PDF converter~~ *(Cannot be done: Requires full headless WebKit / Python GTK stack)*
-    - [ ] `enscript` & `a2ps`: Plaintext to PostScript formatter
-    - [ ] `antiword`, `docx2txt`, `odt2txt`: Word and OpenDocument text extractors
+    - [x] `enscript` & `a2ps`: Plaintext to PostScript formatter (`postscript_suite.wasm`)
+    - [x] `antiword`, `docx2txt`, `odt2txt`: Word and OpenDocument text extractors (`doc_suite.wasm`)
     - ~~`soffice` / `libreoffice`: Headless document converter~~ *(Cannot be done: Multi-gigabyte office suite requiring full Linux desktop GUI/X11 subsystems)*
     - ~~`ebook-convert`: EPUB/MOBI/HTML to document converter~~ *(Cannot be done: Calibre desktop Qt/Python application requiring full GUI/Qt stack)*
 

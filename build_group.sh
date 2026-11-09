@@ -136,3 +136,25 @@ if [[ "$TARGET" == "group12" || "$TARGET" == "12" || "$TARGET" == "all" ]]; then
     tar -czf "$ARTIFACTS/csv_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group12" csv_suite.c cJSON.c cJSON.h LICENSE
     echo "Group 12 done"
 fi
+
+if [[ "$TARGET" == "group13" || "$TARGET" == "13" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 13 ==="
+    echo "Building pdf_suite..."
+    emcc -Os -sUSE_ZLIB=1 "$SCRIPT_DIR/src/desk/programs/sources/group13/pdf_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/pdf_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group13/LICENSE" "$ARTIFACTS/pdf_suite-LICENSE"
+    rm -f "$ARTIFACTS/pdf_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/pdf_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group13" pdf_suite.c LICENSE
+
+    echo "Building postscript_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group13/postscript_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/postscript_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group13/LICENSE" "$ARTIFACTS/postscript_suite-LICENSE"
+    rm -f "$ARTIFACTS/postscript_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/postscript_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group13" postscript_suite.c LICENSE
+
+    echo "Building doc_suite..."
+    emcc -Os -sUSE_ZLIB=1 "$SCRIPT_DIR/src/desk/programs/sources/group13/doc_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/doc_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group13/LICENSE" "$ARTIFACTS/doc_suite-LICENSE"
+    rm -f "$ARTIFACTS/doc_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/doc_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group13" doc_suite.c LICENSE
+    echo "Group 13 done"
+fi

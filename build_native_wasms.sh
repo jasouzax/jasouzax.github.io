@@ -455,4 +455,22 @@ emcc -Os csv_suite.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFAC
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/csv_suite.d.ts"
 echo "Group 12 tools done"
 
+echo "=== 24. Building Group 13 PDF, PostScript & Office Document Suite (pdf_suite, postscript_suite, doc_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group13"
+tar czf "$ARTIFACTS/pdf_suite-source.tar.gz" pdf_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/pdf_suite-LICENSE"
+emcc -Os -sUSE_ZLIB=1 pdf_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/pdf_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/pdf_suite.d.ts"
+
+tar czf "$ARTIFACTS/postscript_suite-source.tar.gz" postscript_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/postscript_suite-LICENSE"
+emcc -Os postscript_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/postscript_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/postscript_suite.d.ts"
+
+tar czf "$ARTIFACTS/doc_suite-source.tar.gz" doc_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/doc_suite-LICENSE"
+emcc -Os -sUSE_ZLIB=1 doc_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/doc_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/doc_suite.d.ts"
+echo "Group 13 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
