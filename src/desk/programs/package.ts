@@ -35,6 +35,19 @@ const target: Record<string, string> = {
     __INTPTR_MAX__: "2147483647", __UINTPTR_MAX__: "4294967295U", __PTRDIFF_MAX__: "2147483647", __SIZE_MAX__: "4294967295U",
 }
 for (const name of ["bits/alltypes.h", "bits/stdint.h"]) for (const [macro, value] of Object.entries(target)) files[name] = files[name].replaceAll(macro, value)
+const runtime = join(root, "sources/group19/runtime")
+if (existsSync(runtime)) {
+    for (const [key, filename] of [
+        ["lib/crt1.o", "crt1.o"],
+        ["lib/crti.o", "crti.o"],
+        ["lib/crtn.o", "crtn.o"],
+        ["lib/libc.a", "libc.a"],
+        ["lib/tcc/libtcc1.a", "libtcc1.a"],
+    ]) {
+        const file_path = join(runtime, filename)
+        if (existsSync(file_path)) files[key] = readFileSync(file_path, "base64")
+    }
+}
 writeFileSync(join(artifact, "tcc-sysroot.json"), JSON.stringify(files))
 writeFileSync(join(artifact, "tcc-sysroot-LICENSE"), readFileSync(join(sdk, "upstream/emscripten/system/lib/libc/musl/COPYRIGHT"), "utf8") + "\nTinyCC headers:\n" + readFileSync(join(work, "tcc-0.9.27/COPYING"), "utf8"))
 console.log(`Packaged 4 native WASM programs and ${Object.keys(files).length} compiler headers`)

@@ -35,6 +35,21 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         async remove(path) { if (!files.delete(path) && !dirs.delete(path)) throw new Error("ENOENT") },
         async rename(from, to) { files.set(to, await fs.read_bytes!(from)); files.delete(from) },
     }
+    const sysroot_json = JSON.parse(readFileSync(resolve("src/desk/programs/artifacts/tcc-sysroot.json"), "utf8")) as Record<string, string>
+    for (const d of ["/usr", "/usr/lib", "/usr/lib/tcc", "/usr/lib/tcc/include"]) dirs.add(d)
+    for (const [name, val] of Object.entries(sysroot_json)) {
+        const is_lib = name.startsWith("lib/")
+        const full_path = is_lib ? `/usr/${name}` : `/usr/lib/tcc/include/${name}`
+        const parent_dirs = full_path.split("/").slice(1, -1)
+        let cur = ""
+        for (const part of parent_dirs) {
+            cur += "/" + part
+            dirs.add(cur)
+        }
+        const is_bin = name.endsWith(".o") || name.endsWith(".a")
+        const bytes = is_bin ? Buffer.from(val, "base64") : Buffer.from(val, "utf8")
+        files.set(full_path, bytes)
+    }
     const wasm = readFileSync(resolve("src/desk/busybox/artifacts/busybox.wasm"))
     register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
     async function register_program(name: string, commands: string[] = [name]) {
@@ -630,6 +645,18 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const make_run = await run("printf 'all:\\n\\t@echo Build Completed Successfully\\n' > /tmp/Makefile; make -f /tmp/Makefile")
         assert.equal(make_run.code, 0)
         assert.match(make_run.stdout, /Build Completed Successfully/)
+
+        const tcc_comp = await run("printf '#include <stdio.h>\\nint main() { printf(\"Hello from compiled TCC!\\\\n\"); return 0; }\\n' > /home/user/main.c; tcc /home/user/main.c -o /home/user/tcc_app; /home/user/tcc_app")
+        assert.equal(tcc_comp.code, 0)
+        assert.match(tcc_comp.stdout, /Hello from compiled TCC!/)
+
+        const gcc_comp = await run("printf '#include <stdio.h>\\nint main() { printf(\"Hello from compiled GCC!\\\\n\"); return 0; }\\n' > /home/user/main2.c; gcc /home/user/main2.c -o /home/user/gcc_app; /home/user/gcc_app")
+        assert.equal(gcc_comp.code, 0)
+        assert.match(gcc_comp.stdout, /Hello from compiled GCC!/)
+
+        const tcc_default = await run("printf '#include <stdio.h>\\nint main() { printf(\"Default a.out output\\\\n\"); return 0; }\\n' > /home/user/main3.c; cd /home/user; tcc main3.c; ./a.out")
+        assert.equal(tcc_default.code, 0)
+        assert.match(tcc_default.stdout, /Default a.out output/)
     })
     await t.test("native group 20 python runtime interprets expressions, loops, and manages environments", async () => {
         const py_ver = await run("python3 --version")

@@ -24,10 +24,13 @@ function ensure_compiler_headers(): Promise<void> {
         for (const [name, text] of Object.entries(files)) {
             const parts = name.split("/")
             if (parts.some(part => !part || part === "." || part === ".." || part.includes("\\"))) throw new Error("Invalid compiler header path")
-            let directory = include
+            const is_lib = name.startsWith("lib/")
+            let directory = is_lib ? usr : include
             for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part, { create: true })
             const file = await directory.getFileHandle(parts.at(-1)!, { create: true }), writer = await file.createWritable!()
-            await writer.write(text); await writer.close()
+            const is_binary = name.endsWith(".o") || name.endsWith(".a")
+            const payload: string | Blob = is_binary ? new Blob([Uint8Array.from(atob(text), c => c.charCodeAt(0))]) : text
+            await writer.write(payload); await writer.close()
         }
     })().catch(error => { compiler_headers = null; throw error })
 }
@@ -46,7 +49,7 @@ export async function resolve(path: string): Promise<fs_node | null> {
     await filesystem_initialized()
     // WASM pathname lookup checks each parent before reaching the header itself.
     const clean = norm(path)
-    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/tcc")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
+    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
     let node = fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {

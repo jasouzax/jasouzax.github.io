@@ -42,7 +42,7 @@ static unsigned char *read_file(const char *path, size_t *out_len) {
 /* ========================================================================= */
 #define MEM_BASE 0x00400000
 #define MEM_SIZE 0x01000000 /* 16 MB virtual address space */
-#define STACK_TOP (MEM_BASE + MEM_SIZE - 0x10000)
+#define GET_STACK_TOP(c) ((c)->mem_base + (c)->mem_size - 0x10000)
 
 typedef struct {
     uint32_t eax, ecx, edx, ebx, esp, ebp, esi, edi;
@@ -182,6 +182,72 @@ static void op_write32(x86_cpu_t *cpu, operand_t op, uint32_t val) {
     else mem_write32(cpu, op.mem_addr, val);
 }
 
+static uint8_t op_read8(x86_cpu_t *cpu, operand_t op) {
+    if (op.is_reg) return (uint8_t)(*op.reg_ptr & 0xFF);
+    return mem_read8(cpu, op.mem_addr);
+}
+
+static uint16_t op_read16(x86_cpu_t *cpu, operand_t op) {
+    if (op.is_reg) return (uint16_t)(*op.reg_ptr & 0xFFFF);
+    return mem_read16(cpu, op.mem_addr);
+}
+
+static void op_write8(x86_cpu_t *cpu, operand_t op, uint8_t val) {
+    if (op.is_reg) *op.reg_ptr = (*op.reg_ptr & ~0xFF) | val;
+    else mem_write8(cpu, op.mem_addr, val);
+}
+
+static inline uint8_t read_reg8(x86_cpu_t *cpu, int reg) {
+    switch (reg) {
+        case 0: return (uint8_t)(cpu->eax & 0xFF);
+        case 1: return (uint8_t)(cpu->ecx & 0xFF);
+        case 2: return (uint8_t)(cpu->edx & 0xFF);
+        case 3: return (uint8_t)(cpu->ebx & 0xFF);
+        case 4: return (uint8_t)((cpu->eax >> 8) & 0xFF);
+        case 5: return (uint8_t)((cpu->ecx >> 8) & 0xFF);
+        case 6: return (uint8_t)((cpu->edx >> 8) & 0xFF);
+        case 7: return (uint8_t)((cpu->ebx >> 8) & 0xFF);
+        default: return 0;
+    }
+}
+
+static inline void write_reg8(x86_cpu_t *cpu, int reg, uint8_t val) {
+    switch (reg) {
+        case 0: cpu->eax = (cpu->eax & ~0xFF) | val; break;
+        case 1: cpu->ecx = (cpu->ecx & ~0xFF) | val; break;
+        case 2: cpu->edx = (cpu->edx & ~0xFF) | val; break;
+        case 3: cpu->ebx = (cpu->ebx & ~0xFF) | val; break;
+        case 4: cpu->eax = (cpu->eax & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 5: cpu->ecx = (cpu->ecx & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 6: cpu->edx = (cpu->edx & ~0xFF00) | ((uint32_t)val << 8); break;
+        case 7: cpu->ebx = (cpu->ebx & ~0xFF00) | ((uint32_t)val << 8); break;
+    }
+}
+
+static inline int check_condition(x86_cpu_t *cpu, int cond) {
+    int zf = (cpu->eflags & 0x40) != 0;
+    int sf = (cpu->eflags & 0x80) != 0;
+    int cf = (cpu->eflags & 0x01) != 0;
+    int of = (cpu->eflags & 0x800) != 0;
+    switch (cond) {
+        case 0x0: return of;
+        case 0x1: return !of;
+        case 0x2: return cf;
+        case 0x3: return !cf;
+        case 0x4: return zf;
+        case 0x5: return !zf;
+        case 0x6: return cf || zf;
+        case 0x7: return !cf && !zf;
+        case 0x8: return sf;
+        case 0x9: return !sf;
+        case 0xC: return sf != of;
+        case 0xD: return sf == of;
+        case 0xE: return zf || (sf != of);
+        case 0xF: return !zf && (sf == of);
+        default: return 0;
+    }
+}
+
 /* Linux Syscall Emulation */
 static void handle_linux_syscall(x86_cpu_t *cpu) {
     uint32_t nr = cpu->eax;
@@ -212,7 +278,7 @@ static void handle_linux_syscall(x86_cpu_t *cpu) {
         }
         case 45: { /* sys_brk */
             uint32_t new_brk = cpu->ebx;
-            if (new_brk != 0 && new_brk >= cpu->mem_base && new_brk < STACK_TOP) {
+            if (new_brk != 0 && new_brk >= cpu->mem_base && new_brk < GET_STACK_TOP(cpu)) {
                 cpu->brk = new_brk;
             }
             cpu->eax = cpu->brk;
@@ -331,6 +397,22 @@ static void cpu_step(x86_cpu_t *cpu) {
 
     uint8_t op = mem_read8(cpu, cpu->eip++);
 
+    /* Group INC r32 (0x40 - 0x47) */
+    if (op >= 0x40 && op <= 0x47) {
+        uint32_t *r = get_reg32(cpu, op - 0x40);
+        (*r)++;
+        cpu->eflags = (*r == 0 ? 0x40 : 0) | ((*r & 0x80000000) ? 0x80 : 0);
+        return;
+    }
+
+    /* Group DEC r32 (0x48 - 0x4F) */
+    if (op >= 0x48 && op <= 0x4F) {
+        uint32_t *r = get_reg32(cpu, op - 0x48);
+        (*r)--;
+        cpu->eflags = (*r == 0 ? 0x40 : 0) | ((*r & 0x80000000) ? 0x80 : 0);
+        return;
+    }
+
     /* Group PUSH r32 (0x50 - 0x57) */
     if (op >= 0x50 && op <= 0x57) {
         cpu_push32(cpu, *get_reg32(cpu, op - 0x50));
@@ -405,6 +487,15 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->eflags = (res == 0 ? 0x40 : 0);
             break;
         }
+        case 0x03: { /* ADD r32, r/m32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            uint32_t res = *get_reg32(cpu, reg) + op_read32(cpu, src);
+            *get_reg32(cpu, reg) = res;
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
         case 0x29: { /* SUB r/m32, r32 */
             uint8_t modrm = mem_read8(cpu, cpu->eip++);
             int reg = (modrm >> 3) & 7;
@@ -413,6 +504,15 @@ static void cpu_step(x86_cpu_t *cpu) {
             uint32_t b = *get_reg32(cpu, reg);
             uint32_t res = a - b;
             op_write32(cpu, dst, res);
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
+        case 0x2B: { /* SUB r32, r/m32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            uint32_t res = *get_reg32(cpu, reg) - op_read32(cpu, src);
+            *get_reg32(cpu, reg) = res;
             cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
             break;
         }
@@ -425,6 +525,15 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->eflags = (res == 0 ? 0x40 : 0);
             break;
         }
+        case 0x33: { /* XOR r32, r/m32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            uint32_t res = *get_reg32(cpu, reg) ^ op_read32(cpu, src);
+            *get_reg32(cpu, reg) = res;
+            cpu->eflags = (res == 0 ? 0x40 : 0);
+            break;
+        }
         case 0x39: { /* CMP r/m32, r32 */
             uint8_t modrm = mem_read8(cpu, cpu->eip++);
             int reg = (modrm >> 3) & 7;
@@ -433,6 +542,89 @@ static void cpu_step(x86_cpu_t *cpu) {
             uint32_t b = *get_reg32(cpu, reg);
             uint32_t res = a - b;
             cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
+        case 0x3B: { /* CMP r32, r/m32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            uint32_t res = *get_reg32(cpu, reg) - op_read32(cpu, src);
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
+        case 0x81: { /* Group 1 r/m32, imm32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint32_t imm = mem_read32(cpu, cpu->eip);
+            cpu->eip += 4;
+            uint32_t a = op_read32(cpu, dst);
+            uint32_t res = a;
+            if (op_sub == 0) res = a + imm; /* ADD */
+            else if (op_sub == 1) res = a | imm; /* OR */
+            else if (op_sub == 4) res = a & imm; /* AND */
+            else if (op_sub == 5) res = a - imm; /* SUB */
+            else if (op_sub == 6) res = a ^ imm; /* XOR */
+            else if (op_sub == 7) { /* CMP */
+                res = a - imm;
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+                break;
+            }
+            op_write32(cpu, dst, res);
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
+        case 0x85: { /* TEST r/m32, r32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint32_t res = op_read32(cpu, dst) & (*get_reg32(cpu, reg));
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            break;
+        }
+        case 0x88: { /* MOV r/m8, r8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            op_write8(cpu, dst, read_reg8(cpu, reg));
+            break;
+        }
+        case 0x8A: { /* MOV r8, r/m8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t src = decode_modrm(cpu, modrm);
+            write_reg8(cpu, reg, op_read8(cpu, src));
+            break;
+        }
+        case 0xC6: { /* MOV r/m8, imm8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint8_t imm = mem_read8(cpu, cpu->eip++);
+            op_write8(cpu, dst, imm);
+            break;
+        }
+        case 0x0F: { /* Two-byte opcodes */
+            uint8_t op2 = mem_read8(cpu, cpu->eip++);
+            if (op2 >= 0x80 && op2 <= 0x8F) { /* Jcc rel32 */
+                int32_t rel = (int32_t)mem_read32(cpu, cpu->eip);
+                cpu->eip += 4;
+                if (check_condition(cpu, op2 & 0x0F)) cpu->eip += rel;
+            } else if (op2 == 0xB6) { /* MOVZX r32, r/m8 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                *get_reg32(cpu, reg) = (uint32_t)op_read8(cpu, src);
+            } else if (op2 == 0xBE) { /* MOVSX r32, r/m8 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                *get_reg32(cpu, reg) = (uint32_t)(int32_t)(int8_t)op_read8(cpu, src);
+            } else if (op2 == 0xAF) { /* IMUL r32, r/m32 */
+                uint8_t modrm = mem_read8(cpu, cpu->eip++);
+                int reg = (modrm >> 3) & 7;
+                operand_t src = decode_modrm(cpu, modrm);
+                *get_reg32(cpu, reg) = (uint32_t)((int32_t)*get_reg32(cpu, reg) * (int32_t)op_read32(cpu, src));
+            }
             break;
         }
         case 0x83: { /* Group 1 r/m32, imm8 */
@@ -471,14 +663,38 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->eip += rel;
             break;
         }
-        case 0x74: { /* JZ / JE rel8 */
+        case 0x70: case 0x71: case 0x72: case 0x73:
+        case 0x74: case 0x75: case 0x76: case 0x77:
+        case 0x78: case 0x79: case 0x7A: case 0x7B:
+        case 0x7C: case 0x7D: case 0x7E: case 0x7F: { /* Jcc rel8 */
             int8_t rel = (int8_t)mem_read8(cpu, cpu->eip++);
-            if (cpu->eflags & 0x40) cpu->eip += rel;
+            if (check_condition(cpu, op & 0x0F)) cpu->eip += rel;
             break;
         }
-        case 0x75: { /* JNZ / JNE rel8 */
-            int8_t rel = (int8_t)mem_read8(cpu, cpu->eip++);
-            if (!(cpu->eflags & 0x40)) cpu->eip += rel;
+        case 0x80: { /* Group 1 r/m8, imm8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint8_t imm = mem_read8(cpu, cpu->eip++);
+            uint8_t a = op_read8(cpu, dst);
+            uint8_t res = a;
+            if (op_sub == 0) res = a + imm;
+            else if (op_sub == 1) res = a | imm;
+            else if (op_sub == 4) res = a & imm;
+            else if (op_sub == 5) res = a - imm;
+            else if (op_sub == 6) res = a ^ imm;
+            else if (op_sub == 7) { /* CMP */
+                res = a - imm;
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+                break;
+            }
+            op_write8(cpu, dst, res);
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+            break;
+        }
+        case 0xC9: { /* LEAVE */
+            cpu->esp = cpu->ebp;
+            cpu->ebp = cpu_pop32(cpu);
             break;
         }
         case 0xC3: { /* RET */
@@ -572,19 +788,30 @@ static int cmd_box86(int argc, char **argv) {
         return 1;
     }
 
-    x86_cpu_t cpu;
-    memset(&cpu, 0, sizeof(cpu));
-    cpu.mem_base = MEM_BASE;
-    cpu.mem_size = MEM_SIZE;
-    cpu.mem = (unsigned char *)calloc(1, cpu.mem_size);
-    if (!cpu.mem) { free(ebuf); return 1; }
-
     uint32_t entry = *(uint32_t *)(ebuf + 24);
     uint32_t phoff = *(uint32_t *)(ebuf + 28);
     uint16_t phentsize = *(uint16_t *)(ebuf + 42);
     uint16_t phnum = *(uint16_t *)(ebuf + 44);
 
-    uint32_t max_brk = MEM_BASE + 0x100000;
+    uint32_t min_vaddr = 0xFFFFFFFF;
+    for (int p = 0; p < phnum; p++) {
+        size_t off = phoff + p * phentsize;
+        if (off + 32 > elen) break;
+        uint32_t p_type = *(uint32_t *)(ebuf + off);
+        uint32_t p_vaddr = *(uint32_t *)(ebuf + off + 8);
+        if (p_type == 1 && p_vaddr < min_vaddr) min_vaddr = p_vaddr;
+    }
+    if (min_vaddr == 0xFFFFFFFF) min_vaddr = entry;
+    uint32_t base = min_vaddr & ~0xFFF;
+
+    x86_cpu_t cpu;
+    memset(&cpu, 0, sizeof(cpu));
+    cpu.mem_base = base;
+    cpu.mem_size = MEM_SIZE;
+    cpu.mem = (unsigned char *)calloc(1, cpu.mem_size);
+    if (!cpu.mem) { free(ebuf); return 1; }
+
+    uint32_t max_brk = base + 0x100000;
 
     for (int p = 0; p < phnum; p++) {
         size_t off = phoff + p * phentsize;
@@ -608,7 +835,7 @@ static int cmd_box86(int argc, char **argv) {
     free(ebuf);
 
     cpu.eip = entry;
-    cpu.esp = STACK_TOP;
+    cpu.esp = GET_STACK_TOP(&cpu);
     cpu.brk = (max_brk + 0xFFF) & ~0xFFF;
 
     /* Setup initial Linux stack: argc, argv pointers, envp, auxv */
@@ -747,7 +974,7 @@ static int cmd_wine(int argc, char **argv) {
     free(pbuf);
 
     cpu.eip = cpu.mem_base + entry_rva;
-    cpu.esp = STACK_TOP;
+    cpu.esp = GET_STACK_TOP(&cpu);
 
     int res = run_cpu(&cpu, 10000000);
     free(cpu.mem);

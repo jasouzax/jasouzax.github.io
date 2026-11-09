@@ -460,8 +460,28 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                 try {
                     if (data.op === "exec") {
                         const a = data.args
-                        const path = a.file === "/proc/self/exe" ? "/bin/sh" : norm(a.file)
-                        const next = executables.get(path)
+                        const raw = a.file === "/proc/self/exe" ? "/bin/sh" : a.file
+                        const path = raw.startsWith("/") ? norm(raw) : norm((a.cwd || p.cwd) + "/" + raw)
+                        let next = executables.get(path)
+                        let exec_argv = [path.split("/").pop()!, ...a.argv.slice(1)]
+                        if (!next && (await p.fs.stat(path)) && p.fs.read_bytes) {
+                            try {
+                                const bytes = await p.fs.read_bytes(path)
+                                if (bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+                                    const box86 = executables.get("/bin/box86") || executables.get("/bin/linux-exec")
+                                    if (box86) {
+                                        next = box86
+                                        exec_argv = ["box86", path, ...a.argv.slice(1)]
+                                    }
+                                } else if (bytes.length >= 2 && bytes[0] === 0x4d && bytes[1] === 0x5a) {
+                                    const wine = executables.get("/bin/wine") || executables.get("/bin/win-exec")
+                                    if (wine) {
+                                        next = wine
+                                        exec_argv = ["wine", path, ...a.argv.slice(1)]
+                                    }
+                                }
+                            } catch {}
+                        }
                         const builtin = path.startsWith("/bin/") ? registered_programs[path.slice(5)] : undefined
                         if ((!next && !builtin) || !(await p.fs.stat(path))) { respond(errno.ENOEXEC); return }
                         descriptors = a.descriptors
@@ -484,7 +504,7 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                             finish(code)
                             return
                         }
-                        await launch(next, [path.split("/").pop()!, ...a.argv.slice(1)], p.env).catch(error => finish(1, error))
+                        await launch(next, exec_argv, p.env).catch(error => finish(1, error))
                         return
                     }
                     const result = await dispatch(data.op, data.args)
