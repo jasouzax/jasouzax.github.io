@@ -545,4 +545,12 @@ emcc -Os jvm_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/jvm_s
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/jvm_suite.d.ts"
 echo "Group 22 tools done"
 
+echo "=== 34. Building Group 23 Perl Suite (perl_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group23"
+tar czf "$ARTIFACTS/perl_suite-source.tar.gz" perl_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/perl_suite-LICENSE"
+emcc -Os perl_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/perl_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/perl_suite.d.ts"
+echo "Group 23 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

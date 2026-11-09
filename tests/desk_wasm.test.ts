@@ -84,6 +84,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
     await register_program("jvm_suite", ["java", "javac"])
+    await register_program("perl_suite", ["perl"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -689,6 +690,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const run_class = await run("java /tmp/Hello.class")
         assert.equal(run_class.code, 0)
         assert.match(run_class.stdout, /Hello from Java WASM!/)
+    })
+    await t.test("native group 23 perl interpreter evaluates one-liners, variables, and loops", async () => {
+        const perl_ver = await run("perl -v")
+        assert.equal(perl_ver.code, 0)
+        assert.match(perl_ver.stdout, /This is perl 5/)
+
+        const perl_print = await run("perl -e 'print \"Hello from Perl WASM!\\n\"'")
+        assert.equal(perl_print.code, 0)
+        assert.equal(perl_print.stdout.trim(), "Hello from Perl WASM!")
+
+        const perl_calc = await run("perl -e '$a = 18; $b = 24; print $a + $b, \"\\n\"'")
+        assert.equal(perl_calc.code, 0)
+        assert.equal(perl_calc.stdout.trim(), "42")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

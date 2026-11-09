@@ -206,7 +206,7 @@
     - [x] `javac`: Java source code compiler producing JVM bytecode (`jvm_suite.wasm`)
 
 23. **Perl & System Scripting**
-    - [ ] `perl`: Practical Extraction and Reporting Language 5 interpreter
+    - [x] `perl`: Practical Extraction and Reporting Language 5 interpreter (`perl_suite.wasm`)
 
 24. **Dynamic & Embedded Languages (Lua, Lisp, BASIC)**
     - [ ] `lua`: Lua 5.4 embeddable scripting engine
