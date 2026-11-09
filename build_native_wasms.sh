@@ -521,4 +521,12 @@ emcc -Os make.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/make.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/make.d.ts"
 echo "Group 19 tools done"
 
+echo "=== 31. Building Group 20 Python Suite (python_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group20"
+tar czf "$ARTIFACTS/python_suite-source.tar.gz" python_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/python_suite-LICENSE"
+emcc -Os python_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/python_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/python_suite.d.ts"
+echo "Group 20 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

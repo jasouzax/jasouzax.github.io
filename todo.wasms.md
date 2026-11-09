@@ -191,9 +191,9 @@
     - [x] `make`: Dependency tracker and build automation tool (`make.wasm`)
 
 20. **Python Runtime & Environment**
-    - [ ] `python` / `python3`: Native Python 3 interpreter and interactive REPL
-    - [ ] `pip`: Python package installer and dependency resolver
-    - [ ] `venv`: Python virtual environment manager
+    - [x] `python` / `python3`: Native Python 3 interpreter and interactive REPL (`python_suite.wasm`)
+    - [x] `pip`: Python package installer and dependency resolver (`python_suite.wasm`)
+    - [x] `venv`: Python virtual environment manager (`python_suite.wasm`)
 
 21. **Rust Toolchain**
     - ~~`rustc`: Official LLVM-backed Rust compiler~~ *(Cannot be done: Requires multi-gigabyte LLVM 18+ backend and multi-threaded JIT codegen)*

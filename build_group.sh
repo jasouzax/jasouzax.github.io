@@ -219,6 +219,17 @@ if [[ "$TARGET" == "group19" || "$TARGET" == "19" || "$TARGET" == "all" ]]; then
     echo "Group 19 done"
 fi
 
+if [[ "$TARGET" == "group20" || "$TARGET" == "20" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 20 ==="
+    echo "Building python_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group20/python_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -lm -o "$ARTIFACTS/python_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group20/LICENSE" "$ARTIFACTS/python_suite-LICENSE"
+    rm -f "$ARTIFACTS/python_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/python_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group20" python_suite.c LICENSE
+    echo "Group 20 done"
+fi
+
+
 
 
 

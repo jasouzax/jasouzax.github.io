@@ -81,6 +81,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
     await register_program("tcc", ["tcc", "gcc", "g++", "cc", "cpp"])
     await register_program("make", ["make"])
+    await register_program("python_suite", ["python", "python3", "pip", "venv"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -625,6 +626,27 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const make_run = await run("printf 'all:\\n\\t@echo Build Completed Successfully\\n' > /tmp/Makefile; make -f /tmp/Makefile")
         assert.equal(make_run.code, 0)
         assert.match(make_run.stdout, /Build Completed Successfully/)
+    })
+    await t.test("native group 20 python runtime interprets expressions, loops, and manages environments", async () => {
+        const py_ver = await run("python3 --version")
+        assert.equal(py_ver.code, 0)
+        assert.match(py_ver.stdout, /Python 3\.12\.0/)
+
+        const py_calc = await run("python -c 'print(15 + 27)'")
+        assert.equal(py_calc.code, 0)
+        assert.equal(py_calc.stdout.trim(), "42")
+
+        const py_loop = await run("python -c 'for i in range(3): print(i)'")
+        assert.equal(py_loop.code, 0)
+        assert.equal(py_loop.stdout.trim(), "0\n1\n2")
+
+        const pip_ver = await run("pip --version")
+        assert.equal(pip_ver.code, 0)
+        assert.match(pip_ver.stdout, /pip 24\.0/)
+
+        const venv_res = await run("venv /tmp/testenv; cat /tmp/testenv/pyvenv.cfg")
+        assert.equal(venv_res.code, 0)
+        assert.match(venv_res.stdout, /version = 3\.12\.0/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
