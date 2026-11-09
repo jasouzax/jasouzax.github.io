@@ -306,4 +306,28 @@ emcc -Os sha384sum.c sha384-512.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$AR
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/sha384sum.d.ts"
 echo "Group 2 tools done"
 
+echo "=== 14. Building Group 3 Data & File Format Conversion (json-flatten, csv_json, json2yaml, ini_env_json) ==="
+G3="$SCRIPT_DIR/src/desk/programs/sources/group3"
+cd "$G3"
+tar czf "$ARTIFACTS/json_flatten-source.tar.gz" json_flatten.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/json_flatten-LICENSE"
+emcc -Os json_flatten.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/json_flatten.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/json_flatten.d.ts"
+
+tar czf "$ARTIFACTS/csv_json-source.tar.gz" csv_json.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/csv_json-LICENSE"
+emcc -Os csv_json.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/csv_json.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/csv_json.d.ts"
+
+tar czf "$ARTIFACTS/json2yaml-source.tar.gz" json2yaml.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/json2yaml-LICENSE"
+emcc -Os json2yaml.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/json2yaml.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/json2yaml.d.ts"
+
+tar czf "$ARTIFACTS/ini_env_json-source.tar.gz" ini_env_json.c cJSON.c cJSON.h LICENSE
+cp LICENSE "$ARTIFACTS/ini_env_json-LICENSE"
+emcc -Os ini_env_json.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/ini_env_json.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/ini_env_json.d.ts"
+echo "Group 3 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

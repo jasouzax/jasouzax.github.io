@@ -19,13 +19,13 @@
    - [x] `json-minify`: JSON minifier (provided by jq WASM)
    - [x] `json-validate`: JSON validator and error locator (provided by jq WASM)
    - [x] `json-keys`: Key and item count extractor (provided by jq WASM)
-   - [ ] `json-flatten`: Flattens nested JSON structures into dot-notation paths
+   - [x] `json-flatten`: Flattens nested JSON structures into dot-notation paths (json_flatten.wasm)
    - [x] `sort-json`: Sorts JSON arrays by key or value (provided by jq WASM)
-   - [ ] `json2csv` & `csv2json`: Bidirectional CSV ↔ JSON converter
-   - [ ] `json2tsv` & `tsv2json`: Bidirectional TSV ↔ JSON converter
-   - [ ] `json2yaml`: JSON to YAML converter
-   - [ ] `ini2json`: INI configuration to JSON converter
-   - [ ] `env2json` & `json2env`: `.env` environment file ↔ JSON converter
+   - [x] `json2csv` & `csv2json`: Bidirectional CSV ↔ JSON converter (csv_json.wasm)
+   - [x] `json2tsv` & `tsv2json`: Bidirectional TSV ↔ JSON converter (csv_json.wasm)
+   - [x] `json2yaml`: JSON to YAML converter (json2yaml.wasm)
+   - [x] `ini2json`: INI configuration to JSON converter (ini_env_json.wasm)
+   - [x] `env2json` & `json2env`: `.env` environment file ↔ JSON converter (ini_env_json.wasm)
 
 4. **Text Manipulation, String Transformation & Generators**
    - [x] `upper` & `lower`: Uppercase and lowercase conversion (provided by BusyBox `tr` WASM)

@@ -65,7 +65,7 @@ test("real additional WASMs run against the shared browser kernel and filesystem
     await page.goto("/desk")
     const registry = await (await page.request.get("/assets/wasm/manifest.json")).json()
     expect(registry.map((image: { id: string }) => image.id)).toEqual([
-        "busybox", "fastfetch", "htop", "tcc", "jq", "bchunk", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum"
+        "busybox", "fastfetch", "htop", "tcc", "jq", "bchunk", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum", "json_flatten", "csv_json", "json2yaml", "ini_env_json"
     ])
     for (const image of registry) expect((await page.request.get(image.worker)).headers()["cross-origin-embedder-policy"]).toBe("require-corp")
     expect(wasm).toHaveLength(0)

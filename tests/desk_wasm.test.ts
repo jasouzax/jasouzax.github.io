@@ -46,6 +46,10 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum"]) {
         await register_program(prog)
     }
+    await register_program("json_flatten", ["json-flatten"])
+    await register_program("csv_json", ["csv2json", "json2csv", "tsv2json", "json2tsv"])
+    await register_program("json2yaml", ["json2yaml"])
+    await register_program("ini_env_json", ["ini2json", "env2json", "json2env"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -184,6 +188,29 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const res = await run("printf 'test' | sha384sum")
         assert.equal(res.code, 0)
         assert.equal(res.stdout, "768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9  -\n")
+    })
+    await t.test("native group 3 data format conversion wasms convert json, csv, tsv, yaml, ini, and env", async () => {
+        const flat_res = await run("printf '{\"a\":{\"b\":42}}\\n' | json-flatten")
+        assert.equal(flat_res.code, 0)
+        assert.match(flat_res.stdout, /"a\.b":\s*42/)
+
+        const csv_res = await run("printf 'name,age\\nAlice,30\\n' | csv2json | json2csv")
+        assert.equal(csv_res.code, 0)
+        assert.equal(csv_res.stdout, "name,age\nAlice,30\n")
+
+        const yaml_res = await run("printf '{\"site\":\"jazu\",\"active\":true}\\n' | json2yaml")
+        assert.equal(yaml_res.code, 0)
+        assert.match(yaml_res.stdout, /site: jazu/)
+        assert.match(yaml_res.stdout, /active: true/)
+
+        const env_res = await run("printf 'FOO=bar\\n' | env2json | json2env")
+        assert.equal(env_res.code, 0)
+        assert.equal(env_res.stdout, "FOO=\"bar\"\n")
+
+        const ini_res = await run("printf '[server]\\nhost=localhost\\n' | ini2json")
+        assert.equal(ini_res.code, 0)
+        assert.match(ini_res.stdout, /"server":/)
+        assert.match(ini_res.stdout, /"host":\s*"localhost"/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
