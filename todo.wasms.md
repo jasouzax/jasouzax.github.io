@@ -29,26 +29,26 @@
 
 4. **Text Manipulation, String Transformation & Generators**
    - [x] `upper` & `lower`: Uppercase and lowercase conversion (provided by BusyBox `tr` WASM)
-   - [ ] `title-case` (`titlecase`): Title-casing
-   - [ ] `camel-case` (`camelcase`): CamelCase converter
-   - [ ] `snake-case` (`snakecase`): snake_case converter
-   - [ ] `kebab-case` (`kebabcase`): kebab-case converter
+   - [x] `title-case` (`titlecase`): Title-casing (`casing_tools.wasm`)
+   - [x] `camel-case` (`camelcase`): CamelCase converter (`casing_tools.wasm`)
+   - [x] `snake-case` (`snakecase`): snake_case converter (`casing_tools.wasm`)
+   - [x] `kebab-case` (`kebabcase`): kebab-case converter (`casing_tools.wasm`)
    - [x] `count-words`: Line, word, and character counter (provided by BusyBox `wc` WASM)
-   - [ ] `count-chars`: Character frequency table
-   - [ ] `charfreq`: Visual character frequency histogram
-   - [ ] `lorem`: Lorem ipsum placeholder text generator (`-n`)
-   - [ ] `slugify`: Converts arbitrary text into URL-safe slugs
+   - [x] `count-chars`: Character frequency table (`text_stats.wasm`)
+   - [x] `charfreq`: Visual character frequency histogram (`text_stats.wasm`)
+   - [x] `lorem`: Lorem ipsum placeholder text generator (`text_gen.wasm`)
+   - [x] `slugify`: Converts arbitrary text into URL-safe slugs (`casing_tools.wasm`)
    - [x] `str-reverse`: Reverses line contents (provided by BusyBox `rev` WASM)
-   - [ ] `str-repeat`: Repeats lines/text N times
+   - [x] `str-repeat`: Repeats lines/text N times (`text_gen.wasm`)
    - [x] `remove-dups`: Deduplicates lines in order (provided by BusyBox `uniq` / `sort` WASM)
    - [x] `random-line`: Randomly samples line(s) from input (provided by BusyBox `shuf` WASM)
    - [x] `number-lines`: Numbers lines with aligned formatting (provided by BusyBox `nl` WASM)
    - [x] `wrap`: Word-wraps text to specified width (`-w`) (provided by BusyBox `fold` WASM)
-   - [ ] `banner-js`: ASCII art block banner generator
+   - [x] `banner-js`: ASCII art block banner generator (`banner.wasm`)
    - [x] `morse`: Morse code encoder and decoder (FreeBSD morse.wasm)
-   - [ ] `pig-latin`: Pig Latin converter
-   - [ ] `anagram`: Checks whether words are anagrams
-   - [ ] `palindrome`: Validates palindromes
+   - [x] `pig-latin`: Pig Latin converter (`word_games.wasm`)
+   - [x] `anagram`: Checks whether words are anagrams (`word_games.wasm`)
+   - [x] `palindrome`: Validates palindromes (`word_games.wasm`)
 
 5. **Numbers, Math & Advanced Computation**
    - [ ] `numbase`: Arbitrary base conversion between bases 2–36 (`-f`, `-t`)

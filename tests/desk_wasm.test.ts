@@ -50,6 +50,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("csv_json", ["csv2json", "json2csv", "tsv2json", "json2tsv"])
     await register_program("json2yaml", ["json2yaml"])
     await register_program("ini_env_json", ["ini2json", "env2json", "json2env"])
+    await register_program("casing_tools", ["title-case", "titlecase", "camel-case", "camelcase", "snake-case", "snakecase", "kebab-case", "kebabcase", "slugify"])
+    await register_program("text_stats", ["count-chars", "charfreq"])
+    await register_program("text_gen", ["lorem", "str-repeat"])
+    await register_program("banner", ["banner", "banner-js"])
+    await register_program("word_games", ["pig-latin", "anagram", "palindrome"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -211,6 +216,39 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(ini_res.code, 0)
         assert.match(ini_res.stdout, /"server":/)
         assert.match(ini_res.stdout, /"host":\s*"localhost"/)
+    })
+    await t.test("native group 4 text manipulation wasms handle casing, stats, generators, banner, and word games", async () => {
+        const case_res = await run("printf 'hello world foo_bar' | camel-case")
+        assert.equal(case_res.code, 0)
+        assert.equal(case_res.stdout.trim(), "helloWorldFooBar")
+
+        const snake_res = await run("printf 'Hello World' | snake-case")
+        assert.equal(snake_res.code, 0)
+        assert.equal(snake_res.stdout.trim(), "hello_world")
+
+        const slug_res = await run("printf 'Hello, World! 123' | slugify")
+        assert.equal(slug_res.code, 0)
+        assert.equal(slug_res.stdout.trim(), "hello-world-123")
+
+        const stats_res = await run("printf 'hello world' | count-chars")
+        assert.equal(stats_res.code, 0)
+        assert.match(stats_res.stdout, /'l'\t3\t27\.27%/)
+
+        const repeat_res = await run("str-repeat abc 3")
+        assert.equal(repeat_res.code, 0)
+        assert.equal(repeat_res.stdout, "abcabcabc\n")
+
+        const banner_res = await run("banner hi")
+        assert.equal(banner_res.code, 0)
+        assert.match(banner_res.stdout, /#/)
+
+        const pig_res = await run("printf 'hello world' | pig-latin")
+        assert.equal(pig_res.code, 0)
+        assert.equal(pig_res.stdout.trim(), "ellohay orldway")
+
+        const palin_res = await run("palindrome 'racecar'")
+        assert.equal(palin_res.code, 0)
+        assert.equal(palin_res.stdout, "true\n")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

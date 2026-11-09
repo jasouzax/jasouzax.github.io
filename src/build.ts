@@ -130,6 +130,11 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["csv_json", "1.0.0-jazu.1", "tar.gz", ["csv2json", "json2csv", "tsv2json", "json2tsv"]],
         ["json2yaml", "1.0.0-jazu.1", "tar.gz", ["json2yaml"]],
         ["ini_env_json", "1.0.0-jazu.1", "tar.gz", ["ini2json", "env2json", "json2env"]],
+        ["casing_tools", "1.0.0-jazu.1", "tar.gz", ["title-case", "titlecase", "camel-case", "camelcase", "snake-case", "snakecase", "kebab-case", "kebabcase", "slugify"]],
+        ["text_stats", "1.0.0-jazu.1", "tar.gz", ["count-chars", "charfreq"]],
+        ["text_gen", "1.0.0-jazu.1", "tar.gz", ["lorem", "str-repeat"]],
+        ["banner", "1.0.0-jazu.1", "tar.gz", ["banner", "banner-js"]],
+        ["word_games", "1.0.0-jazu.1", "tar.gz", ["pig-latin", "anagram", "palindrome"]],
     ] as [string, string, string, string[]?][]) {
         const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`

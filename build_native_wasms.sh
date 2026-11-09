@@ -330,4 +330,33 @@ emcc -Os ini_env_json.c cJSON.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTI
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/ini_env_json.d.ts"
 echo "Group 3 tools done"
 
+echo "=== 15. Building Group 4 Text Manipulation (casing_tools, text_stats, text_gen, banner, word_games) ==="
+G4="$SCRIPT_DIR/src/desk/programs/sources/group4"
+cd "$G4"
+tar czf "$ARTIFACTS/casing_tools-source.tar.gz" casing_tools.c LICENSE
+cp LICENSE "$ARTIFACTS/casing_tools-LICENSE"
+emcc -Os casing_tools.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/casing_tools.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/casing_tools.d.ts"
+
+tar czf "$ARTIFACTS/text_stats-source.tar.gz" text_stats.c LICENSE
+cp LICENSE "$ARTIFACTS/text_stats-LICENSE"
+emcc -Os text_stats.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/text_stats.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/text_stats.d.ts"
+
+tar czf "$ARTIFACTS/text_gen-source.tar.gz" text_gen.c LICENSE
+cp LICENSE "$ARTIFACTS/text_gen-LICENSE"
+emcc -Os text_gen.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/text_gen.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/text_gen.d.ts"
+
+tar czf "$ARTIFACTS/banner-source.tar.gz" banner.c LICENSE
+cp LICENSE "$ARTIFACTS/banner-LICENSE"
+emcc -Os banner.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/banner.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/banner.d.ts"
+
+tar czf "$ARTIFACTS/word_games-source.tar.gz" word_games.c LICENSE
+cp LICENSE "$ARTIFACTS/word_games-LICENSE"
+emcc -Os word_games.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/word_games.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/word_games.d.ts"
+echo "Group 4 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
