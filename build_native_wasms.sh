@@ -497,4 +497,12 @@ emcc -Os disk_archive_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFA
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/disk_archive_suite.d.ts"
 echo "Group 16 tools done"
 
+echo "=== 28. Building Group 17 Linux Suite (linux_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group17"
+tar czf "$ARTIFACTS/linux_suite-source.tar.gz" linux_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/linux_suite-LICENSE"
+emcc -Os linux_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/linux_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/linux_suite.d.ts"
+echo "Group 17 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

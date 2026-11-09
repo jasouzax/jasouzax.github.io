@@ -77,6 +77,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("image_suite", ["pngtopnm", "pnmtopng", "jpegtopnm", "pnmtojpeg", "jpegoptim"])
     await register_program("audio_suite", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"])
     await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
+    await register_program("linux_suite", ["file", "readelf"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -552,6 +553,45 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const z_extract = await run("rm /tmp/hello.txt; 7z x /tmp/hello.7z; cat /tmp/hello.txt")
         assert.equal(z_extract.code, 0)
         assert.match(z_extract.stdout, /Hello 7z Compressed World/)
+    })
+    await t.test("native group 17 linux essentials wasms inspect file types and decode elf binary headers", async () => {
+        const ver_res = await run("file --version")
+        assert.equal(ver_res.code, 0)
+        assert.match(ver_res.stdout, /file-5\.45/)
+
+        const png_type = await run("file -b /tmp/sample.png")
+        assert.equal(png_type.code, 0)
+        assert.match(png_type.stdout, /PNG image data/)
+
+        const png_mime = await run("file --mime-type -b /tmp/sample.png")
+        assert.equal(png_mime.code, 0)
+        assert.equal(png_mime.stdout.trim(), "image/png")
+
+        const z_type = await run("file -b /tmp/hello.7z")
+        assert.equal(z_type.code, 0)
+        assert.match(z_type.stdout, /7-zip archive data/)
+
+        const make_sh = await run("printf '#!/bin/sh\\necho Hello\\n' > /tmp/script.sh")
+        assert.equal(make_sh.code, 0)
+
+        const sh_type = await run("file /tmp/script.sh")
+        assert.equal(sh_type.code, 0)
+        assert.match(sh_type.stdout, /POSIX shell script/)
+
+        const make_elf = await run("printf '\\x7fELF\\x02\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x3e\\x00\\x01\\x00\\x00\\x00\\x00\\x10\\x40\\x00\\x00\\x00\\x00\\x00\\x40\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x40\\x00\\x38\\x00\\x01\\x00\\x40\\x00\\x00\\x00\\x00\\x00' > /tmp/test.elf")
+        assert.equal(make_elf.code, 0)
+
+        const elf_file = await run("file -b /tmp/test.elf")
+        assert.equal(elf_file.code, 0)
+        assert.match(elf_file.stdout, /ELF 64-bit LSB executable, x86-64/)
+
+        const readelf_res = await run("readelf -h /tmp/test.elf")
+        assert.equal(readelf_res.code, 0)
+        assert.match(readelf_res.stdout, /ELF Header:/)
+        assert.match(readelf_res.stdout, /Class:\s+ELF64/)
+        assert.match(readelf_res.stdout, /Type:\s+EXEC \(Executable file\)/)
+        assert.match(readelf_res.stdout, /Machine:\s+Advanced Micro Devices X86-64/)
+        assert.match(readelf_res.stdout, /Entry point address:\s+0x401000/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

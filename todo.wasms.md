@@ -174,7 +174,7 @@
     - ~~`openscad`: Solid 3D CAD CSG script compiler~~ *(Cannot be done: CGAL / Qt desktop GUI dependency)*
 
 17. **Linux Essentials**
-    - [ ] `file`: Reads magic numbers and headers to reliably identify file types (Ian Darwin file-5.45)
+    - [x] `file`: Reads magic numbers and headers to reliably identify file types (Ian Darwin file-5.45, `linux_suite.wasm`)
     - [x] `tree`: Recursively renders directory hierarchies with depth limiters and size summaries (Steve Baker tree.wasm)
     - [x] `binutils` (`strings`): Extracts readable strings from compiled binaries (provided by BusyBox `strings` WASM)
-    - [ ] `readelf`: Decodes ELF headers and lists exported symbols from shared libraries
+    - [x] `readelf`: Decodes ELF headers and lists exported symbols from shared libraries (`linux_suite.wasm`)

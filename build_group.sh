@@ -189,3 +189,14 @@ if [[ "$TARGET" == "group16" || "$TARGET" == "16" || "$TARGET" == "all" ]]; then
     echo "Group 16 done"
 fi
 
+if [[ "$TARGET" == "group17" || "$TARGET" == "17" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 17 ==="
+    echo "Building linux_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group17/linux_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/linux_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group17/LICENSE" "$ARTIFACTS/linux_suite-LICENSE"
+    rm -f "$ARTIFACTS/linux_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/linux_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group17" linux_suite.c LICENSE
+    echo "Group 17 done"
+fi
+
+
