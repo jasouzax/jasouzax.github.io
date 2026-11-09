@@ -389,5 +389,12 @@ cp LICENSE "$ARTIFACTS/color_tools-LICENSE"
 emcc -Os color_tools.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/color_tools.js"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/color_tools.d.ts"
 echo "Group 7 tools done"
+echo "=== 19. Building Group 8 Date & Unit Conversion (date_units) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group8"
+tar czf "$ARTIFACTS/date_units-source.tar.gz" date_units.c LICENSE
+cp LICENSE "$ARTIFACTS/date_units-LICENSE"
+emcc -Os date_units.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/date_units.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/date_units.d.ts"
+echo "Group 8 tools done"
 
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

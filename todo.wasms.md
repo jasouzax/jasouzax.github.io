@@ -75,11 +75,11 @@
 8. **Date, Time & Unit Conversion**
    - [x] `timestamp`: Unix timestamp generator and date-string converter (provided by BusyBox `date` WASM)
    - [x] `from-timestamp`: Timestamp to ISO 8601 string converter (provided by BusyBox `date` WASM)
-   - [ ] `date-diff`: High-precision duration difference between dates
+   - [x] `date-diff`: High-precision duration difference between dates (`date_units.wasm`)
    - [x] `cal-js`: Terminal monthly calendar generator (provided by BusyBox `cal` WASM)
-   - [ ] `bytes-human`: Human-readable byte formatting and reverse parsing
-   - [ ] `temp`: Temperature conversion across Celsius, Fahrenheit, and Kelvin
-   - [ ] `unit`: Measurement conversion across length, weight, and volume
+   - [x] `bytes-human`: Human-readable byte formatting and reverse parsing (`date_units.wasm`)
+   - [x] `temp`: Temperature conversion across Celsius, Fahrenheit, and Kelvin (`date_units.wasm`)
+   - [x] `unit`: Measurement conversion across length, weight, and volume (`date_units.wasm`)
 
 9. **Network, Web & File Analysis**
    - ~~`myip`: Public IP query~~ *(Cannot be done: Browser WASM environment blocks raw socket / external network access)*

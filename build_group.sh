@@ -60,3 +60,15 @@ if [[ "$TARGET" == "group7" || "$TARGET" == "7" || "$TARGET" == "all" ]]; then
     done
     echo "Group 7 done"
 fi
+
+if [[ "$TARGET" == "group8" || "$TARGET" == "8" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 8 ==="
+    for tool in date_units; do
+        echo "Building $tool..."
+        emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group8/$tool.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/$tool.js"
+        cp "$SCRIPT_DIR/src/desk/programs/sources/group8/LICENSE" "$ARTIFACTS/$tool-LICENSE"
+        rm -f "$ARTIFACTS/$tool-source.tar.gz"
+        tar -czf "$ARTIFACTS/$tool-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group8" "$tool.c" LICENSE
+    done
+    echo "Group 8 done"
+fi

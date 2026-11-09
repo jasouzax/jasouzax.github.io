@@ -60,6 +60,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("math_suite", ["fib", "fibonacci", "gcd", "lcm", "stats", "matrix"])
     await register_program("uuid_token", ["uuidgen", "uuidgen-js", "nanoid"])
     await register_program("color_tools", ["hex2rgb", "rgb2hex", "color-mix"])
+    await register_program("date_units", ["date-diff", "bytes-human", "temp", "unit"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -330,6 +331,24 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const mix_res = await run("color-mix '#ff0000' '#0000ff' 0.5")
         assert.equal(mix_res.code, 0)
         assert.equal(mix_res.stdout.trim(), "#800080")
+    })
+    await t.test("native group 8 date and unit conversion wasms compute date differences, format bytes, and convert units", async () => {
+        const diff_res = await run("date-diff 100000 186400")
+        assert.equal(diff_res.code, 0)
+        assert.match(diff_res.stdout, /86400 seconds/)
+        assert.match(diff_res.stdout, /1 days/)
+
+        const bytes_res = await run("bytes-human 1048576")
+        assert.equal(bytes_res.code, 0)
+        assert.equal(bytes_res.stdout.trim(), "1.00 MiB")
+
+        const temp_res = await run("temp 100 C")
+        assert.equal(temp_res.code, 0)
+        assert.match(temp_res.stdout, /212\.00 °F/)
+
+        const unit_res = await run("unit 1000 m km")
+        assert.equal(unit_res.code, 0)
+        assert.equal(unit_res.stdout.trim(), "1 km")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void
