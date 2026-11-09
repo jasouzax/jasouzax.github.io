@@ -43,7 +43,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const wasm_bytes = readFileSync(resolve(`src/desk/programs/artifacts/${name}.wasm`))
         register_wasm({ id: name, version: "1.0.0", worker: worker_path, wasm: "data:application/wasm;base64," + wasm_bytes.toString("base64"), sha256: createHash("sha256").update(wasm_bytes).digest("hex"), commands }, factory)
     }
-    for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame"]) {
+    for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa"]) {
         await register_program(prog)
     }
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
@@ -162,6 +162,23 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.match(result.stdout, /[a-zA-Z0-9]{12}/)
         assert.match(result.stdout, /LAME 32bits version 3\.100/)
         assert.match(result.stdout, /Error: Bad syntax/)
+    })
+    await t.test("native group 1 encoding wasms urlencode, htmlencode, rot13, atob, and btoa encode and decode", async () => {
+        const u_res = await run("urlencode 'hello world'; urlencode -d 'hello%20world'")
+        assert.equal(u_res.code, 0)
+        assert.equal(u_res.stdout, "hello%20world\nhello world\n")
+
+        const h_res = await run("htmlencode '<hello & world>'; htmlencode -d '&lt;hello &amp; world&gt;'")
+        assert.equal(h_res.code, 0)
+        assert.equal(h_res.stdout, "&lt;hello &amp; world&gt;\n<hello & world>\n")
+
+        const r_res = await run("rot13 'hello'")
+        assert.equal(r_res.code, 0)
+        assert.equal(r_res.stdout, "uryyb\n")
+
+        const b_res = await run("printf 'hello' | btoa; printf 'aGVsbG8=' | atob")
+        assert.equal(b_res.code, 0)
+        assert.equal(b_res.stdout, "aGVsbG8=\nhello")
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

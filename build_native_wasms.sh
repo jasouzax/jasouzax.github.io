@@ -268,4 +268,33 @@ cp "$WORK/lame.tar.gz" "$ARTIFACTS/lame-source.tar.gz"
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/lame.d.ts"
 echo "lame done"
 
+echo "=== 12. Building Group 1 Encoding & Decoding (urlencode, htmlencode, rot13, atob, btoa) ==="
+G1="$SCRIPT_DIR/src/desk/programs/sources/group1"
+cd "$G1"
+tar czf "$ARTIFACTS/urlencode-source.tar.gz" urlencode.c LICENSE
+cp LICENSE "$ARTIFACTS/urlencode-LICENSE"
+emcc -Os urlencode.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/urlencode.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/urlencode.d.ts"
+
+tar czf "$ARTIFACTS/htmlencode-source.tar.gz" htmlencode.c LICENSE
+cp LICENSE "$ARTIFACTS/htmlencode-LICENSE"
+emcc -Os htmlencode.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/htmlencode.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/htmlencode.d.ts"
+
+tar czf "$ARTIFACTS/rot13-source.tar.gz" rot13.c LICENSE
+cp LICENSE "$ARTIFACTS/rot13-LICENSE"
+emcc -Os rot13.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/rot13.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/rot13.d.ts"
+
+tar czf "$ARTIFACTS/atob-source.tar.gz" base64_helper.c LICENSE
+cp LICENSE "$ARTIFACTS/atob-LICENSE"
+emcc -Os base64_helper.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/atob.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/atob.d.ts"
+
+tar czf "$ARTIFACTS/btoa-source.tar.gz" base64_helper.c LICENSE
+cp LICENSE "$ARTIFACTS/btoa-LICENSE"
+emcc -Os base64_helper.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/btoa.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/btoa.d.ts"
+echo "Group 1 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="
