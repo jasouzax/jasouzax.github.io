@@ -83,6 +83,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("make", ["make"])
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
+    await register_program("jvm_suite", ["java", "javac"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(reset_kernel)
     const run = async (script: string) => {
@@ -668,6 +669,26 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const cargo_new = await run("cargo new /tmp/rustapp; cd /tmp/rustapp; cargo run")
         assert.equal(cargo_new.code, 0)
         assert.match(cargo_new.stdout, /Hello, world!/)
+    })
+    await t.test("native group 22 jvm suite compiles java source and interprets bytecode", async () => {
+        const java_ver = await run("java --version")
+        assert.equal(java_ver.code, 0)
+        assert.match(java_ver.stdout, /openjdk version "21\.0\.2"/)
+
+        const javac_ver = await run("javac --version")
+        assert.equal(javac_ver.code, 0)
+        assert.match(javac_ver.stdout, /javac 21\.0\.2/)
+
+        const make_java = await run("printf 'public class Hello {\\n    public static void main(String[] args) {\\n        System.out.println(\"Hello from Java WASM!\");\\n    }\\n}\\n' > /tmp/Hello.java")
+        assert.equal(make_java.code, 0)
+
+        const compile_res = await run("javac /tmp/Hello.java -d /tmp; cat /tmp/Hello.class | xxd -p | head -n 1 | cut -c1-8")
+        assert.equal(compile_res.code, 0)
+        assert.equal(compile_res.stdout.trim(), "cafebabe")
+
+        const run_class = await run("java /tmp/Hello.class")
+        assert.equal(run_class.code, 0)
+        assert.match(run_class.stdout, /Hello from Java WASM!/)
     })
     await t.test("the kernel terminates a Worker running a compiled infinite loop", async () => {
         let ready!: () => void

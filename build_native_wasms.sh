@@ -537,4 +537,12 @@ emcc -Os rust_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/rust
 echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/rust_suite.d.ts"
 echo "Group 21 tools done"
 
+echo "=== 33. Building Group 22 JVM Suite (jvm_suite) ==="
+cd "$SCRIPT_DIR/src/desk/programs/sources/group22"
+tar czf "$ARTIFACTS/jvm_suite-source.tar.gz" jvm_suite.c LICENSE
+cp LICENSE "$ARTIFACTS/jvm_suite-LICENSE"
+emcc -Os jvm_suite.c "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/jvm_suite.js"
+echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/jvm_suite.d.ts"
+echo "Group 22 tools done"
+
 echo "=== ALL NATIVE WASMS BUILT SUCCESSFULLY ==="

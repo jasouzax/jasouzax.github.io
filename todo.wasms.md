@@ -202,8 +202,8 @@
 
 22. **Java & JVM Runtime**
     - ~~`openjdk` / `hotspot`: Full enterprise Java runtime~~ *(Cannot be done: Multi-gigabyte JVM requiring OS signals, thread suspension, and memory mapping)*
-    - [ ] `java`: Embedded Java virtual machine executing compiled `.class` bytecode
-    - [ ] `javac`: Java source code compiler producing JVM bytecode
+    - [x] `java`: Embedded Java virtual machine executing compiled `.class` bytecode (`jvm_suite.wasm`)
+    - [x] `javac`: Java source code compiler producing JVM bytecode (`jvm_suite.wasm`)
 
 23. **Perl & System Scripting**
     - [ ] `perl`: Practical Extraction and Reporting Language 5 interpreter

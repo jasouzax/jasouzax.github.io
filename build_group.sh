@@ -239,6 +239,17 @@ if [[ "$TARGET" == "group21" || "$TARGET" == "21" || "$TARGET" == "all" ]]; then
     echo "Group 21 done"
 fi
 
+if [[ "$TARGET" == "group22" || "$TARGET" == "22" || "$TARGET" == "all" ]]; then
+    echo "=== Building Group 22 ==="
+    echo "Building jvm_suite..."
+    emcc -Os "$SCRIPT_DIR/src/desk/programs/sources/group22/jvm_suite.c" "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/jvm_suite.js"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group22/LICENSE" "$ARTIFACTS/jvm_suite-LICENSE"
+    rm -f "$ARTIFACTS/jvm_suite-source.tar.gz"
+    tar -czf "$ARTIFACTS/jvm_suite-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group22" jvm_suite.c LICENSE
+    echo "Group 22 done"
+fi
+
+
 
 
 
