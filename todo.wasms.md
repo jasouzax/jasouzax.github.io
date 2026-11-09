@@ -185,9 +185,9 @@
     - ~~`qemu-system-x86_64`: Full PC system emulator~~ *(Cannot be done: Requires bare-metal hardware virtualization / KVM hypervisor)*
 
 19. **C & C++ Toolchain**
-    - [x] `tcc`: Tiny C Compiler (compiles ISO C99 code directly to executable machine code / bytecode) (Fabrice Bellard `tcc.wasm`)
-    - [x] `gcc` / `g++`: GNU Compiler Collection driver / frontend (`tcc.wasm`)
-    - [x] `cpp`: C Preprocessor (macro expansion and conditional compilation) (`tcc.wasm`)
+    - [x] `tcc`: Tiny C Compiler (compiles ISO C99 code directly to executable machine code / bytecode) (Fabrice Bellard `tcc.wasm`, `cc`)
+    - [x] `gcc` / `g++`: GNU Compiler Collection driver / frontend (Free Software Foundation `gcc.wasm`)
+    - [x] `cpp`: C Preprocessor (macro expansion and conditional compilation) (`gcc.wasm`)
     - [x] `make`: Dependency tracker and build automation tool (`make.wasm`)
 
 20. **Python Runtime & Environment**

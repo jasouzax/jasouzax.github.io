@@ -94,7 +94,8 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
     await register_program("linux_suite", ["file", "readelf"])
     await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
-    await register_program("tcc", ["tcc", "gcc", "g++", "cc", "cpp"])
+    await register_program("tcc", ["tcc", "cc"])
+    await register_program("gcc", ["gcc", "g++", "cpp"])
     await register_program("make", ["make"])
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
@@ -636,7 +637,15 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
 
         const gcc_ver = await run("gcc -v")
         assert.equal(gcc_ver.code, 0)
-        assert.match(gcc_ver.stdout, /tcc version 0\.9\.27/)
+        assert.match(gcc_ver.stdout, /gcc version 14\.2\.0/)
+
+        const gcc_version = await run("gcc --version")
+        assert.equal(gcc_version.code, 0)
+        assert.match(gcc_version.stdout, /gcc \(GCC\) 14\.2\.0/)
+
+        const gxx_ver = await run("g++ --version")
+        assert.equal(gxx_ver.code, 0)
+        assert.match(gxx_ver.stdout, /g\+\+ \(GCC\) 14\.2\.0/)
 
         const make_ver = await run("make --version")
         assert.equal(make_ver.code, 0)

@@ -216,6 +216,26 @@ if [[ "$TARGET" == "group19" || "$TARGET" == "19" || "$TARGET" == "all" ]]; then
     cp "$SCRIPT_DIR/src/desk/programs/sources/group19/LICENSE" "$ARTIFACTS/make-LICENSE"
     rm -f "$ARTIFACTS/make-source.tar.gz"
     tar -czf "$ARTIFACTS/make-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group19" make.c LICENSE
+
+    echo "Building gcc..."
+    TCC_DIR="$WORK/tcc-0.9.27"
+    if [ ! -d "$TCC_DIR" ]; then
+        if [ -d "/home/jazo/tcc_build/tcc-0.9.27" ]; then
+            cp -r /home/jazo/tcc_build/tcc-0.9.27 "$TCC_DIR"
+        else
+            tar -xjf "$ARTIFACTS/tcc-source.tar.bz2" -C "$WORK"
+        fi
+    fi
+    if [ ! -f "$TCC_DIR/config.h" ]; then
+        printf '#ifndef CONFIG_TCCDIR\n# define CONFIG_TCCDIR "/usr/lib/tcc"\n#endif\n#define TCC_VERSION "0.9.27"\n' > "$TCC_DIR/config.h"
+    fi
+    emcc -Os -DCONFIG_TCC_CROSS -DONE_SOURCE=1 -DTCC_TARGET_I386 -Wno-implicit-function-declaration \
+        -I"$TCC_DIR" "$SCRIPT_DIR/src/desk/programs/sources/group19/gcc.c" \
+        "$WORK/host.o" "$WORK/compat.o" $FLAGS -o "$ARTIFACTS/gcc.js"
+    echo 'export default function createProgram(options: any): Promise<any>' > "$ARTIFACTS/gcc.d.ts"
+    cp "$SCRIPT_DIR/src/desk/programs/sources/group19/LICENSE" "$ARTIFACTS/gcc-LICENSE"
+    rm -f "$ARTIFACTS/gcc-source.tar.gz"
+    tar -czf "$ARTIFACTS/gcc-source.tar.gz" -C "$SCRIPT_DIR/src/desk/programs/sources/group19" gcc.c LICENSE
     echo "Group 19 done"
 fi
 
