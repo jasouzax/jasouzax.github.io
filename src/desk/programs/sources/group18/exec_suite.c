@@ -692,6 +692,146 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
             break;
         }
+        case 0x84: { /* TEST r/m8, r8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int reg = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint8_t res = op_read8(cpu, dst) & read_reg8(cpu, reg);
+            cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+            break;
+        }
+        case 0x99: { /* CDQ */
+            cpu->edx = ((int32_t)cpu->eax < 0) ? 0xFFFFFFFF : 0;
+            break;
+        }
+        case 0xC0:
+        case 0xD0:
+        case 0xD2: { /* Group 2 r/m8, imm8 / 1 / CL */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint8_t val = op_read8(cpu, dst);
+            uint8_t count = 1;
+            if (op == 0xC0) count = mem_read8(cpu, cpu->eip++) & 0x1F;
+            else if (op == 0xD2) count = cpu->ecx & 0x1F;
+            else if (op == 0xD0) count = 1;
+
+            if (count > 0) {
+                uint8_t res = val;
+                count %= 8;
+                if (count > 0) {
+                    if (op_sub == 0) res = (val << count) | (val >> (8 - count));
+                    else if (op_sub == 1) res = (val >> count) | (val << (8 - count));
+                    else if (op_sub == 4 || op_sub == 6) res = val << count;
+                    else if (op_sub == 5) res = val >> count;
+                    else if (op_sub == 7) res = (uint8_t)(((int8_t)val) >> count);
+                }
+                op_write8(cpu, dst, res);
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+            }
+            break;
+        }
+        case 0xC1:
+        case 0xD1:
+        case 0xD3: { /* Group 2 r/m32, imm8 / 1 / CL */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint32_t val = op_read32(cpu, dst);
+            uint8_t count = 1;
+            if (op == 0xC1) count = mem_read8(cpu, cpu->eip++) & 0x1F;
+            else if (op == 0xD3) count = cpu->ecx & 0x1F;
+            else if (op == 0xD1) count = 1;
+
+            if (count > 0) {
+                uint32_t res = val;
+                if (op_sub == 0) res = (val << count) | (val >> (32 - count));
+                else if (op_sub == 1) res = (val >> count) | (val << (32 - count));
+                else if (op_sub == 4 || op_sub == 6) res = val << count;
+                else if (op_sub == 5) res = val >> count;
+                else if (op_sub == 7) res = (uint32_t)(((int32_t)val) >> count);
+                op_write32(cpu, dst, res);
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            }
+            break;
+        }
+        case 0xF6: { /* Group 3 r/m8 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint8_t val = op_read8(cpu, dst);
+            if (op_sub == 0) { /* TEST r/m8, imm8 */
+                uint8_t imm = mem_read8(cpu, cpu->eip++);
+                uint8_t res = val & imm;
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+            } else if (op_sub == 2) { /* NOT */
+                op_write8(cpu, dst, ~val);
+            } else if (op_sub == 3) { /* NEG */
+                uint8_t res = (uint8_t)(-(int8_t)val);
+                op_write8(cpu, dst, res);
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80) ? 0x80 : 0);
+            } else if (op_sub == 4) { /* MUL AL */
+                uint16_t prod = (uint16_t)(cpu->eax & 0xFF) * (uint16_t)val;
+                cpu->eax = (cpu->eax & ~0xFFFF) | prod;
+            } else if (op_sub == 5) { /* IMUL AL */
+                int16_t prod = (int16_t)(int8_t)(cpu->eax & 0xFF) * (int16_t)(int8_t)val;
+                cpu->eax = (cpu->eax & ~0xFFFF) | (uint16_t)prod;
+            } else if (op_sub == 6) { /* DIV */
+                if (val != 0) {
+                    uint16_t dividend = (uint16_t)(cpu->eax & 0xFFFF);
+                    uint8_t quot = (uint8_t)(dividend / val);
+                    uint8_t rem = (uint8_t)(dividend % val);
+                    cpu->eax = (cpu->eax & ~0xFFFF) | ((uint16_t)rem << 8) | quot;
+                }
+            } else if (op_sub == 7) { /* IDIV */
+                if (val != 0) {
+                    int16_t dividend = (int16_t)(cpu->eax & 0xFFFF);
+                    int8_t quot = (int8_t)(dividend / (int8_t)val);
+                    int8_t rem = (int8_t)(dividend % (int8_t)val);
+                    cpu->eax = (cpu->eax & ~0xFFFF) | ((uint16_t)(uint8_t)rem << 8) | (uint8_t)quot;
+                }
+            }
+            break;
+        }
+        case 0xF7: { /* Group 3 r/m32 */
+            uint8_t modrm = mem_read8(cpu, cpu->eip++);
+            int op_sub = (modrm >> 3) & 7;
+            operand_t dst = decode_modrm(cpu, modrm);
+            uint32_t val = op_read32(cpu, dst);
+            if (op_sub == 0) { /* TEST r/m32, imm32 */
+                uint32_t imm = mem_read32(cpu, cpu->eip);
+                cpu->eip += 4;
+                uint32_t res = val & imm;
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            } else if (op_sub == 2) { /* NOT */
+                op_write32(cpu, dst, ~val);
+            } else if (op_sub == 3) { /* NEG */
+                uint32_t res = (uint32_t)(-(int32_t)val);
+                op_write32(cpu, dst, res);
+                cpu->eflags = (res == 0 ? 0x40 : 0) | ((res & 0x80000000) ? 0x80 : 0);
+            } else if (op_sub == 4) { /* MUL EAX */
+                uint64_t prod = (uint64_t)cpu->eax * (uint64_t)val;
+                cpu->eax = (uint32_t)prod;
+                cpu->edx = (uint32_t)(prod >> 32);
+            } else if (op_sub == 5) { /* IMUL EAX */
+                int64_t prod = (int64_t)(int32_t)cpu->eax * (int64_t)(int32_t)val;
+                cpu->eax = (uint32_t)prod;
+                cpu->edx = (uint32_t)(prod >> 32);
+            } else if (op_sub == 6) { /* DIV */
+                if (val != 0) {
+                    uint64_t dividend = ((uint64_t)cpu->edx << 32) | (uint64_t)cpu->eax;
+                    cpu->eax = (uint32_t)(dividend / val);
+                    cpu->edx = (uint32_t)(dividend % val);
+                }
+            } else if (op_sub == 7) { /* IDIV */
+                if (val != 0) {
+                    int64_t dividend = (int64_t)(((uint64_t)cpu->edx << 32) | (uint64_t)cpu->eax);
+                    cpu->eax = (uint32_t)(dividend / (int32_t)val);
+                    cpu->edx = (uint32_t)(dividend % (int32_t)val);
+                }
+            }
+            break;
+        }
         case 0xC9: { /* LEAVE */
             cpu->esp = cpu->ebp;
             cpu->ebp = cpu_pop32(cpu);
@@ -733,7 +873,7 @@ static void cpu_step(x86_cpu_t *cpu) {
             cpu->halted = 1;
             break;
         default:
-            /* Unsupported opcode, halt */
+            fprintf(stderr, "[box86] unknown op 0x%02X at eip 0x%08X\n", op, cpu->eip - 1);
             cpu->halted = 1;
             break;
     }

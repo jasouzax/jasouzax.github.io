@@ -66,6 +66,7 @@ typedef unsigned int size_t;
 typedef int ssize_t;
 typedef int intptr_t;
 typedef unsigned int uintptr_t;
+typedef long off_t;
 
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -74,11 +75,15 @@ typedef unsigned int uintptr_t;
 typedef struct FILE FILE;
 struct FILE {
     int fd;
+    int unget;
+    unsigned char r_buf[256];
+    int r_pos;
+    int r_len;
 };
 
-static FILE _stdin_file = { STDIN_FILENO };
-static FILE _stdout_file = { STDOUT_FILENO };
-static FILE _stderr_file = { STDERR_FILENO };
+static FILE _stdin_file = { STDIN_FILENO, -1, {0}, 0, 0 };
+static FILE _stdout_file = { STDOUT_FILENO, -1, {0}, 0, 0 };
+static FILE _stderr_file = { STDERR_FILENO, -1, {0}, 0, 0 };
 
 FILE *stdin = &_stdin_file;
 FILE *stdout = &_stdout_file;
@@ -133,11 +138,31 @@ int close(int fd) {
     return syscall1(6, fd);
 }
 
+off_t lseek(int fd, off_t offset, int whence) {
+    return syscall3(19, fd, offset, whence);
+}
+
 int fflush(FILE *stream) {
     (void)stream;
     return 0;
 }
 
+/* Character types */
+int isdigit(int c) { return c >= '0' && c <= '9'; }
+int isalpha(int c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+int isalnum(int c) { return isdigit(c) || isalpha(c); }
+int isspace(int c) { return c == ' ' || (c >= 9 && c <= 13); }
+int isupper(int c) { return c >= 'A' && c <= 'Z'; }
+int islower(int c) { return c >= 'a' && c <= 'z'; }
+int isprint(int c) { return c >= 32 && c <= 126; }
+int ispunct(int c) { return isprint(c) && !isalnum(c) && c != ' '; }
+int isxdigit(int c) { return isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
+int toupper(int c) { return islower(c) ? c - 'a' + 'A' : c; }
+int tolower(int c) { return isupper(c) ? c - 'A' + 'a' : c; }
+int abs(int j) { return j < 0 ? -j : j; }
+long labs(long j) { return j < 0 ? -j : j; }
+
+/* String & Memory */
 size_t strlen(const char *s) {
     size_t len = 0;
     while (*s++) len++;
@@ -211,6 +236,26 @@ char *strstr(const char *haystack, const char *needle) {
     return 0;
 }
 
+size_t strspn(const char *s, const char *accept) {
+    size_t count = 0;
+    while (*s && strchr(accept, *s)) { count++; s++; }
+    return count;
+}
+
+size_t strcspn(const char *s, const char *reject) {
+    size_t count = 0;
+    while (*s && !strchr(reject, *s)) { count++; s++; }
+    return count;
+}
+
+char *strpbrk(const char *s, const char *accept) {
+    while (*s) {
+        if (strchr(accept, *s)) return (char *)s;
+        s++;
+    }
+    return 0;
+}
+
 void *memcpy(void *dest, const void *src, size_t n) {
     char *d = (char *)dest;
     const char *s = (const char *)src;
@@ -256,7 +301,7 @@ void *memchr(const void *s, int c, size_t n) {
 }
 
 /* Heap allocator */
-static char heap_arena[256 * 1024];
+static char heap_arena[512 * 1024];
 static size_t heap_offset = 0;
 
 void *malloc(size_t size) {
@@ -292,16 +337,37 @@ char *strdup(const char *s) {
     return p;
 }
 
-int putchar(int c) {
-    char ch = (char)c;
-    write(STDOUT_FILENO, &ch, 1);
+/* Standard I/O core */
+int ungetc(int c, FILE *stream) {
+    if (!stream) stream = stdin;
+    if (c == -1) return -1;
+    stream->unget = (unsigned char)c;
     return c;
 }
 
+int fgetc(FILE *stream) {
+    if (!stream) stream = stdin;
+    if (stream->unget != -1) {
+        int c = stream->unget;
+        stream->unget = -1;
+        return c;
+    }
+    if (stream->r_pos < stream->r_len) {
+        return stream->r_buf[stream->r_pos++];
+    }
+    ssize_t n = read(stream->fd, stream->r_buf, sizeof(stream->r_buf));
+    if (n <= 0) return -1;
+    stream->r_len = (int)n;
+    stream->r_pos = 1;
+    return stream->r_buf[0];
+}
+
+int getc(FILE *stream) {
+    return fgetc(stream);
+}
+
 int getchar(void) {
-    unsigned char c;
-    if (read(STDIN_FILENO, &c, 1) == 1) return c;
-    return -1;
+    return fgetc(stdin);
 }
 
 int fputc(int c, FILE *stream) {
@@ -310,10 +376,12 @@ int fputc(int c, FILE *stream) {
     return c;
 }
 
-int fgetc(FILE *stream) {
-    unsigned char c;
-    if (read(stream ? stream->fd : STDIN_FILENO, &c, 1) == 1) return c;
-    return -1;
+int putc(int c, FILE *stream) {
+    return fputc(c, stream);
+}
+
+int putchar(int c) {
+    return fputc(c, stdout);
 }
 
 int fputs(const char *s, FILE *stream) {
@@ -330,17 +398,137 @@ int puts(const char *s) {
 
 char *fgets(char *s, int size, FILE *stream) {
     if (size <= 0) return 0;
-    int fd = stream ? stream->fd : STDIN_FILENO;
     int i = 0;
     while (i < size - 1) {
-        char c;
-        if (read(fd, &c, 1) != 1) { if (i == 0) return 0; break; }
-        s[i++] = c;
+        int c = fgetc(stream);
+        if (c == -1) { if (i == 0) return 0; break; }
+        s[i++] = (char)c;
         if (c == '\n') break;
     }
     s[i] = 0;
     return s;
 }
+
+FILE *fopen(const char *pathname, const char *mode) {
+    int flags = 0;
+    if (strchr(mode, '+')) flags = 2;
+    else if (strchr(mode, 'w') || strchr(mode, 'a')) flags = 1;
+    else flags = 0;
+    if (strchr(mode, 'w')) flags |= 0100 | 01000;
+    if (strchr(mode, 'a')) flags |= 0100 | 02000;
+    int fd = open(pathname, flags, 0666);
+    if (fd < 0) return 0;
+    FILE *fp = (FILE *)malloc(sizeof(FILE));
+    if (!fp) { close(fd); return 0; }
+    fp->fd = fd;
+    fp->unget = -1;
+    fp->r_pos = 0;
+    fp->r_len = 0;
+    return fp;
+}
+
+int fclose(FILE *stream) {
+    if (!stream || stream == stdin || stream == stdout || stream == stderr) return 0;
+    int ret = close(stream->fd);
+    free(stream);
+    return ret;
+}
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    size_t total = size * nmemb;
+    char *p = (char *)ptr;
+    size_t done = 0;
+    while (done < total) {
+        int c = fgetc(stream);
+        if (c == -1) break;
+        p[done++] = (char)c;
+    }
+    return size ? (done / size) : 0;
+}
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    size_t total = size * nmemb;
+    int fd = stream ? stream->fd : STDOUT_FILENO;
+    ssize_t n = write(fd, ptr, total);
+    return (n > 0 && size > 0) ? ((size_t)n / size) : 0;
+}
+
+/* Number conversions */
+long strtol(const char *nptr, char **endptr, int base) {
+    const char *s = nptr;
+    while (isspace((unsigned char)*s)) s++;
+    int neg = 0;
+    if (*s == '-') { neg = 1; s++; }
+    else if (*s == '+') s++;
+
+    if ((base == 0 || base == 16) && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        s += 2;
+        base = 16;
+    }
+    if (base == 0) base = (s[0] == '0') ? 8 : 10;
+
+    unsigned long acc = 0;
+    int any = 0;
+    while (*s) {
+        int val;
+        if (isdigit((unsigned char)*s)) val = *s - '0';
+        else if (isalpha((unsigned char)*s)) val = toupper((unsigned char)*s) - 'A' + 10;
+        else break;
+        if (val >= base) break;
+        acc = acc * base + val;
+        any = 1;
+        s++;
+    }
+    if (endptr) *endptr = (char *)(any ? s : nptr);
+    return neg ? -(long)acc : (long)acc;
+}
+
+unsigned long strtoul(const char *nptr, char **endptr, int base) {
+    return (unsigned long)strtol(nptr, endptr, base);
+}
+
+int atoi(const char *nptr) {
+    return (int)strtol(nptr, 0, 10);
+}
+
+long atol(const char *nptr) {
+    return strtol(nptr, 0, 10);
+}
+
+double atof(const char *nptr) {
+    const char *s = nptr;
+    while (isspace((unsigned char)*s)) s++;
+    double sign = 1.0;
+    if (*s == '-') { sign = -1.0; s++; }
+    else if (*s == '+') s++;
+
+    double val = 0.0;
+    while (isdigit((unsigned char)*s)) {
+        val = val * 10.0 + (*s - '0');
+        s++;
+    }
+    if (*s == '.') {
+        s++;
+        double frac = 0.1;
+        while (isdigit((unsigned char)*s)) {
+            val += (*s - '0') * frac;
+            frac *= 0.1;
+            s++;
+        }
+    }
+    return sign * val;
+}
+
+double strtod(const char *nptr, char **endptr) {
+    if (endptr) *endptr = (char *)nptr;
+    return atof(nptr);
+}
+
+/* Formatted Output */
+typedef char *va_list;
+#define va_start(ap, last) (ap = (char *)&(last) + ((sizeof(last) + 3) & ~3))
+#define va_arg(ap, type) (*(type *)((ap += ((sizeof(type) + 3) & ~3)) - ((sizeof(type) + 3) & ~3)))
+#define va_end(ap)
 
 static void print_num(int fd, unsigned long num, int base, int sign) {
     char buf[32];
@@ -362,11 +550,6 @@ static void print_num(int fd, unsigned long num, int base, int sign) {
         write(fd, &buf[--i], 1);
     }
 }
-
-typedef char *va_list;
-#define va_start(ap, last) (ap = (char *)&(last) + ((sizeof(last) + 3) & ~3))
-#define va_arg(ap, type) (*(type *)((ap += ((sizeof(type) + 3) & ~3)) - ((sizeof(type) + 3) & ~3)))
-#define va_end(ap)
 
 int vfprintf(FILE *stream, const char *fmt, va_list ap) {
     int fd = stream ? stream->fd : STDOUT_FILENO;
@@ -474,32 +657,338 @@ int snprintf(char *str, size_t size, const char *fmt, ...) {
     return ret;
 }
 
-int atoi(const char *nptr) {
-    int res = 0, sign = 1;
-    while (*nptr == ' ' || (*nptr >= 9 && *nptr <= 13)) nptr++;
-    if (*nptr == '-') { sign = -1; nptr++; }
-    else if (*nptr == '+') nptr++;
-    while (*nptr >= '0' && *nptr <= '9') {
-        res = res * 10 + (*nptr - '0');
-        nptr++;
+/* Formatted Input (scanf, sscanf, fscanf) */
+static int src_get(int is_str, const char **str_ptr, FILE *stream) {
+    if (is_str) {
+        return **str_ptr ? (unsigned char)*(*str_ptr)++ : -1;
     }
-    return sign * res;
+    return fgetc(stream);
 }
 
-long atol(const char *nptr) {
-    return (long)atoi(nptr);
+static void src_unget(int is_str, const char **str_ptr, FILE *stream, int c) {
+    if (c == -1) return;
+    if (is_str) {
+        (*str_ptr)--;
+    } else {
+        ungetc(c, stream);
+    }
 }
 
-int isdigit(int c) { return c >= '0' && c <= '9'; }
-int isalpha(int c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
-int isalnum(int c) { return isdigit(c) || isalpha(c); }
-int isspace(int c) { return c == ' ' || (c >= 9 && c <= 13); }
-int isupper(int c) { return c >= 'A' && c <= 'Z'; }
-int islower(int c) { return c >= 'a' && c <= 'z'; }
-int toupper(int c) { return islower(c) ? c - 'a' + 'A' : c; }
-int tolower(int c) { return isupper(c) ? c - 'A' + 'a' : c; }
-int abs(int j) { return j < 0 ? -j : j; }
-long labs(long j) { return j < 0 ? -j : j; }
+static int vscan_core(int is_str, const char **str_ptr, FILE *stream, const char *fmt, va_list ap) {
+    int matched = 0;
+    while (*fmt) {
+        if (isspace((unsigned char)*fmt)) {
+            while (isspace((unsigned char)*fmt)) fmt++;
+            int c;
+            while ((c = src_get(is_str, str_ptr, stream)) != -1 && isspace((unsigned char)c));
+            if (c != -1) src_unget(is_str, str_ptr, stream, c);
+            continue;
+        }
+
+        if (*fmt != '%') {
+            int c = src_get(is_str, str_ptr, stream);
+            if (c != (unsigned char)*fmt) {
+                if (c != -1) src_unget(is_str, str_ptr, stream, c);
+                return matched;
+            }
+            fmt++;
+            continue;
+        }
+
+        fmt++; /* skip '%' */
+        if (*fmt == '%') {
+            int c = src_get(is_str, str_ptr, stream);
+            if (c != '%') {
+                if (c != -1) src_unget(is_str, str_ptr, stream, c);
+                return matched;
+            }
+            fmt++;
+            continue;
+        }
+
+        int suppress = 0;
+        if (*fmt == '*') {
+            suppress = 1;
+            fmt++;
+        }
+
+        int width = 0;
+        while (isdigit((unsigned char)*fmt)) {
+            width = width * 10 + (*fmt - '0');
+            fmt++;
+        }
+        if (width <= 0) width = 0x7FFFFFFF;
+
+        int len_mod = 0;
+        if (*fmt == 'l') {
+            len_mod = 2;
+            fmt++;
+            if (*fmt == 'l') { len_mod = 3; fmt++; }
+        } else if (*fmt == 'h') {
+            len_mod = 1;
+            fmt++;
+        }
+
+        char spec = *fmt++;
+
+        /* Scanset: %[...] */
+        if (spec == '[') {
+            int invert = 0;
+            if (*fmt == '^') {
+                invert = 1;
+                fmt++;
+            }
+            char table[256] = {0};
+            if (*fmt == ']') {
+                table[(unsigned char)']'] = 1;
+                fmt++;
+            }
+            while (*fmt && *fmt != ']') {
+                if (fmt[1] == '-' && fmt[2] && fmt[2] != ']') {
+                    unsigned char start = (unsigned char)*fmt;
+                    unsigned char end = (unsigned char)fmt[2];
+                    for (int ch = start; ch <= end; ch++) table[ch] = 1;
+                    fmt += 3;
+                } else {
+                    table[(unsigned char)*fmt++] = 1;
+                }
+            }
+            if (*fmt == ']') fmt++;
+
+            char *out_str = suppress ? 0 : va_arg(ap, char *);
+            int count = 0;
+            int c;
+            while (count < width && (c = src_get(is_str, str_ptr, stream)) != -1) {
+                int in_set = table[(unsigned char)c];
+                if (invert) in_set = !in_set;
+                if (!in_set) {
+                    src_unget(is_str, str_ptr, stream, c);
+                    break;
+                }
+                if (out_str) out_str[count] = (char)c;
+                count++;
+            }
+            if (count == 0) {
+                if (c == -1 && matched == 0) return -1;
+                return matched;
+            }
+            if (out_str) out_str[count] = '\0';
+            if (!suppress) matched++;
+            continue;
+        }
+
+        /* %c */
+        if (spec == 'c') {
+            char *out_c = suppress ? 0 : va_arg(ap, char *);
+            int count = (width == 0x7FFFFFFF) ? 1 : width;
+            int read_chars = 0;
+            for (int i = 0; i < count; i++) {
+                int c = src_get(is_str, str_ptr, stream);
+                if (c == -1) break;
+                if (out_c) out_c[i] = (char)c;
+                read_chars++;
+            }
+            if (read_chars == 0) {
+                if (matched == 0) return -1;
+                return matched;
+            }
+            if (!suppress) matched++;
+            continue;
+        }
+
+        /* Skip leading whitespace for all other specifiers */
+        int c;
+        while ((c = src_get(is_str, str_ptr, stream)) != -1 && isspace((unsigned char)c));
+        if (c == -1) return matched ? matched : -1;
+        src_unget(is_str, str_ptr, stream, c);
+
+        /* %s */
+        if (spec == 's') {
+            char *out_s = suppress ? 0 : va_arg(ap, char *);
+            int count = 0;
+            while (count < width && (c = src_get(is_str, str_ptr, stream)) != -1 && !isspace((unsigned char)c)) {
+                if (out_s) out_s[count] = (char)c;
+                count++;
+            }
+            if (c != -1 && isspace((unsigned char)c)) src_unget(is_str, str_ptr, stream, c);
+            if (count == 0) return matched;
+            if (out_s) out_s[count] = '\0';
+            if (!suppress) matched++;
+            continue;
+        }
+
+        /* %d, %i, %u, %x, %o, %p */
+        if (spec == 'd' || spec == 'i' || spec == 'u' || spec == 'x' || spec == 'X' || spec == 'o' || spec == 'p') {
+            int base = 10;
+            if (spec == 'x' || spec == 'X' || spec == 'p') base = 16;
+            else if (spec == 'o') base = 8;
+            else if (spec == 'i') base = 0;
+
+            char num_buf[64];
+            int ni = 0;
+            c = src_get(is_str, str_ptr, stream);
+            if (c == '+' || c == '-') {
+                num_buf[ni++] = c;
+                c = src_get(is_str, str_ptr, stream);
+            }
+            if (c == '0' && (base == 0 || base == 16)) {
+                int c2 = src_get(is_str, str_ptr, stream);
+                if (c2 == 'x' || c2 == 'X') {
+                    base = 16;
+                } else {
+                    if (c2 != -1) src_unget(is_str, str_ptr, stream, c2);
+                    if (base == 0) base = 8;
+                }
+            }
+            if (base == 0) base = 10;
+
+            while (ni < 60 && c != -1) {
+                int valid = 0;
+                if (isdigit((unsigned char)c)) valid = 1;
+                else if (base == 16 && ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) valid = 1;
+                if (!valid) {
+                    src_unget(is_str, str_ptr, stream, c);
+                    break;
+                }
+                num_buf[ni++] = c;
+                c = src_get(is_str, str_ptr, stream);
+            }
+            num_buf[ni] = '\0';
+            if (ni == 0) return matched;
+
+            char *endp = 0;
+            long val = strtol(num_buf, &endp, base);
+
+            if (!suppress) {
+                if (len_mod == 1) {
+                    short *p = va_arg(ap, short *);
+                    *p = (short)val;
+                } else if (len_mod == 2 || len_mod == 3) {
+                    long *p = va_arg(ap, long *);
+                    *p = val;
+                } else {
+                    int *p = va_arg(ap, int *);
+                    *p = (int)val;
+                }
+                matched++;
+            }
+            continue;
+        }
+
+        /* %f, %lf, %g */
+        if (spec == 'f' || spec == 'g' || spec == 'e') {
+            char fbuf[64];
+            int fi = 0;
+            while (fi < 60 && (c = src_get(is_str, str_ptr, stream)) != -1) {
+                if (isdigit((unsigned char)c) || c == '.' || c == '-' || c == '+' || c == 'e' || c == 'E') {
+                    fbuf[fi++] = c;
+                } else {
+                    src_unget(is_str, str_ptr, stream, c);
+                    break;
+                }
+            }
+            fbuf[fi] = '\0';
+            if (fi == 0) return matched;
+            if (!suppress) {
+                if (len_mod == 2) {
+                    double *p = va_arg(ap, double *);
+                    *p = atof(fbuf);
+                } else {
+                    float *p = va_arg(ap, float *);
+                    *p = (float)atof(fbuf);
+                }
+                matched++;
+            }
+            continue;
+        }
+    }
+    return matched;
+}
+
+int vfscanf(FILE *stream, const char *fmt, va_list ap) {
+    return vscan_core(0, 0, stream ? stream : stdin, fmt, ap);
+}
+
+int vscanf(const char *fmt, va_list ap) {
+    return vfscanf(stdin, fmt, ap);
+}
+
+int vsscanf(const char *str, const char *fmt, va_list ap) {
+    const char *p = str;
+    return vscan_core(1, &p, 0, fmt, ap);
+}
+
+int fscanf(FILE *stream, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vfscanf(stream, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int scanf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vscanf(fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+int sscanf(const char *str, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int ret = vsscanf(str, fmt, ap);
+    va_end(ap);
+    return ret;
+}
+
+/* Utilities */
+static char *_strtok_ctx = 0;
+char *strtok_r(char *str, const char *delim, char **saveptr) {
+    char *s = str ? str : *saveptr;
+    if (!s) return 0;
+    while (*s && strchr(delim, *s)) s++;
+    if (!*s) { *saveptr = 0; return 0; }
+    char *token = s;
+    while (*s && !strchr(delim, *s)) s++;
+    if (*s) { *s++ = 0; *saveptr = s; }
+    else { *saveptr = 0; }
+    return token;
+}
+
+char *strtok(char *str, const char *delim) {
+    return strtok_r(str, delim, &_strtok_ctx);
+}
+
+static void qsort_swap(char *a, char *b, size_t size) {
+    while (size--) {
+        char t = *a; *a++ = *b; *b++ = t;
+    }
+}
+
+void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *)) {
+    if (nmemb <= 1 || size == 0) return;
+    char *arr = (char *)base;
+    for (size_t i = 0; i < nmemb - 1; i++) {
+        for (size_t j = 0; j < nmemb - 1 - i; j++) {
+            if (compar(arr + j * size, arr + (j + 1) * size) > 0) {
+                qsort_swap(arr + j * size, arr + (j + 1) * size, size);
+            }
+        }
+    }
+}
+
+void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *)) {
+    size_t l = 0, r = nmemb;
+    while (l < r) {
+        size_t m = l + (r - l) / 2;
+        int cmp = compar(key, (const char *)base + m * size);
+        if (cmp == 0) return (void *)((const char *)base + m * size);
+        if (cmp < 0) r = m;
+        else l = m + 1;
+    }
+    return 0;
+}
 
 static unsigned long _next_rand = 1;
 int rand(void) {

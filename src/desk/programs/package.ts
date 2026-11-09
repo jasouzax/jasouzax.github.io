@@ -3,7 +3,29 @@ import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 const root = dirname(fileURLToPath(import.meta.url)), artifact = join(root, "artifacts")
 const work = process.argv[2], sdk = process.argv[3]
-if (!work || !sdk) throw new Error("Usage: package.ts WORK EMSDK")
+const sysroot_json_path = join(artifact, "tcc-sysroot.json")
+if (!work || !sdk) {
+    if (existsSync(sysroot_json_path)) {
+        const files = JSON.parse(readFileSync(sysroot_json_path, "utf8"))
+        const runtime = join(root, "sources/group19/runtime")
+        if (existsSync(runtime)) {
+            for (const [key, filename] of [
+                ["lib/crt1.o", "crt1.o"],
+                ["lib/crti.o", "crti.o"],
+                ["lib/crtn.o", "crtn.o"],
+                ["lib/libc.a", "libc.a"],
+                ["lib/tcc/libtcc1.a", "libtcc1.a"],
+            ]) {
+                const file_path = join(runtime, filename)
+                if (existsSync(file_path)) files[key] = readFileSync(file_path, "base64")
+            }
+        }
+        writeFileSync(sysroot_json_path, JSON.stringify(files))
+        console.log(`Updated runtime sysroot with ${Object.keys(files).length} files`)
+        process.exit(0)
+    }
+    throw new Error("Usage: package.ts WORK EMSDK")
+}
 for (const [name, source, archive, extension, license] of [
     ["fastfetch", "fastfetch-2.40.4", "fastfetch.tar.gz", "tar.gz", "LICENSE"],
     ["htop", "htop-3.4.1", "htop.tar.gz", "tar.gz", "COPYING"],

@@ -657,6 +657,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const tcc_default = await run("printf '#include <stdio.h>\\nint main() { printf(\"Default a.out output\\\\n\"); return 0; }\\n' > /home/user/main3.c; cd /home/user; tcc main3.c; ./a.out")
         assert.equal(tcc_default.code, 0)
         assert.match(tcc_default.stdout, /Default a.out output/)
+
+        const user_c = await run("printf '#include <stdio.h>\\nint main() {\\n  char name[64];\\n  printf(\"Enter name:\\\\n\");\\n  scanf(\"%%[^\\\\n]\", name);\\n  printf(\"Hello %%s!\", name);\\n  return 0;\\n}\\n' > /home/user/main_scanf.c; cd /home/user; gcc main_scanf.c -o scanf_app; printf 'Jasouza\\n' | ./scanf_app")
+        assert.equal(user_c.code, 0)
+        assert.match(user_c.stdout, /Enter name:/)
+        assert.match(user_c.stdout, /Hello Jasouza!/)
     })
     await t.test("native group 20 python runtime interprets expressions, loops, and manages environments", async () => {
         const py_ver = await run("python3 --version")

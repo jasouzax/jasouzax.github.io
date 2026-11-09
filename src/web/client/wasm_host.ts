@@ -6,7 +6,7 @@ import { proc_record, browser_system } from "./wasm_procfs.ts"
 const encoder = new TextEncoder()
 type byte_queue = { chunks: Uint8Array[], readers: (() => void)[], writers: number, size: number }
 type terminal = { termios: any, cols: number, rows: number, pending: Uint8Array, line: string, decoder: TextDecoder }
-type handle = { refs: number, path: string, flags: number, offset: number, kind: "file" | "pipe_read" | "pipe_write" | "stdin" | "stdout" | "stderr" | "null" | "zero" | "random", queue?: byte_queue, terminal?: terminal, proc?: proc_api }
+type handle = { refs: number, path: string, flags: number, offset: number, kind: "file" | "pipe_read" | "pipe_write" | "stdin" | "stdout" | "stderr" | "null" | "zero" | "random", queue?: byte_queue, terminal?: terminal, proc?: proc_api, pending?: Uint8Array }
 const handles = new Map<number, handle>()
 let next_handle = 1
 const metadata = new Map<string, { mode?: number, mtime?: number }>()
@@ -134,8 +134,13 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
         }
         if (h.kind === "stdin") {
             const t = h.terminal
-            const pending = t?.pending ?? new Uint8Array()
-            if (pending.length) { const part = pending.slice(0, length); if (t) t.pending = pending.slice(length); return part }
+            const pending = h.pending ?? t?.pending ?? new Uint8Array()
+            if (pending.length) {
+                const part = pending.slice(0, length)
+                h.pending = pending.slice(length)
+                if (t) t.pending = h.pending
+                return part
+            }
             let interrupted = false
             interrupt_read = () => { interrupted = true; h.proc!.stdin.eof() }
             const abort_read = () => h.proc!.stdin.eof()
@@ -162,8 +167,9 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                 text = ready
             }
             let bytes = encoder.encode(text)
-            if (t) { t.pending = bytes.slice(length); bytes = bytes.slice(0, length) }
-            return bytes
+            h.pending = bytes.slice(length)
+            if (t) t.pending = h.pending
+            return bytes.slice(0, length)
         }
         if (h.kind !== "file") throw new Error("EBADF")
         return with_file(h.path, async () => {
