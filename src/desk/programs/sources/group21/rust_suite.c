@@ -38,106 +38,328 @@ static unsigned char *read_entire_file(const char *path, size_t *out_len) {
 }
 
 /* ========================================================================= */
-/* Rust AST Interpreter                                                      */
+/* Rust Types and Variables                                                  */
 /* ========================================================================= */
+typedef enum {
+    RUST_VAL_INT = 0,
+    RUST_VAL_STR = 1
+} rust_type_t;
+
+typedef struct {
+    rust_type_t type;
+    long ival;
+    char sval[1024];
+} rust_value_t;
+
 typedef struct {
     char name[64];
-    long val;
+    rust_type_t type;
+    long ival;
+    char sval[1024];
 } rust_var_t;
 
-static rust_var_t rust_vars[128];
+static rust_var_t rust_vars[256];
 static int rust_var_count = 0;
 
-static void set_rust_var(const char *name, long val) {
-    for (int i = 0; i < rust_var_count; i++) {
-        if (strcmp(rust_vars[i].name, name) == 0) {
-            rust_vars[i].val = val;
-            return;
-        }
-    }
-    if (rust_var_count < 128) {
-        strncpy(rust_vars[rust_var_count].name, name, sizeof(rust_vars[0].name) - 1);
-        rust_vars[rust_var_count].val = val;
-        rust_var_count++;
-    }
+static void clear_rust_vars(void) {
+    rust_var_count = 0;
 }
 
-static long get_rust_var(const char *name) {
+static rust_var_t *find_rust_var(const char *name) {
     for (int i = 0; i < rust_var_count; i++) {
-        if (strcmp(rust_vars[i].name, name) == 0) return rust_vars[i].val;
+        if (strcmp(rust_vars[i].name, name) == 0) return &rust_vars[i];
     }
-    return 0;
+    return NULL;
+}
+
+static void set_rust_int(const char *name, long val) {
+    rust_var_t *v = find_rust_var(name);
+    if (!v) {
+        if (rust_var_count >= 256) return;
+        v = &rust_vars[rust_var_count++];
+        strncpy(v->name, name, sizeof(v->name) - 1);
+        v->name[sizeof(v->name) - 1] = '\0';
+    }
+    v->type = RUST_VAL_INT;
+    v->ival = val;
+    snprintf(v->sval, sizeof(v->sval), "%ld", val);
+}
+
+static void set_rust_str(const char *name, const char *str) {
+    rust_var_t *v = find_rust_var(name);
+    if (!v) {
+        if (rust_var_count >= 256) return;
+        v = &rust_vars[rust_var_count++];
+        strncpy(v->name, name, sizeof(v->name) - 1);
+        v->name[sizeof(v->name) - 1] = '\0';
+    }
+    v->type = RUST_VAL_STR;
+    v->ival = atol(str ? str : "0");
+    if (str) {
+        strncpy(v->sval, str, sizeof(v->sval) - 1);
+        v->sval[sizeof(v->sval) - 1] = '\0';
+    } else {
+        v->sval[0] = '\0';
+    }
 }
 
 static const char *skip_rust_ws(const char *p) {
-    while (*p && (isspace((unsigned char)*p) || (*p == '/' && p[1] == '/'))) {
-        if (*p == '/' && p[1] == '/') {
-            while (*p && *p != '\n') p++;
-        } else {
+    while (*p) {
+        if (isspace((unsigned char)*p)) {
             p++;
+        } else if (*p == '/' && p[1] == '/') {
+            while (*p && *p != '\n') p++;
+        } else if (*p == '/' && p[1] == '*') {
+            p += 2;
+            while (*p && !(*p == '*' && p[1] == '/')) p++;
+            if (*p) p += 2;
+        } else {
+            break;
         }
     }
     return p;
 }
 
-static long eval_rust_expr(const char *expr);
+/* ========================================================================= */
+/* Expression Evaluator (Strings & Integers)                                 */
+/* ========================================================================= */
+static rust_value_t eval_rust_value(const char *expr);
 
-static long eval_rust_primary(const char **p) {
+static rust_value_t eval_rust_primary(const char **p) {
+    rust_value_t res;
+    res.type = RUST_VAL_INT;
+    res.ival = 0;
+    res.sval[0] = '\0';
+
     *p = skip_rust_ws(*p);
-    if (**p == '\0') return 0;
+    if (**p == '\0') return res;
 
+    /* String literal: "..." */
+    if (**p == '"') {
+        (*p)++;
+        res.type = RUST_VAL_STR;
+        size_t si = 0;
+        while (**p && **p != '"' && si < sizeof(res.sval) - 1) {
+            if (**p == '\\' && (*p)[1]) {
+                (*p)++;
+                if (**p == 'n') res.sval[si++] = '\n';
+                else if (**p == 't') res.sval[si++] = '\t';
+                else if (**p == 'r') res.sval[si++] = '\r';
+                else res.sval[si++] = **p;
+            } else {
+                res.sval[si++] = **p;
+            }
+            (*p)++;
+        }
+        if (**p == '"') (*p)++;
+        res.sval[si] = '\0';
+        res.ival = atol(res.sval);
+        return res;
+    }
+
+    /* String constructors: String::new(), String:new(), String::from(...) */
+    if (strncmp(*p, "String::new()", 13) == 0 || strncmp(*p, "String:new()", 12) == 0 ||
+        strncmp(*p, "String::default()", 17) == 0) {
+        if (strncmp(*p, "String::new()", 13) == 0) *p += 13;
+        else if (strncmp(*p, "String:new()", 12) == 0) *p += 12;
+        else *p += 17;
+        res.type = RUST_VAL_STR;
+        res.ival = 0;
+        res.sval[0] = '\0';
+        return res;
+    }
+
+    if (strncmp(*p, "String::from", 12) == 0 || strncmp(*p, "String:from", 11) == 0) {
+        if (strncmp(*p, "String::from", 12) == 0) *p += 12;
+        else *p += 11;
+        *p = skip_rust_ws(*p);
+        if (**p == '(') {
+            (*p)++;
+            rust_value_t inner = eval_rust_primary(p);
+            *p = skip_rust_ws(*p);
+            if (**p == ')') (*p)++;
+            inner.type = RUST_VAL_STR;
+            return inner;
+        }
+    }
+
+    /* Number literal */
     if (isdigit((unsigned char)**p)) {
         char *end = NULL;
         long v = strtol(*p, &end, 10);
         *p = end;
-        return v;
+        res.type = RUST_VAL_INT;
+        res.ival = v;
+        snprintf(res.sval, sizeof(res.sval), "%ld", v);
+        return res;
     }
 
+    /* Booleans */
+    if (strncmp(*p, "true", 4) == 0 && !isalnum((unsigned char)(*p)[4]) && (*p)[4] != '_') {
+        *p += 4;
+        res.type = RUST_VAL_INT;
+        res.ival = 1;
+        strcpy(res.sval, "true");
+        return res;
+    }
+    if (strncmp(*p, "false", 5) == 0 && !isalnum((unsigned char)(*p)[5]) && (*p)[5] != '_') {
+        *p += 5;
+        res.type = RUST_VAL_INT;
+        res.ival = 0;
+        strcpy(res.sval, "false");
+        return res;
+    }
+
+    /* Parenthesized expression: (...) */
+    if (**p == '(') {
+        (*p)++;
+        res = eval_rust_value(*p);
+        while (**p && **p != ')') (*p)++;
+        if (**p == ')') (*p)++;
+        return res;
+    }
+
+    /* Identifier or method call: var, var.trim(), var.len(), etc. */
     if (isalpha((unsigned char)**p) || **p == '_') {
         char id[64] = {0};
         size_t idi = 0;
         while ((isalnum((unsigned char)**p) || **p == '_') && idi < sizeof(id) - 1) {
             id[idi++] = *(*p)++;
         }
-        return get_rust_var(id);
+
+        rust_var_t *v = find_rust_var(id);
+        if (v) {
+            res.type = v->type;
+            res.ival = v->ival;
+            strncpy(res.sval, v->sval, sizeof(res.sval) - 1);
+            res.sval[sizeof(res.sval) - 1] = '\0';
+        }
+
+        /* Check for method call: .trim(), .len(), .to_string() */
+        *p = skip_rust_ws(*p);
+        if (**p == '.') {
+            if (strncmp(*p, ".trim()", 7) == 0 || strncmp(*p, ".trim_end()", 11) == 0) {
+                if (strncmp(*p, ".trim()", 7) == 0) *p += 7;
+                else *p += 11;
+                /* Strip whitespace */
+                char *s = res.sval;
+                while (*s && isspace((unsigned char)*s)) s++;
+                memmove(res.sval, s, strlen(s) + 1);
+                size_t l = strlen(res.sval);
+                while (l > 0 && isspace((unsigned char)res.sval[l - 1])) {
+                    res.sval[l - 1] = '\0';
+                    l--;
+                }
+                res.type = RUST_VAL_STR;
+                res.ival = atol(res.sval);
+            } else if (strncmp(*p, ".len()", 6) == 0) {
+                *p += 6;
+                res.type = RUST_VAL_INT;
+                res.ival = (long)strlen(res.sval);
+                snprintf(res.sval, sizeof(res.sval), "%ld", res.ival);
+            } else if (strncmp(*p, ".to_string()", 12) == 0) {
+                *p += 12;
+                res.type = RUST_VAL_STR;
+            }
+        }
+
+        return res;
     }
 
-    if (**p == '(') {
-        (*p)++;
-        long v = eval_rust_expr(*p);
-        while (**p && **p != ')') (*p)++;
-        if (**p == ')') (*p)++;
-        return v;
-    }
-
-    return 0;
+    return res;
 }
 
-static long eval_rust_expr(const char *expr) {
+static rust_value_t eval_rust_value(const char *expr) {
     const char *p = expr;
-    long left = eval_rust_primary(&p);
+    rust_value_t left = eval_rust_primary(&p);
     p = skip_rust_ws(p);
 
     while (*p && strchr("+-*/%", *p)) {
         char op = *p++;
-        long right = eval_rust_primary(&p);
-        if (op == '+') left += right;
-        else if (op == '-') left -= right;
-        else if (op == '*') left *= right;
-        else if (op == '/') left = (right != 0) ? (left / right) : 0;
-        else if (op == '%') left = (right != 0) ? (left % right) : 0;
+        rust_value_t right = eval_rust_primary(&p);
+
+        if (op == '+' && (left.type == RUST_VAL_STR || right.type == RUST_VAL_STR)) {
+            /* String concatenation */
+            char combined[1024] = {0};
+            snprintf(combined, sizeof(combined), "%s%s", left.sval, right.sval);
+            left.type = RUST_VAL_STR;
+            strncpy(left.sval, combined, sizeof(left.sval) - 1);
+            left.sval[sizeof(left.sval) - 1] = '\0';
+            left.ival = atol(left.sval);
+        } else {
+            /* Arithmetic operation */
+            left.type = RUST_VAL_INT;
+            if (op == '+') left.ival += right.ival;
+            else if (op == '-') left.ival -= right.ival;
+            else if (op == '*') left.ival *= right.ival;
+            else if (op == '/') left.ival = (right.ival != 0) ? (left.ival / right.ival) : 0;
+            else if (op == '%') left.ival = (right.ival != 0) ? (left.ival % right.ival) : 0;
+            snprintf(left.sval, sizeof(left.sval), "%ld", left.ival);
+        }
         p = skip_rust_ws(p);
     }
     return left;
 }
 
+/* ========================================================================= */
+/* Stdin Reader Handler                                                      */
+/* ========================================================================= */
+static int handle_read_line(const char *stmt) {
+    const char *p = strstr(stmt, "read_line");
+    if (!p) return 0;
+    p += 9;
+    p = skip_rust_ws(p);
+    if (*p != '(') return 0;
+    p++;
+    p = skip_rust_ws(p);
+    if (*p == '&') {
+        p++;
+        p = skip_rust_ws(p);
+    }
+    if (strncmp(p, "mut ", 4) == 0) {
+        p += 4;
+        p = skip_rust_ws(p);
+    }
+    char vname[64] = {0};
+    size_t vi = 0;
+    while ((isalnum((unsigned char)*p) || *p == '_') && vi < sizeof(vname) - 1) {
+        vname[vi++] = *p++;
+    }
+    if (vi == 0) return 0;
+
+    fflush(stdout);
+    char buf[1024] = {0};
+    if (fgets(buf, sizeof(buf), stdin) != NULL) {
+        /* Strip trailing \r and \n */
+        size_t len = strlen(buf);
+        while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n')) {
+            buf[len - 1] = '\0';
+            len--;
+        }
+        set_rust_str(vname, buf);
+    } else {
+        set_rust_str(vname, "");
+    }
+    return 1;
+}
+
+/* ========================================================================= */
+/* Rust Statement Executor                                                   */
+/* ========================================================================= */
 static void execute_rust_body(const char *body) {
     const char *p = body;
     while (*p) {
         p = skip_rust_ws(p);
         if (*p == '\0' || *p == '}') break;
 
-        /* println!(...) */
+        /* Skip module imports: use ...; */
+        if (strncmp(p, "use ", 4) == 0) {
+            while (*p && *p != ';') p++;
+            if (*p == ';') p++;
+            continue;
+        }
+
+        /* println!(...) or print!(...) */
         if (strncmp(p, "println!", 8) == 0 || strncmp(p, "print!", 6) == 0) {
             int newline = (strncmp(p, "println!", 8) == 0);
             p = strchr(p, '(');
@@ -154,6 +376,7 @@ static void execute_rust_body(const char *body) {
                         p++;
                         if (*p == 'n') fmt[fi++] = '\n';
                         else if (*p == 't') fmt[fi++] = '\t';
+                        else if (*p == 'r') fmt[fi++] = '\r';
                         else fmt[fi++] = *p;
                     } else {
                         fmt[fi++] = *p;
@@ -164,29 +387,62 @@ static void execute_rust_body(const char *body) {
             }
 
             p = skip_rust_ws(p);
-            long args[16];
+            rust_value_t args[16];
             int argc = 0;
             while (*p == ',') {
                 p++;
-                char arg_str[128] = {0};
+                char arg_str[256] = {0};
                 size_t ai = 0;
-                while (*p && *p != ',' && *p != ')' && ai < sizeof(arg_str) - 1) {
+                int paren = 0;
+                while (*p && (paren > 0 || (*p != ',' && *p != ')')) && ai < sizeof(arg_str) - 1) {
+                    if (*p == '(') paren++;
+                    else if (*p == ')') paren--;
                     arg_str[ai++] = *p++;
                 }
-                if (argc < 16) args[argc++] = eval_rust_expr(arg_str);
+                if (argc < 16) {
+                    args[argc++] = eval_rust_value(arg_str);
+                }
                 p = skip_rust_ws(p);
             }
             if (*p == ')') p++;
             if (*p == ';') p++;
 
-            /* Format print */
+            /* Format and print */
             int arg_idx = 0;
             for (size_t i = 0; i < strlen(fmt); i++) {
-                if (fmt[i] == '{' && fmt[i + 1] == '}') {
-                    if (arg_idx < argc) {
-                        printf("%ld", args[arg_idx++]);
+                if (fmt[i] == '{') {
+                    if (fmt[i + 1] == '}' || (fmt[i + 1] == ':' && fmt[i + 2] == '?' && fmt[i + 3] == '}')) {
+                        if (fmt[i + 1] == ':') i += 3;
+                        else i += 1;
+                        if (arg_idx < argc) {
+                            rust_value_t val = args[arg_idx++];
+                            if (val.type == RUST_VAL_STR) printf("%s", val.sval);
+                            else printf("%ld", val.ival);
+                        }
+                    } else {
+                        /* Named interpolation: {name} */
+                        char vname[64] = {0};
+                        size_t vni = 0;
+                        size_t j = i + 1;
+                        while (fmt[j] && fmt[j] != '}' && fmt[j] != ':' && vni < sizeof(vname) - 1) {
+                            vname[vni++] = fmt[j++];
+                        }
+                        while (fmt[j] && fmt[j] != '}') j++;
+                        if (fmt[j] == '}' && vni > 0) {
+                            i = j;
+                            rust_var_t *v = find_rust_var(vname);
+                            if (v) {
+                                if (v->type == RUST_VAL_STR) printf("%s", v->sval);
+                                else printf("%ld", v->ival);
+                            } else {
+                                rust_value_t val = eval_rust_value(vname);
+                                if (val.type == RUST_VAL_STR) printf("%s", val.sval);
+                                else printf("%ld", val.ival);
+                            }
+                        } else {
+                            putchar(fmt[i]);
+                        }
                     }
-                    i++;
                 } else {
                     putchar(fmt[i]);
                 }
@@ -196,7 +452,21 @@ static void execute_rust_body(const char *body) {
             continue;
         }
 
-        /* let [mut] <var> = <expr>; */
+        /* Check if CURRENT statement contains read_line */
+        const char *semi = strchr(p, ';');
+        size_t stmt_len = semi ? (size_t)(semi - p) : strlen(p);
+        if (stmt_len < 1024) {
+            char stmt_buf[1024] = {0};
+            strncpy(stmt_buf, p, stmt_len);
+            stmt_buf[stmt_len] = '\0';
+            if (strstr(stmt_buf, "read_line") && (strstr(stmt_buf, "stdin") || strstr(stmt_buf, "read_line("))) {
+                handle_read_line(stmt_buf);
+                p = semi ? semi + 1 : p + strlen(p);
+                continue;
+            }
+        }
+
+        /* let [mut] <var> [: type] [= <expr>]; */
         if (strncmp(p, "let ", 4) == 0) {
             p += 4;
             p = skip_rust_ws(p);
@@ -206,22 +476,32 @@ static void execute_rust_body(const char *body) {
             }
             char vname[64] = {0};
             size_t vi = 0;
-            while (isalnum((unsigned char)*p) || *p == '_') vname[vi++] = *p++;
+            while ((isalnum((unsigned char)*p) || *p == '_') && vi < sizeof(vname) - 1) {
+                vname[vi++] = *p++;
+            }
             p = skip_rust_ws(p);
             if (*p == ':') {
                 /* Skip type annotation */
-                while (*p && *p != '=') p++;
+                while (*p && *p != '=' && *p != ';') p++;
             }
             if (*p == '=') {
                 p++;
-                char expr_buf[256] = {0};
+                char expr_buf[512] = {0};
                 size_t ei = 0;
                 while (*p && *p != ';' && ei < sizeof(expr_buf) - 1) {
                     expr_buf[ei++] = *p++;
                 }
                 if (*p == ';') p++;
-                long val = eval_rust_expr(expr_buf);
-                set_rust_var(vname, val);
+                if (strstr(expr_buf, "read_line")) {
+                    handle_read_line(expr_buf);
+                } else {
+                    rust_value_t val = eval_rust_value(expr_buf);
+                    if (val.type == RUST_VAL_STR) set_rust_str(vname, val.sval);
+                    else set_rust_int(vname, val.ival);
+                }
+            } else {
+                if (*p == ';') p++;
+                set_rust_str(vname, "");
             }
             continue;
         }
@@ -232,7 +512,9 @@ static void execute_rust_body(const char *body) {
             p = skip_rust_ws(p);
             char vname[64] = {0};
             size_t vi = 0;
-            while (isalnum((unsigned char)*p) || *p == '_') vname[vi++] = *p++;
+            while ((isalnum((unsigned char)*p) || *p == '_') && vi < sizeof(vname) - 1) {
+                vname[vi++] = *p++;
+            }
             p = skip_rust_ws(p);
             if (strncmp(p, "in ", 3) == 0) {
                 p += 3;
@@ -254,19 +536,63 @@ static void execute_rust_body(const char *body) {
                     }
                     size_t body_len = (p - 1) - body_start;
                     char *loop_body = (char *)malloc(body_len + 1);
-                    strncpy(loop_body, body_start, body_len);
-                    loop_body[body_len] = '\0';
+                    if (loop_body) {
+                        strncpy(loop_body, body_start, body_len);
+                        loop_body[body_len] = '\0';
 
-                    long s_val = eval_rust_expr(s_str);
-                    long e_val = eval_rust_expr(e_str);
-                    for (long n = s_val; n < e_val; n++) {
-                        set_rust_var(vname, n);
-                        execute_rust_body(loop_body);
+                        rust_value_t s_val = eval_rust_value(s_str);
+                        rust_value_t e_val = eval_rust_value(e_str);
+                        for (long n = s_val.ival; n < e_val.ival; n++) {
+                            set_rust_int(vname, n);
+                            execute_rust_body(loop_body);
+                        }
+                        free(loop_body);
                     }
-                    free(loop_body);
                 }
             }
             continue;
+        }
+
+        /* Assignment: <var> = <expr>; or <var> += <expr>; */
+        if (isalpha((unsigned char)*p) || *p == '_') {
+            const char *ident_start = p;
+            char vname[64] = {0};
+            size_t vi = 0;
+            while ((isalnum((unsigned char)*p) || *p == '_') && vi < sizeof(vname) - 1) {
+                vname[vi++] = *p++;
+            }
+            p = skip_rust_ws(p);
+            if (*p == '=' && p[1] != '=') {
+                p++;
+                char expr_buf[512] = {0};
+                size_t ei = 0;
+                while (*p && *p != ';' && ei < sizeof(expr_buf) - 1) {
+                    expr_buf[ei++] = *p++;
+                }
+                if (*p == ';') p++;
+                rust_value_t val = eval_rust_value(expr_buf);
+                if (val.type == RUST_VAL_STR) set_rust_str(vname, val.sval);
+                else set_rust_int(vname, val.ival);
+                continue;
+            } else if (*p == '+' && p[1] == '=') {
+                p += 2;
+                char expr_buf[512] = {0};
+                size_t ei = 0;
+                while (*p && *p != ';' && ei < sizeof(expr_buf) - 1) {
+                    expr_buf[ei++] = *p++;
+                }
+                if (*p == ';') p++;
+                rust_value_t val = eval_rust_value(expr_buf);
+                rust_var_t *cur = find_rust_var(vname);
+                if (cur && cur->type == RUST_VAL_STR) {
+                    strncat(cur->sval, val.sval, sizeof(cur->sval) - strlen(cur->sval) - 1);
+                } else if (cur) {
+                    set_rust_int(vname, cur->ival + val.ival);
+                }
+                continue;
+            } else {
+                p = ident_start;
+            }
         }
 
         /* Skip unknown statement up to ';' */
@@ -276,6 +602,7 @@ static void execute_rust_body(const char *body) {
 }
 
 static void run_rust_source(const char *source) {
+    clear_rust_vars();
     const char *main_fn = strstr(source, "fn main()");
     if (!main_fn) main_fn = strstr(source, "fn main ()");
     if (!main_fn) {
@@ -287,7 +614,20 @@ static void run_rust_source(const char *source) {
     const char *brace = strchr(main_fn, '{');
     if (!brace) return;
     brace++;
-    execute_rust_body(brace);
+    int depth = 1;
+    const char *end = brace;
+    while (*end && depth > 0) {
+        if (*end == '{') depth++;
+        else if (*end == '}') depth--;
+        end++;
+    }
+    size_t blen = (end - 1) - brace;
+    char *body = (char *)malloc(blen + 1);
+    if (!body) return;
+    memcpy(body, brace, blen);
+    body[blen] = '\0';
+    execute_rust_body(body);
+    free(body);
 }
 
 /* ========================================================================= */
@@ -356,12 +696,11 @@ static int cmd_rustc(int argc, char **argv) {
         return 1;
     }
 
-    /* Wrap as runnable script executing via rust-runner / rustc --run */
-    fprintf(out, "#!/bin/sh\n# Compiled Rust Application\n");
+    /* Wrap as runnable script executing via rustc --run */
+    fprintf(out, "#!/bin/sh\nrustc --run %s \"$@\"\n", input_file);
     fclose(out);
     chmod(output_file, 0755);
 
-    run_rust_source((const char *)src);
     free(src);
     return 0;
 }
@@ -426,6 +765,14 @@ static int cmd_cargo(int argc, char **argv) {
     }
 
     if (strcmp(cmd, "build") == 0 || strcmp(cmd, "b") == 0) {
+        mkdir("target", 0755);
+        mkdir("target/debug", 0755);
+        FILE *fp = fopen("target/debug/app", "w");
+        if (fp) {
+            fprintf(fp, "#!/bin/sh\nif [ -f src/main.rs ]; then rustc --run src/main.rs \"$@\"; else rustc --run main.rs \"$@\"; fi\n");
+            fclose(fp);
+            chmod("target/debug/app", 0755);
+        }
         printf("   Compiling package v0.1.0\n    Finished dev [unoptimized + debuginfo] target(s) in 0.05s\n");
         return 0;
     }
@@ -437,6 +784,7 @@ static int cmd_cargo(int argc, char **argv) {
 
     if (strcmp(cmd, "run") == 0 || strcmp(cmd, "r") == 0) {
         printf("    Finished dev [unoptimized + debuginfo] target(s) in 0.02s\n     Running `target/debug/app`\n");
+        fflush(stdout);
         if (access("src/main.rs", R_OK) == 0) {
             size_t slen = 0;
             unsigned char *src = read_entire_file("src/main.rs", &slen);
@@ -486,4 +834,3 @@ int main(int argc, char **argv) {
     fflush(stderr);
     return ret;
 }
-

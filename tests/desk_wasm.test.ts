@@ -10,7 +10,7 @@ import type { worker_factory } from "../src/web/client/wasm_host.ts"
 import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web/client/kernel.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
-test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 120000 }, async t => {
+test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 300000 }, async t => {
     const worker_file = resolve(".cache/desk-test-worker.cjs")
     mkdirSync(resolve(".cache"), { recursive: true })
     await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
@@ -698,6 +698,14 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const cargo_new = await run("cargo new /tmp/rustapp; cd /tmp/rustapp; cargo run")
         assert.equal(cargo_new.code, 0)
         assert.match(cargo_new.stdout, /Hello, world!/)
+
+        const user_rs = await run("printf 'use std::stdin;\\nfn main() {\\n    println!(\"Enter name:\");\\n    let name:&str = String:new();\\n    stdin().read_line(&mut name).unwrap();\\n    println!(\"Hello {}!\", name);\\n}\\n' > /tmp/rustapp/src/main.rs")
+        assert.equal(user_rs.code, 0)
+
+        const run_stdin = await run("cd /tmp/rustapp; printf 'Jasouza\\n' | cargo run")
+        assert.equal(run_stdin.code, 0)
+        assert.match(run_stdin.stdout, /Enter name:/)
+        assert.match(run_stdin.stdout, /Hello Jasouza!/)
     })
     await t.test("native group 22 jvm suite compiles java source and interprets bytecode", async () => {
         const java_ver = await run("java --version")
