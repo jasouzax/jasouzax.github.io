@@ -641,6 +641,16 @@
         text-shadow: none;
     }
 
+    & .list_drop_li>input {
+        position: absolute;
+        opacity: 0;
+    }
+
+    & .list_drop_li>input:focus-visible+label {
+        outline: 1px dotted #0a1a52;
+        outline-offset: -2px;
+    }
+
     & .list_drop_li> :is(a, button, label) {
         border-radius: 0;
         color: #0a1a52;
@@ -2724,6 +2734,16 @@
         color: #ececec;
         border-color: #6a6a6a;
         box-shadow: 2px 2px 3px rgba(0, 0, 0, .6);
+    }
+
+    & .list_drop_li>input {
+        position: absolute;
+        opacity: 0;
+    }
+
+    & .list_drop_li>input:focus-visible+label {
+        outline: 1px dotted #ececec;
+        outline-offset: -2px;
     }
 
     & .list_drop_li> :is(a, button, label) {
