@@ -36,7 +36,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         async remove(path) { if (!files.delete(path) && !dirs.delete(path)) throw new Error("ENOENT") },
         async rename(from, to) { files.set(to, await fs.read_bytes!(from)); files.delete(from) },
     }
-    const sysroot_json = JSON.parse(readFileSync(resolve("src/desk/programs/artifacts/tcc-sysroot.json"), "utf8")) as Record<string, string>
+    const sysroot_json = JSON.parse(readFileSync(resolve("build/tcc/tcc-sysroot.json"), "utf8")) as Record<string, string>
     for (const d of ["/usr", "/usr/include", "/usr/lib", "/usr/lib/tcc", "/usr/lib/tcc/include", "/usr/lib/x86_64-linux-gnu"]) dirs.add(d)
     for (const [name, val] of Object.entries(sysroot_json)) {
         const is_lib = name.startsWith("lib/")
@@ -61,8 +61,8 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
             files.set(usr_inc, bytes)
         }
     }
-    const wasm = readFileSync(resolve("src/desk/busybox/artifacts/busybox.wasm"))
-    register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
+    const wasm = readFileSync(resolve("build/busybox/busybox.wasm"))
+    register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("build/busybox/commands.json"), "utf8")) }, factory)
     async function register_program(name: string, commands: string[] = [name]) {
         const worker_path = resolve(`.cache/desk-test-${name}-worker.cjs`)
         await build({
@@ -72,9 +72,9 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
             format: "cjs",
             bundle: true,
             logLevel: "silent",
-            external: ["@wasmer/sdk"]
+            external: ["@wasmer/sdk", "pyodide"]
         })
-        const wasm_bytes = readFileSync(resolve(`src/desk/programs/artifacts/${name}.wasm`))
+        const wasm_bytes = readFileSync(resolve(`build/${name}/${name}.wasm`))
         register_wasm({ id: name, version: "1.0.0", worker: worker_path, wasm: "data:application/wasm;base64," + wasm_bytes.toString("base64"), sha256: createHash("sha256").update(wasm_bytes).digest("hex"), commands }, factory)
     }
     for (const prog of ["jq", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "bchunk", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum"]) {

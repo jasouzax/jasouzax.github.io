@@ -1,4 +1,4 @@
-import createProgram from "../../desk/programs/artifacts/potrace.js"
+import createProgram from "../../../build/potrace/potrace.js"
 import type { worker_start } from "./wasm_protocol.ts"
 import { run_worker_runtime } from "./wasm_worker_runtime.ts"
 export function run_worker(start: worker_start, send: (value: unknown) => void): Promise<void> { return run_worker_runtime(start, send, createProgram) }

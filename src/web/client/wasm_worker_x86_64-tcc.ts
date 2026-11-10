@@ -1,4 +1,4 @@
-import createProgram from "../../desk/programs/artifacts/x86_64-tcc.js"
+import createProgram from "../../../build/x86_64-tcc/x86_64-tcc.js"
 import type { worker_start } from "./wasm_protocol.ts"
 import { run_worker_runtime } from "./wasm_worker_runtime.ts"
 

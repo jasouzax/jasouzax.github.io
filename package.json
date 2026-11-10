@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "node src/main.ts build",
+    "pkgbuild": "node --import tsx src/pkgbuild.ts",
     "check": "node src/main.ts check",
     "serve": "node src/main.ts serve",
     "pack": "node src/main.ts pack",

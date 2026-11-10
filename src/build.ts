@@ -88,20 +88,23 @@ async function bundle_script(root: string, entry: string, files: output_files, m
 }
 
 async function bundle_runtime(root: string, files: output_files, mode: string): Promise<{ page: string, theme_switch: string, desk_shell: string, boot: string }> {
-    const artifact = join(root, "src", "desk", "busybox", "artifacts")
+    const build_dir = join(root, "build")
+    const bb_dir = join(build_dir, "busybox")
     const worker = await bundle_script(root, "wasm_worker", files, mode)
-    const wasm_bytes = readFileSync(join(artifact, "busybox.wasm"))
+    const wasm_bytes = readFileSync(join(bb_dir, "busybox.wasm"))
     const hash = sha256(wasm_bytes)
     const wasm_path = `assets/wasm/busybox-${hash.slice(0, 10)}.wasm`
     files.set(wasm_path, wasm_bytes)
-    files.set("assets/wasm/busybox-LICENSE", readFileSync(join(artifact, "LICENSE")))
-    files.set("assets/wasm/busybox.config", readFileSync(join(artifact, "busybox.config")))
+    files.set("assets/wasm/busybox-LICENSE", readFileSync(join(bb_dir, "LICENSE")))
+    files.set("assets/wasm/busybox.config", readFileSync(join(bb_dir, "busybox.config")))
     files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
-    files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(artifact, "busybox-source.tar.bz2")))
-    for (const name of ["build.sh", "port.py", "host.c"]) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(join(root, "src", "desk", "busybox", name)))
+    files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(bb_dir, "busybox-source.tar.bz2")))
+    for (const name of ["build.sh", "port.py", "host.c"]) {
+        const p = join(bb_dir, "custom", name)
+        if (existsSync(p)) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(p))
+    }
     const images = [{ id: "busybox", version: "1.36.1-jazu.2", worker, wasm: "/" + wasm_path, sha256: hash,
-        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
-    const programs = join(root, "src", "desk", "programs", "artifacts")
+        commands: JSON.parse(readFileSync(join(bb_dir, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
     for (const [name, version, extension, cmd_list] of [
         ["fastfetch", "2.40.4-jazu.1", "tar.gz"],
         ["htop", "3.4.1-jazu.1", "tar.gz"],
@@ -170,18 +173,35 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["perl_suite", "1.0.0-jazu.1", "tar.gz", ["perl"]],
         ["lang_suite", "1.0.0-jazu.1", "tar.gz", ["lua", "lisp", "basic"]],
     ] as [string, string, string, string[]?][]) {
-        const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
+        const pkg_dir = join(build_dir, name)
+        const bytes = readFileSync(join(pkg_dir, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`
         files.set(path, bytes)
-        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(join(programs, `${name}-LICENSE`)))
-        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
+        const lic_path = existsSync(join(pkg_dir, `${name}-LICENSE`)) ? join(pkg_dir, `${name}-LICENSE`) : join(pkg_dir, "LICENSE")
+        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(lic_path))
+        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(pkg_dir, `${name}-source.${extension}`)))
         images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: cmd_list ?? [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
     }
-    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE", "python_stdlib.zip", "pyodide.asm.js", "pyodide-lock.json", "pyodide.asm.wasm", "numpy-2.0.2-cp312-cp312-pyodide_2024_0_wasm32.whl", "clang.webc"]) {
-        const p = join(programs, name)
-        if (existsSync(p)) files.set(`assets/wasm/${name}`, readFileSync(p))
+    const extra_assets: [string, string][] = [
+        ["htop", "ncurses-source.tar.gz"],
+        ["tcc", "tcc-sysroot.json"],
+        ["tcc", "tcc-sysroot-LICENSE"],
+        ["python_suite", "python_stdlib.zip"],
+        ["python_suite", "pyodide.asm.js"],
+        ["python_suite", "pyodide-lock.json"],
+        ["python_suite", "pyodide.asm.wasm"],
+        ["python_suite", "numpy-2.0.2-cp312-cp312-pyodide_2024_0_wasm32.whl"],
+        ["clang", "clang.webc"],
+    ]
+    for (const [pkg, asset] of extra_assets) {
+        const p = join(build_dir, pkg, asset)
+        if (existsSync(p)) files.set(`assets/wasm/${asset}`, readFileSync(p))
     }
-    for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
+    const common_custom = join(build_dir, "common", "custom")
+    for (const name of ["build.sh", "port.py", "compat.c", "package.ts"]) {
+        const p = join(common_custom, name)
+        if (existsSync(p)) files.set(`assets/wasm/programs-port/${name}`, readFileSync(p))
+    }
     const wasmer_root = join(root, "node_modules", "@wasmer", "sdk")
     if (existsSync(wasmer_root)) {
         for (const dir of ["dist", "pkg"]) {
