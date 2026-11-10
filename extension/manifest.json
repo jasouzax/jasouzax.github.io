@@ -1,0 +1,13 @@
+{
+    "manifest_version": 3,
+    "name": "JAZU Device Bridge",
+    "version": "0.1.0",
+    "description": "Connects the JAZU desk on localhost to this machine's shell through a native messaging host.",
+    "minimum_chrome_version": "116",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoUDk0/T+whBPrnAI2w0MVYYEi8owRYeYBUNPoDy1qbXnqy2Wxwh0PL66u3N1UFKPpxW2alUbyW3gGb3PgLGn+1mJst2NxrdpFDwxrKfYYCL8Uq0inqJFDB/OJnddY945ZBSQJsp1aIPP6VAzhBnfvTMf7fYN5SzZOfg1LF6x3UovRE4pzNqMp4r7p/ezPcmiicErzb5PMoGAJwmIFx9xvdGt/3PUk8+u9O+e7lH7vGci11NeKITR/PTb9XEiaDKNGX9POnIZIl6qgmqqdihbzgFaxqbCyPLJIqIYOx6LyLwQ+baNhi8zJ3Q4yQ2PDgAwraVrm9OaBZ6u23DgRzdDIQIDAQAB",
+    "permissions": ["nativeMessaging"],
+    "background": { "service_worker": "background.js" },
+    "content_scripts": [
+        { "matches": ["http://localhost/*"], "js": ["content.js"], "run_at": "document_start", "all_frames": false }
+    ]
+}

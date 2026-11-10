@@ -9,6 +9,7 @@ import type { proc } from "./kernel.ts"
 import type { program } from "./proc_types.ts"
 import { make_fs } from "./desk_vfs.ts"
 import { mount_executables } from "./desk_fs.ts"
+import { host_programs, probe_host } from "./desk_host.ts"
 import { Terminal } from "@xterm/xterm"
 import { FitAddon } from "@xterm/addon-fit"
 
@@ -92,7 +93,18 @@ function new_shell(): proc {
     return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: working_directory(), env: { HOME: "/home/user", USER: "user", LOGNAME: "user", HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "\\[\\033[1;32m\\]user@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ " }, interactive: true })
 }
 
+// a real shell on the device through the extension bridge; the process only relays bytes, the shell itself runs on the machine
+function new_host_shell(): proc {
+    const stdin = make_stream()
+    kernel.terminals.add(stdin)
+    return start_process(["host_sh"], { root: true, stdin, cwd: "/", env: {}, interactive: true })
+}
+
 async function open_pid(item: desk_window, uri: string): Promise<boolean> {
+    if (/^(host:|pid:\/\/host)$/i.test(uri.trim())) {
+        attach(item, new_host_shell().pid)
+        return true
+    }
     const match = /^pid:(\d*)$/i.exec(uri.trim()) ?? (uri.trim() === "pid://sh" ? [uri, ""] : null)
     if (!match) return false
     if (match[1] === "") {
@@ -134,7 +146,7 @@ function terminal_body(item: desk_window): HTMLElement {
     const box = document.createElement("div")
     box.className = "desk_wbox_body_term"
     box.style.cssText = "position:relative;display:block;min-height:120px;height:100%;overflow:hidden;padding:8px"
-    const terminal = new Terminal({ allowTransparency: true, cursorBlink: true, convertEol: true, screenReaderMode: true, fontSize: 14, scrollback: 4000 })
+    const terminal = new Terminal({ allowTransparency: true, cursorBlink: true, convertEol: proc.argv[0] !== "host_sh", screenReaderMode: true, fontSize: 14, scrollback: 4000 })
     const sync_theme = (): void => {
         const style = getComputedStyle(item.el)
         const foreground = style.getPropertyValue("--terminal-text").trim() || style.color
@@ -195,13 +207,13 @@ export function init_proc(): void {
             program_names = names
             await mount_executables(program_names)
         }
-        return programs
+        return { ...programs, ...host_programs }
     }
     kernel.hooks = {
         programs,
         fs: uid => make_fs(() => program_names, uid),
     }
-    document.addEventListener("jazu:fs:init", () => { void programs().catch(error => console.error(error)) })
+    document.addEventListener("jazu:fs:init", () => { void programs().catch(error => console.error(error)); probe_host() })
     process_hooks.body = terminal_body
     process_hooks.release = detach
     process_hooks.release_body = item => { cleanups.get(item)?.(); cleanups.delete(item) }

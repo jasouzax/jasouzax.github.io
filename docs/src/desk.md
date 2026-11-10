@@ -60,6 +60,10 @@ Prerequisites: Bash, git, curl, Python 3, make, gcc, tar, bzip2, Node 22.18+, **
 4. The image entry in `assets/wasm/manifest.json` needs `id`, `version`, `commands`, `worker`, `wasm`, `sha256`; `register_wasm()` can also register at runtime.
 5. Files the program creates follow the existing `/tmp` and `/home/user` privacy rules.
 
+## Device shell (extension bridge)
+
+`host:` (or `pid://host`) in a window's source field starts **a shell on the machine running the browser**, through the Chromium extension in `extension/` and its native messaging host. Code: `desk_host.ts` (page side: handshake, sessions, the `host_sh` kernel program), `desk_proc.ts` (`new_host_shell`, `open_pid`; the terminal turns `convertEol` off for it), `desk_view.ts` (`terminal_hooks.uri`: "Open terminal" starts `host:` once the bridge answered, else `pid:`). `host_sh` is an ordinary process: its stdin/stdout are the window's streams, Ctrl+C is forwarded as data (`\x03`) so the device's line discipline raises SIGINT, and the terminal's size is forwarded to the pty. Without the extension the handshake fails after 2.5 s and nothing else changes. Protocol, install and threat model: [../../extension/README.md](../../extension/README.md).
+
 ## Limits to remember
 
 Browser userland, not a Linux kernel ABI: no arbitrary native binaries, no general fork outside ash, no process groups/stop-resume signals, sockets, hard links or symlinks; `/proc` CPU/memory are placeholders; ffmpeg/ImageMagick are not bundled; `timeout` and tar's compression subprocess modes are unsupported (use `tar | gzip`). TinyCC emits i386 ELF objects, not runnable WASM.

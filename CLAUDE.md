@@ -52,6 +52,7 @@ src/
     client/            browser runtime → bundled to assets/runtime/*.js (boot, spa, loading, desk*, kernel, wasm_*)
   node/                worker.ts (Cloudflare router) security.ts (HMAC) personal.ts (git read API) serve.ts deploy.ts d1_migrate.ts
   desk/                WASM toolchains: busybox/ programs/ (build.sh, port.py, artifacts/). Not TypeScript.
+extension/             Chromium extension (plain JS, MV3) + native messaging host (host/*.ts, pty_shim.py): real device shell for /desk via `host:`. Not part of the site build; see extension/README.md
 migrations/            D1 SQL (0001_work.sql)
 terraform/             Cloudflare infra (Pages, Worker, R2, KV, D1, routes)
 tests/                 *.test.ts (node:test) and *.spec.ts (Playwright) + configs
@@ -82,6 +83,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 | Skeleton/loading | `src/web/skeleton_css.ts`, `src/web/client/loading.ts`, `boot.ts` |
 | Desk window bodies | `content/plugins/plugins.xml` (cases) + `src/web/client/desk_view.ts` hosts |
 | Shell / WASM program | `src/desk/**`, `src/web/client/wasm_*.ts`, `kernel.ts`; docs `src/desk/README.md` |
+| Device shell / extension bridge | `extension/**` (+ `src/web/client/desk_host.ts`, `desk_proc.ts`); docs `extension/README.md`, `docs/feat/desk_env.md`; tests `tests/host*.test.ts` |
 | Worker route / API | `src/node/worker.ts` (+ test in `tests/nodes.test.ts`); keep `{error:{code,message}}` shape and fail closed |
 | Infra | `terraform/*.tf`; deploy glue `src/node/deploy.ts` |
 | Fonts | `src/font/*`, `src/font_build.ts`; tests `tests/font.test.ts` |
@@ -103,6 +105,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 - **A fresh checkout from `codebase.zip` cannot build** until the ignored WASM artifacts exist: `src/desk/busybox/artifacts/busybox.wasm` + `busybox-source.tar.bz2`, `src/desk/programs/artifacts/{fastfetch,htop,tcc}.wasm` + `*-source.tar.*` + `ncurses-source.tar.gz`. `bundle_runtime()` reads them unconditionally (ENOENT otherwise). `npm run pack` drops them because `.gitignore` ignores `*.wasm`/`*.tar.*` even when git tracks them. `tests/desk_wasm.test.ts` needs them too.
 - **Cloud sessions:** network and `npm ci` may be unavailable; without `node_modules` you cannot run tsc/tests/build. Say so honestly instead of claiming verification. Docs-only changes need no build.
+- **Device bridge:** `extension/` is plain JS/TS run directly (no build step; host needs Node ≥ 22.18 type stripping, so only erasable TS syntax: no enums/namespaces). The extension id is fixed by the `key` in `extension/manifest.json`; `extension/host/install.ts` derives it, so never change the key without reinstalling. `tests/host_bridge.test.ts` runs the real `content.js`/`background.js`/`desk_host.ts` in `vm` against the real host (no browser available in cloud sessions). Branded Chrome ≥ 137 ignores `--load-extension`; kiosk docs assume Chromium.
 - **Legacy residue:** `schema.ts` still accepts `landing`, `contact`, `error`, `resume` tags and `seo_text.tsx` handles them; no content uses them (migration to `hero`/`item` is done). Safe to remove when touching those files.
 - **Stale comments:** some file headers mention `client_*.ts` names, `jazu.config.ts`, `<resume format=…>`, `home_jason` — gen-11 names. Trust the code, fix the comment when you are there.
 - `README`/docs once claimed "22 regression tests / 68 routes"; the suite has grown. Re-measure before quoting numbers.
