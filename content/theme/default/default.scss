@@ -586,12 +586,35 @@ a {
         }
     }
 
-    &.crumb>&_summ {
-        padding: 0 0.125em;
-    }
+    &.crumb {
+        flex: 0 0 1.5em;
+        width: 1.5em;
+        min-width: 0;
+        margin: 0;
+        background: none;
+        border: 0;
 
-    &.crumb[open]>&_summ>span {
-        transform: rotate(90deg);
+        &::before, &::after {
+            content: none !important;
+        }
+
+        > .list_summ {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+
+            &::before, &::after {
+                content: none;
+            }
+        }
+
+        &[open] > .list_summ > span {
+            transform: rotate(90deg);
+        }
     }
 
     &[open]:has(> .list_drop)>&_summ::after {
@@ -834,7 +857,8 @@ a {
 }
 
 @media (max-width: 24em) {
-    #head_div {
+    #head_div,
+    .crumb {
         min-width: 0;
     }
 }
@@ -7925,10 +7949,10 @@ body:has(#motion_pause:checked) {
 #head_signature { display: flex; align-items: center; flex: 0 0 auto; padding-inline: .5em; }
 #head_signature #head_path_logo { height: 2em; width: auto; max-width: 7em; }
 #head_menu[hidden] { display: none !important; }
-#head_div { flex: 0 0 1.5em; width: 1.5em; min-width: 0; margin: 0; background: none; border: 0; }
-#head_div::before, #head_div::after { content: none !important; }
-#head_div > summary { display: flex; align-items: center; justify-content: center; padding: 0; }
-#head_div > summary::before, #head_div > summary::after { content: none; }
+#head_div, #head_path .crumb { flex: 0 0 1.5em; width: 1.5em; min-width: 0; margin: 0; background: none; border: 0; }
+#head_div::before, #head_div::after, #head_path .crumb::before, #head_path .crumb::after { content: none !important; }
+#head_div > summary, #head_path .crumb > summary { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0; border: 0; }
+#head_div > summary::before, #head_div > summary::after, #head_path .crumb > summary::before, #head_path .crumb > summary::after { content: none; }
 #head_path { flex: 0 1 auto; }
 #head_tray { display: contents; }
 #head_tray > :first-child {
