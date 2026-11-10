@@ -186,6 +186,11 @@ export async function run_wasm_instance(options: {
             } catch {}
         })()
 
+        let hasExited = false
+        let lineBuf = ""
+        let notifyExit = () => {}
+        const exitPromise = new Promise<null>(resolve => { notifyExit = () => resolve(null) })
+
         const stdinDone = (async () => {
             if (!proc.stdin) return
             try {
@@ -194,25 +199,56 @@ export async function run_wasm_instance(options: {
                     await proc.stdin.close()
                 } else if (options.stdin && typeof (options.stdin as text_stream).read === "function") {
                     const stream = options.stdin as text_stream
-                    while (true) {
-                        const chunk = await stream.read()
-                        if (chunk === null) break
-                        if (chunk.length > 0) await proc.stdin.write(chunk)
+                    while (!hasExited) {
+                        const chunk = await Promise.race([stream.read(), exitPromise])
+                        if (chunk === null || hasExited) break
+                        for (const char of chunk) {
+                            if (char === "\r" || char === "\n") {
+                                lineBuf += "\n"
+                                options.onStdout?.("\r\n")
+                                await proc.stdin.write(lineBuf)
+                                lineBuf = ""
+                            } else if (char === "\x7f" || char === "\b") {
+                                if (lineBuf.length > 0) {
+                                    lineBuf = lineBuf.slice(0, -1)
+                                    options.onStdout?.("\b \b")
+                                }
+                            } else if (char === "\x03") {
+                                break
+                            } else if (char === "\x04") {
+                                if (lineBuf.length > 0) {
+                                    await proc.stdin.write(lineBuf)
+                                    lineBuf = ""
+                                }
+                                await proc.stdin.close().catch(() => {})
+                                return
+                            } else {
+                                lineBuf += char
+                                options.onStdout?.(char)
+                            }
+                        }
                     }
-                    await proc.stdin.close()
+                    if (lineBuf.length > 0) {
+                        await proc.stdin.write(lineBuf)
+                    }
+                    await proc.stdin.close().catch(() => {})
                 } else if (options.stdin && Symbol.asyncIterator in (options.stdin as any)) {
                     for await (const chunk of (options.stdin as any)) {
+                        if (hasExited) break
                         await proc.stdin.write(chunk)
                     }
-                    await proc.stdin.close()
+                    await proc.stdin.close().catch(() => {})
                 } else {
-                    await proc.stdin.close()
+                    await proc.stdin.close().catch(() => {})
                 }
             } catch {}
         })()
 
         const result = await proc.wait({ check: false })
-        await Promise.all([stdoutDone, stderrDone, stdinDone])
+        hasExited = true
+        notifyExit()
+        try { await proc.stdin.close() } catch {}
+        await Promise.all([stdoutDone, stderrDone])
         return result.exitCode
     } finally {
         await appSb.close().catch(() => {})
