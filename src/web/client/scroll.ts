@@ -41,19 +41,6 @@ export function init_scroll(): void {
     addEventListener("scroll", queue, { passive: true })
     addEventListener("resize", queue)
     addEventListener("hashchange", queue)
-    document.addEventListener("click", event => {
-        if (event.defaultPrevented || event.button !== 0) return
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-        const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('#head_tabs a[href^="#"]:not([data-desk-tab]), a.landing_scroll[href^="#"]') : null
-        if (!link) return
-        const id = decodeURIComponent(link.hash.slice(1))
-        const target = id ? document.getElementById(id) : null
-        if (!target) return
-        event.preventDefault()
-        const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
-        target.scrollIntoView({ behavior: reduced ? "auto" : "smooth" })
-        if (location.hash !== link.hash) history.pushState(null, "", link.hash)
-    })
     setTimeout(() => {
         const background = document.querySelector(".background")
         if (background && !background.classList.contains("ready")) background.classList.add("fallback")

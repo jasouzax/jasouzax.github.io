@@ -99,9 +99,10 @@ body.page_portfolio .expertise > :not(.expertise_resume) {
 }
 
 /* ---- the form: two sheets of inline SVG --------------------------------------------------------------------------------------------- */
+/* display needs !important: the skeleton (layout.xml) ships [hidden] { display: none !important }, and the form is emitted hidden */
 body.page_portfolio .rireki {
     all: revert;
-    display: block;
+    display: block !important;
     margin: 0;
     padding: 0;
     background: #fff;
