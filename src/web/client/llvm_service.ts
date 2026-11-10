@@ -33,15 +33,16 @@ export async function getWasmer(): Promise<any> {
         } else {
             let mod: any = null
             if (typeof location !== "undefined") {
+                const base = (location.origin && location.origin !== "null") ? location.origin : location.href
+                const localUrl = new URL("/assets/wasmer/dist/index.js", base).href
                 try {
-                    const base = (location.origin && location.origin !== "null") ? location.origin : location.href
-                    const localUrl = new URL("/assets/wasmer/dist/index.js", base).href
                     mod = await import(/* @vite-ignore */ localUrl)
-                } catch {}
-            }
-            if (!mod) {
-                const cdnUrl = "https://cdn.jsdelivr.net/npm/@wasmer/sdk@0.19.1/dist/index.js"
-                mod = await import(/* @vite-ignore */ cdnUrl)
+                } catch (err: any) {
+                    console.error("Failed to load local Wasmer SDK:", err)
+                    throw new Error(`Failed to load local Wasmer SDK from ${localUrl}: ${err?.message || err}`)
+                }
+            } else {
+                throw new Error("Cannot locate Wasmer SDK: location is undefined in worker context")
             }
             Wasmer = mod.Wasmer
         }
@@ -54,6 +55,19 @@ export async function getClangPackage(onProgress?: (p: any) => void): Promise<an
     if (!clangPackagePromise) {
         clangPackagePromise = (async () => {
             const wasmer = await getWasmer()
+            // 1. Try local WEBC package first for offline compilation
+            try {
+                if (typeof location !== "undefined") {
+                    const base = (location.origin && location.origin !== "null") ? location.origin : location.href
+                    const localWebcUrl = new URL("/assets/wasm/clang.webc", base).href
+                    const response = await fetch(localWebcUrl)
+                    if (response.ok) {
+                        const buffer = await response.arrayBuffer()
+                        return await wasmer.packages.load(new Uint8Array(buffer), onProgress ? { onProgress } : undefined)
+                    }
+                }
+            } catch {}
+            // 2. Fall back to registry or local package cache
             return wasmer.packages.load("clang/clang", onProgress ? { onProgress } : undefined)
         })()
     }
