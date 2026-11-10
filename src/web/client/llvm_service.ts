@@ -26,7 +26,25 @@ let clangPackagePromise: Promise<any> | null = null
 
 export async function getWasmer(): Promise<any> {
     if (!wasmerInstance) {
-        const { Wasmer } = await import("@wasmer/sdk")
+        let Wasmer: any
+        if (typeof process !== "undefined" && process.versions?.node) {
+            const mod = await import("@wasmer/sdk")
+            Wasmer = mod.Wasmer
+        } else {
+            let mod: any = null
+            if (typeof location !== "undefined") {
+                try {
+                    const base = (location.origin && location.origin !== "null") ? location.origin : location.href
+                    const localUrl = new URL("/assets/wasmer/dist/index.js", base).href
+                    mod = await import(/* @vite-ignore */ localUrl)
+                } catch {}
+            }
+            if (!mod) {
+                const cdnUrl = "https://cdn.jsdelivr.net/npm/@wasmer/sdk@0.19.1/dist/index.js"
+                mod = await import(/* @vite-ignore */ cdnUrl)
+            }
+            Wasmer = mod.Wasmer
+        }
         wasmerInstance = new Wasmer()
     }
     return wasmerInstance

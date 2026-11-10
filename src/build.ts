@@ -181,6 +181,21 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         if (existsSync(p)) files.set(`assets/wasm/${name}`, readFileSync(p))
     }
     for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
+    const wasmer_root = join(root, "node_modules", "@wasmer", "sdk")
+    if (existsSync(wasmer_root)) {
+        for (const dir of ["dist", "pkg"]) {
+            const dir_path = join(wasmer_root, dir)
+            if (existsSync(dir_path)) {
+                for (const file of readdirSync(dir_path, { recursive: true })) {
+                    const full = join(dir_path, String(file))
+                    if (statSync(full).isFile()) {
+                        const rel = relative(wasmer_root, full).replace(/\\/g, "/")
+                        files.set(`assets/wasmer/${rel}`, readFileSync(full))
+                    }
+                }
+            }
+        }
+    }
     files.set("assets/wasm/manifest.json", JSON.stringify(images))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
