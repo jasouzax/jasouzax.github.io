@@ -97,3 +97,29 @@ int select(int count, fd_set *reads, fd_set *writes, fd_set *excepts, struct tim
     for (int i=0;i<n;i++) { if (reads && (fds[i].revents & POLLIN)) FD_SET(fds[i].fd, reads); if (writes && (fds[i].revents & POLLOUT)) FD_SET(fds[i].fd, writes); }
     return result;
 }
+
+#include <spawn.h>
+extern int desk_spawn(char **argv, char **envp);
+
+int posix_spawn(pid_t *pid, const char *path,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *attrp,
+                char *const argv[], char *const envp[]) {
+    (void)file_actions; (void)attrp;
+    extern char **environ;
+    char *default_argv[] = {(char *)path, NULL};
+    char **use_argv = argv ? (char **)argv : default_argv;
+    char **use_envp = envp ? (char **)envp : environ;
+    int res = desk_spawn(use_argv, use_envp);
+    if (res < 0) return -res;
+    if (pid) *pid = res;
+    return 0;
+}
+
+int posix_spawnp(pid_t *pid, const char *file,
+                 const posix_spawn_file_actions_t *file_actions,
+                 const posix_spawnattr_t *attrp,
+                 char *const argv[], char *const envp[]) {
+    return posix_spawn(pid, file, file_actions, attrp, argv, envp);
+}
+

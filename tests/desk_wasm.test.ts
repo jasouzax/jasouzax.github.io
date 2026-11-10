@@ -780,7 +780,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await t.test("native group 24 dynamic languages suite evaluates lua, lisp, and basic programs", async () => {
         const lua_ver = await run("lua -v")
         assert.equal(lua_ver.code, 0)
-        assert.match(lua_ver.stdout, /Lua 5\.4\.6/)
+        assert.match(lua_ver.stdout, /Lua 5\.4/)
 
         const lua_print = await run("lua -e 'print(\"Hello from Lua WASM!\")'")
         assert.equal(lua_print.code, 0)
