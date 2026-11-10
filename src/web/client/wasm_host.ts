@@ -338,8 +338,13 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                                     spawn_argv = ["wasm-runner", candidate, ...a.argv.slice(1)]
                                     break
                                 } else if (bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
-                                    path = "/bin/box86"
-                                    spawn_argv = ["box86", candidate, ...a.argv.slice(1)]
+                                    if (bytes[4] === 2) {
+                                        path = "/bin/box64"
+                                        spawn_argv = ["box64", candidate, ...a.argv.slice(1)]
+                                    } else {
+                                        path = "/bin/box86"
+                                        spawn_argv = ["box86", candidate, ...a.argv.slice(1)]
+                                    }
                                     break
                                 }
                             }
@@ -497,10 +502,13 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                             try {
                                 const bytes = await p.fs.read_bytes(path)
                                 if (bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
-                                    const box86 = executables.get("/bin/box86") || executables.get("/bin/linux-exec")
-                                    if (box86) {
-                                        next = box86
-                                        exec_argv = ["box86", path, ...a.argv.slice(1)]
+                                    const is64 = bytes[4] === 2
+                                    const runnerName = is64 ? "box64" : "box86"
+                                    const altRunner = is64 ? "linux64-exec" : "linux-exec"
+                                    const runner = executables.get("/bin/" + runnerName) || executables.get("/bin/" + altRunner)
+                                    if (runner) {
+                                        next = runner
+                                        exec_argv = [runnerName, path, ...a.argv.slice(1)]
                                     }
                                 } else if (bytes.length >= 2 && bytes[0] === 0x4d && bytes[1] === 0x5a) {
                                     const wine = executables.get("/bin/wine") || executables.get("/bin/win-exec")

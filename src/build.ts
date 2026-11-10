@@ -159,7 +159,7 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["audio_suite", "1.0.0-jazu.1", "tar.gz", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"]],
         ["disk_archive_suite", "1.0.0-jazu.1", "tar.gz", ["iat", "7z", "p7zip"]],
         ["linux_suite", "1.0.0-jazu.1", "tar.gz", ["file", "readelf"]],
-        ["exec_suite", "1.0.0-jazu.1", "tar.gz", ["box86", "linux-exec", "wine", "win-exec"]],
+        ["exec_suite", "1.0.0-jazu.1", "tar.gz", ["box86", "linux-exec", "box64", "linux64-exec", "wine", "win-exec"]],
         ["tcc", "0.9.27-jazu.1", "tar.bz2", ["tcc", "cc"]],
         ["x86_64-tcc", "0.9.27-jazu.1", "tar.bz2", ["x86_64-tcc"]],
         ["gcc", "14.2.0-jazu.1", "tar.gz", ["gcc", "g++", "cpp", "clang", "clang++"]],

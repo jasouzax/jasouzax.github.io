@@ -112,7 +112,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("audio_suite", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"])
     await register_program("disk_archive_suite", ["iat", "7z", "p7zip"])
     await register_program("linux_suite", ["file", "readelf"])
-    await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
+    await register_program("exec_suite", ["box86", "linux-exec", "box64", "linux64-exec", "wine", "win-exec"])
     await register_program("tcc", ["tcc", "cc"])
     await register_program("x86_64-tcc", ["x86_64-tcc"])
     await register_program("gcc", ["gcc", "g++", "cpp", "clang", "clang++"])
@@ -646,6 +646,10 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(box_ver.code, 0)
         assert.match(box_ver.stdout, /Box86 v0\.3\.2/)
 
+        const box64_ver = await run("box64 --version")
+        assert.equal(box64_ver.code, 0)
+        assert.match(box64_ver.stdout, /Box64 v0\.3\.0/)
+
         const wine_ver = await run("wine --version")
         assert.equal(wine_ver.code, 0)
         assert.match(wine_ver.stdout, /wine-9\.0/)
@@ -707,13 +711,30 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(x86_comp.code, 0)
         assert.match(x86_comp.stdout, /ELF 64-bit/)
 
+        const x86_run = await run("/home/user/x64_app")
+        assert.equal(x86_run.code, 0)
+        assert.match(x86_run.stdout, /Hello from x86_64-tcc!/)
+
         const tcc_m64 = await run("cd /home/user; tcc main_x64.c -o /home/user/m64_app -m64; file /home/user/m64_app")
         assert.equal(tcc_m64.code, 0)
         assert.match(tcc_m64.stdout, /ELF 64-bit/)
 
+        const m64_run = await run("/home/user/m64_app")
+        assert.equal(m64_run.code, 0)
+        assert.match(m64_run.stdout, /Hello from x86_64-tcc!/)
+
         const clang_x64 = await run("cd /home/user; clang -target x86_64-pc-linux-gnu main_x64.c -o clang_x64_app; file clang_x64_app")
         assert.equal(clang_x64.code, 0)
         assert.match(clang_x64.stdout, /ELF 64-bit/)
+
+        const clang_run = await run("cd /home/user; ./clang_x64_app")
+        assert.equal(clang_run.code, 0)
+        assert.match(clang_run.stdout, /Hello from x86_64-tcc!/)
+
+        const user_x64_age = await run("printf '#include <stdio.h>\\nint main() {\\n    int age;\\n    printf(\"Enter your age: \");\\n    scanf(\"%%d\", &age);\\n    printf(\"Your age is: %%d\\\\n\", age);\\n    return 0;\\n}\\n' > /home/user/main_age64.c; cd /home/user; x86_64-tcc main_age64.c -o age64_app; printf '42\\n' | ./age64_app")
+        assert.equal(user_x64_age.code, 0)
+        assert.match(user_x64_age.stdout, /Enter your age: /)
+        assert.match(user_x64_age.stdout, /Your age is: 42/)
 
         const user_c = await run("printf '#include <stdio.h>\\nint main() {\\n  char name[64];\\n  printf(\"Enter name:\\\\n\");\\n  scanf(\"%%[^\\\\n]\", name);\\n  printf(\"Hello %%s!\", name);\\n  return 0;\\n}\\n' > /home/user/main_scanf.c; cd /home/user; gcc main_scanf.c -o scanf_app; printf 'Jasouza\\n' | ./scanf_app")
         assert.equal(user_c.code, 0)
