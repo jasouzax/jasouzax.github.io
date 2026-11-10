@@ -127,6 +127,8 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
                 inc_paths.push(args[++i])
             } else if (arg.startsWith("-I") && arg.length > 2) {
                 inc_paths.push(arg.slice(2))
+            } else if ((arg === "-target" || arg === "--target" || arg === "-arch" || arg === "-x" || arg === "-sysroot" || arg === "--sysroot") && i + 1 < args.length) {
+                extra_flags.push(arg, args[++i])
             } else if (arg.startsWith("-")) {
                 extra_flags.push(arg)
             } else {
