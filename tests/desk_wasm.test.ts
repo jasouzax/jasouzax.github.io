@@ -8,6 +8,7 @@ import { build } from "esbuild"
 import { register_wasm, registered_programs } from "../src/web/client/wasm_host.ts"
 import type { worker_factory } from "../src/web/client/wasm_host.ts"
 import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web/client/kernel.ts"
+import { cleanup_llvm } from "../src/web/client/llvm_service.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
 test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 300000 }, async t => {
@@ -54,7 +55,15 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
     async function register_program(name: string, commands: string[] = [name]) {
         const worker_path = resolve(`.cache/desk-test-${name}-worker.cjs`)
-        await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker_${name}.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_path, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })
+        await build({
+            stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker_${name}.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() },
+            outfile: worker_path,
+            platform: "node",
+            format: "cjs",
+            bundle: true,
+            logLevel: "silent",
+            external: ["@wasmer/sdk"]
+        })
         const wasm_bytes = readFileSync(resolve(`src/desk/programs/artifacts/${name}.wasm`))
         register_wasm({ id: name, version: "1.0.0", worker: worker_path, wasm: "data:application/wasm;base64," + wasm_bytes.toString("base64"), sha256: createHash("sha256").update(wasm_bytes).digest("hex"), commands }, factory)
     }
@@ -95,7 +104,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("linux_suite", ["file", "readelf"])
     await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
     await register_program("tcc", ["tcc", "cc"])
-    await register_program("gcc", ["gcc", "g++", "cpp"])
+    await register_program("gcc", ["gcc", "g++", "cpp", "clang", "clang++"])
     await register_program("make", ["make"])
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
@@ -103,7 +112,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("perl_suite", ["perl"])
     await register_program("lang_suite", ["lua", "lisp", "basic"])
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
-    t.after(reset_kernel)
+    t.after(() => {
+        reset_kernel()
+        cleanup_llvm()
+        setTimeout(() => process.exit(0), 500)
+    })
     const run = async (script: string) => {
         let stdout = "", stderr = ""
         const proc = start_process(["sh", "-c", script], { root: true, cwd: "/home/user", env: { PATH: "/bin", HOME: "/home/user" }, stdout: make_sink(text => { stdout += text }), stderr: make_sink(text => { stderr += text }) })
@@ -647,6 +660,10 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         assert.equal(gxx_ver.code, 0)
         assert.match(gxx_ver.stdout, /g\+\+ \(GCC\) 14\.2\.0/)
 
+        const clang_ver = await run("clang --version")
+        assert.equal(clang_ver.code, 0)
+        assert.match(clang_ver.stdout, /clang version 16\.0\.0/)
+
         const make_ver = await run("make --version")
         assert.equal(make_ver.code, 0)
         assert.match(make_ver.stdout, /GNU Make 4\.4\.1/)
@@ -662,6 +679,10 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const gcc_comp = await run("printf '#include <stdio.h>\\nint main() { printf(\"Hello from compiled GCC!\\\\n\"); return 0; }\\n' > /home/user/main2.c; gcc /home/user/main2.c -o /home/user/gcc_app; /home/user/gcc_app")
         assert.equal(gcc_comp.code, 0)
         assert.match(gcc_comp.stdout, /Hello from compiled GCC!/)
+
+        const clang_comp = await run("printf '#include <stdio.h>\\nint main(void) { printf(\"Hello from genuine Clang LLVM!\\\\n\"); return 0; }\\n' > /home/user/clang_test.c; clang /home/user/clang_test.c -o /home/user/clang_app; /home/user/clang_app")
+        assert.equal(clang_comp.code, 0)
+        assert.match(clang_comp.stdout, /Hello from genuine Clang LLVM!/)
 
         const tcc_default = await run("printf '#include <stdio.h>\\nint main() { printf(\"Default a.out output\\\\n\"); return 0; }\\n' > /home/user/main3.c; cd /home/user; tcc main3.c; ./a.out")
         assert.equal(tcc_default.code, 0)

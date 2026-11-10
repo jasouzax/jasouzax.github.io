@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@wasmer/sdk": "^0.19.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "esbuild": "^0.28.2",

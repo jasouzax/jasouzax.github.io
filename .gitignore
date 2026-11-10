@@ -1,6 +1,7 @@
 # Generated / local
 codebase*.zip
 .cache/
+.wasmer/
 dist/
 .wrangler/
 node_modules/

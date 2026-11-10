@@ -2,6 +2,7 @@ import type { proc_api, program, stat_info } from "./proc_types.ts"
 import type { descriptor, fork_state, wasm_image, worker_message, worker_start } from "./wasm_protocol.ts"
 import { rpc_capacity, errno, error_number } from "./wasm_protocol.ts"
 import { proc_record, browser_system } from "./wasm_procfs.ts"
+import { run_wasm_runner } from "./llvm_service.ts"
 
 const encoder = new TextEncoder()
 type byte_queue = { chunks: Uint8Array[], readers: (() => void)[], writers: number, size: number }
@@ -23,7 +24,10 @@ async function with_file<T>(path: string, operation: () => Promise<T>): Promise<
     try { return await operation() }
     finally { release(); if (file_locks.get(path) === next) file_locks.delete(path) }
 }
-export const registered_programs: Record<string, program> = {}
+export const registered_programs: Record<string, program> = {
+    "wasm-runner": run_wasm_runner,
+    "wasm-exec": run_wasm_runner,
+}
 export function inherit_descriptors(descriptors: descriptor[]): descriptor[] {
     for (const descriptor of descriptors) get(descriptor.handle).refs++
     return descriptors
@@ -322,12 +326,31 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
             case "spawn": {
                 const env = Object.fromEntries(a.env.map((entry: string) => { const at = entry.indexOf("="); return [entry.slice(0, at), entry.slice(at + 1)] }))
                 const paths = a.argv[0].includes("/") ? [norm(a.argv[0].startsWith("/") ? a.argv[0] : a.cwd + "/" + a.argv[0])] : (env.PATH ?? "/bin").split(":").map((dir: string) => norm((dir.startsWith("/") ? dir : a.cwd + "/" + dir) + "/" + a.argv[0]))
-                const path = paths.find((path: string) => executables.has(path) || (path.startsWith("/bin/") && registered_programs[path.slice(5)]))
+                let path = paths.find((path: string) => executables.has(path) || (path.startsWith("/bin/") && registered_programs[path.slice(5)]))
+                let spawn_argv = [path ? path.split("/").pop()! : a.argv[0], ...a.argv.slice(1)]
+                if (!path && p.fs.read_bytes) {
+                    for (const candidate of paths) {
+                        try {
+                            if (await p.fs.stat(candidate)) {
+                                const bytes = await p.fs.read_bytes(candidate)
+                                if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x61 && bytes[2] === 0x73 && bytes[3] === 0x6d) {
+                                    path = "/bin/wasm-runner"
+                                    spawn_argv = ["wasm-runner", candidate, ...a.argv.slice(1)]
+                                    break
+                                } else if (bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46) {
+                                    path = "/bin/box86"
+                                    spawn_argv = ["box86", candidate, ...a.argv.slice(1)]
+                                    break
+                                }
+                            }
+                        } catch {}
+                    }
+                }
                 if (!path) return -errno.ENOENT
                 for (const d of a.descriptors) get(d.handle).refs++
                 const is_wasm = executables.has(path)
                 const bridge = is_wasm ? {} : bridge_descriptors(a.descriptors)
-                const child = p.spawn([path.split("/").pop()!, ...a.argv.slice(1)], {
+                const child = p.spawn(spawn_argv, {
                     cwd: a.cwd,
                     env,
                     ...(bridge.stdin ? { stdin: bridge.stdin } : {}),
@@ -467,7 +490,7 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                     if (data.op === "exec") {
                         const a = data.args
                         const raw = a.file === "/proc/self/exe" ? "/bin/sh" : a.file
-                        const path = raw.startsWith("/") ? norm(raw) : norm((a.cwd || p.cwd) + "/" + raw)
+                        let path = raw.startsWith("/") ? norm(raw) : norm((a.cwd || p.cwd) + "/" + raw)
                         let next = executables.get(path)
                         let exec_argv = [path.split("/").pop()!, ...a.argv.slice(1)]
                         if (!next && (await p.fs.stat(path)) && p.fs.read_bytes) {
@@ -484,6 +507,13 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
                                     if (wine) {
                                         next = wine
                                         exec_argv = ["wine", path, ...a.argv.slice(1)]
+                                    }
+                                } else if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x61 && bytes[2] === 0x73 && bytes[3] === 0x6d) {
+                                    const runner = (registered_programs as Record<string, program | undefined>)["wasm-runner"] || (registered_programs as Record<string, program | undefined>)["wasm-exec"]
+                                    if (runner !== undefined) {
+                                        const raw_target = path
+                                        path = "/bin/wasm-runner"
+                                        a.argv = ["wasm-runner", raw_target, ...a.argv.slice(1)]
                                     }
                                 }
                             } catch {}
