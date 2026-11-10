@@ -1,6 +1,7 @@
 # Generated / local
 codebase*.zip
 .cache/
+.wasmer/
 dist/
 .wrangler/
 node_modules/
@@ -8,6 +9,15 @@ node_modules/
 *.tar.gz
 *.tar.bz2
 *.wasm
+*.webc
+
+# Build directory: ignore all compiled artifacts and external sources, but keep custom implementations
+/build/*
+!/build/*/
+/build/*/*
+!/build/*/custom/
+!/build/*/custom/**
+
 
 # Secrets and local config
 .env
