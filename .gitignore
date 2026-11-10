@@ -12,12 +12,9 @@ node_modules/
 *.webc
 
 # Build directory: ignore all compiled artifacts and external sources, but keep custom implementations
-/build/*
-!/build/*/
-/build/*/*
-!/build/*/custom/
+/build/**
 !/build/*/custom/**
-
+!/build/*.md
 
 # Secrets and local config
 .env
