@@ -15,7 +15,7 @@ import { FitAddon } from "@xterm/addon-fit"
 export const pid_mime = "application/x-pid"
 
 // the page script's data-desk-shell attribute is the address of the shell bundle; document.currentScript is only set while it first runs
-const shell_url = document.currentScript?.getAttribute("data-desk-shell") ?? ""
+const shell_url = document.currentScript?.getAttribute("data-desk-shell") ?? (typeof document !== "undefined" ? (document.querySelector("script[data-desk-shell]") as HTMLScriptElement | null)?.getAttribute("data-desk-shell") ?? "" : "")
 
 type shell_window = Window & { jazu_desk_shell?: { programs: Record<string, program>, ready: Promise<void> } }
 

@@ -93,7 +93,7 @@ test("personal Git adapter reads only safe public repository resources", async (
     } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
-test("deployment staging separates oversized R2 assets from the Pages upload", () => {
+test("deployment staging separates oversized R2 assets from the Pages upload", async () => {
     const root = mkdtempSync(join(tmpdir(), "jazu_deploy_"))
     try {
         mkdirSync(join(root, "dist/assets/media"), { recursive: true })
@@ -101,10 +101,9 @@ test("deployment staging separates oversized R2 assets from the Pages upload", (
         writeFileSync(join(root, "dist/index.html"), "home")
         writeFileSync(join(root, "dist/stray_secret.txt"), "do not deploy")
         writeFileSync(join(root, "dist/.jazu_output.json"), JSON.stringify(["index.html", "assets/media/large.mp4"]))
-        writeFileSync(join(root, "wrangler.jsonc"), readFileSync(resolve("wrangler.jsonc")))
         const result = { model: { config: { base_url: "https://example.com", deploy: { worker_name: "router", pages_project: "pages" } }, objects: [] } } as unknown as build_result
-        const stage = prepare_deploy(root, join(root, "dist"), result, 10)
-        const pages = JSON.parse(readFileSync(stage.pages_config, "utf8")).pages_build_output_dir
+        const stage = await prepare_deploy(root, join(root, "dist"), result, 10)
+        const pages = stage.pages_dir
         assert(existsSync(join(pages, "index.html")))
         assert(!existsSync(join(pages, "assets/media/large.mp4")))
         assert(!existsSync(join(pages, "stray_secret.txt")))

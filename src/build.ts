@@ -79,6 +79,7 @@ async function bundle_script(root: string, entry: string, files: output_files, m
     const result = await esbuild_build({
         entryPoints: [{ in: join(root, "src", "web", "client", `${entry}.ts`), out: entry }], outdir, write: false, bundle: true, format: "iife",
         minify: mode === "production", entryNames: "assets/runtime/[name].[hash]", target: "es2020", logLevel: "silent",
+        external: ["node:*", "ws", "@wasmer/sdk"],
     })
     const output = result.outputFiles[0]
     const rel = relative(outdir, output.path).replace(/\\/g, "/")
@@ -87,30 +88,135 @@ async function bundle_script(root: string, entry: string, files: output_files, m
 }
 
 async function bundle_runtime(root: string, files: output_files, mode: string): Promise<{ page: string, theme_switch: string, desk_shell: string, boot: string }> {
-    const artifact = join(root, "src", "desk", "busybox", "artifacts")
+    const build_dir = join(root, "build")
+    const bb_dir = join(build_dir, "busybox")
     const worker = await bundle_script(root, "wasm_worker", files, mode)
-    const wasm_bytes = readFileSync(join(artifact, "busybox.wasm"))
+    const wasm_bytes = readFileSync(join(bb_dir, "busybox.wasm"))
     const hash = sha256(wasm_bytes)
     const wasm_path = `assets/wasm/busybox-${hash.slice(0, 10)}.wasm`
     files.set(wasm_path, wasm_bytes)
-    files.set("assets/wasm/busybox-LICENSE", readFileSync(join(artifact, "LICENSE")))
-    files.set("assets/wasm/busybox.config", readFileSync(join(artifact, "busybox.config")))
+    files.set("assets/wasm/busybox-LICENSE", readFileSync(join(bb_dir, "LICENSE")))
+    files.set("assets/wasm/busybox.config", readFileSync(join(bb_dir, "busybox.config")))
     files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
-    files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(artifact, "busybox-source.tar.bz2")))
-    for (const name of ["build.sh", "port.py", "host.c"]) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(join(root, "src", "desk", "busybox", name)))
+    files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(bb_dir, "busybox-source.tar.bz2")))
+    for (const name of ["build.sh", "port.py", "host.c"]) {
+        const p = join(bb_dir, "custom", name)
+        if (existsSync(p)) files.set(`assets/wasm/busybox-port/${name}`, readFileSync(p))
+    }
     const images = [{ id: "busybox", version: "1.36.1-jazu.2", worker, wasm: "/" + wasm_path, sha256: hash,
-        commands: JSON.parse(readFileSync(join(artifact, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
-    const programs = join(root, "src", "desk", "programs", "artifacts")
-    for (const [name, version, extension] of [["fastfetch", "2.40.4-jazu.1", "tar.gz"], ["htop", "3.4.1-jazu.1", "tar.gz"], ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"]]) {
-        const bytes = readFileSync(join(programs, `${name}.wasm`)), hash = sha256(bytes)
+        commands: JSON.parse(readFileSync(join(bb_dir, "commands.json"), "utf8")) as string[], license: "/assets/wasm/busybox-LICENSE", source: "/assets/wasm/busybox-source.tar.bz2" }]
+    for (const [name, version, extension, cmd_list] of [
+        ["fastfetch", "2.40.4-jazu.1", "tar.gz"],
+        ["htop", "3.4.1-jazu.1", "tar.gz"],
+        ["tcc", "0.9.27-i386-jazu.1", "tar.bz2"],
+        ["jq", "1.7.1-jazu.1", "tar.gz"],
+        ["bchunk", "1.2.2-jazu.1", "tar.gz"],
+        ["caesar", "1.0.0-bsd-jazu.1", "tar.gz"],
+        ["morse", "1.0.0-bsd-jazu.1", "tar.gz"],
+        ["optipng", "0.7.8-jazu.1", "tar.gz"],
+        ["cwebp", "1.4.0-jazu.1", "tar.gz"],
+        ["dwebp", "1.4.0-jazu.1", "tar.gz"],
+        ["potrace", "1.16-jazu.1", "tar.gz"],
+        ["flac", "1.4.3-jazu.1", "tar.xz"],
+        ["mkbitmap", "1.16-jazu.1", "tar.gz"],
+        ["metaflac", "1.4.3-jazu.1", "tar.xz"],
+        ["bin2iso", "1.9.b-jazu.1", "tar.gz"],
+        ["tree", "2.1.3-jazu.1", "tar.gz"],
+        ["pwgen", "2.08-jazu.1", "tar.gz"],
+        ["lame", "3.100-jazu.1", "tar.gz"],
+        ["urlencode", "1.0.0-jazu.1", "tar.gz", ["urlencode", "urldecode"]],
+        ["htmlencode", "1.0.0-jazu.1", "tar.gz", ["htmlencode", "htmldecode"]],
+        ["rot13", "1.0.0-jazu.1", "tar.gz"],
+        ["atob", "1.0.0-jazu.1", "tar.gz"],
+        ["btoa", "1.0.0-jazu.1", "tar.gz"],
+        ["sha384sum", "1.0.0-jazu.1", "tar.gz"],
+        ["json_flatten", "1.0.0-jazu.1", "tar.gz", ["json-flatten"]],
+        ["csv_json", "1.0.0-jazu.1", "tar.gz", ["csv2json", "json2csv", "tsv2json", "json2tsv"]],
+        ["json2yaml", "1.0.0-jazu.1", "tar.gz", ["json2yaml"]],
+        ["ini_env_json", "1.0.0-jazu.1", "tar.gz", ["ini2json", "env2json", "json2env"]],
+        ["casing_tools", "1.0.0-jazu.1", "tar.gz", ["title-case", "titlecase", "camel-case", "camelcase", "snake-case", "snakecase", "kebab-case", "kebabcase", "slugify"]],
+        ["text_stats", "1.0.0-jazu.1", "tar.gz", ["count-chars", "charfreq"]],
+        ["text_gen", "1.0.0-jazu.1", "tar.gz", ["lorem", "str-repeat"]],
+        ["banner", "1.0.0-jazu.1", "tar.gz", ["banner", "banner-js"]],
+        ["word_games", "1.0.0-jazu.1", "tar.gz", ["pig-latin", "anagram", "palindrome"]],
+        ["numbase", "1.0.0-jazu.1", "tar.gz", ["numbase", "dec2bin", "dec2hex", "dec2oct", "hex2dec"]],
+        ["random_bytes", "1.0.0-jazu.1", "tar.gz", ["random-bytes"]],
+        ["math_suite", "1.0.0-jazu.1", "tar.gz", ["fib", "fibonacci", "gcd", "lcm", "stats", "matrix"]],
+        ["uuid_token", "1.0.0-jazu.1", "tar.gz", ["uuidgen", "uuidgen-js", "nanoid"]],
+        ["color_tools", "1.0.0-jazu.1", "tar.gz", ["hex2rgb", "rgb2hex", "color-mix"]],
+        ["date_units", "1.0.0-jazu.1", "tar.gz", ["date-diff", "bytes-human", "temp", "unit"]],
+        ["qr", "1.0.0-jazu.1", "tar.gz", ["qr"]],
+        ["net_tools", "1.0.0-jazu.1", "tar.gz", ["url-parse", "http-status", "mime-type"]],
+        ["file_analysis", "1.0.0-jazu.1", "tar.gz", ["entropy", "detect-encoding", "file-info"]],
+        ["string_helpers", "1.0.0-jazu.1", "tar.gz", ["escape-string", "unescape-string", "count-tokens"]],
+        ["markup_tools", "1.0.0-jazu.1", "tar.gz", ["md2html", "html2text"]],
+        ["tools_catalog", "1.0.0-jazu.1", "tar.gz", ["tools"]],
+        ["encoding_suite", "1.0.0-jazu.1", "tar.gz", ["iconv", "recode"]],
+        ["xml_suite", "1.0.0-jazu.1", "tar.gz", ["xmlstarlet", "xq"]],
+        ["yq", "1.0.0-jazu.1", "tar.gz", ["yq"]],
+        ["csv_suite", "1.0.0-jazu.1", "tar.gz", ["csvsql", "csvformat", "xlsx2csv", "csvjson", "in2csv"]],
+        ["pdf_suite", "1.0.0-jazu.1", "tar.gz", ["pdfinfo", "pdftotext", "pdfimages", "img2pdf", "qpdf"]],
+        ["postscript_suite", "1.0.0-jazu.1", "tar.gz", ["enscript", "a2ps"]],
+        ["doc_suite", "1.0.0-jazu.1", "tar.gz", ["antiword", "docx2txt", "odt2txt"]],
+        ["image_suite", "1.0.0-jazu.1", "tar.gz", ["pngtopnm", "pnmtopng", "jpegtopnm", "pnmtojpeg", "jpegoptim"]],
+        ["audio_suite", "1.0.0-jazu.1", "tar.gz", ["sox", "soxi", "oggdec", "oggenc", "opusdec", "opusenc"]],
+        ["disk_archive_suite", "1.0.0-jazu.1", "tar.gz", ["iat", "7z", "p7zip"]],
+        ["linux_suite", "1.0.0-jazu.1", "tar.gz", ["file", "readelf"]],
+        ["exec_suite", "1.0.0-jazu.1", "tar.gz", ["box86", "linux-exec", "box64", "linux64-exec", "wine", "win-exec"]],
+        ["tcc", "0.9.27-jazu.1", "tar.bz2", ["tcc", "cc"]],
+        ["x86_64-tcc", "0.9.27-jazu.1", "tar.bz2", ["x86_64-tcc"]],
+        ["gcc", "14.2.0-jazu.1", "tar.gz", ["gcc", "g++", "cpp", "clang", "clang++"]],
+        ["make", "4.4.1-jazu.1", "tar.gz", ["make"]],
+        ["python_suite", "1.0.0-jazu.1", "tar.gz", ["python", "python3", "pip", "venv"]],
+        ["rust_suite", "1.0.0-jazu.1", "tar.gz", ["rustc", "rust-runner", "cargo"]],
+        ["jvm_suite", "1.0.0-jazu.1", "tar.gz", ["java", "javac"]],
+        ["perl_suite", "1.0.0-jazu.1", "tar.gz", ["perl"]],
+        ["lang_suite", "1.0.0-jazu.1", "tar.gz", ["lua", "lisp", "basic"]],
+    ] as [string, string, string, string[]?][]) {
+        const pkg_dir = join(build_dir, name)
+        const bytes = readFileSync(join(pkg_dir, `${name}.wasm`)), hash = sha256(bytes)
         const path = `assets/wasm/${name}-${hash.slice(0, 10)}.wasm`
         files.set(path, bytes)
-        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(join(programs, `${name}-LICENSE`)))
-        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(programs, `${name}-source.${extension}`)))
-        images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
+        const lic_path = existsSync(join(pkg_dir, `${name}-LICENSE`)) ? join(pkg_dir, `${name}-LICENSE`) : join(pkg_dir, "LICENSE")
+        files.set(`assets/wasm/${name}-LICENSE`, readFileSync(lic_path))
+        files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(pkg_dir, `${name}-source.${extension}`)))
+        images.push({ id: name, version, worker: await bundle_script(root, `wasm_worker_${name}`, files, mode), wasm: "/" + path, sha256: hash, commands: cmd_list ?? [name], license: `/assets/wasm/${name}-LICENSE`, source: `/assets/wasm/${name}-source.${extension}` })
     }
-    for (const name of ["ncurses-source.tar.gz", "tcc-sysroot.json", "tcc-sysroot-LICENSE"]) files.set(`assets/wasm/${name}`, readFileSync(join(programs, name)))
-    for (const name of ["build.sh", "port.py", "compat.c", "htop_processes.c", "package.ts", "README.md"]) files.set(`assets/wasm/programs-port/${name}`, readFileSync(join(root, "src", "desk", "programs", name)))
+    const extra_assets: [string, string][] = [
+        ["htop", "ncurses-source.tar.gz"],
+        ["tcc", "tcc-sysroot.json"],
+        ["tcc", "tcc-sysroot-LICENSE"],
+        ["python_suite", "python_stdlib.zip"],
+        ["python_suite", "pyodide.asm.js"],
+        ["python_suite", "pyodide-lock.json"],
+        ["python_suite", "pyodide.asm.wasm"],
+        ["python_suite", "numpy-2.0.2-cp312-cp312-pyodide_2024_0_wasm32.whl"],
+        ["clang", "clang.webc"],
+    ]
+    for (const [pkg, asset] of extra_assets) {
+        const p = join(build_dir, pkg, asset)
+        if (existsSync(p)) files.set(`assets/wasm/${asset}`, readFileSync(p))
+    }
+    const common_custom = join(build_dir, "common", "custom")
+    for (const name of ["build.sh", "port.py", "compat.c", "package.ts"]) {
+        const p = join(common_custom, name)
+        if (existsSync(p)) files.set(`assets/wasm/programs-port/${name}`, readFileSync(p))
+    }
+    const wasmer_root = join(root, "node_modules", "@wasmer", "sdk")
+    if (existsSync(wasmer_root)) {
+        for (const dir of ["dist", "pkg"]) {
+            const dir_path = join(wasmer_root, dir)
+            if (existsSync(dir_path)) {
+                for (const file of readdirSync(dir_path, { recursive: true })) {
+                    const full = join(dir_path, String(file))
+                    if (statSync(full).isFile()) {
+                        const rel = relative(wasmer_root, full).replace(/\\/g, "/")
+                        files.set(`assets/wasmer/${rel}`, readFileSync(full))
+                    }
+                }
+            }
+        }
+    }
     files.set("assets/wasm/manifest.json", JSON.stringify(images))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)

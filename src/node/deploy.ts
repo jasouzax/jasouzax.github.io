@@ -6,7 +6,7 @@ import type { build_result } from "../build.ts"
 import { output_file } from "../paths.ts"
 
 export type asset_upload = { key: string, file: string, size: number, content_type: string }
-const mime: Record<string, string> = { mp4: "video/mp4", webm: "video/webm", png: "image/png", jpg: "image/jpeg", avif: "image/avif", wasm: "application/wasm", mp3: "audio/mpeg", woff2: "font/woff2" }
+const mime: Record<string, string> = { mp4: "video/mp4", webm: "video/webm", png: "image/png", jpg: "image/jpeg", avif: "image/avif", wasm: "application/wasm", mp3: "audio/mpeg", woff2: "font/woff2", js: "text/javascript", json: "application/json", zip: "application/zip", whl: "application/octet-stream" }
 
 export async function prepare_deploy(root: string, out: string, result: build_result, limit = 25 * 1024 * 1024): Promise<{ pages_dir: string, worker_bundle: string, var_file: string, uploads: asset_upload[] }> {
     // A unique staging folder prevents removed files from surviving between preparations.
@@ -28,7 +28,8 @@ export async function prepare_deploy(root: string, out: string, result: build_re
     }
     // Terraform uploads a single ES module, so bundle the Worker (and its local imports) here.
     const worker_bundle = join(stage, "worker.js")
-    await esbuild_build({ entryPoints: [join(root, "src/node/worker.ts")], outfile: worker_bundle, bundle: true, format: "esm", platform: "neutral", target: "es2022", minify: false, logLevel: "silent" })
+    const worker_entry = existsSync(join(root, "src/node/worker.ts")) ? join(root, "src/node/worker.ts") : resolve("src/node/worker.ts")
+    await esbuild_build({ entryPoints: [worker_entry], outfile: worker_bundle, bundle: true, format: "esm", platform: "neutral", target: "es2022", minify: false, logLevel: "silent" })
     const projects = [...new Set(result.model.objects.filter(node => node.tag === "project").map(node => node.attrs.id))]
     const var_file = join(stage, "deploy.auto.tfvars.json")
     writeFileSync(var_file, JSON.stringify({

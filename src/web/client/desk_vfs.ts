@@ -15,6 +15,7 @@ function ensure_compiler_headers(): Promise<void> {
         if (!root) throw new Error("ENOENT")
         // Existing system directories are not resurrected if root removed them.
         const usr = await root.getDirectoryHandle("usr")
+        const usr_include = await usr.getDirectoryHandle("include", { create: true })
         const lib = await usr.getDirectoryHandle("lib", { create: true })
         const tcc = await lib.getDirectoryHandle("tcc", { create: true })
         const include = await tcc.getDirectoryHandle("include", { create: true })
@@ -24,10 +25,19 @@ function ensure_compiler_headers(): Promise<void> {
         for (const [name, text] of Object.entries(files)) {
             const parts = name.split("/")
             if (parts.some(part => !part || part === "." || part === ".." || part.includes("\\"))) throw new Error("Invalid compiler header path")
-            let directory = include
+            const is_lib = name.startsWith("lib/")
+            let directory = is_lib ? usr : include
             for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part, { create: true })
             const file = await directory.getFileHandle(parts.at(-1)!, { create: true }), writer = await file.createWritable!()
-            await writer.write(text); await writer.close()
+            const is_binary = name.endsWith(".o") || name.endsWith(".a") || name.endsWith(".so")
+            const payload: string | Blob = is_binary ? new Blob([Uint8Array.from(atob(text), c => c.charCodeAt(0))]) : text
+            await writer.write(payload); await writer.close()
+            if (!is_lib) {
+                let u_dir = usr_include
+                for (const part of parts.slice(0, -1)) u_dir = await u_dir.getDirectoryHandle(part, { create: true })
+                const u_file = await u_dir.getFileHandle(parts.at(-1)!, { create: true }), u_writer = await u_file.createWritable!()
+                await u_writer.write(payload); await u_writer.close()
+            }
         }
     })().catch(error => { compiler_headers = null; throw error })
 }
@@ -46,7 +56,7 @@ export async function resolve(path: string): Promise<fs_node | null> {
     await filesystem_initialized()
     // WASM pathname lookup checks each parent before reaching the header itself.
     const clean = norm(path)
-    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/tcc")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
+    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc") || clean === "/usr/include" || clean.startsWith("/usr/include/")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
     let node = fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {
@@ -105,6 +115,8 @@ function virtual_stat(path: string, programs: string[]): stat_info | null {
         const text = proc_file(pid, proc_match[2])
         return text === null ? null : { kind: "file", size: text.length, writable: false }
     }
+    const bin = /^\/bin\/([^/]+)$/.exec(clean)
+    if (bin && (programs.includes(bin[1]) || (typeof window !== "undefined" && (window as any).jazu_desk_shell?.programs?.[bin[1]]))) return { kind: "file", size: 0, writable: false }
     return null
 }
 
@@ -168,6 +180,12 @@ export function make_fs(programs: () => string[], uid = 1000): fs_api {
             if (!node && clean !== "/bin" && clean !== "/dev") throw new Error("No such file or directory")
             if (node && node.kind !== "dir") throw new Error("Not a directory")
             for (const child of node ? await list_node(node) : []) out.set(child.name, child.kind)
+            if (clean === "/bin") {
+                for (const name of programs()) out.set(name, "file")
+                if (typeof window !== "undefined" && (window as any).jazu_desk_shell?.programs) {
+                    for (const name of Object.keys((window as any).jazu_desk_shell.programs)) out.set(name, "file")
+                }
+            }
             if (clean === "/dev") out.set("null", "file")
             return [...out].map(([name, kind]) => ({ name, kind }))
         },
