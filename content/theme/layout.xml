@@ -19,5 +19,7 @@
         [hidden]:not(.landing_resume):not(.expertise_resume) { display: none !important; }
         @media screen { :is(.landing_resume, .expertise_resume)[hidden] { display: none !important; } }
         .theme_radio, .list_drop_li > input { position: absolute; opacity: 0; }
+        :root.js .expertise .expertise_track .arrow { display: none !important; }
+        .expertise .expertise_nav .arrow[hidden] { display: none !important; }
     ]]></style>
 </theme>
