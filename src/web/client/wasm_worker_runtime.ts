@@ -58,9 +58,16 @@ export async function run_worker_runtime(start: worker_start, send: (value: unkn
             close: (stream: em_object) => call("close", { handle: stream.jazu_handle }),
             dup: (stream: em_object) => call("retain", { handle: stream.jazu_handle }),
             read(stream: em_object, buffer: Uint8Array, offset: number, length: number) {
-                const bytes = call("read", { handle: stream.jazu_handle, length: Math.min(length, io_chunk) })
-                buffer.set(bytes, offset)
-                return bytes.length
+                let read_bytes = 0
+                while (read_bytes < length) {
+                    const count = Math.min(length - read_bytes, io_chunk)
+                    const bytes = call("read", { handle: stream.jazu_handle, length: count })
+                    if (!bytes || !bytes.length) break
+                    buffer.set(bytes, offset + read_bytes)
+                    read_bytes += bytes.length
+                    if (stream.seekable === false || bytes.length < count) break
+                }
+                return read_bytes
             },
             write(stream: em_object, buffer: Uint8Array, offset: number, length: number) {
                 let written = 0

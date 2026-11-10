@@ -8,6 +8,7 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
     const encoder = new TextEncoder()
 
     function call(op: string, args: unknown = {}): any {
+        if (op === "exec" || op === "spawn") args = { ...(args as object), descriptors: start.descriptors, cwd: start.cwd }
         Atomics.store(control, 0, 0)
         send({ op, args })
         while (Atomics.load(control, 0) === 0) Atomics.wait(control, 0, 0)
@@ -92,12 +93,38 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
         let dump_machine = false
         let print_dirs = false
 
+        let is_x86_64 = false
+        const x86_args: string[] = []
         const input_files: string[] = []
         const extra_flags: string[] = []
         const inc_paths: string[] = []
 
         for (let i = 0; i < args.length; i++) {
             const arg = args[i]
+            if (arg === "-m64") {
+                is_x86_64 = true
+                continue
+            }
+            if ((arg === "-target" || arg === "--target") && i + 1 < args.length) {
+                const targetVal = args[++i]
+                if (targetVal.startsWith("x86_64")) {
+                    is_x86_64 = true
+                } else {
+                    extra_flags.push(arg, targetVal)
+                    x86_args.push(arg, targetVal)
+                }
+                continue
+            }
+            if (arg.startsWith("-target=") || arg.startsWith("--target=")) {
+                if (arg.includes("x86_64")) {
+                    is_x86_64 = true
+                } else {
+                    extra_flags.push(arg)
+                    x86_args.push(arg)
+                }
+                continue
+            }
+            x86_args.push(arg)
             if (arg === "--version") {
                 show_version = true
             } else if (arg === "-v") {
@@ -112,6 +139,7 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
                 print_dirs = true
             } else if (arg === "-o" && i + 1 < args.length) {
                 outfile = args[++i]
+                x86_args.push(outfile)
             } else if (arg.startsWith("-o") && arg.length > 2) {
                 outfile = arg.slice(2)
             } else if (arg === "-c") {
@@ -124,11 +152,15 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
                 mode = "preprocess"
                 extra_flags.push(arg)
             } else if (arg === "-I" && i + 1 < args.length) {
-                inc_paths.push(args[++i])
+                const inc = args[++i]
+                inc_paths.push(inc)
+                x86_args.push(inc)
             } else if (arg.startsWith("-I") && arg.length > 2) {
                 inc_paths.push(arg.slice(2))
-            } else if ((arg === "-target" || arg === "--target" || arg === "-arch" || arg === "-x" || arg === "-sysroot" || arg === "--sysroot") && i + 1 < args.length) {
-                extra_flags.push(arg, args[++i])
+            } else if ((arg === "-arch" || arg === "-x" || arg === "-sysroot" || arg === "--sysroot") && i + 1 < args.length) {
+                const val = args[++i]
+                extra_flags.push(arg, val)
+                x86_args.push(val)
             } else if (arg.startsWith("-")) {
                 extra_flags.push(arg)
             } else {
@@ -187,6 +219,12 @@ export async function run_worker(start: worker_start, send: (value: unknown) => 
         if (input_files.length === 0) {
             write_stderr(`${prog}: fatal error: no input files\ncompilation terminated.\n`)
             send({ exit: 1 })
+            return
+        }
+
+        if (is_x86_64) {
+            const env = Object.entries(start.env).map(([k, v]) => `${k}=${v}`)
+            call("exec", { file: "/bin/x86_64-tcc", argv: ["x86_64-tcc", ...x86_args], env })
             return
         }
 

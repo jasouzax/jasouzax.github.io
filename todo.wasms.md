@@ -186,6 +186,7 @@
 
 19. **C & C++ Toolchain**
     - [x] `tcc`: Tiny C Compiler (compiles ISO C99 code directly to executable machine code / bytecode) (Fabrice Bellard `tcc.wasm`, `cc`)
+    - [x] `x86_64-tcc`: 64-bit Tiny C Compiler cross-compiler (compiles ISO C99 code to authentic 64-bit Linux ELF binary) (Fabrice Bellard `x86_64-tcc.wasm`, `tcc -m64`)
     - [x] `gcc` / `g++`: GNU Compiler Collection driver / frontend (Free Software Foundation `gcc.wasm`)
     - [x] `cpp`: C Preprocessor (macro expansion and conditional compilation) (`gcc.wasm`)
     - [x] `make`: Dependency tracker and build automation tool (`make.wasm`)

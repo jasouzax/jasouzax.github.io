@@ -15,6 +15,7 @@ function ensure_compiler_headers(): Promise<void> {
         if (!root) throw new Error("ENOENT")
         // Existing system directories are not resurrected if root removed them.
         const usr = await root.getDirectoryHandle("usr")
+        const usr_include = await usr.getDirectoryHandle("include", { create: true })
         const lib = await usr.getDirectoryHandle("lib", { create: true })
         const tcc = await lib.getDirectoryHandle("tcc", { create: true })
         const include = await tcc.getDirectoryHandle("include", { create: true })
@@ -28,9 +29,15 @@ function ensure_compiler_headers(): Promise<void> {
             let directory = is_lib ? usr : include
             for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part, { create: true })
             const file = await directory.getFileHandle(parts.at(-1)!, { create: true }), writer = await file.createWritable!()
-            const is_binary = name.endsWith(".o") || name.endsWith(".a")
+            const is_binary = name.endsWith(".o") || name.endsWith(".a") || name.endsWith(".so")
             const payload: string | Blob = is_binary ? new Blob([Uint8Array.from(atob(text), c => c.charCodeAt(0))]) : text
             await writer.write(payload); await writer.close()
+            if (!is_lib) {
+                let u_dir = usr_include
+                for (const part of parts.slice(0, -1)) u_dir = await u_dir.getDirectoryHandle(part, { create: true })
+                const u_file = await u_dir.getFileHandle(parts.at(-1)!, { create: true }), u_writer = await u_file.createWritable!()
+                await u_writer.write(payload); await u_writer.close()
+            }
         }
     })().catch(error => { compiler_headers = null; throw error })
 }
@@ -49,7 +56,7 @@ export async function resolve(path: string): Promise<fs_node | null> {
     await filesystem_initialized()
     // WASM pathname lookup checks each parent before reaching the header itself.
     const clean = norm(path)
-    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
+    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc") || clean === "/usr/include" || clean.startsWith("/usr/include/")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
     let node = fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {

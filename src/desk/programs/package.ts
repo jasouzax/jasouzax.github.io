@@ -15,6 +15,12 @@ if (!work || !sdk) {
                 ["lib/crtn.o", "crtn.o"],
                 ["lib/libc.a", "libc.a"],
                 ["lib/tcc/libtcc1.a", "libtcc1.a"],
+                ["lib/x86_64-linux-gnu/crt1.o", "x86_64-crt1.o"],
+                ["lib/x86_64-linux-gnu/crti.o", "x86_64-crti.o"],
+                ["lib/x86_64-linux-gnu/crtn.o", "x86_64-crtn.o"],
+                ["lib/x86_64-linux-gnu/libc.so", "x86_64-libc.so"],
+                ["lib/x86_64-linux-gnu/libc_nonshared.a", "x86_64-libc_nonshared.a"],
+                ["lib/tcc/x86_64-libtcc1.a", "x86_64-libtcc1.a"],
             ]) {
                 const file_path = join(runtime, filename)
                 if (existsSync(file_path)) files[key] = readFileSync(file_path, "base64")
@@ -65,6 +71,12 @@ if (existsSync(runtime)) {
         ["lib/crtn.o", "crtn.o"],
         ["lib/libc.a", "libc.a"],
         ["lib/tcc/libtcc1.a", "libtcc1.a"],
+        ["lib/x86_64-linux-gnu/crt1.o", "x86_64-crt1.o"],
+        ["lib/x86_64-linux-gnu/crti.o", "x86_64-crti.o"],
+        ["lib/x86_64-linux-gnu/crtn.o", "x86_64-crtn.o"],
+        ["lib/x86_64-linux-gnu/libc.so", "x86_64-libc.so"],
+        ["lib/x86_64-linux-gnu/libc_nonshared.a", "x86_64-libc_nonshared.a"],
+        ["lib/tcc/x86_64-libtcc1.a", "x86_64-libtcc1.a"],
     ]) {
         const file_path = join(runtime, filename)
         if (existsSync(file_path)) files[key] = readFileSync(file_path, "base64")

@@ -161,6 +161,7 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         ["linux_suite", "1.0.0-jazu.1", "tar.gz", ["file", "readelf"]],
         ["exec_suite", "1.0.0-jazu.1", "tar.gz", ["box86", "linux-exec", "wine", "win-exec"]],
         ["tcc", "0.9.27-jazu.1", "tar.bz2", ["tcc", "cc"]],
+        ["x86_64-tcc", "0.9.27-jazu.1", "tar.bz2", ["x86_64-tcc"]],
         ["gcc", "14.2.0-jazu.1", "tar.gz", ["gcc", "g++", "cpp", "clang", "clang++"]],
         ["make", "4.4.1-jazu.1", "tar.gz", ["make"]],
         ["python_suite", "1.0.0-jazu.1", "tar.gz", ["python", "python3", "pip", "venv"]],

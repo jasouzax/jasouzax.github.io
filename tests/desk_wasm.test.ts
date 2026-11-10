@@ -37,7 +37,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         async rename(from, to) { files.set(to, await fs.read_bytes!(from)); files.delete(from) },
     }
     const sysroot_json = JSON.parse(readFileSync(resolve("src/desk/programs/artifacts/tcc-sysroot.json"), "utf8")) as Record<string, string>
-    for (const d of ["/usr", "/usr/lib", "/usr/lib/tcc", "/usr/lib/tcc/include"]) dirs.add(d)
+    for (const d of ["/usr", "/usr/include", "/usr/lib", "/usr/lib/tcc", "/usr/lib/tcc/include", "/usr/lib/x86_64-linux-gnu"]) dirs.add(d)
     for (const [name, val] of Object.entries(sysroot_json)) {
         const is_lib = name.startsWith("lib/")
         const full_path = is_lib ? `/usr/${name}` : `/usr/lib/tcc/include/${name}`
@@ -47,9 +47,19 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
             cur += "/" + part
             dirs.add(cur)
         }
-        const is_bin = name.endsWith(".o") || name.endsWith(".a")
+        const is_bin = name.endsWith(".o") || name.endsWith(".a") || name.endsWith(".so")
         const bytes = is_bin ? Buffer.from(val, "base64") : Buffer.from(val, "utf8")
         files.set(full_path, bytes)
+        if (!is_lib) {
+            const usr_inc = `/usr/include/${name}`
+            const u_parents = usr_inc.split("/").slice(1, -1)
+            let u_cur = ""
+            for (const p of u_parents) {
+                u_cur += "/" + p
+                dirs.add(u_cur)
+            }
+            files.set(usr_inc, bytes)
+        }
     }
     const wasm = readFileSync(resolve("src/desk/busybox/artifacts/busybox.wasm"))
     register_wasm({ id: "busybox-test", version: "1", worker: worker_file, wasm: "data:application/wasm;base64," + wasm.toString("base64"), sha256: createHash("sha256").update(wasm).digest("hex"), commands: JSON.parse(readFileSync(resolve("src/desk/busybox/artifacts/commands.json"), "utf8")) }, factory)
@@ -104,6 +114,7 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("linux_suite", ["file", "readelf"])
     await register_program("exec_suite", ["box86", "linux-exec", "wine", "win-exec"])
     await register_program("tcc", ["tcc", "cc"])
+    await register_program("x86_64-tcc", ["x86_64-tcc"])
     await register_program("gcc", ["gcc", "g++", "cpp", "clang", "clang++"])
     await register_program("make", ["make"])
     await register_program("python_suite", ["python", "python3", "pip", "venv"])
@@ -687,6 +698,22 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const tcc_default = await run("printf '#include <stdio.h>\\nint main() { printf(\"Default a.out output\\\\n\"); return 0; }\\n' > /home/user/main3.c; cd /home/user; tcc main3.c; ./a.out")
         assert.equal(tcc_default.code, 0)
         assert.match(tcc_default.stdout, /Default a.out output/)
+
+        const x86_ver = await run("x86_64-tcc -v")
+        assert.equal(x86_ver.code, 0)
+        assert.match(x86_ver.stdout, /tcc version 0\.9\.27/)
+
+        const x86_comp = await run("printf '#include <stdio.h>\\nint main() { printf(\"Hello from x86_64-tcc!\\\\n\"); return 0; }\\n' > /home/user/main_x64.c; x86_64-tcc /home/user/main_x64.c -o /home/user/x64_app; file /home/user/x64_app")
+        assert.equal(x86_comp.code, 0)
+        assert.match(x86_comp.stdout, /ELF 64-bit/)
+
+        const tcc_m64 = await run("cd /home/user; tcc main_x64.c -o /home/user/m64_app -m64; file /home/user/m64_app")
+        assert.equal(tcc_m64.code, 0)
+        assert.match(tcc_m64.stdout, /ELF 64-bit/)
+
+        const clang_x64 = await run("cd /home/user; clang -target x86_64-pc-linux-gnu main_x64.c -o clang_x64_app; file clang_x64_app")
+        assert.equal(clang_x64.code, 0)
+        assert.match(clang_x64.stdout, /ELF 64-bit/)
 
         const user_c = await run("printf '#include <stdio.h>\\nint main() {\\n  char name[64];\\n  printf(\"Enter name:\\\\n\");\\n  scanf(\"%%[^\\\\n]\", name);\\n  printf(\"Hello %%s!\", name);\\n  return 0;\\n}\\n' > /home/user/main_scanf.c; cd /home/user; gcc main_scanf.c -o scanf_app; printf 'Jasouza\\n' | ./scanf_app")
         assert.equal(user_c.code, 0)
