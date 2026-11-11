@@ -151,11 +151,15 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters
   - [x] Loopback-only listener; unsigned requests (including `/health`) return `401`
   - [ ] Owner: provision Cloudflare Access/Tunnel and operate the node
-  - [ ] Native Git clone/push transport and authorized pushes
+  - [x] Native Git push transport with per-user tokens, roles and archived projects (local end-to-end test)
+  - [x] Static git mirror for `git clone {domain}/projects/{id}.git` on Pages (local dumb-HTTP clone test)
+  - [ ] Verified on the real Cloudflare Worker/Tunnel/Access/Pages
   - [ ] Dashboard snapshots (`GET /dashboards/{client}/{name}`)
-  - [ ] Live rebuild/CI pipeline on the server
+  - [x] CI/CD pipeline for `jazu` (tests gate build; deploy only if output changed; fake-step tests)
+  - [ ] Real run of types/tests/check/wrangler on the server
   - [ ] AI agents with repository access
-  - [ ] Private repositories and contributor authentication
+  - [x] Contributor tokens and private-repository clone via the node (tested)
+  - [ ] SSH access to the repository hub
 
 ## Work portal
 

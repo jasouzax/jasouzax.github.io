@@ -17,6 +17,9 @@ node_modules/
 !/build/*.md
 
 # Secrets and local config
+server.json
+.server/
+repos/
 .env
 .env.*
 !.env.example

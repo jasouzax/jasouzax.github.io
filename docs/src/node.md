@@ -7,7 +7,15 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 | `serve.ts` | Your machine | Static server for `dist/` on `127.0.0.1`: path safety, `_headers` application, 404 page, `/work` headers |
 | `worker.ts` | Cloudflare Worker (`{domain}/*`, `*.{domain}/*`) | Central router |
 | `security.ts` | Worker + personal node | Security headers, API error shape, HMAC sign/verify |
-| `personal.ts` | Personal server | Signed read-only Git adapter + health |
+| `personal.ts` | Personal server | HTTP listener: signed read-only Git adapter, health, CI run list, and the smart-HTTP route family |
+| `server_config.ts` | Personal server | `server.json`: paths, collaborators, token hashing; only `site.project` is active, all others archived |
+| `git_http.ts` | Personal server | `git http-backend` CGI bridge for push (and private clone): Basic-token auth, throttle, role/archive checks |
+| `git_hooks.ts`, `hook_main.ts` | Personal server (inside each bare repo) | pre-receive policy + post-receive job queueing; hooks are generated and rewritten at node start |
+| `git_mirror.ts` | Personal server | Builds the static dumb-HTTP mirror (`projects/{id}.git/`) that Pages serves for `git clone` |
+| `queue.ts`, `runner.ts` | Personal server | Durable job queue, sequential runner, run records, working-copy watcher |
+| `ci_jazu.ts` | Personal server | The one CI/CD pipeline (project `jazu`): tests gate a build + conditional `wrangler pages deploy` |
+| `publish.ts` | Deploy machine / personal server | Pages staging with overlay, content fingerprint, wrangler call; shared by `deploy` and `publish` |
+| `server_cli.ts` | Operator | `node src/main.ts server …`: init, repo init, user add/remove, run, status, sync |
 | `deploy.ts` | Deploy machine | Stage `dist`, bundle Worker, run Terraform and the Pages upload |
 | `d1_migrate.ts` | Deploy machine (called by Terraform) | Apply `migrations/*.sql` through the D1 HTTP API |
 
@@ -62,6 +70,31 @@ Contract (all requests must be signed GETs; `401` otherwise, including `/health`
 **HMAC** (`sign_origin`/`verify_origin`): signs `METHOD\npath+query\ntimestamp\nnonce\nclient\nSHA256(body)`. Headers `x-jazu-time`, `x-jazu-nonce`, `x-jazu-client`, `x-jazu-signature`. Window ±60 s; nonces are remembered for 120 s to refuse replay.
 
 The node binds loopback; reach it with a Cloudflare Tunnel protected by an Access service-token policy ([../../README.md#server-use](../../README.md#server-use)). If it is offline the public Git API returns 503 and everything else keeps working.
+
+## <a id="git-hub"></a>Git hub, CI/CD and the static mirror
+
+```
+git clone https://{domain}/projects/jazu.git   ->  Worker -> Pages (static files from git_mirror.ts; the node is never contacted)
+git push  https://{user}:{token}@{domain}/projects/jazu.git
+          ->  Worker (route /projects/{id}.git/...: info/refs?service=git-receive-pack, POST git-receive-pack)
+          ->  Tunnel + Access service token, HMAC "stream" signature
+          ->  node: token auth (git_http.ts) -> `git http-backend` -> pre-receive policy -> post-receive -> queue job
+          ->  runner: CI (clean checkout of the pushed commit) -> CD (mirror, fast-forward working copy, publish)
+```
+
+**Projects.** Only `site.project` (`jazu`) is active. Every other project is archived by construction: pushes are refused by the node and by a generated pre-receive hook; there is no CI/CD for it. Archived public repositories are still mirrored for `git clone`. A project with `"visibility": "private"` is never mirrored; the Worker sends *all* its git traffic (clone included) to the node and it needs a token.
+
+**Roles** (tokens created with `server user add`; only scrypt hashes are stored in `server.json`): `owner` pushes anything; `write` pushes branches but not the deploy branch or tags (owners merge, because CI executes pushed code on this machine); `read` can clone private projects. Non-fast-forward and deletion are blocked by repository config. Failed logins are throttled (8/min per user).
+
+**CI** (`ci_jazu.ts`, push to the deploy branch only): clean checkout of that exact commit in `<state>/ci/jazu`, `npm ci` only when `package-lock.json` changed, then `npm run types`, `npm test`, `npm run check`. Any failure marks the run `failed`, deploys nothing, and leaves the working copy where it was. **CD**: refresh the mirror (pinned to the vetted commit), `git merge --ff-only` the working copy (`site.dir`; refuses if it has uncommitted tracked changes, never resets), then `node src/main.ts publish`: build, stage `dist` + mirror, compare a content fingerprint with `<state>/published.json`, run `wrangler pages deploy` only if it differs, and write the fingerprint only after wrangler succeeded.
+
+**File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) assets are not uploaded by `publish`; they live in R2 from `npm run deploy`.
+
+**Environment of commands.** CI and git run with `PATH`, `HOME=<state>/home`, `CI=true` only. The publish step additionally gets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
+
+**Wire details.** The Worker signs git requests with `x-jazu-body: stream`, which leaves the (huge, binary) body out of the HMAC; the node accepts that mode only on `/git-http/*`. Request bodies are capped at 512 MiB by the node, and Cloudflare's own request-size limit for your plan applies first.
+
+Operate: `node src/main.ts server init`, `server repo init jazu`, `server user add <you> --role owner`, start with `npm run node`; `server status` / `server run` afterwards.
 
 ## <a id="deploy"></a>Deploy (`deploy.ts`)
 

@@ -26,21 +26,31 @@ function payload(request: Request, timestamp: string, nonce: string, client: str
     return [request.method, url.pathname + url.search, timestamp, nonce, client, body_hash].join("\n")
 }
 
-export async function sign_origin(request: Request, secret: string, client: string, now = Date.now()): Promise<Headers> {
+// "stream" leaves the body out of the signature: git push bodies are large binary streams that must not be buffered.
+// The mode itself is signed (it replaces the body hash), so a signed "hash" request cannot be downgraded to "stream".
+export type body_mode = "hash" | "stream"
+const stream_marker = "stream"
+
+export async function sign_origin(request: Request, secret: string, client: string, now = Date.now(), mode: body_mode = "hash"): Promise<Headers> {
     const timestamp = String(Math.floor(now / 1000))
     const nonce = crypto.randomUUID()
-    const body_hash = await digest(await request.clone().text())
+    const body_hash = mode === "stream" ? stream_marker : await digest(await request.clone().text())
     const signature = hex(await crypto.subtle.sign("HMAC", await key(secret), encoder.encode(payload(request, timestamp, nonce, client, body_hash))))
-    return new Headers({ "x-jazu-time": timestamp, "x-jazu-nonce": nonce, "x-jazu-client": client, "x-jazu-signature": signature })
+    const headers = new Headers({ "x-jazu-time": timestamp, "x-jazu-nonce": nonce, "x-jazu-client": client, "x-jazu-signature": signature })
+    if (mode === "stream") headers.set("x-jazu-body", stream_marker)
+    return headers
 }
 
-export async function verify_origin(request: Request, secret: string, seen: Map<string, number>, now = Date.now()): Promise<boolean> {
+// `allow_stream` is true only for routes that accept unsigned bodies (git smart HTTP); every other route keeps the body bound.
+export async function verify_origin(request: Request, secret: string, seen: Map<string, number>, now = Date.now(), allow_stream = false): Promise<boolean> {
     const timestamp = request.headers.get("x-jazu-time") ?? ""
     const nonce = request.headers.get("x-jazu-nonce") ?? ""
     const client = request.headers.get("x-jazu-client") ?? ""
     const signature = request.headers.get("x-jazu-signature") ?? ""
+    const streamed = request.headers.get("x-jazu-body") === stream_marker
+    if (streamed && !allow_stream) return false
     if (!/^\d+$/.test(timestamp) || Math.abs(now / 1000 - Number(timestamp)) > 60 || !/^[\da-f-]{36}$/i.test(nonce) || !/^[\da-f]{64}$/i.test(signature) || !client || seen.has(nonce)) return false
-    const body_hash = await digest(await request.clone().text())
+    const body_hash = streamed ? stream_marker : await digest(await request.clone().text())
     const bytes = new Uint8Array(signature.match(/../g)!.map(pair => parseInt(pair, 16)))
     const valid = await crypto.subtle.verify("HMAC", await key(secret), bytes, encoder.encode(payload(request, timestamp, nonce, client, body_hash)))
     if (!valid) return false

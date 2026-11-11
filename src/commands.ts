@@ -19,8 +19,13 @@ import { output_directory, inside } from "./paths.ts"
 import { realpathSync } from "node:fs"
 import { dependency_graph } from "./graph.ts"
 import { collect_unignored } from "./gitignore.ts"
-import { deploy } from "./node/deploy.ts"
+import { deploy, load_env } from "./node/deploy.ts"
 import { personal_server } from "./node/personal.ts"
+import { publish_pages } from "./node/publish.ts"
+import { server_command, server_config_file } from "./node/server_cli.ts"
+import { load_server_config, is_public, repository_path } from "./node/server_config.ts"
+import { sync_repositories } from "./node/git_hooks.ts"
+import { start_runner, start_site_watcher } from "./node/runner.ts"
 
 type flags = Record<string, string | boolean>
 
@@ -35,7 +40,7 @@ function parse_args(args: string[]): { words: string[], flags: flags } {
         }
         const name = arg.slice(2)
         const next = args[index + 1]
-        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target"].includes(name)) {
+        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role"].includes(name)) {
             flags[name] = next
             index++
         } else flags[name] = true
@@ -59,7 +64,34 @@ async function main(): Promise<void> {
     const root = resolve(String(flags.root ?? process.cwd()))
     const command = words[0] ?? "build"
     if (command === "node") {
-        personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories: JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}"), port: Number(flags.port ?? 8788) })
+        const legacy: Record<string, string> = JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}")
+        const file = server_config_file(root, flags)
+        // Without server.json the node stays the read-only adapter; with it, it also serves pushes and runs CI/CD.
+        const config = existsSync(file) ? load_server_config(file, legacy) : undefined
+        const repositories = config ? Object.fromEntries(Object.keys({ ...config.projects, [config.site.project]: 1 }).filter(id => is_public(config, id)).map(id => [id, repository_path(config, id)])) : legacy
+        personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), config })
+        if (!config) return console.log(`no ${file}: push and CI/CD are disabled (read-only Git API only)`)
+        console.log(`hooks synced for: ${sync_repositories(config).join(", ") || "(no repositories yet)"}`)
+        const runner = start_runner(config)
+        const watcher = start_site_watcher(config, runner.busy)
+        for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { watcher.close(); runner.stop(); process.exit(0) })
+        return
+    }
+    if (command === "server") {
+        server_command(words.slice(1), flags, root)
+        return
+    }
+    if (command === "publish") {
+        // CD: build, compare with the last successful deploy, upload with wrangler only when something differs.
+        load_env(root)
+        const result = await run_build(root, flags, false)
+        show(result)
+        const outcome = publish_pages(root, output_directory(root, String(flags.out ?? "dist")), result.model.config.deploy.pages_project, {
+            overlay_dir: flags.overlay ? resolve(String(flags.overlay)) : undefined, state_file: flags.state_file ? resolve(String(flags.state_file)) : undefined,
+            dry_run: Boolean(flags.dry_run), force: Boolean(flags.force), commit: flags.commit ? String(flags.commit) : undefined, message: flags.message ? String(flags.message) : undefined,
+        })
+        if (outcome.large_assets.length) console.warn(`warning: ${outcome.large_assets.length} file(s) over 25 MiB are served from R2 and were not uploaded; run "npm run deploy -- --target pages" if they changed`)
+        console.log(`JAZU_PUBLISH ${JSON.stringify(outcome)}`)
         return
     }
     if (command === "deploy") {
@@ -140,7 +172,7 @@ async function main(): Promise<void> {
         await pack_command(project, String(flags.out_file ?? "codebase.zip"), words.slice(1))
         return
     }
-    console.error(`unknown command "${command}". commands: build, check, serve, watch, clean, icons, graph, pack, deploy, node`)
+    console.error(`unknown command "${command}". commands: build, check, serve, watch, clean, icons, graph, pack, deploy, publish, node, server`)
     process.exitCode = 1
 }
 
