@@ -242,6 +242,7 @@ test("builds repair JSON, invalidate inline layout and article changes, and prun
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        symlinkSync(resolve("build"), join(f.root, "build"), "junction")
         symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         f.put("content/blogs/article.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
         f.put("content/blogs/article.md", "# First article")
@@ -288,6 +289,7 @@ test("content folders can be renamed using only XML and config changes", async (
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        symlinkSync(resolve("build"), join(f.root, "build"), "junction")
         symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M1 1L19 19" stroke="currentColor"/></svg>'
         f.put("content/assets/drawing.svg", svg)

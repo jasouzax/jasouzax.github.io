@@ -53,7 +53,9 @@ test("case accepts child_* flow attributes and rejects bad booleans and unknown 
     assert.deepEqual(valid.errors, [])
     const invalid = new_diagnostics()
     validate_roots(parse_xml('<plugin id="x" version="1"><case child_view="maybe" host="live"/><case child_mime="a/b" host="bogus"/></plugin>', "bad.xml"), invalid)
-    assert.equal(invalid.errors.length, 2)
+    assert.equal(invalid.errors.length, 3)
+    assert(invalid.errors.some(error => error.includes("child_view")))
+    assert.equal(invalid.errors.filter(error => error.includes("host")).length, 2)
 })
 
 test("plugin roots compile identically in one file, separate files and nested content folders", async () => {

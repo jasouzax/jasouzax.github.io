@@ -125,7 +125,7 @@ function checkout_for_ci(config: Server_Config, commit: string, env: NodeJS.Proc
     // Restore them after clean so a fresh CI clone has the same build inputs as the deployment checkout.
     for (const entry of ["build", "content/media"]) {
         const source = join(config.site.dir, entry)
-        if (existsSync(source)) cpSync(source, join(dir, entry), { recursive: true, force: false, filter: file => !file.endsWith(".zip") })
+        if (existsSync(source)) cpSync(source, join(dir, entry), { recursive: true, force: false, filter: file => file !== join(source, "build.zip") })
     }
     return dir
 }
