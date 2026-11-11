@@ -20,6 +20,9 @@ node_modules/
 extension/host/jazu-host
 
 # Secrets and local config
+server.json
+.server/
+repos/
 .env
 .env.*
 !.env.example

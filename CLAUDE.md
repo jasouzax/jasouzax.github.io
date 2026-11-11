@@ -50,7 +50,8 @@ src/
     seo*.tsx           head tags, sitemap/robots/_headers/manifest/llms/icons/covers
     partials/          background_default|memory.tsx, window_*.tsx
     client/            browser runtime → bundled to assets/runtime/*.js (boot, spa, loading, desk*, kernel, wasm_*)
-  node/                worker.ts (Cloudflare router) security.ts (HMAC) personal.ts (git read API) serve.ts deploy.ts d1_migrate.ts
+  node/                worker.ts (Cloudflare router) security.ts (HMAC) personal.ts (node HTTP) serve.ts deploy.ts publish.ts d1_migrate.ts
+                       personal-server hub: server_config git_http git_hooks hook_main git_mirror queue runner ci_jazu server_cli (docs/src/node.md#git-hub)
   desk/                WASM toolchains: busybox/ programs/ (build.sh, port.py, artifacts/). Not TypeScript.
 extension/             Chromium extension (plain JS, MV3) + native messaging host (host/*.ts, pty_shim.py): real device shell for /desk via `host:`. Not part of the site build; see extension/README.md
 migrations/            D1 SQL (0001_work.sql)
@@ -115,6 +116,10 @@ dist/ .cache/ .wrangler/   generated, ignored
 - `.cache/hashes.json` is a flat hash map, not the timestamp/manifest/`HEAD` design the docs describe as the target.
 - `schema.ts` `event` rule is defined twice (the second via `Object.assign` wins).
 - Existing code style does not fully follow the "block comment at top of each file" rule below; apply it to files you create or substantially rewrite, don't mass-edit.
+
+- **Personal server git/CI:** only `site.project` (`jazu`) is active; all other projects are archived in code (`is_active`). New `src/node/*` files avoid enums/parameter properties so plain `node` (type stripping) can run them, which the generated git hooks and `tests/git_server.test.ts` rely on (`node --test tests/git_server.test.ts`; uses real git, needs no npm install). In tests, git clients that talk to in-process servers must be async (`execFileSync` deadlocks the event loop).
+- `ci_jazu.ts` is meant as the template for other projects' pipelines; its steps are data (`jazu_steps`). CI/CD children get a scrubbed env on purpose; test doubles must signal through files, not env vars.
+- `content/projects.xml` has a placeholder `<project id="jazu">` (needed so the Worker's `PUBLIC_PROJECTS` includes it and `/projects/jazu` exists). It was added without a build; run `npm run check` and rewrite the text.
 
 ## Docs maintenance (do this as you work)
 

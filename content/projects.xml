@@ -1,3 +1,8 @@
+<project name="JAZU: File-Authored Portfolio and Workspace" rank="70" short="JAZU" date="Nov 2026" note="Personal" icon="[project]" role="Personal Project" sub="Sole developer" id="jazu">
+        <!-- Placeholder text: rewrite freely. The id must stay "jazu": the personal server's git hub, CI/CD and static clone mirror are keyed on it. -->
+        <slide alt="JAZU website generated from files" stack="ts, sass, nodejs" skill="web-app, cloud" info="File-authored portfolio, browser workspace and technical showcase: a TypeScript engine turns XML and Markdown into a static multilingual site on Cloudflare Pages, with a Worker, a Tunnel-connected personal server for git and CI/CD, and infrastructure as code." />
+    </project>
+
 <project name="Galactic Strike: Distributed Arcade Arena" rank="45" short="Galactic Strike" date="May 2023" note="Booth Demo" icon="[project]" role="Exhibition Booth" sub="Sole developer of the course booth demo" id="galactic-strike" source="https://github.com/jasouzax/galactic-strike">
         <slide media="/media/galacticstrike_booth.jpg" alt="Galactic Strike running at the exhibition booth" stack="nodejs, websockets, engine" skill="web-app, cloud" info="Real-time multiplayer arcade game where one host machine renders the arena and players' phones become low-latency dual-joystick controllers over WebSockets. The Node.js server synchronizes state, asteroid collisions, progressively smarter enemy AI and a live leaderboard." />
     </project>

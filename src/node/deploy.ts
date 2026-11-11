@@ -1,31 +1,16 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { build as esbuild_build } from "esbuild"
 import type { build_result } from "../build.ts"
-import { output_file } from "../paths.ts"
+import { stage_pages, wrangler_pages_deploy } from "./publish.ts"
+import type { Asset_Upload } from "./publish.ts"
 
-export type asset_upload = { key: string, file: string, size: number, content_type: string }
-const mime: Record<string, string> = { mp4: "video/mp4", webm: "video/webm", png: "image/png", jpg: "image/jpeg", avif: "image/avif", wasm: "application/wasm", mp3: "audio/mpeg", woff2: "font/woff2", js: "text/javascript", json: "application/json", zip: "application/zip", whl: "application/octet-stream" }
+export type asset_upload = Asset_Upload
 
-export async function prepare_deploy(root: string, out: string, result: build_result, limit = 25 * 1024 * 1024): Promise<{ pages_dir: string, worker_bundle: string, var_file: string, uploads: asset_upload[] }> {
-    // A unique staging folder prevents removed files from surviving between preparations.
-    const stage = join(root, ".cache", "deploy", `${Date.now()}_${crypto.randomUUID().slice(0, 8)}`)
-    const pages = join(stage, "pages")
-    mkdirSync(pages, { recursive: true })
-    const uploads: asset_upload[] = []
-    const manifest: string[] = JSON.parse(readFileSync(join(out, ".jazu_output.json"), "utf8"))
-    for (const name of manifest) {
-            const source = output_file(out, name)
-            const size = statSync(source).size
-            if (size > limit) {
-                if (!name.startsWith("assets/media/") && !name.startsWith("assets/wasm/")) throw new Error(`Oversized asset ${name} must be published under assets/media or assets/wasm`)
-                uploads.push({ key: name, file: source, size, content_type: mime[name.split(".").pop()!] ?? "application/octet-stream" })
-            } else {
-                mkdirSync(resolve(pages, name, ".."), { recursive: true })
-                cpSync(source, join(pages, name))
-            }
-    }
+// Staging (including the optional overlay such as the static git mirror) lives in publish.ts and is shared with CD.
+export async function prepare_deploy(root: string, out: string, result: build_result, limit = 25 * 1024 * 1024, overlay_dir?: string): Promise<{ pages_dir: string, worker_bundle: string, var_file: string, uploads: asset_upload[] }> {
+    const { stage, pages, uploads } = stage_pages(root, out, limit, overlay_dir)
     // Terraform uploads a single ES module, so bundle the Worker (and its local imports) here.
     const worker_bundle = join(stage, "worker.js")
     const worker_entry = existsSync(join(root, "src/node/worker.ts")) ? join(root, "src/node/worker.ts") : resolve("src/node/worker.ts")
@@ -87,7 +72,6 @@ export async function deploy(root: string, out: string, result: build_result, ta
     terraform(root, ["apply", "-input=false", `-var-file=${stage.var_file}`, ...flags])
     if (target !== "worker") {
         // Terraform has no resource for Pages direct-upload deployments, so this is the one remaining wrangler call.
-        const entry = join(root, "node_modules/wrangler/bin/wrangler.js")
-        run(root, process.execPath, [entry, "pages", "deploy", stage.pages_dir, "--project-name", result.model.config.deploy.pages_project, "--branch", "master"], { WRANGLER_SEND_METRICS: "false" })
+        wrangler_pages_deploy(root, stage.pages_dir, result.model.config.deploy.pages_project, ["--branch", "master"])
     }
 }

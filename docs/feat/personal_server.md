@@ -14,11 +14,16 @@
 - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters
 - [x] Loopback-only listener; unsigned requests (including `/health`) return `401`
 - [ ] Owner: provision Cloudflare Access/Tunnel and operate the node
-- [ ] Native Git clone/push transport and authorized pushes
+- [x] Native Git push transport with per-user tokens, roles and archived projects (tested end to end with real git through `route()` + node; not yet on a real Tunnel/Access)
+- [x] Static git mirror for `git clone {domain}/projects/{id}.git` served by Pages (dumb HTTP; tested with a real clone against a local static server)
+- [ ] Verified on the real Cloudflare Worker/Tunnel/Access/Pages (push size limits, auth challenge pass-through, Pages serving `info/refs`)
 - [ ] Dashboard snapshots (`GET /dashboards/{client}/{name}`)
-- [ ] Live rebuild/CI pipeline on the server
+- [x] CI/CD pipeline for `jazu`: tests gate the build, deploy only when the output changed (pipeline tested with fake steps; failing CI blocks deploy)
+- [ ] Real run of `npm run types` / `npm test` / `npm run check` / `wrangler pages deploy` on the server (needs `npm ci`, credentials)
+- [ ] Per-project pipelines for the archived projects (intentionally not built)
 - [ ] AI agents with repository access
-- [ ] Private repositories and contributor authentication
+- [x] Contributor authentication (tokens) and private-repository clone via the node (tested)
+- [ ] SSH access to the repository hub (not built)
 
 ## Contract
 

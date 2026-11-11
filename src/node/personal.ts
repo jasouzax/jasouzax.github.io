@@ -1,9 +1,14 @@
 import { createServer } from "node:http"
+import type { IncomingMessage } from "node:http"
 import { execFileSync } from "node:child_process"
 import { resolve } from "node:path"
 import { api_error, verify_origin } from "./security.ts"
+import { git_route, handle_git_http, make_throttle } from "./git_http.ts"
+import { list_runs } from "./runner.ts"
+import type { Server_Config } from "./server_config.ts"
 
-export type personal_options = { secret: string, repositories: Record<string, string>, port: number }
+// `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
+export type personal_options = { secret: string, repositories: Record<string, string>, port: number, config?: Server_Config }
 
 export function git_read(repository: string, action: string, url: URL): Response {
     const ref = url.searchParams.get("ref") ?? "HEAD"
@@ -37,21 +42,48 @@ export function git_read(repository: string, action: string, url: URL): Response
     } catch { return api_error("not_found", "Repository resource unavailable or exceeds read limit", 404) }
 }
 
+// Only the x-jazu-* headers take part in verification; everything else on the request is none of its business.
+function signed_view(incoming: IncomingMessage): Request {
+    const headers = new Headers()
+    for (const name of ["x-jazu-time", "x-jazu-nonce", "x-jazu-client", "x-jazu-signature", "x-jazu-body"]) {
+        const value = incoming.headers[name]
+        if (typeof value === "string") headers.set(name, value)
+    }
+    return new Request(`http://127.0.0.1${incoming.url ?? "/"}`, { method: incoming.method, headers })
+}
+
+function read_response(request: Request, options: personal_options): Response {
+    const url = new URL(request.url)
+    const match = /^\/git\/([a-z0-9_-]+)\/(refs|tree|blob|log)$/.exec(url.pathname)
+    const runs = /^\/ci\/([a-z0-9_-]+)\/runs$/.exec(url.pathname)
+    if (url.pathname === "/health") return Response.json({ status: "ok", generation: 12 })
+    if (match && Object.hasOwn(options.repositories, match[1])) return git_read(options.repositories[match[1]], match[2], url)
+    if (runs && options.config && runs[1] === options.config.site.project) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20) })
+    return api_error("not_found", "Unknown repository or route", 404)
+}
+
 export function personal_server(options: personal_options) {
     if (options.secret.length < 32) throw new Error("Set ORIGIN_HMAC_SECRET to at least 32 random characters")
     const seen = new Map<string, number>()
+    const throttle = make_throttle()
     return createServer(async (incoming, outgoing) => {
         try {
-            const request = new Request(`http://127.0.0.1${incoming.url ?? "/"}`, { method: incoming.method, headers: incoming.headers as Record<string, string> })
-            let response: Response
-            if (request.method !== "GET" || !await verify_origin(request, options.secret, seen)) response = api_error("unauthorized", "Signed GET request required", 401)
-            else {
-                const url = new URL(request.url)
-                const match = /^\/git\/([a-z0-9_-]+)\/(refs|tree|blob|log)$/.exec(url.pathname)
-                if (url.pathname === "/health") response = Response.json({ status: "ok", generation: 12 })
-                else if (match && Object.hasOwn(options.repositories, match[1])) response = git_read(options.repositories[match[1]], match[2], url)
-                else response = api_error("not_found", "Unknown repository or route", 404)
+            const request = signed_view(incoming)
+            const url = new URL(request.url)
+            if (git_route.test(url.pathname)) {
+                // Smart HTTP carries a streamed body, so it is the one route family that verifies the unsigned-stream mode.
+                if (!options.config || !await verify_origin(request, options.secret, seen, Date.now(), true)) {
+                    const denied = api_error("unauthorized", "Signed request required", 401)
+                    outgoing.writeHead(denied.status, Object.fromEntries(denied.headers))
+                    outgoing.end(await denied.text())
+                    return
+                }
+                handle_git_http(incoming, outgoing, url, options.config, throttle)
+                return
             }
+            const response = request.method !== "GET" || !await verify_origin(request, options.secret, seen)
+                ? api_error("unauthorized", "Signed GET request required", 401)
+                : read_response(request, options)
             outgoing.writeHead(response.status, Object.fromEntries(response.headers))
             outgoing.end(new Uint8Array(await response.arrayBuffer()))
         } catch {

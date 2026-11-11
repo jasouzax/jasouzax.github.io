@@ -17,7 +17,7 @@ Required: `id`, `name`, `date`.
 
 | Attribute | Meaning |
 |---|---|
-| `id` | Identity; page `/projects/{id}`, repository mount `/srv/repo/{id}`, subdomain redirect `{id}.{domain}` |
+| `id` | Identity; page `/projects/{id}`, bare repository `{repos_dir}/{id}.git` on the personal server, static clone URL `/projects/{id}.git`, subdomain redirect `{id}.{domain}` |
 | `name` | Full title. `short` is used where space is tight |
 | `short`, `sub`, `note`, `role`, `rank` | Display, timeline data and ordering (`rank` higher = earlier) |
 | `date`, `icon` | See [value types](README.md#2-value-types) |

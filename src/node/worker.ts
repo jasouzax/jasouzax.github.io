@@ -20,6 +20,32 @@ export type worker_env = {
 }
 type fetcher = (request: Request) => Promise<Response>
 
+function add_access_headers(headers: Headers, env: worker_env): void {
+    if (!env.ACCESS_CLIENT_ID || !env.ACCESS_CLIENT_SECRET) return
+    headers.set("CF-Access-Client-Id", env.ACCESS_CLIENT_ID)
+    headers.set("CF-Access-Client-Secret", env.ACCESS_CLIENT_SECRET)
+}
+
+// Git smart HTTP is forwarded to the personal node as a stream. Only the headers git needs are passed on;
+// the Authorization header carries the collaborator's token, which the node (not the Worker) verifies.
+async function forward_git(request: Request, env: worker_env, id: string, operation: string, search: string, upstream: fetcher): Promise<Response> {
+    if (!env.PERSONAL_ORIGIN || !env.ORIGIN_HMAC_SECRET) return api_error("origin_offline", "Personal node is not configured", 503)
+    const method = operation === "info/refs" ? "GET" : "POST"
+    if (request.method !== method) return api_error("method_not_allowed", `Use ${method}`, 405)
+    const target = new URL(`/git-http/${id}.git/${operation}${search}`, env.PERSONAL_ORIGIN)
+    if (target.protocol !== "https:" && target.hostname !== "127.0.0.1") return api_error("bad_origin", "Personal origin requires HTTPS", 503)
+    const headers = await sign_origin(new Request(target, { method }), env.ORIGIN_HMAC_SECRET, "git", Date.now(), "stream")
+    add_access_headers(headers, env)
+    for (const name of ["authorization", "content-type", "content-encoding", "git-protocol"]) if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
+    const init: RequestInit & { duplex?: "half" } = { method, headers, redirect: "manual", signal: AbortSignal.timeout(10 * 60_000) }
+    if (method === "POST") { init.body = request.body; init.duplex = "half" }
+    try {
+        const response = await upstream(new Request(target, init))
+        if (response.status >= 300 && response.status < 400) return api_error("origin_unavailable", "Personal node rejected the request", 503)
+        return response
+    } catch { return api_error("origin_offline", "Personal node is unreachable", 503) }
+}
+
 export async function route(request: Request, env: worker_env, upstream: fetcher = fetch): Promise<Response> {
     const url = new URL(request.url)
     let path: string
@@ -47,19 +73,22 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         }
         return api_error("unknown_host", "Unassigned subdomain", 404)
     }
+    // `git clone` of a public project is static (dumb HTTP on Pages). Pushes, and every access to a private project, go to the node.
+    const smart = /^\/projects\/([a-z0-9_-]+)\.git\/(info\/refs|git-upload-pack|git-receive-pack)$/.exec(path)
+    if (smart) {
+        const writes = smart[2] === "git-receive-pack" || (smart[2] === "info/refs" && url.searchParams.get("service") === "git-receive-pack")
+        if (writes || !projects.includes(smart[1])) return forward_git(request, env, smart[1], smart[2], url.search, upstream)
+    }
     if (path.startsWith("/api/")) {
         if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: "not_implemented" } }, { headers: { "cache-control": "no-store" } })
-        const git = /^\/api\/v1\/git\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
-        if (git && projects.includes(git[1]) && request.method === "GET") {
+        const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
+        if (read && projects.includes(read[2]) && request.method === "GET") {
             if (!env.PERSONAL_ORIGIN || !env.ORIGIN_HMAC_SECRET) return api_error("origin_offline", "Personal node is not configured", 503)
-            const target = new URL(`/git/${git[1]}${git[2] ?? "/refs"}${url.search}`, env.PERSONAL_ORIGIN)
+            const target = new URL(`/${read[1]}/${read[2]}${read[3] ?? (read[1] === "ci" ? "/runs" : "/refs")}${url.search}`, env.PERSONAL_ORIGIN)
             if (target.protocol !== "https:" && target.hostname !== "127.0.0.1") return api_error("bad_origin", "Personal origin requires HTTPS", 503)
             const origin_request = new Request(target)
             const headers = await sign_origin(origin_request, env.ORIGIN_HMAC_SECRET, "public")
-            if (env.ACCESS_CLIENT_ID && env.ACCESS_CLIENT_SECRET) {
-                headers.set("CF-Access-Client-Id", env.ACCESS_CLIENT_ID)
-                headers.set("CF-Access-Client-Secret", env.ACCESS_CLIENT_SECRET)
-            }
+            add_access_headers(headers, env)
             try {
                 const response = await upstream(new Request(target, { headers, redirect: "manual", signal: AbortSignal.timeout(10_000) }))
                 if (response.status >= 300 && response.status < 400) return api_error("origin_unavailable", "Personal node rejected the request", 503)
