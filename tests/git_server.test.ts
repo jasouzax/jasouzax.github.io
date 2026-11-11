@@ -425,3 +425,53 @@ test("pipeline restores ignored build inputs and advances a feature checkout fro
         assert.equal(git(p.f.config.site.dir, "rev-parse", "HEAD"), commit)
     } finally { p.cleanup() }
 })
+
+
+test("oversized Git packs use R2 with range support while the personal node is offline", async () => {
+    const key = `projects/jazu.git/objects/pack/pack-${"a".repeat(40)}.pack`
+    const env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.dev", PUBLIC_PROJECTS: '["jazu"]', ASSETS: { get: async (received: string) => {
+        assert.equal(received, key)
+        return { body: new Response("abc").body!, httpEtag: '"pack"', size: 32, range: { offset: 2, length: 3 }, writeHttpMetadata: (_headers: Headers) => {} }
+    } } }
+    const response = await route(new Request(`https://example.com/${key.replace("jazu.git", "jazu")}`, { headers: { range: "bytes=2-4" } }), env, async () => { throw new Error("Pages and node must not be contacted") })
+    assert.equal(response.status, 206)
+    assert.equal(response.headers.get("content-range"), "bytes 2-4/32")
+    assert.equal(response.headers.get("content-type"), "application/octet-stream")
+    assert.equal(await response.text(), "abc")
+})
+
+test("publication uploads oversized Git packs before Pages and tracks hashes of large assets", () => {
+    const root = mkdtempSync(join(tmpdir(), "jazu_r2_"))
+    const previous = process.env.CLOUDFLARE_API_TOKEN
+    try {
+        process.env.CLOUDFLARE_API_TOKEN = "test-only"
+        mkdirSync(join(root, "dist"), { recursive: true })
+        writeFileSync(join(root, "dist/index.html"), "home")
+        writeFileSync(join(root, "dist/.jazu_output.json"), '["index.html"]')
+        const key = `projects/jazu.git/objects/pack/pack-${"a".repeat(40)}.pack`
+        mkdirSync(join(root, "overlay", key, ".."), { recursive: true })
+        const pack = join(root, "overlay", key)
+        writeFileSync(pack, "a".repeat(32))
+        const staged = stage_pages(root, join(root, "dist"), 16, join(root, "overlay"))
+        assert.equal(staged.uploads[0].key, key)
+        assert(!existsSync(join(staged.pages, key)))
+        const first_hash = fingerprint_pages(staged.pages, staged.uploads)
+        writeFileSync(pack, "b".repeat(32))
+        assert.notEqual(fingerprint_pages(staged.pages, staged.uploads), first_hash, "same-size edits must invalidate publication")
+        mkdirSync(join(root, "node_modules/wrangler/bin"), { recursive: true })
+        const fake = join(root, "node_modules/wrangler/bin/wrangler.js")
+        writeFileSync(fake, `const fs = require('fs'); fs.appendFileSync('calls.txt', process.argv[2] + '\\n'); if (process.argv[2] === 'r2') process.exit(1)`)
+        const options = { limit: 16, overlay_dir: join(root, "overlay"), state_file: join(root, "state.json") }
+        assert.throws(() => publish_pages(root, join(root, "dist"), "test", options), /R2 upload failed/)
+        assert.equal(readFileSync(join(root, "calls.txt"), "utf8"), "r2\n")
+        assert(!existsSync(options.state_file))
+        writeFileSync(fake, `require('fs').appendFileSync('calls.txt', process.argv[2] + '\\n')`)
+        assert.equal(publish_pages(root, join(root, "dist"), "test", options).deployed, true)
+        assert.equal(readFileSync(join(root, "calls.txt"), "utf8"), "r2\nr2\npages\n")
+        assert.equal(publish_pages(root, join(root, "dist"), "test", options).reason, "unchanged")
+    } finally {
+        if (previous === undefined) delete process.env.CLOUDFLARE_API_TOKEN
+        else process.env.CLOUDFLARE_API_TOKEN = previous
+        rmSync(root, { recursive: true, force: true })
+    }
+})
