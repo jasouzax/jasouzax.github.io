@@ -25,7 +25,7 @@ export const skeleton_css = `
 #loading_overlay::before { content: ''; position: absolute; inset: 0; background: var(--loading-bg); transition: opacity .45s ease; }
 #loading_overlay.background_fade::before { opacity: 0; }
 .loading_shapes { position: absolute; inset: 0; }
-.loading_placeholder { position: absolute; overflow: hidden; border: 1px solid rgb(var(--loading-gray) / .25); background: rgb(var(--loading-gray) / .14); border-radius: 3px; }
+.loading_placeholder { position: absolute; overflow: hidden; border: 1px solid rgb(var(--loading-gray) / .25); background: rgb(var(--loading-gray) / .14); border-radius: 3px; opacity: .75; }
 .loading_shapes::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 20%, rgb(var(--loading-gray) / .28) 50%, transparent 80%); transform: translateX(-110%); animation: skeleton_shine 1.6s ease-in-out infinite; }
 @keyframes skeleton_shine { to { transform: translateX(110%); } }
 @keyframes skeleton_enter { from { opacity: 0; } to { opacity: 1; } }

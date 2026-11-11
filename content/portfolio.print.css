@@ -94,10 +94,11 @@ body.page_portfolio .landing > :not(.landing_resume) {
     display: none !important;
 }
 
+/* display needs !important: the skeleton (layout.xml) ships [hidden] { display: none !important }, and the resume markup is emitted hidden */
 body.page_portfolio .landing_resume,
 body.page_portfolio .expertise_resume {
     all: initial;
-    display: block;
+    display: block !important;
     color: #000;
     font: 11pt/1.15 "Times New Roman", Times, serif;
     text-align: left;

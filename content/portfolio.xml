@@ -5,6 +5,7 @@
             <item icon="[location]" name="Location" text="Iloilo, Philippines" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
             <action text="Let's work together" link="#contact" icon="[arrow_right]" primary="true" />
             <action text="View projects" link="#expertise" icon="[arrow_down]" />
+            <action text="Open Desktop" link="/desk" icon="[arrow_right]" />
         </hero>
         <expertise>
             <skill id="web-app" name="Web/App" icon="[web]" group="Software" />
