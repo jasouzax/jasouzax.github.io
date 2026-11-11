@@ -55,7 +55,7 @@ These are public-content or operator inputs, not implemented product features. S
 | `content/privacy*.md` | Inherited privacy wording | Update to match the enabled deployment, storage, sign-in and retention behaviour |
 | SEO `info` descriptions in page/object XML | 37 inherited length warnings | Shorten long descriptions or write fuller short ones; review Japanese copy separately |
 | `content/work.xml` | Static workspace shell with API placeholders | Keep client data out of XML; complete the authenticated backend tasks before use with clients |
-| `config.json.personal_server` | Empty | Set the private origin URL only when the origin service and Tunnel/Access policy are configured |
+| `config.json.personal_server` | `https://personal-server.jasouza.com` | Keep the origin behind Tunnel/Access service authentication; adjust it when moving the server |
 | `src/desk/*/artifacts/*.wasm` + source archives | Not in `codebase.zip` (ignored by `.gitignore`, so `npm run pack` drops them); the build needs them | Restore from the repository/backup or rebuild ([src/desk.md](src/desk.md#artifacts)) |
 
 The inherited sample birth date, phone numbers, postal code, family/commute fields and application text were removed. They are not valid owner facts and must never be silently restored. Photo fields remain empty until a public hero profile is intentionally supplied. Repository locations are private operator settings and must never be embedded in public page payloads.
@@ -88,7 +88,7 @@ These figures were recorded by the previous author and **were not re-run** when 
 ## Known limitations (summary)
 
 - Client authentication, chat, receipts and dashboards are unimplemented; those APIs return `501` and accept no client data.
-- The personal node supports signed health and public Git **read** only: no pushes, dashboards, CI or agents yet.
+- The personal node supports signed Git reads, authenticated HTTPS pushes, a static Pages/R2 Git mirror and Jazu CI/CD. Dashboards, agents and other projects’ pipelines remain unimplemented.
 - Terraform has not been validated against a real account; state is local.
 - Plugins: no WASM manifest verification before execution beyond build-time hashes; conversion graph not implemented.
 - Expertise radio filters, `#all/{id}` fragments and search deduplication are pending.

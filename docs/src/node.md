@@ -88,7 +88,7 @@ git push  https://{user}:{token}@{domain}/projects/jazu.git
 
 **CI** (`ci_jazu.ts`, push to the deploy branch only): clean checkout of that exact commit in `<state>/ci/jazu`, `npm ci` only when `package-lock.json` changed, then `npm run types`, `npm test`, `npm run check`. Any failure marks the run `failed`, deploys nothing, and leaves the working copy where it was. **CD**: refresh the mirror (pinned to the vetted commit), `git merge --ff-only` the working copy (`site.dir`; refuses if it has uncommitted tracked changes, never resets), then `node src/main.ts publish`: build, stage `dist` + mirror, compare a content fingerprint with `<state>/published.json`, run `wrangler pages deploy` only if it differs, and write the fingerprint only after wrangler succeeded.
 
-**File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) assets are not uploaded by `publish`; they live in R2 from `npm run deploy`.
+**File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) website assets and Git packs are uploaded to R2 before Pages; unchanged large objects are skipped using recorded content hashes.
 
 **Environment of commands.** CI and git run with `PATH`, `HOME=<state>/home`, `CI=true` only. The publish step additionally gets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
 

@@ -150,13 +150,14 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] HMAC origin verification, replay bounds and Access service-token forwarding (4.8)
   - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters
   - [x] Loopback-only listener; unsigned requests (including `/health`) return `401`
-  - [ ] Owner: provision Cloudflare Access/Tunnel and operate the node
+  - [x] Owner: provision Cloudflare Access/Tunnel and operate the node
   - [x] Native Git push transport with per-user tokens, roles and archived projects (local end-to-end test)
-  - [x] Static git mirror for `git clone {domain}/projects/{id}.git` on Pages (local dumb-HTTP clone test)
-  - [ ] Verified on the real Cloudflare Worker/Tunnel/Access/Pages
+  - [x] Static git mirror for extensionless and `.git` clones on Pages/R2 (production clone verified)
+  - [x] Verified authenticated push and public clone on the real Worker/Tunnel/Access/Pages/R2
+  - [ ] Test pushes approaching the Cloudflare plan request-size limit
   - [ ] Dashboard snapshots (`GET /dashboards/{client}/{name}`)
   - [x] CI/CD pipeline for `jazu` (tests gate build; deploy only if output changed; fake-step tests)
-  - [ ] Real run of types/tests/check/wrangler on the server
+  - [x] Real run of types/tests/check/build/R2/wrangler on the Pi (136 tests passed)
   - [ ] AI agents with repository access
   - [x] Contributor tokens and private-repository clone via the node (tested)
   - [ ] SSH access to the repository hub

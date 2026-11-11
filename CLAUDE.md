@@ -139,3 +139,5 @@ dist/ .cache/ .wrangler/   generated, ignored
 * **Robust & Secure:** Implement the simplest code that robustly satisfies the requirement (DRY & KISS). Code must fail gracefully, provide meaningful debug context, and sanitize inputs by default.
 
 - **Current WASM inputs** live in ignored `build/<package>/`, including `build/busybox/busybox.wasm`, not the older `src/desk/*/artifacts` locations described above. CI restores `build/` and `content/media/` from `site.dir`. Production uses `wrangler.production.jsonc`; import its resources before running Terraform. The hub deploy branch can differ from the working branch using `site.checkout_branch`.
+
+- **Production Git history contains large videos.** `git repack --max-pack-size=20m` can still emit oversized packs for indivisible blobs. `publish.ts` uploads these packs (and oversized site assets) to R2 before Pages; the Worker serves pack ranges from R2. CI on the ARM Pi needs the 10-minute WASM test timeout. Production clone and push were verified; a real service-stop test was blocked by automatic review. See `docs/feat/personal_server.md` for evidence.

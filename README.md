@@ -66,7 +66,7 @@ Useful URLs: `/` (portfolio), `/desk` (desktop; enter `pid:` in a window's sourc
 
 ### Two things a fresh checkout may be missing
 
-1. **WebAssembly artifacts.** `npm run build` bundles BusyBox, fastfetch, htop and TinyCC for the desk and needs `src/desk/busybox/artifacts/busybox.wasm`, `src/desk/programs/artifacts/{fastfetch,htop,tcc}.wasm` and their source archives. Those file types are git-ignored, so they are **absent from `codebase.zip`**. Restore them from the real repository/backup, or rebuild on Linux/WSL (needs network): see [docs/src/desk.md](docs/src/desk.md#artifacts).
+1. **WebAssembly artifacts.** `npm run build` bundles BusyBox, fastfetch, htop and TinyCC for the desk and needs the ignored `build/<package>/` artifacts, including `build/busybox/busybox.wasm`, the worker JavaScript modules and matching source archives. Those file types are git-ignored, so they are **absent from `codebase.zip`**. Restore them from the real repository/backup, or restore the complete build archive on the build server. `npm run pkgbuild` checks these inputs; it does not download the compiled packages.
 2. **Media archive.** `content/media/` is git-ignored. Without it the build still runs but `check` reports each missing image/video. Restore the owner's archive there. Never put private documents in public content.
 
 ### Emulated cloud (optional)
@@ -149,7 +149,7 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 
 Set up the **personal server**: your own machine running an instance of this repository, connected to Cloudflare through a Tunnel protected by Zero Trust, so the public Worker can reach it securely and (later) your Git repository, CI/CD and AI agents can work on it. The public website never depends on it.
 
-**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Every other project is archived: no pushes, no CI, no CD. **Not built yet:** dashboards, AI agents, SSH, pipelines for other projects ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The git/CI parts are tested locally with real git but have not run on a real Cloudflare account.
+**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Every other project is archived: no pushes, no CI, no CD. **Not built yet:** dashboards, AI agents, SSH, pipelines for other projects ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The Git hub and push-triggered CI/CD are verified on the Pi and the real Cloudflare Worker, Access, Tunnel, Pages and R2 deployment (2026-11-12).
 
 1. **Install** Node.js 22.18+, Git and [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). Clone this repository (the server is an instance of it) and run `npm ci`.
 2. **Configure `.env`** (copy `.env.example`):
@@ -186,7 +186,7 @@ git remote add server https://you:<token>@<domain>/projects/jazu.git && git push
 node src/main.ts server status                       # queue and last runs; `server run` re-runs by hand
 ```
 
-`site.dir` must be a normal clone on the deploy branch (it keeps the git-ignored WASM artifacts and `content/media`); the pipeline only fast-forwards it. Collaborators: `server user add friend --role write` (branches only; owners merge). Existing archived repositories: put them in `projects` in `server.json` (`path` to a bare repo) and they are mirrored read-only. Also add `<project id="jazu">` to `content/` (included) so the Worker treats it as public.
+`site.dir` must be a normal clone on `site.checkout_branch` (defaults to the deploy branch; it keeps the git-ignored `build/` artifacts and `content/media`); the pipeline only fast-forwards it. Collaborators: `server user add friend --role write` (branches only; owners merge). Existing archived repositories: put them in `projects` in `server.json` (`path` to a bare repo) and they are mirrored read-only. Also add `<project id="jazu">` to `content/` (included) so the Worker treats it as public.
 
 **Using the server as the build/deploy machine manually (no pipeline).** The server may also run `git pull && npm ci && npm run deploy -- --target all`. That machine then needs Node, Terraform, `npm ci`, the same `.env`, **and the Terraform state** (use a remote backend).
 
@@ -258,6 +258,6 @@ cd jazu
 git push origin master
 ```
 
-Create tokens on the Pi with `node src/main.ts server user add <name> --role owner` (trusted deployers) or `--role write` (contributors who push review branches). Owners can push master and execute CI code on the Pi. Tokens are separate from SSH passwords and Cloudflare credentials. Store tokens in your Git credential manager. Public clones continue working when the Pi is stopped; pushes and origin-backed APIs return an unavailable response.
+Create tokens on the Pi with `node src/main.ts server user add <name> --role owner` (trusted deployers) or `--role write` (contributors who push review branches). Owners can push master and execute CI code on the Pi. Tokens are separate from SSH passwords and Cloudflare credentials. Restart `jazu-node` after changing collaborators in `server.json`, because the running node keeps its authentication configuration in memory. Store tokens in your Git credential manager. Public clones continue working when the Pi is stopped; pushes and origin-backed APIs return an unavailable response.
 
 The production resources provisioned for this branch use Wrangler and the Cloudflare API. Import them into Terraform before using `npm run deploy`; no Terraform state was created by this setup. CI/CD uploads large website assets and oversized historical Git packs to `jazu-assets` before publishing Pages. Clones use Pages plus static R2 objects, and continue working with the Pi offline. Set `JAZU_ASSETS_BUCKET` if using another bucket.
