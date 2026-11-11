@@ -22,7 +22,7 @@
  */
 import { spawn, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { Job } from "./queue.ts"
 import { mirror_dir, refresh_mirrors } from "./git_mirror.ts"
@@ -121,6 +121,12 @@ function checkout_for_ci(config: Server_Config, commit: string, env: NodeJS.Proc
     git_must(["cat-file", "-e", `${commit}^{commit}`], dir, env, log, `commit ${commit} is not in the repository`)
     git_must(["checkout", "--quiet", "--force", "--detach", commit], dir, env, log, "cannot check out the commit")
     git(["clean", "-fdxq", "-e", "node_modules"], dir, env, log)
+    // Build artifacts and the public media archive are operator-provided and ignored by Git.
+    // Restore them after clean so a fresh CI clone has the same build inputs as the deployment checkout.
+    for (const entry of ["build", "content/media"]) {
+        const source = join(config.site.dir, entry)
+        if (existsSync(source)) cpSync(source, join(dir, entry), { recursive: true, force: false, filter: file => !file.endsWith(".zip") })
+    }
     return dir
 }
 
@@ -129,7 +135,7 @@ function advance_working_copy(config: Server_Config, commit: string, env: NodeJS
     const dir = config.site.dir
     if (!existsSync(join(dir, ".git"))) throw new Error(`${dir} is not a git working copy; set site.dir in server.json`)
     const branch = git_must(["symbolic-ref", "--short", "-q", "HEAD"], dir, env, log, "working copy has a detached HEAD")
-    if (branch !== config.site.branch) throw new Error(`working copy is on ${branch}, expected ${config.site.branch}`)
+    if (branch !== (config.site.checkout_branch ?? config.site.branch)) throw new Error(`working copy is on ${branch}, expected ${config.site.checkout_branch ?? config.site.branch}`)
     if (git_must(["status", "--porcelain", "--untracked-files=no"], dir, env, log, "cannot read working copy status")) throw new Error("working copy has uncommitted changes; commit or discard them, then run `server run`")
     if (git(["merge-base", "--is-ancestor", commit, "HEAD"], dir, env, log).code === 0) return
     const tracking = `refs/remotes/jazu-hub/${config.site.branch}`
@@ -161,7 +167,7 @@ async function run_cd(config: Server_Config, job: Job, steps: Pipeline_Steps, se
     const commit = job.commit
     const mirrors = refresh_mirrors(config, commit ?? read_last_green(config))
     record.mirrors = mirrors.results
-    for (const error of mirrors.errors) log(`\n[mirror] ${error}\n`)
+    if (mirrors.errors.length) throw new Error(`static Git mirror failed: ${mirrors.errors.join("; ")}`)
     if (commit) advance_working_copy(config, commit, env, log)
     if (!await ensure_dependencies(config.site.dir, steps, env, log, record)) throw new Error("dependency install failed in the working copy")
     const head = git(["log", "-1", "--format=%H%x09%s"], config.site.dir, env, log).stdout.split("\t")

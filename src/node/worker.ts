@@ -74,12 +74,28 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         return api_error("unknown_host", "Unassigned subdomain", 404)
     }
     // `git clone` of a public project is static (dumb HTTP on Pages). Pushes, and every access to a private project, go to the node.
-    const smart = /^\/projects\/([a-z0-9_-]+)\.git\/(info\/refs|git-upload-pack|git-receive-pack)$/.exec(path)
+    const smart = /^\/projects\/([a-z0-9_-]+)(?:\.git)?\/(info\/refs|git-upload-pack|git-receive-pack)$/.exec(path)
     if (smart) {
         const writes = smart[2] === "git-receive-pack" || (smart[2] === "info/refs" && url.searchParams.get("service") === "git-receive-pack")
         if (writes || !projects.includes(smart[1])) return forward_git(request, env, smart[1], smart[2], url.search, upstream)
     }
-    if (path.startsWith("/api/")) {
+    // Both clone URLs use the same static mirror. The project HTML at /projects/{id} stays a normal page.
+    const mirror = /^\/projects\/([a-z0-9_-]+)(?:\.git)?\/(HEAD|info\/refs|objects\/info\/packs|objects\/pack\/pack-[0-9a-f]+\.(?:pack|idx))$/.exec(path)
+    if (mirror && projects.includes(mirror[1])) {
+        if (!["GET", "HEAD"].includes(request.method)) return api_error("method_not_allowed", "Static Git routes allow GET and HEAD", 405)
+        const pages = new URL(env.PAGES_ORIGIN)
+        if (pages.hostname === url.hostname || pages.origin !== env.PAGES_ORIGIN || (pages.protocol !== "https:" && pages.hostname !== "127.0.0.1")) return api_error("bad_origin", "Configure a distinct Pages HTTPS origin", 503)
+        const headers = new Headers()
+        for (const name of ["range", "if-none-match", "if-modified-since"]) if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
+        const target = new URL(`/projects/${mirror[1]}.git/${mirror[2]}`, pages)
+        const response = await upstream(new Request(target, { method: request.method, headers, redirect: "manual" }))
+        const output = new Headers(response.headers)
+        output.set("cache-control", mirror[2].startsWith("objects/pack/") ? "public, max-age=31536000, immutable" : "no-cache")
+        output.set("content-type", mirror[2].startsWith("objects/pack/") ? "application/octet-stream" : "text/plain; charset=utf-8")
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers: output })
+    }
+    if (path === "/api" || path.startsWith("/api/")) {
+        if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
         if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: "not_implemented" } }, { headers: { "cache-control": "no-store" } })
         const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
         if (read && projects.includes(read[2]) && request.method === "GET") {

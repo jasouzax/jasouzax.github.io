@@ -11,7 +11,7 @@ import type { Server } from "node:http"
 import { once } from "node:events"
 import { Readable } from "node:stream"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, join, resolve } from "node:path"
 import worker, { route } from "../src/node/worker.ts"
 import { sign_origin, verify_origin } from "../src/node/security.ts"
 import { hash_token, load_server_config, make_token, update_server_file, verify_token } from "../src/node/server_config.ts"
@@ -154,7 +154,7 @@ test("Worker: pushes and private reads go to the node as streams, public clones 
     assert.equal(seen[0].headers.get("cookie"), null)
     assert.equal(seen[0].headers.get("x-jazu-body"), "stream")
     await route(new Request("https://example.com/projects/jazu.git/info/refs?service=git-upload-pack"), env, upstream)
-    assert.equal(seen[1].url, "https://pages.example.dev/projects/jazu.git/info/refs?service=git-upload-pack")
+    assert.equal(seen[1].url, "https://pages.example.dev/projects/jazu.git/info/refs")
     await route(new Request("https://example.com/projects/hidden.git/info/refs?service=git-upload-pack"), env, upstream)
     assert.equal(seen[2].url, "https://node.example.net/git-http/hidden.git/info/refs?service=git-upload-pack")
     assert.equal((await route(new Request("https://example.com/projects/jazu.git/git-receive-pack"), env, upstream)).status, 405)
@@ -166,7 +166,7 @@ test("end to end: owner pushes through Worker -> node -> git http-backend; hooks
     const edge = await start_edge(f.config)
     const work = seed(f.config, "jazu")
     install_hooks(f.config)
-    const remote = (user: string, project = "jazu") => `http://${user}:${f.tokens[user as keyof typeof f.tokens] ?? "bad"}@${edge.url.slice("http://".length)}/projects/${project}.git`
+    const remote = (user: string, project = "jazu") => `http://${user}:${f.tokens[user as keyof typeof f.tokens] ?? "bad"}@${edge.url.slice("http://".length)}/projects/${project}`
     try {
         git(work, "commit", "-q", "--allow-empty", "-m", "second")
         const pushed = await try_git(work, "push", remote("owner"), "master")
@@ -221,14 +221,14 @@ test("static mirror serves a working clone over dumb HTTP and publishes only the
         assert.equal(refresh_mirror(f.config, "secretproj").status, "skipped")
 
         const root = join(f.config.state_dir, "mirror")
-        const published = readdirSync(join(root, "projects/jazu.git"), { recursive: true }).map(String).sort()
+        const published = readdirSync(join(root, "projects/jazu.git"), { recursive: true }).map(name => String(name).replace(/\\/g, "/")).sort()
         assert(published.includes("HEAD") && published.includes("info/refs") && published.includes("objects/info/packs"))
         assert(!published.includes("config") && !published.some(name => name.startsWith("hooks")))
         assert(!readFileSync(join(root, "projects/jazu.git/info/refs"), "utf8").includes("refs/heads/wip"), "collaborator branches stay private")
 
         const files = createServer((request, response) => {
             const path = join(root, decodeURIComponent((request.url ?? "").split("?")[0]))
-            if (!path.startsWith(root) || !existsSync(path) || !readdirSync(join(path, "..")).includes(path.split("/").pop()!)) { response.writeHead(404); response.end(); return }
+            if (!path.startsWith(root) || !existsSync(path) || !readdirSync(join(path, "..")).includes(basename(path))) { response.writeHead(404); response.end(); return }
             try { response.writeHead(200, { "content-type": "text/plain" }); response.end(readFileSync(path)) } catch { response.end() }
         }).listen(0, "127.0.0.1")
         await once(files, "listening")
@@ -385,4 +385,43 @@ test("public run list hides pushers, messages and paths", () => {
         assert.equal("pusher" in run, false)
         assert.equal("message" in run, false)
     } finally { rmSync(state, { recursive: true, force: true }) }
+})
+
+
+test("extensionless public clones use Pages even with the node offline; API root returns discovery", async () => {
+    const env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.dev", PUBLIC_PROJECTS: '["jazu"]' }
+    const seen: Request[] = []
+    const upstream = async (request: Request) => { seen.push(request); return new Response("static") }
+    for (const path of ["info/refs?service=git-upload-pack", "HEAD", "objects/info/packs", `objects/pack/pack-${"a".repeat(40)}.pack`]) {
+        const response = await route(new Request(`https://example.com/projects/jazu/${path}`, { headers: { authorization: "Basic secret", cookie: "private" } }), env, upstream)
+        assert.equal(response.status, 200)
+        assert.equal(seen.at(-1)!.url, `https://pages.example.dev/projects/jazu.git/${path.split("?")[0]}`)
+        assert.equal(seen.at(-1)!.headers.get("authorization"), null)
+        assert.equal(seen.at(-1)!.headers.get("cookie"), null)
+    }
+    assert.equal((await route(new Request("https://example.com/projects/jazu/info/refs?service=git-receive-pack"), env, upstream)).status, 503)
+    const discovery = await route(new Request("https://example.com/api"), env, upstream)
+    assert.equal(discovery.status, 200)
+    assert.equal((await discovery.json() as any).health, "/api/v1/health")
+})
+
+
+test("pipeline restores ignored build inputs and advances a feature checkout from the hub master", async () => {
+    const p = pipeline_fixture()
+    try {
+        git(p.f.config.site.dir, "checkout", "-q", "-b", "feature/personal-server")
+        p.f.config.site.checkout_branch = "feature/personal-server"
+        mkdirSync(join(p.f.config.site.dir, "build/busybox"), { recursive: true })
+        writeFileSync(join(p.f.config.site.dir, "build/busybox/example.wasm"), "artifact")
+        mkdirSync(join(p.f.config.site.dir, "content/media"), { recursive: true })
+        writeFileSync(join(p.f.config.site.dir, "content/media/example.png"), "public media")
+        // These inputs are untracked in this fixture, as they are ignored in the real checkout.
+        const steps = p.steps()
+        steps.ci[0] = { name: "build inputs", command: process.execPath, args: ["-e", `const fs = require('fs'); for (const f of ['build/busybox/example.wasm', 'content/media/example.png']) if (!fs.existsSync(f)) process.exit(1)`] }
+        const commit = p.push_commit("feat: asset-backed build")
+        const { record, log } = await execute(p, commit, steps)
+        assert.equal(record.state, "passed", log)
+        assert.equal(git(p.f.config.site.dir, "branch", "--show-current"), "feature/personal-server")
+        assert.equal(git(p.f.config.site.dir, "rev-parse", "HEAD"), commit)
+    } finally { p.cleanup() }
 })

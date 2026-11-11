@@ -74,9 +74,9 @@ The node binds loopback; reach it with a Cloudflare Tunnel protected by an Acces
 ## <a id="git-hub"></a>Git hub, CI/CD and the static mirror
 
 ```
-git clone https://{domain}/projects/jazu.git   ->  Worker -> Pages (static files from git_mirror.ts; the node is never contacted)
+git clone https://{domain}/projects/jazu   ->  Worker -> Pages (static files from git_mirror.ts; the node is never contacted)
 git push  https://{user}:{token}@{domain}/projects/jazu.git
-          ->  Worker (route /projects/{id}.git/...: info/refs?service=git-receive-pack, POST git-receive-pack)
+          ->  Worker (route /projects/{id}[.git]/...: info/refs?service=git-receive-pack, POST git-receive-pack)
           ->  Tunnel + Access service token, HMAC "stream" signature
           ->  node: token auth (git_http.ts) -> `git http-backend` -> pre-receive policy -> post-receive -> queue job
           ->  runner: CI (clean checkout of the pushed commit) -> CD (mirror, fast-forward working copy, publish)
@@ -110,3 +110,9 @@ Terraform targets: `pages` → `cloudflare_pages_project.site`, `aws_s3_object.l
 ## D1 migrations (`d1_migrate.ts`)
 
 Runs as a script (`node src/node/d1_migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
+
+### Personal-server deployment
+
+`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/v1/health` works while the Pi is offline.
+
+Set `site.branch` to `master` for the hub's public deploy branch. Set optional `site.checkout_branch` to `feature/personal-server` to keep the server checkout on the development branch while fast-forwarding commits accepted on the hub's master. It defaults to `site.branch`. CI restores the ignored `build/` artifacts and `content/media/` from the deployment checkout after cleaning its isolated checkout. Mirror failures block publication.

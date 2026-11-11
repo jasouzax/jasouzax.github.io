@@ -25,7 +25,7 @@ export type Server_Config = {
     file: string
     repos_dir: string
     state_dir: string
-    site: { project: string, dir: string, branch: string }
+    site: { project: string, dir: string, branch: string, checkout_branch?: string }
     projects: Record<string, Project_Entry>
     collaborators: Record<string, Collaborator>
 }
@@ -66,11 +66,12 @@ export function load_server_config(file: string, legacy: Record<string, string> 
     const site = { project: "jazu", branch: "master", ...raw.site }
     if (!id_pattern.test(site.project)) throw new Error("site.project must be a lowercase project id")
     if (!branch_pattern.test(site.branch) || site.branch.includes("..")) throw new Error("site.branch is not a safe branch name")
+    if (site.checkout_branch !== undefined && (!branch_pattern.test(site.checkout_branch) || site.checkout_branch.includes(".."))) throw new Error("site.checkout_branch is not a safe branch name")
     const config: Server_Config = {
         file: path,
         repos_dir: absolute(base, raw.repos_dir, "repos"),
         state_dir: absolute(base, raw.state_dir, ".server"),
-        site: { project: site.project, branch: site.branch, dir: absolute(base, site.dir, ".") },
+        site: { project: site.project, branch: site.branch, dir: absolute(base, site.dir, "."), checkout_branch: site.checkout_branch ?? site.branch },
         projects: {},
         collaborators: {},
     }
