@@ -20,7 +20,7 @@ This repository is generation 12. Nothing in it is specific to one person: owner
 | **Personal server** | The owner's own machine, running this same repository, reachable only through Cloudflare Tunnel + Zero Trust: repository hub, and later CI/CD and AI agents. | [personal server](docs/feat/personal_server.md) |
 | **Work portal** | `/work`: a per-client page for messages, files, dashboards and receipts. Static shell today; backend is **not implemented** yet. | [work](docs/feat/work.md) |
 
-What works today and what does not is tracked as checkboxes in **[docs/feat/README.md](docs/feat/README.md)**. In short: the public static site, themes, expertise timeline, desk with WASM shell, print layouts, Terraform/Worker routing and the signed read-only Git node work; client authentication, chat, receipts, dashboards, pushes, CI/CD and agents are not built.
+What works today and what does not is tracked as checkboxes in **[docs/feat/README.md](docs/feat/README.md)**. In short: the public static site, themes, expertise timeline, desk with WASM shell, print layouts, Terraform/Worker routing and the signed read-only Git node work; client authentication, chat, receipts, dashboards and agents are not built. Personal Git pushes and Jazu CI/CD are implemented; see Server Use.
 
 ## Documentation map
 
@@ -149,7 +149,7 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 
 Set up the **personal server**: your own machine running an instance of this repository, connected to Cloudflare through a Tunnel protected by Zero Trust, so the public Worker can reach it securely and (later) your Git repository, CI/CD and AI agents can work on it. The public website never depends on it.
 
-**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu.git` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Every other project is archived: no pushes, no CI, no CD. **Not built yet:** dashboards, AI agents, SSH, pipelines for other projects ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The git/CI parts are tested locally with real git but have not run on a real Cloudflare account.
+**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Every other project is archived: no pushes, no CI, no CD. **Not built yet:** dashboards, AI agents, SSH, pipelines for other projects ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The git/CI parts are tested locally with real git but have not run on a real Cloudflare account.
 
 1. **Install** Node.js 22.18+, Git and [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). Clone this repository (the server is an instance of it) and run `npm ci`.
 2. **Configure `.env`** (copy `.env.example`):
@@ -190,7 +190,7 @@ node src/main.ts server status                       # queue and last runs; `ser
 
 **Using the server as the build/deploy machine manually (no pipeline).** The server may also run `git pull && npm ci && npm run deploy -- --target all`. That machine then needs Node, Terraform, `npm ci`, the same `.env`, **and the Terraform state** (use a remote backend).
 
-**Planned** (unchecked in [feat/personal_server.md](docs/feat/personal_server.md)): a `git`-over-HTTPS/SSH endpoint through the tunnel so `git clone {domain}/projects/<id>` and client pushes work; a push-triggered pipeline (check → build → test → deploy); AI agents with repository access; dashboard snapshots (`GET /dashboards/{client}/{name}`); private repositories with contributor authentication.
+**Planned:** SSH transport, AI agents, dashboards and pipelines for projects other than Jazu. HTTPS Git transport, contributor tokens and the Jazu push pipeline are implemented.
 
 ---
 
@@ -233,3 +233,31 @@ config.json   content/   src/   extension/   docs/   migrations/   terraform/   
 ```
 
 Generated, never commit: `dist/`, `.cache/`, `.wrangler/`, `.env`, Terraform state/tfvars. Details: [docs/src/README.md](docs/src/README.md).
+
+
+### Personal-server production configuration
+
+The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/v1/ci/jazu/runs` reports deployment status.
+
+Worker updates are an operator action (CI deploys Pages only):
+
+```sh
+node --env-file=.env node_modules/wrangler/bin/wrangler.js deploy --config wrangler.production.jsonc
+# Upload ORIGIN_HMAC_SECRET, ACCESS_CLIENT_ID and ACCESS_CLIENT_SECRET using wrangler secret bulk.
+# Never pass the entire .env: the Worker does not need the Cloudflare API token.
+```
+
+Use `ops/jazu-node.service.example` as the systemd service, adjusting the user, checkout and Node paths. The node must run with Node 22.18+; Node 24 is recommended. Keep `build/` WASM artifacts and `content/media/` in the checkout: CI restores these ignored inputs into its isolated clone. Keep `server.json`, `.env` and state private and backed up.
+
+For a hub that accepts `git push origin master` while this feature is developed, set `site.branch` to `master` and `site.checkout_branch` to `feature/personal-server`. The hub's bare `master` is seeded from this feature branch; the server's working checkout stays on the feature branch. The GitHub remote remains the source backup and is separate from the personal Git hub.
+
+```sh
+git clone https://jasouza.com/projects/jazu
+cd jazu
+# Git prompts for the collaborator username and token on the first push.
+git push origin master
+```
+
+Create tokens on the Pi with `node src/main.ts server user add <name> --role owner` (trusted deployers) or `--role write` (contributors who push review branches). Owners can push master and execute CI code on the Pi. Tokens are separate from SSH passwords and Cloudflare credentials. Store tokens in your Git credential manager. Public clones continue working when the Pi is stopped; pushes and origin-backed APIs return an unavailable response.
+
+The production resources provisioned for this branch use Wrangler and the Cloudflare API. Import them into Terraform before using `npm run deploy`; no Terraform state was created by this setup. Large assets over the Pages limit must be uploaded to `jazu-assets` at their generated `assets/media/...` or `assets/wasm/...` keys before publishing, and again when those assets change.

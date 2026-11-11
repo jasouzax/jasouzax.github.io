@@ -1,0 +1,19 @@
+[Unit]
+Description=Jazu personal Git server and CI runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jason
+WorkingDirectory=/home/jason/jasouzax.github.io
+Environment=PATH=/home/jason/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/jason/.local/bin/node --env-file=.env src/main.ts node --port 8788
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
