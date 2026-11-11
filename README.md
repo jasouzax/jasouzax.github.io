@@ -237,7 +237,7 @@ Generated, never commit: `dist/`, `.cache/`, `.wrangler/`, `.env`, Terraform sta
 
 ### Personal-server production configuration
 
-The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/v1/ci/jazu/runs` reports deployment status.
+The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu-1ws.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/v1/ci/jazu/runs` reports deployment status.
 
 Worker updates are an operator action (CI deploys Pages only):
 

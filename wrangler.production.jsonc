@@ -7,7 +7,7 @@
     "routes": [{ "pattern": "jasouza.com/*", "zone_name": "jasouza.com" }],
     "vars": {
         "DOMAIN": "jasouza.com",
-        "PAGES_ORIGIN": "https://jazu.pages.dev",
+        "PAGES_ORIGIN": "https://jazu-1ws.pages.dev",
         "PUBLIC_PROJECTS": "[\"jazu\"]",
         "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
     },
