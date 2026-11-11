@@ -1,0 +1,26 @@
+#!/bin/sh
+# ~/.xinitrc for a JAZU kiosk: serve the site on localhost, then show /desk full screen in Chromium with the device bridge.
+# Adjust the three variables; run `npm run build` and `npm run extension:install -- --user-data-dir "$PROFILE"` once beforehand.
+JAZU_DIR=/opt/jazu
+PORT=8080
+PROFILE="$HOME/.config/jazu-desk"
+
+cd "$JAZU_DIR" || exit 1
+mkdir -p "$HOME/.cache"
+npm run serve -- --port "$PORT" > "$HOME/.cache/jazu-serve.log" 2>&1 &
+
+# Start the browser only once the server answers, and only after it holds the port (see the threat model about port squatting).
+tries=0
+until node -e "require('http').get('http://localhost:$PORT/',r=>process.exit(0)).on('error',()=>process.exit(1))"; do
+    tries=$((tries + 1))
+    [ "$tries" -ge 120 ] && exit 1
+    sleep 1
+done
+
+# Chromium (unbranded) keeps --load-extension; Google Chrome 137+ does not. For a window without browser chrome use --app; for true kiosk replace
+# "--app=... --start-fullscreen" with "--kiosk http://localhost:$PORT/desk".
+exec chromium \
+    --user-data-dir="$PROFILE" \
+    --load-extension="$JAZU_DIR/extension" \
+    --app="http://localhost:$PORT/desk" --start-fullscreen \
+    --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble

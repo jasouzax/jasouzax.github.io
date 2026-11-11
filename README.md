@@ -182,43 +182,41 @@ Set up the **personal server**: your own machine running an instance of this rep
 
 ---
 
-## Desk Use (TODO)
+## Desk Use
 
-> **Not implemented.** This section records the intended design so the work can start from it. Nothing below has been built or tested.
+Run the desk as a **full desktop**: the machine boots to an X session whose only program is Chromium showing `/desk`, and a terminal window there is a **real shell on the machine**, not the WebAssembly one.
 
-Goal: run the desk as a **full desktop environment**: boot to an X session (`xinit` + an X server) that starts Chromium in kiosk/app mode on the desk, so the machine *is* the JAZU desktop.
-
-Design decisions already made:
-
-- The site is served from **`localhost`**, not from the real domain, to avoid security vulnerabilities: the bridge to the device shell must never be reachable from a public website. (`npm run serve` already binds `127.0.0.1`; `localhost` is also a secure context, which the File System Access API needs.)
-- A **Chromium extension** is the bridge: the page talks to the extension, and the extension talks to the device's shell. This chain (localhost page ↔ extension ↔ device shell) is **not developed yet**.
-
-Sketch of the setup (untested; adjust paths):
-
-```sh
-# ~/.xinitrc
-npm --prefix /opt/jazu run serve -- --port 8080 &
-exec chromium --app=http://localhost:8080/desk --start-fullscreen \
-     --user-data-dir="$HOME/.config/jazu-desk" --load-extension=/opt/jazu/extension
+```
+Chromium (--app, full screen) → http://localhost:8080/desk
+        ↕ JAZU extension (extension/)            only on the exact localhost origin you allow
+        ↕ native messaging host (extension/host)  Node + a pty, started by Chromium, no network port
+        your shell on the device
 ```
 
+Design decisions:
+
+- The site is served from **`localhost`**, never from the real domain: the bridge to the shell must not be reachable from a public website. (`npm run serve` binds `127.0.0.1`; `localhost` is also a secure context, which the File System Access API needs.)
+- The extension is the only way in. It runs on `http://localhost/*`, accepts only origins listed in `extension/allowed_origins.json` (default `http://localhost:8080`), and Chrome starts the host only for this extension's fixed id.
+- Without the extension nothing changes: `/desk` keeps its WebAssembly shell, and `pid:` always opens it, even with the bridge present.
+
+Setup on the kiosk machine (Debian, no desktop environment: `xinit`/`startx`, an X server such as `xserver-xorg`, `chromium`, Node 22.18+, `python3`):
+
 ```sh
-startx            # or: xinit ~/.xinitrc -- :0 vt1
+git clone <your repo> /opt/jazu && cd /opt/jazu
+npm ci && npm run build
+npm run extension:install -- --origin http://localhost:8080 --user-data-dir ~/.config/jazu-desk
+cp extension/xinitrc.example ~/.xinitrc     # edit JAZU_DIR / PORT
+startx                                      # or: xinit ~/.xinitrc -- :0 vt1
 ```
 
-Open items (tracked in [docs/feat/desk_env.md](docs/feat/desk_env.md)):
-
-- [ ] Script/document the `xinit` + X server session and Chromium kiosk flags
-- [ ] Extension that accepts messages only from the exact `http://localhost:<port>` origin
-- [ ] Device-shell channel (likely Chrome Native Messaging) with an explicit allow-list and no remote reachability
-- [ ] Threat model and permission prompts for the bridge
+Use **Chromium** (or Chrome for Testing): branded Google Chrome removed `--load-extension` in version 137. Full guide, protocol, threat model and troubleshooting: [extension/README.md](extension/README.md). Status: [docs/feat/desk_env.md](docs/feat/desk_env.md). The host and the page-to-host chain are covered by `tests/host.test.ts` and `tests/host_bridge.test.ts`; running it inside a real Chromium/X session has **not** been verified yet.
 
 ---
 
 ## Repository at a glance
 
 ```
-config.json   content/   src/   docs/   migrations/   terraform/   tests/
+config.json   content/   src/   extension/   docs/   migrations/   terraform/   tests/
 .env.example  wrangler.local.jsonc  CLAUDE.md
 ```
 

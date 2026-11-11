@@ -94,6 +94,6 @@ These figures were recorded by the previous author and **were not re-run** when 
 - Expertise radio filters, `#all/{id}` fragments and search deduplication are pending.
 - The engine is Node-only (portability to Deno/Bun is not done).
 - Desk userland is a browser port, not a Linux kernel; see [src/desk.md](src/desk.md#limits-to-remember).
-- A desktop (`xinit`) deployment does not exist yet: [feat/desk_env.md](feat/desk_env.md).
+- The desktop (`xinit` kiosk) device shell is implemented and tested against a simulated browser, but not yet verified in a real Chromium session: [feat/desk_env.md](feat/desk_env.md).
 
 Full list: [feat/README.md](feat/README.md).

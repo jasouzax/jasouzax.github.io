@@ -347,6 +347,9 @@ export const process_hooks = {
     release: (_item: desk_window): void => {},
     release_body: (_item: desk_window): void => {},
 }
+// what the empty window's "Open terminal" starts: the WASM shell, or the device shell once the extension bridge answers (see desk_host.ts)
+export const terminal_hooks = { uri: "pid:" }
+
 export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
 const renders = new WeakMap<desk_window, AbortController>()
 
@@ -614,7 +617,7 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
     const box = item.el
     box.addEventListener("click", event => {
         if ((event.target as Element).closest(".desk_wbox_body_empty_folder")) void open_source(item, `file://${working_directory()}`)
-        if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, "pid:")
+        if ((event.target as Element).closest(".desk_wbox_body_empty_terminal")) void open_source(item, terminal_hooks.uri)
     })
     let depth = 0
     box.addEventListener("dragenter", event => {

@@ -27,7 +27,9 @@
     "tf:validate": "terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate",
     "cloud:dev": "wrangler dev --config wrangler.local.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
-    "node": "node --env-file=.env src/main.ts node"
+    "node": "node --env-file=.env src/main.ts node",
+    "extension:install": "node extension/host/install.ts",
+    "extension:uninstall": "node extension/host/install.ts --uninstall"
   },
   "engines": {
     "node": ">=22.18"

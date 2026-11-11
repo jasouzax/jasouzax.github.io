@@ -170,11 +170,13 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 
 ## Desktop environment
 
-- [ ] **[Desktop environment](desk_env.md)** — open items below
-  - [ ] Document and script the `xinit` + X server session that starts Chromium in kiosk/app mode on `localhost`
-  - [ ] Chromium extension that bridges the page to the device shell
-  - [ ] Localhost ↔ extension ↔ device-shell channel (not yet developed)
-  - [ ] Threat model: why the desktop stays on `localhost`, never on a public domain
+- [ ] **[Desktop environment](desk_env.md)** — real-browser verification open
+  - [x] Native messaging host with real pty shells, installer, strict protocol (tests)
+  - [x] Page ↔ extension ↔ host chain with origin allow-list, simulated-browser test
+  - [x] `host:` terminal windows and device-shell preference in "Open terminal"
+  - [x] Threat model: why the desktop stays on `localhost`, never on a public domain
+  - [ ] Verify in a real Chromium and an `xinit` kiosk session on the target machine
+  - [ ] Reattach to shells after a page reload
 
 ## Migration
 

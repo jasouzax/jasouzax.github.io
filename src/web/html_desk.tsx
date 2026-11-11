@@ -523,6 +523,7 @@ const runtime_keys = [
     "drop_file_or_upload",
     "choose_file",
     "open_terminal",
+    "host_missing",
     "open_folder",
     "open_new_window",
     "files_toggle_hidden",
