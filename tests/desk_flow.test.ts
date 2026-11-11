@@ -1,5 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { flow_of, no_picks } from "../src/web/client/desk_flow_rules.ts"
+import { adopt, announce_edit, children_of, flow_kind_of, forget_edits, latest_bytes, link_hooks, refresh_children, release_links, subscribe_edits } from "../src/web/client/desk_flow.ts"
+import type { desk_window } from "../src/web/client/desk.ts"
 import { case_flow, is_child_case, plugin_serves_flow, select_case, select_flow_case, type plugin_case, type plugin_target } from "../src/plugin_types.ts"
 
 const file = new Blob(["x"])
@@ -78,4 +81,71 @@ test("a plugin's flow list limits the flows it serves", () => {
     assert.equal(plugin_serves_flow({ id: "a", version: "1" }, "convert"), true)
     assert.equal(plugin_serves_flow({ id: "a", version: "1", flow: "convert, compare" }, "compare"), true)
     assert.equal(plugin_serves_flow({ id: "a", version: "1", flow: "convert" }, "mirror"), false)
+})
+
+const fake_window = (): desk_window => ({ parent: null, picks: no_picks() }) as unknown as desk_window
+
+test("a child's flow follows what the user picked in it", () => {
+    assert.equal(flow_of(no_picks()), "")
+    assert.equal(flow_of({ ...no_picks(), mode: true }), "mirror")
+    assert.equal(flow_of({ ...no_picks(), mime: true }), "convert")
+    assert.equal(flow_of({ ...no_picks(), mime: true, mode: true }), "convert")
+    assert.equal(flow_of({ ...no_picks(), own: true }), "compare")
+    assert.equal(flow_of({ mime: true, mode: true, own: true }), "compare")
+})
+
+test("links: a child is its parent's child until either closes", () => {
+    const parent = fake_window()
+    const child = fake_window()
+    const other = fake_window()
+    adopt(parent, child)
+    assert.deepEqual(children_of(parent), [child])
+    assert.equal(child.parent, parent)
+    assert.equal(flow_kind_of(child), "")
+    child.picks.mode = true
+    assert.equal(flow_kind_of(child), "mirror")
+    assert.equal(flow_kind_of(parent), "")
+    assert.equal(flow_kind_of(other), "")
+    const drawn: desk_window[] = []
+    link_hooks.render = item => { drawn.push(item) }
+    refresh_children(parent)
+    assert.deepEqual(drawn, [child])
+    // the parent closes: the child is an ordinary window again, drawn once
+    drawn.length = 0
+    release_links(parent, true)
+    assert.equal(child.parent, null)
+    assert.deepEqual(children_of(parent), [])
+    assert.deepEqual(drawn, [child])
+    assert.equal(flow_kind_of(child), "")
+})
+
+test("links: a closing child leaves its parent, and a discarded desk redraws nothing", () => {
+    const parent = fake_window()
+    const first = fake_window()
+    const second = fake_window()
+    adopt(parent, first)
+    adopt(parent, second)
+    release_links(first, true)
+    assert.deepEqual(children_of(parent), [second])
+    const drawn: desk_window[] = []
+    link_hooks.render = item => { drawn.push(item) }
+    release_links(parent, false)
+    assert.deepEqual(drawn, [])
+    assert.equal(second.parent, null)
+})
+
+test("edits reach subscribers and the newest bytes are kept until forgotten", () => {
+    const source = fake_window()
+    const seen: number[][] = []
+    const stop = subscribe_edits(source, bytes => { seen.push([...bytes]) })
+    assert.equal(latest_bytes(source), null)
+    announce_edit(source, new Uint8Array([1, 2]))
+    announce_edit(source, new Uint8Array([3]))
+    assert.deepEqual(seen, [[1, 2], [3]])
+    assert.deepEqual([...latest_bytes(source)!], [3])
+    stop()
+    announce_edit(source, new Uint8Array([4]))
+    assert.equal(seen.length, 2)
+    forget_edits(source)
+    assert.equal(latest_bytes(source), null)
 })

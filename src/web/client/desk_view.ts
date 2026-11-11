@@ -11,6 +11,8 @@ import { markdown_body } from "./desk_markdown.ts"
 import { folder_body } from "./desk_folder.ts"
 import { bind_navigation, sync_navigation } from "./desk_navigation.ts"
 import { desk_drag_type } from "./desk_fs.ts"
+import { link_hooks, refresh_children } from "./desk_flow.ts"
+import { no_picks } from "./desk_flow_rules.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -102,6 +104,7 @@ export function fill_mime_list(item: desk_window, query: string = ""): void {
 }
 
 export function set_mime(item: desk_window, mime: string): void {
+    if (item.parent) item.picks.mime = true
     item.mime = mime
     item.icon = mime_icon(mime)
     render_window(item)
@@ -109,6 +112,7 @@ export function set_mime(item: desk_window, mime: string): void {
 
 export function set_mode(item: desk_window, mode: string): void {
     if (item.mode === mode) return
+    if (item.parent) item.picks.mode = true
     item.mode = mode
     render_window(item)
 }
@@ -382,7 +386,9 @@ function fallback_body(item: desk_window): HTMLElement {
         terminal.type = "button"
         terminal.className = "desk_wbox_body_empty_terminal"
         terminal.textContent = text("open_terminal")
-        actions.append(folder, terminal)
+        // a split child holds the parent's resource or a resource of its own: it is never a terminal
+        actions.append(folder)
+        if (!item.parent) actions.append(terminal)
         empty.append(actions, label)
         return empty
     }
@@ -413,10 +419,14 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
         process_hooks.release(item)
         item.file = null
         item.path = item.name = ""
-        item.mime = item.icon = ""; item.candidates = []; item.save = null; item.mode = "view"
+        item.mime = item.icon = ""; item.candidates = []; item.save = null
+        // an emptied child is back to everything off
+        item.mode = item.parent ? "" : "view"
+        if (item.parent) item.picks = no_picks()
         render_window(item)
         return
     }
+    if (item.parent) item.picks.own = true
     try {
         for (const handler of uri_handlers) {
             if (!current()) return
@@ -485,10 +495,12 @@ export function render_window(item: desk_window): void {
     sync_navigation(item)
     const summary = head_part(item, ".desk_wbox_head_mime > summary")
     if (summary) summary.textContent = item.mime || text("no_mime")
-    for (const button of item.el.querySelectorAll<HTMLElement>(".desk_wbox_head_mode button[data-mode]")) {
+    // with no mode picked (an empty child) neither radio is on; the first stays reachable by keyboard
+    const no_mode = item.mode !== "view" && item.mode !== "edit"
+    for (const [index, button] of item.el.querySelectorAll<HTMLElement>(".desk_wbox_head_mode button[data-mode]").entries()) {
         const active = button.dataset.mode === item.mode
         button.setAttribute("aria-checked", String(active))
-        button.tabIndex = active ? 0 : -1
+        button.tabIndex = active || (no_mode && index === 0) ? 0 : -1
     }
     fill_mime_list(item)
     // a new body starts with nothing to save; an editor claims the save button when it is made
@@ -497,10 +509,13 @@ export function render_window(item: desk_window): void {
     item.problem = ""
     body_for(item)
     sync_save(item)
+    // the children hold this window's resource: they draw themselves again
+    refresh_children(item)
 }
 
 export async function load_file(item: desk_window, file: Blob, name: string, path: string = "", current = () => true): Promise<void> {
     if (!current()) return
+    if (item.parent) item.picks.own = true
     process_hooks.release(item)
     item.error = ""
     item.pid = null
@@ -518,6 +533,7 @@ export async function load_file(item: desk_window, file: Blob, name: string, pat
 }
 
 export function load_folder(item: desk_window, path: string, name: string): void {
+    if (item.parent) item.picks.own = true
     process_hooks.release(item)
     item.error = ""; item.pid = null; item.file = null; item.save = null
     item.path = path; item.name = name; item.mode = "view"
@@ -664,6 +680,7 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
 }
 
 export function init_view(open_window: () => desk_window | null): void {
+    link_hooks.render = render_window
     window_hooks.closed = item => {
         renders.get(item)?.abort()
         item.el.querySelectorAll<HTMLMediaElement>("video, audio").forEach(media => media.pause())

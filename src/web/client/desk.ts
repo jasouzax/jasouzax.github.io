@@ -6,6 +6,8 @@ import { init_view, open_source, render_window, save_window } from "./desk_view.
 import { navigate_window } from "./desk_navigation.ts"
 import { init_fs } from "./desk_fs.ts"
 import { init_proc } from "./desk_proc.ts"
+import { adopt, release_links } from "./desk_flow.ts"
+import { no_picks, type Child_Picks } from "./desk_flow_rules.ts"
 
 export type desk_data = {
     text: Record<string, string>
@@ -40,6 +42,11 @@ export type desk_window = {
     // the process this window shows (client_desk_proc.ts), or null
     pid: number | null
     error?: string
+    // the window this one was split from (desk_flow.ts), or null; a child shows the parent's resource, so what it holds is derived from the parent
+    // until the user gives it a resource of its own
+    parent: desk_window | null
+    // what the user picked in a child (a type, a mode, a resource): that decides the flow with the parent (desk_flow_rules.ts)
+    picks: Child_Picks
 }
 
 export const state = {
@@ -293,7 +300,8 @@ export function focus_window(item: desk_window | null): void {
     arrange()
 }
 
-export function new_window(existing?: HTMLElement): desk_window | null {
+// A child (made by split_window) starts with everything off: no type, no source, no mode. Its mode is "" until the user picks one.
+export function new_window(existing?: HTMLElement, parent: desk_window | null = null): desk_window | null {
     const desk = state.desk
     const template = document.getElementById("desk_window_template") as HTMLTemplateElement | null
     if (!desk || !template) return null
@@ -303,13 +311,31 @@ export function new_window(existing?: HTMLElement): desk_window | null {
     element.id = `desk_win_${id}`
     element.dataset.window = String(id)
     desk.insertBefore(element, template)
-    const item: desk_window = { id, el: element, tab: null as unknown as HTMLAnchorElement, minimized: false, name: "", mime: "", mode: "view", icon: "", file: null, path: "", candidates: [], save: null, commit: null, dirty: false, problem: "", pid: null }
+    const item: desk_window = { id, el: element, tab: null as unknown as HTMLAnchorElement, minimized: false, name: "", mime: "", mode: parent ? "" : "view", icon: "", file: null, path: "", candidates: [], save: null, commit: null, dirty: false, problem: "", pid: null, parent: null, picks: no_picks() }
     item.tab = make_tab(item)
-    state.windows.push(item)
+    if (parent) {
+        adopt(parent, item)
+        // the child's tab and place in the list follow its parent
+        parent.tab.after(item.tab)
+        state.windows.splice(state.windows.indexOf(parent) + 1, 0, item)
+    } else state.windows.push(item)
     state.focused = item
     window_hooks.created(item)
     arrange()
     return item
+}
+
+// The head's split control: a new empty window beside this one, connected to it (desk_flow.ts). What the pair does depends on what the user
+// then picks in the child, and on the plugins (desk_view.ts). In portrait the child is a new tab, like any window.
+export function split_window(parent: desk_window | null): desk_window | null {
+    if (!parent || !state.desk) return null
+    parent.minimized = false
+    if (state.maximized) state.maximized = null
+    const child = new_window(undefined, parent)
+    if (!child) return null
+    if (!portrait.matches) dock_window(child, parent, "right")
+    child.el.focus({ preventScroll: true })
+    return child
 }
 
 // the viewer and the file system hook in here (so this file does not import them)
@@ -320,7 +346,7 @@ export const window_hooks = {
 
 function dispose(): void {
     cancel_drag?.()
-    for (const item of state.windows) { window_hooks.closed(item); item.tab.remove() }
+    for (const item of state.windows) { window_hooks.closed(item); release_links(item, false); item.tab.remove() }
     state.windows = []
     state.focused = null
     state.maximized = null
@@ -352,6 +378,12 @@ function on_click(event: MouseEvent): void {
         close_menu(move)
         const item = window_of(move)
         if (item) move_window(item, move.dataset.move ?? "")
+        return
+    }
+    const split = target.closest<HTMLElement>(".desk_wbox_head_split")
+    if (split && state.desk) {
+        event.preventDefault()
+        split_window(window_of(split))
         return
     }
     const button = target.closest<HTMLElement>("#head_new, #head_mini, #head_full, #head_exit")
@@ -634,6 +666,7 @@ export function close_window(item: desk_window | null): void {
     item.el.remove()
     item.tab.remove()
     state.windows.splice(index, 1)
+    release_links(item, true)
     if (state.maximized === item) state.maximized = null
     if (state.focused === item) state.focused = state.windows.filter(entry => !entry.minimized)[Math.max(0, index - 1)] ?? null
     arrange()
