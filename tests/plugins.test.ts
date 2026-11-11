@@ -42,6 +42,20 @@ test("XML bare attributes become true without changing quoted values, comments o
     assert.deepEqual(page.children[0].children[0].attrs, { full: "true", save: "false", flow: "true" })
 })
 
+test("case accepts child_* flow attributes and rejects bad booleans and unknown hosts", () => {
+    const source = `<plugin id="flow" version="1" flow="convert,compare,mirror">
+        <case file mime="image/png" child_mime="image/jpeg" host="media"/>
+        <case file mime="text/*" child_file child_mime="text/*" host="text"/>
+        <case file edit mime="text/html" child_view host="markdown"/>
+    </plugin>`
+    const valid = new_diagnostics()
+    validate_roots(parse_xml(source, "flow.xml"), valid)
+    assert.deepEqual(valid.errors, [])
+    const invalid = new_diagnostics()
+    validate_roots(parse_xml('<plugin id="x" version="1"><case child_view="maybe" host="live"/><case child_mime="a/b" host="bogus"/></plugin>', "bad.xml"), invalid)
+    assert.equal(invalid.errors.length, 2)
+})
+
 test("plugin roots compile identically in one file, separate files and nested content folders", async () => {
     const root = mkdtempSync(join(tmpdir(), "jazu_plugin_roots_"))
     try {
