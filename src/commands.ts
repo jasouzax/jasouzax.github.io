@@ -36,7 +36,7 @@ function parse_args(args: string[]): { words: string[], flags: flags } {
         }
         const name = arg.slice(2)
         const next = args[index + 1]
-        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role", "project"].includes(name)) {
+        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role", "project", "branch", "base_url", "pages_project", "assets_bucket"].includes(name)) {
             flags[name] = next
             index++
         } else flags[name] = true
@@ -51,7 +51,7 @@ function show(result: Awaited<ReturnType<typeof build_site>>): void {
 async function run_build(root: string, flags: flags, only_check: boolean): ReturnType<typeof build_site> {
     return build_site({
         root, out: output_directory(root, String(flags.out ?? "dist")), mode: flags.dev ? "development" : "production", force: Boolean(flags.force),
-        build_date: flags.date ? new Date(String(flags.date)) : new Date(), only_check,
+        build_date: flags.date ? new Date(String(flags.date)) : new Date(), only_check, base_url: flags.base_url ? String(flags.base_url) : undefined,
     })
 }
 
@@ -73,9 +73,10 @@ async function main(): Promise<void> {
         const result = flags.skip_build ? undefined : await run_build(root, flags, false)
         if (result) show(result)
         const config = result?.model.config ?? await load_config(root)
-        const outcome = publish_pages(root, output_directory(root, String(flags.out ?? "dist")), config.deploy.pages_project, {
+        const outcome = publish_pages(root, output_directory(root, String(flags.out ?? "dist")), String(flags.pages_project ?? config.deploy.pages_project), {
             overlay_dir: flags.overlay ? resolve(String(flags.overlay)) : undefined, state_file: flags.state_file ? resolve(String(flags.state_file)) : undefined,
             dry_run: Boolean(flags.dry_run), force: Boolean(flags.force), commit: flags.commit ? String(flags.commit) : undefined, message: flags.message ? String(flags.message) : undefined,
+            branch: flags.branch ? String(flags.branch) : undefined, assets_bucket: flags.assets_bucket ? String(flags.assets_bucket) : undefined,
         })
         if (outcome.large_assets.length) console.warn(`warning: ${outcome.large_assets.length} file(s) over 25 MiB are served from R2`)
         console.log(`JAZU_PUBLISH ${JSON.stringify(outcome)}`)

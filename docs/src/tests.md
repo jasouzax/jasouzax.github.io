@@ -22,6 +22,8 @@ Node 22.18+ is required (`tests/nodes.test.ts` uses `node:sqlite`). Tests build 
 | `gitignore.test.ts` | `.gitignore` semantics used by `pack` |
 | `git_server.test.ts`, `project_pipeline.test.ts` | Real Git transport, repository synchronization, CI-gated mirrors and XML project pipelines |
 | `listener_process.test.ts` | Incoming schema/engine isolation, failed-worker recovery, catalog failure recovery and real service exit 75 after a committed runtime update |
+| `staging_pipeline.test.ts`, `staging_publish.test.ts` | Same-SHA branch jobs, owner-only deployment refs, shared checkout switches, CI/dirty-file protection, branch sync state, primary mirror isolation and independent Pages/R2 CLI targets |
+| `staging_setup.test.ts` | Existing .env alias precedence for the standalone Terraform staging entry; Terraform resource assertions live in `terraform/staging/tests/` and use a mocked provider |
 | `desk_*.test.ts` | Desk logic: rename tokens, ZIP, folder covers, paths, permissions, previews, selection; `desk_wasm.test.ts` runs the real BusyBox WASM in `worker_threads` (needs the `.wasm` artifacts) |
 
 ## Browser tests (Playwright, Chromium)

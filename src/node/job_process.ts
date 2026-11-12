@@ -9,7 +9,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { Server_Config } from "./server_config.ts"
-import { repository_path } from "./server_config.ts"
+import { repository_path, project_branches } from "./server_config.ts"
 import { child_environment, run_command } from "./pipeline_process.ts"
 import type { Log, Run_Record } from "./pipeline.ts"
 import type { Job } from "./queue.ts"
@@ -79,9 +79,9 @@ function worker(dir: string, mode: string, payload: unknown, env: NodeJS.Process
                 else child.kill("SIGKILL")
             } catch { /* The process group has already exited. */ }
         }
-        const timer = setTimeout(kill_tree, mode === "catalog" ? 30000 : 6 * 60 * 60 * 1000)
+        const timer = setTimeout(kill_tree, mode === "run" ? 6 * 60 * 60 * 1000 : 30000)
         child.stdout.on("data", chunk => {
-            if (mode === "catalog") output = (output + chunk).slice(-4 * 1024 * 1024)
+            if (mode !== "run") output = (output + chunk).slice(-4 * 1024 * 1024)
             else log(chunk.toString())
         })
         child.stderr.on("data", chunk => { error_tail = (error_tail + chunk).slice(-4000); log(chunk.toString()) })
@@ -107,6 +107,10 @@ export async function fresh_catalog(config: Server_Config): Promise<Server_Confi
 export async function run_job_process(config: Server_Config, job: Job, record: Run_Record, log: Log, server_env: NodeJS.ProcessEnv): Promise<void> {
     const dir = job.project === config.site.project && job.commit ? await stage_engine(config, job.commit, log) : config.site.dir
     const env = { ...child_environment(config), HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK, JAZU_REPOSITORIES_JSON: process.env.JAZU_REPOSITORIES_JSON, ...server_env }
+    if (project_branches(config, job.project).length > 1) {
+        const capabilities = JSON.parse(await worker(dir, "capabilities", {}, child_environment(config), log))
+        if (capabilities.branch_pipelines !== true) throw new Error("Engine worker lacks branch pipeline support; merge the staging feature into this branch before deploying it")
+    }
     await worker(dir, "run", { config, job, record, catalog_dir: dir }, env, log)
     Object.assign(record, JSON.parse(readFileSync(join(config.state_dir, "runs", `${job.id}.json`), "utf8")))
 }

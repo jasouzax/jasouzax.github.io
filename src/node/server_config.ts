@@ -21,7 +21,7 @@ import { apply_project_catalog } from "./project_catalog.ts"
 
 export type Role = "owner" | "write" | "read"
 export type Action = "read" | "write"
-export type Project_Entry = { visibility: "public" | "private", path: string, active?: boolean, dir?: string, branch?: string, checkout_branch?: string, pipeline?: Project_Pipeline, upstream?: Upstream_Config }
+export type Project_Entry = { visibility: "public" | "private", path: string, active?: boolean, dir?: string, branch?: string, checkout_branch?: string, pipeline?: Project_Pipeline, pipelines?: Record<string, Project_Pipeline>, upstream?: Upstream_Config }
 export type Collaborator = { role: Role, token_hash: string }
 export type Upstream_Config = { remote: string, branch: string, poll_seconds: number }
 export type Server_Config = {
@@ -33,6 +33,10 @@ export type Server_Config = {
     collaborators: Record<string, Collaborator>
     upstream?: Upstream_Config
     pipeline?: Project_Pipeline
+    pipelines?: Record<string, Project_Pipeline>
+    shared_checkout?: boolean
+    primary_branch?: string
+    work_state_dir?: string
     root_config?: Server_Config
     catalog?: boolean
 }
@@ -61,13 +65,25 @@ export function project_branch(config: Server_Config, id: string): string { retu
 
 export function project_ids(config: Server_Config): string[] { return [...new Set([config.site.project, ...Object.keys(config.projects)])] }
 
-export function project_view(config: Server_Config, id: string): Server_Config {
+export function project_branches(config: Server_Config, id: string): string[] {
+    const root = config.root_config ?? config
+    return [...new Set([project_branch(root, id), ...Object.keys(root.projects[id]?.pipelines ?? (id === root.site.project ? root.pipelines : undefined) ?? {})])]
+}
+
+export function project_view(config: Server_Config, id: string, selected_branch?: string): Server_Config {
     const root = config.root_config ?? config
     if (!is_active(root, id)) throw new Error(`${id} is archived and has no active pipeline`)
-    if (id === root.site.project) return root
     const entry = root.projects[id]
     const branch = project_branch(root, id)
-    return { ...root, root_config: root, state_dir: join(root.state_dir, "projects", id), site: { project: id, dir: entry.dir ?? join(root.state_dir, "work", id), branch, checkout_branch: entry.checkout_branch ?? branch }, pipeline: entry.pipeline, upstream: entry.upstream }
+    const base = id === root.site.project ? root : { ...root, root_config: root, state_dir: join(root.state_dir, "projects", id), site: { project: id, dir: entry.dir ?? join(root.state_dir, "work", id), branch, checkout_branch: entry.checkout_branch ?? branch }, pipeline: entry.pipeline, pipelines: entry.pipelines, upstream: entry.upstream }
+    if (!selected_branch) return base
+    const pipeline = base.pipelines && Object.hasOwn(base.pipelines, selected_branch) ? base.pipelines[selected_branch] : selected_branch === branch ? base.pipeline : undefined
+    if (selected_branch !== branch && !pipeline) throw new Error(`No pipeline declared for ${id}:${selected_branch}`)
+    const shared_checkout = project_branches(root, id).length > 1
+    return { ...base, root_config: root, primary_branch: branch, shared_checkout, work_state_dir: base.state_dir,
+        state_dir: selected_branch === branch ? base.state_dir : join(base.state_dir, "branches", encodeURIComponent(selected_branch)),
+        site: { ...base.site, branch: selected_branch, checkout_branch: shared_checkout ? selected_branch : base.site.checkout_branch }, pipeline,
+        upstream: base.upstream ? { ...base.upstream, branch: selected_branch, poll_seconds: pipeline?.poll_seconds ?? base.upstream.poll_seconds } : undefined }
 }
 
 export function queue_root(config: Server_Config): string { return (config.root_config ?? config).state_dir }

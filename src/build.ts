@@ -36,6 +36,7 @@ export type build_options = {
     force: boolean
     build_date: Date
     only_check: boolean
+    base_url?: string
 }
 
 export type build_result = {
@@ -259,6 +260,11 @@ export async function build_site(options: build_options): Promise<build_result> 
     options.out = output_directory(options.root, options.out)
     if (!Number.isFinite(options.build_date.getTime())) throw new Error("Invalid build date")
     const config = await load_config(options.root)
+    if (options.base_url) {
+        const url = new URL(options.base_url)
+        if (!["https:", "http:"].includes(url.protocol) || url.origin !== options.base_url) throw new Error("base_url must be an HTTP(S) origin")
+        config.base_url = url.origin
+    }
     const diag = new_diagnostics()
     const model = load_site(options.root, config, diag, options.build_date, options.mode)
     synthesize(model)

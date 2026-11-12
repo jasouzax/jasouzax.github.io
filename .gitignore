@@ -29,6 +29,9 @@ repos/
 *.tfstate
 *.tfstate.*
 terraform/terraform.tfvars
+terraform/**/terraform.tfvars
+terraform/**/*.auto.tfvars*
+*.tfplan
 crash.log
 
 # Tests, logs, coverage

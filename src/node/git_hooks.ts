@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { Job } from "./queue.ts"
-import { is_active, project_branch, project_ids, repository_path, zero_oid } from "./server_config.ts"
+import { is_active, project_branch, project_branches, project_ids, repository_path, zero_oid } from "./server_config.ts"
 import type { Role, Server_Config } from "./server_config.ts"
 
 export type Ref_Update = { old: string, new: string, ref: string }
@@ -34,16 +34,16 @@ export function check_push(config: Server_Config, project: string, role: Role | 
     if (!is_active(config, project)) return `${project} is archived and no longer accepts pushes`
     if (role === "read") return "this token is read-only"
     if (role !== "write") return null
-    const deploy_ref = `refs/heads/${project_branch(config, project)}`
-    const blocked = updates.find(update => update.ref === deploy_ref || update.ref.startsWith("refs/tags/"))
+    const deploy_refs = project_branches(config, project).map(branch => `refs/heads/${branch}`)
+    const blocked = updates.find(update => deploy_refs.includes(update.ref) || update.ref.startsWith("refs/tags/"))
     return blocked ? `only owners may update ${blocked.ref}; push a branch and ask an owner to merge it` : null
 }
 
-// Only the deploy branch starts a pipeline; branches pushed by collaborators never run code on this machine.
+// Only declared deployment branches start pipelines; collaborator review branches never run code here.
 export function jobs_for_push(config: Server_Config, project: string, pusher: string, updates: Ref_Update[]): Omit<Job, "id" | "queued_at">[] {
     if (!is_active(config, project)) return []
-    const deploy_ref = `refs/heads/${project_branch(config, project)}`
-    return updates.filter(update => update.ref === deploy_ref && update.new !== zero_oid).map(update => ({ kind: "push" as const, project, ref: update.ref, old: update.old, commit: update.new, pusher }))
+    const deploy_refs = project_branches(config, project).map(branch => `refs/heads/${branch}`)
+    return updates.filter(update => deploy_refs.includes(update.ref) && update.new !== zero_oid).map(update => ({ kind: "push" as const, project, ref: update.ref, old: update.old, commit: update.new, pusher }))
 }
 
 function shell_quote(value: string): string { return `'${value.replace(/\\/g, "/").replace(/'/g, `'\\''`)}'` }

@@ -31,7 +31,7 @@ Required: `id`, `name`, `date`.
 
 **Not allowed on `<project>`:** `skill` and `info` (put them on slides). Unknown attributes are errors.
 
-Children: `<slide>`, `<menu>`, `<window>`, `<action>`, `<research>`, `<pipeline>`. At most one `<pipeline>` is allowed.
+Children: `<slide>`, `<menu>`, `<window>`, `<action>`, `<research>`, `<pipeline>`. Multiple pipelines are allowed, each with a distinct branch. The first pipeline is the primary deployment branch; keep that order consistent across branches and translations.
 
 ## `<slide>`
 
@@ -68,7 +68,7 @@ Files, Version and Agent tabs are planned (repository-backed; Agent for signed-i
 
 ## `<pipeline>` — repository synchronization and CI/CD
 
-A project with `repo` or `<pipeline>` becomes a managed personal-server project. Its bare repository is created automatically at `{repos_dir}/{id}.git`. The server synchronizes its selected branch with `repo`, using the server account's SSH key or HTTPS credential helper. Git providers are ordinary Git remotes; there is no GitHub-specific API or webhook requirement.
+A project with `repo` or `<pipeline>` becomes a managed personal-server project. Its bare repository is created automatically at `{repos_dir}/{id}.git`. The server synchronizes each declared pipeline branch with `repo`, using the server account's SSH key or HTTPS credential helper. Git providers are ordinary Git remotes; there is no GitHub-specific API or webhook requirement.
 
 ```xml
 <project id="example" name="Example" date="Jan 2026" repo="gitlab.com/team/example">
@@ -89,7 +89,7 @@ The real Jazu definition in [content/projects.xml](../../content/projects.xml) d
 
 | Attribute | Default | Rule |
 |---|---|---|
-| `branch` | `master` | Git branch to receive, synchronize, test and deploy; a safe branch name without traversal, empty segments or `.lock` components |
+| `branch` | `master` | Git branch to receive, synchronize, test and deploy (unique within the project); a safe branch name without traversal, empty segments or `.lock` components |
 | `poll_seconds` | `60` | Integer 10–86400; checks external and local checkout commits at startup and while the sequential runner is idle |
 
 ### `<step>` attributes
@@ -115,15 +115,15 @@ The supported argument substitutions are:
 | `${branch}` | Pipeline branch |
 | `${commit}` | Exact tested commit (or current checkout commit for a direct file-change build) |
 | `${mirror_dir}` | Absolute path of the shared, approved public Git mirror overlay |
-| `${publish_state}` | This project's private publication fingerprint state file |
+| `${publish_state}` | This project/branch's private publication fingerprint state file |
 
-Unknown substitutions, malformed argument arrays, invalid phases, duplicate names, duplicate pipelines and unknown attributes fail content validation. Arguments containing XML-sensitive characters still need normal XML escaping. Repository URLs must use HTTPS or SSH and cannot contain passwords; HTTPS URLs cannot contain an embedded username/token.
+Unknown substitutions, malformed argument arrays, invalid phases, duplicate step names, duplicate pipeline branches and unknown attributes fail content validation. Arguments containing XML-sensitive characters still need normal XML escaping. Repository URLs must use HTTPS or SSH and cannot contain passwords; HTTPS URLs cannot contain an embedded username/token.
 
 ### Execution and visibility
 
 1. An external branch update or a committed change in the Pi checkout fast-forwards the bare hub and queues CI. An authenticated push to the personal hub queues the same pipeline. Histories are never force-overwritten; divergence requires an owner to merge them.
 2. `ci` steps run in a clean, isolated checkout of the exact commit, with a scrubbed environment. The existing local `build/` artifacts and `content/media/` inputs are restored when present. CI failure leaves the deployment checkout and public mirror at their approved version.
-3. After CI passes, the server creates or fast-forwards the working checkout and synchronizes that tested commit to the external repository. The checkout cannot silently run an independently advanced, untested HEAD.
+3. After CI passes, the server creates or fast-forwards the working checkout, switching to the selected pipeline branch when multiple branches are declared and synchronizes that tested commit to the external repository. The checkout cannot silently run an independently advanced, untested HEAD.
 4. `build` steps run in the working checkout without service secrets injected into their environment. `deploy` steps then receive only their requested credential names. CI and build use different checkouts, which is why the npm example prepares dependencies in both.
 5. Successful public project jobs queue the engine's build/publication pipeline to upload approved Git mirrors to Pages/R2. New public managed ids are published in `projects/git.json`; the Worker uses this catalog when `PUBLIC_PROJECTS_MANIFEST` is configured. Private projects are excluded from this catalog and from public mirrors.
 
@@ -147,3 +147,16 @@ The default working checkout for another project is `{state_dir}/work/{id}`. Pri
 The engine project's working path still comes from `site.dir`; `site.project` identifies the engine, not the only project allowed to run CI. Local paths are not accepted as `repo` URLs. Use `dir`/`path` in `server.json` for those paths. The old top-level `upstream` operator setting remains a compatibility input for the engine; new declarations belong in project XML and take precedence.
 
 For translated `<project>` roots sharing an id, declare `repo`/`pipeline` once or repeat identical declarations. Conflicting repository URLs, branches, visibility or steps are rejected by the server catalog. The idle runner reloads the reviewed engine checkout's catalog after engine updates and creates hooks for newly managed projects. Changes committed only in a project's own upstream do not replace the engine's pipeline policy.
+
+
+### Staging and other deployment branches
+
+Declare another `<pipeline branch="staging">` under the same project, after the primary pipeline. Any branch name is supported; the listener has no Jazu or staging hostname logic. Each pipeline has its own ordered commands and deploy arguments. Jazu's concrete example builds with `--base_url https://staging.jasouza.com` and publishes with `--pages_project jazu-staging --branch staging --assets_bucket jazu-staging-assets`.
+
+All branches share one deployment checkout and one sequential queue. The existing exact-commit CI workspace is reused across branches; no branch worktrees or second deployment repositories are created. CI passes before the server switches the deployment checkout, then runs that branch's build/deploy steps and leaves it checked out. Another branch update (or explicit `server run --branch ...`) switches it again. Dirty files, independently advanced target branches and divergent histories are refused rather than reset. A failed staging test does not change the deployed checkout.
+
+Sync status, CI approval and publication state are isolated per branch. The primary branch retains its existing state paths; other branches use `branches/<URL-encoded-branch>/` below the project's state directory. Identical commits on two branches still run both pipelines. A declared upstream branch that has never existed is idle until created. Only owners/local operators may push any declared pipeline branch; collaborators with write tokens use review branches.
+
+The public clone mirror continues to advertise only the primary branch and its approved tags. Staging does not change that mirror or queue a production mirror publication. A CD-only mirror-publication request for the primary engine branch is deferred while its checkout is on another branch; it is included when the primary branch next updates. Direct file edits run the pipeline of the currently checked-out declared branch.
+
+Use `server run --project <id> --branch staging`, `server status --project <id> --branch staging`, or `GET /api/v1/ci/<id>/runs?branch=staging`. For Jazu deployment instructions after merging this feature, see [staging setup](../infra-staging.md). Keep all engine branches on a version supporting branch pipelines; incompatible old workers fail their capability check before executing a pipeline.

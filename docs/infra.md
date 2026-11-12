@@ -17,6 +17,8 @@ The public site is static and keeps working if the personal node is offline.
 
 ## Terraform (`terraform/`)
 
+Staging is a separate Terraform root at [`terraform/staging`](../terraform/staging/README.md), with its own state and Cloudflare provider lock. `npm run tf:staging -- plan` / `apply` bundle its Worker and automate Pages, R2, Worker secrets, Pages domain association, DNS and routing without loading production state. See [post-merge setup](infra-staging.md). The production root described below retains its existing ownership and import requirements.
+
 | Resource | Purpose |
 |---|---|
 | `cloudflare_r2_bucket.assets` | Large media and WASM (`jazu-assets`) |

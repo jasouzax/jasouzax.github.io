@@ -1,0 +1,11 @@
+# Optional overrides. Copy to terraform.tfvars (ignored) if necessary.
+# Existing TF_VAR_* inputs are reused; setup.ts also maps the ordinary .env names.
+# account_id = "your-account-id"
+# zone_id = "your-jasouza-zone-id"
+# staging_domain = "staging.jasouza.com"
+# staging_pages_project = "jazu-staging"
+# staging_assets_bucket_name = "jazu-staging-assets"
+# staging_worker_name = "jazu_staging_router"
+# staging_branch = "staging"
+# personal_origin = "https://personal-server.jasouza.com"
+# Secrets: prefer the existing private .env rather than adding them here.

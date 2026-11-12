@@ -8,6 +8,10 @@ async function main(): Promise<void> {
     const chunks: Buffer[] = []
     for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk))
     const input = JSON.parse(Buffer.concat(chunks).toString("utf8"))
+    if (process.argv[2] === "capabilities") {
+        process.stdout.write(JSON.stringify({ branch_pipelines: true }))
+        return
+    }
     if (process.argv[2] === "catalog") {
         process.stdout.write(JSON.stringify(load_server_config(input.file, input.legacy)))
         return

@@ -17,7 +17,7 @@ function git(dir: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
 }
 
-function fixture(catalog_failure = false) {
+function fixture(catalog_failure = false, staging = false) {
     // Keep fixtures below the workspace so dependency lookup works without network installation.
     mkdirSync(".cache", { recursive: true })
     const root = mkdtempSync(join(process.cwd(), ".cache/listener_test_"))
@@ -30,7 +30,7 @@ function fixture(catalog_failure = false) {
         writeFileSync(worker, 'if (process.argv[2] === "catalog") { console.error("catalog unavailable"); process.exit(12) }\n' + readFileSync(worker, "utf8"))
     }
     writeFileSync(join(engine, "package.json"), '{"type":"module"}')
-    writeFileSync(join(engine, "content/projects.xml"), '<project id="engine" name="Engine" date="2026"><pipeline><step name="old" command="node" args=\'["old.mjs"]\'/></pipeline></project>')
+    writeFileSync(join(engine, "content/projects.xml"), '<project id="engine" name="Engine" date="2026"><pipeline><step name="old" command="node" args=\'["old.mjs"]\'/></pipeline>' + (staging ? '<pipeline branch="staging"><step name="staging" command="node" args=\'["old.mjs"]\'/></pipeline>' : '') + '</project>')
     writeFileSync(join(engine, "old.mjs"), "process.exit(77)")
     git(engine, "init", "-q", "-b", "master")
     git(engine, "add", ".")
@@ -167,4 +167,34 @@ test("the real node service exits 75 for its supervisor after listener runtime c
         child.kill()
         f.cleanup()
     }
+})
+
+test("an engine staging job uses its own branch and rejects workers without branch capabilities", { timeout: 180000 }, async () => {
+    const f = fixture(false, true)
+    let runner: ReturnType<typeof start_runner> | undefined
+    try {
+        git(f.author, "switch", "-c", "staging")
+        writeFileSync(join(f.author, "old.mjs"), "process.exit(0)")
+        const queue = () => {
+            git(f.author, "add", ".")
+            git(f.author, "commit", "-qm", "update staging")
+            git(repository_path(f.config, "engine"), "fetch", "-q", f.author, "+staging:staging")
+            const commit = git(f.author, "rev-parse", "HEAD")
+            enqueue(f.config.state_dir, { kind: "push", project: "engine", commit, ref: "refs/heads/staging" })
+            return commit
+        }
+        const approved = queue()
+        runner = start_runner(f.config, { poll_ms: 100000 })
+        await idle(runner)
+        assert.equal(list_runs(f.config.state_dir, "engine", 1, "staging")[0].state, "passed")
+        assert.equal(git(f.engine, "branch", "--show-current"), "staging")
+        assert.equal(git(f.engine, "rev-parse", "master"), f.old)
+        const worker = join(f.author, "src/node/job_main.ts")
+        writeFileSync(worker, readFileSync(worker, "utf8").replace("branch_pipelines: true", "branch_pipelines: false"))
+        queue()
+        await runner.drain()
+        await idle(runner)
+        assert.equal(list_runs(f.config.state_dir, "engine", 1, "staging")[0].state, "failed")
+        assert.equal(git(f.engine, "rev-parse", "HEAD"), approved)
+    } finally { runner?.stop(); f.cleanup() }
 })

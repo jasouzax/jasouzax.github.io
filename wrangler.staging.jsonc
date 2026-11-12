@@ -1,0 +1,16 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "jazu_staging_router",
+    "main": "src/node/worker.ts",
+    "compatibility_date": "2026-11-04",
+    "workers_dev": false,
+    "routes": [{ "pattern": "staging.jasouza.com/*", "zone_name": "jasouza.com" }],
+    "vars": {
+        "DOMAIN": "staging.jasouza.com",
+        "PAGES_ORIGIN": "https://jazu-staging.pages.dev",
+        "PUBLIC_PROJECTS": "[\"jazu\"]",
+        "PUBLIC_PROJECTS_MANIFEST": "/projects/git.json",
+        "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
+    },
+    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-staging-assets" }]
+}
