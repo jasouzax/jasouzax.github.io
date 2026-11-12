@@ -5,7 +5,7 @@ import { once } from "node:events"
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { docker_options, refresh_content } from "../ops/docker/entry.ts"
+import { docker_options, refresh_content, restore_inputs } from "../ops/docker/entry.ts"
 import { serve } from "../src/node/serve.ts"
 
 test("Docker defaults serve the website and personal mode selects its own port and persistent directory", () => {
@@ -54,5 +54,25 @@ test("custom content refresh removes deleted resources without changing the sour
         assert.equal(existsSync(join(work, "content/removed.txt")), false)
         assert.equal(readFileSync(join(work, "content/kept.txt"), "utf8"), "second")
         assert.equal(readFileSync(join(source, "kept.txt"), "utf8"), "second")
+    } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+
+test("personal bootstrap restores missing artifacts into tracked build directories without replacing newer source or media", () => {
+    const root = mkdtempSync(join(tmpdir(), "jazu_restore_inputs_"))
+    const image = join(root, "image"), work = join(root, "work")
+    try {
+        for (const path of ["build/tool/custom", "content/media"]) {
+            mkdirSync(join(image, path), { recursive: true }); mkdirSync(join(work, path), { recursive: true })
+        }
+        writeFileSync(join(image, "build/tool/custom/tool.c"), "image source")
+        writeFileSync(join(work, "build/tool/custom/tool.c"), "newer Git source")
+        writeFileSync(join(image, "build/tool/tool.wasm"), "compiled artifact")
+        writeFileSync(join(image, "content/media/photo.png"), "image photo")
+        writeFileSync(join(work, "content/media/photo.png"), "owner photo")
+        restore_inputs(image, work)
+        assert.equal(readFileSync(join(work, "build/tool/tool.wasm"), "utf8"), "compiled artifact")
+        assert.equal(readFileSync(join(work, "build/tool/custom/tool.c"), "utf8"), "newer Git source")
+        assert.equal(readFileSync(join(work, "content/media/photo.png"), "utf8"), "owner photo")
     } finally { rmSync(root, { recursive: true, force: true }) }
 })

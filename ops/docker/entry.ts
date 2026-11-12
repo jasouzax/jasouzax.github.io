@@ -66,6 +66,13 @@ export function custom_site(options: Docker_Options): string {
     return join(root, "dist")
 }
 
+export function restore_inputs(image: string, work: string): void {
+    for (const name of ["build", "content/media"]) if (existsSync(join(image, name))) {
+        // Git tracks custom compiler sources inside build/; its existence does not mean artifacts were restored.
+        cpSync(join(image, name), join(work, name), { recursive: true, force: false, errorOnExist: false })
+    }
+}
+
 function personal(options: Docker_Options): void {
     process.umask(0o077)
     mkdirSync(options.data, { recursive: true })
@@ -85,7 +92,7 @@ function personal(options: Docker_Options): void {
         mkdirSync(dirname(work), { recursive: true })
         run("git", ["clone", "--branch", process.env.JAZU_ENGINE_BRANCH ?? config.site.branch, remote, work], options.data)
     }
-    for (const name of ["build", "content/media"]) if (!existsSync(join(work, name)) && existsSync(join(application, name))) cpSync(join(application, name), join(work, name), { recursive: true })
+    restore_inputs(application, work)
     const lock = createHash("sha256").update(readFileSync(join(work, "package-lock.json"))).digest("hex")
     const image_lock = createHash("sha256").update(readFileSync(join(application, "package-lock.json"))).digest("hex")
     const marker = join(options.data, "engine-dependencies")
