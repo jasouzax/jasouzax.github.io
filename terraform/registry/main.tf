@@ -21,3 +21,19 @@ resource "cloudflare_workers_custom_domain" "registry" {
   zone_id    = var.zone_id
 }
 output "registry" { value = var.registry_domain }
+
+# OCI clients are not browsers. Scope this setting to anonymous reads on the dedicated registry API.
+resource "cloudflare_ruleset" "registry_clients" {
+  zone_id = var.zone_id
+  name    = "Jazu registry API configuration"
+  kind    = "zone"
+  phase   = "http_config_settings"
+  rules = [{
+    ref               = "registry_oci_reads"
+    description       = "Allow non-browser OCI read clients on the dedicated registry"
+    expression        = "(http.host eq ${jsonencode(var.registry_domain)} and (http.request.uri.path eq \"/v2\" or starts_with(http.request.uri.path, \"/v2/\")) and http.request.method in {\"GET\" \"HEAD\"})"
+    action            = "set_config"
+    action_parameters = { bic = false }
+    enabled           = true
+  }]
+}
