@@ -13,8 +13,8 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 
 - [ ] **[Docker](docker.md)** — image distribution and recovery
   - [x] Container entry selects prebuilt website, custom content or persistent personal-server mode; static assets stream with byte ranges (runtime contract tests).
-  - [ ] Publish and pull native ARM64 and AMD64 images through `registry.jasouza.com`.
-  - [ ] Verify custom content and both image architectures on the Raspberry Pi.
+  - [x] Publish and pull native ARM64 and AMD64 images through `registry.jasouza.com`.
+  - [x] Verify custom content and both image architectures on the Raspberry Pi.
   - [ ] Move the Pi listener to Docker, preserving the old checkout/service and documenting rollback.
   - [ ] Verify Git/CI after cutover and a container restart.
 

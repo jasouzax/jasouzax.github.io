@@ -145,6 +145,14 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 
 ---
 
+## Docker use
+
+```sh
+docker run --rm --init -p 8080:8080 registry.jasouza.com/jazu:latest
+```
+
+The image serves its prebuilt website at `http://localhost:8080`, including prepared WASM packages and public assets. Custom content uses a read-only host mount and `--content=/content`. Personal-server mode uses `--personal-server`, external credentials and a persistent `/data` volume. See [Docker installation, custom content, registry releases and recovery](docs/feat/docker.md) for commands, Compose profiles, migration and rollback. Back up the data volume separately from the image.
+
 ## Server Use
 
 Set up the **personal server**: your own machine running an instance of this repository, connected to Cloudflare through a Tunnel protected by Zero Trust, so the public Worker can reach it securely and (later) your Git repository, CI/CD and AI agents can work on it. The public website never depends on it.
