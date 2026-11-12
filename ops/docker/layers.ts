@@ -1,5 +1,5 @@
 /* Split an image payload into bounded filesystem layers so public registry uploads stay below proxy limits. */
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from "node:fs"
+import { cpSync, existsSync, lutimesSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { dirname, join, relative, resolve } from "node:path"
 import { gzipSync } from "node:zlib"
@@ -30,4 +30,10 @@ function visit(path: string): void {
     }
 }
 visit(source)
+// Stable metadata lets architectures and later releases share unchanged public asset layers.
+function normalize(path: string): void {
+    if (lstatSync(path).isDirectory()) for (const name of readdirSync(path)) normalize(join(path, name))
+    lutimesSync(path, 0, 0)
+}
+normalize(destination)
 console.log(`Prepared ${index + 1} bounded application layers`)

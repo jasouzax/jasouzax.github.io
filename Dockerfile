@@ -7,13 +7,17 @@ FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS website_build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY . .
+COPY config.json tsconfig.json .gitignore ./
+COPY src/ ./src/
+COPY content/ ./content/
+COPY build/ ./build/
 # WASM packages are compiled release inputs from build/. A missing input fails the website build.
 RUN npm run build && rm -rf node_modules .cache
 
 FROM operating_system AS payload
 WORKDIR /app
 COPY --from=website_build /app/ ./
+COPY ops/docker/ ./ops/docker/
 RUN npm ci --omit=dev --no-audit --no-fund && node ops/docker/layers.ts /app /layers
 
 FROM operating_system AS runtime

@@ -2,10 +2,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { docker_options } from "../ops/docker/entry.ts"
+import { docker_options, refresh_content } from "../ops/docker/entry.ts"
 import { serve } from "../src/node/serve.ts"
 
 test("Docker defaults serve the website and personal mode selects its own port and persistent directory", () => {
@@ -37,4 +37,22 @@ test("standalone hosting streams complete assets with HEAD and valid ranges with
         assert.equal((await fetch(url + "/movie.mp4", { headers: { range: "bytes=50-" } })).status, 416)
         assert.equal(await (await fetch(url + "/empty.txt")).text(), "")
     } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); rmSync(root, { recursive: true, force: true }) }
+})
+
+
+test("custom content refresh removes deleted resources without changing the source", () => {
+    const root = mkdtempSync(join(tmpdir(), "jazu_custom_refresh_"))
+    const source = join(root, "source"), work = join(root, "work")
+    mkdirSync(source)
+    try {
+        writeFileSync(join(source, "kept.txt"), "first")
+        writeFileSync(join(source, "removed.txt"), "old")
+        refresh_content(source, work)
+        rmSync(join(source, "removed.txt"))
+        writeFileSync(join(source, "kept.txt"), "second")
+        refresh_content(source, work)
+        assert.equal(existsSync(join(work, "content/removed.txt")), false)
+        assert.equal(readFileSync(join(work, "content/kept.txt"), "utf8"), "second")
+        assert.equal(readFileSync(join(source, "kept.txt"), "utf8"), "second")
+    } finally { rmSync(root, { recursive: true, force: true }) }
 })

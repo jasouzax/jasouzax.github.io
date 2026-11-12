@@ -5,7 +5,7 @@
  */
 import { spawn, spawnSync } from "node:child_process"
 import { randomBytes, createHash } from "node:crypto"
-import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { serve } from "../../src/node/serve.ts"
@@ -41,12 +41,22 @@ function health(options: Docker_Options): void {
     writeFileSync("/tmp/jazu-health.json", JSON.stringify({ personal: options.personal, port: options.port, data: options.data }))
 }
 
+export function refresh_content(source: string, root: string): void {
+    mkdirSync(root, { recursive: true })
+    const pending = mkdtempSync(join(root, ".content-"))
+    try {
+        cpSync(source, pending, { recursive: true })
+        rmSync(join(root, "content"), { recursive: true, force: true })
+        renameSync(pending, join(root, "content"))
+    } finally { rmSync(pending, { recursive: true, force: true }) }
+}
+
 export function custom_site(options: Docker_Options): string {
     if (!options.content || !existsSync(options.content)) throw new Error("Mount custom content with --mount type=bind,src=<host-directory>,dst=/content,readonly and pass --content=/content")
     const root = join(options.data, "website")
     mkdirSync(root, { recursive: true })
     // Copy into a writable workspace; never generate files inside the owner's read-only content mount.
-    cpSync(options.content, join(root, "content"), { recursive: true })
+    refresh_content(options.content, root)
     cpSync(options.config ?? join(application, "config.json"), join(root, "config.json"))
     for (const name of ["src", "build", "node_modules"]) if (!existsSync(join(root, name))) symlinkSync(join(application, name), join(root, name), "dir")
     for (const name of ["package.json", "package-lock.json", "tsconfig.json"]) cpSync(join(application, name), join(root, name))
@@ -78,10 +88,15 @@ function personal(options: Docker_Options): void {
     for (const name of ["build", "content/media"]) if (!existsSync(join(work, name)) && existsSync(join(application, name))) cpSync(join(application, name), join(work, name), { recursive: true })
     const lock = createHash("sha256").update(readFileSync(join(work, "package-lock.json"))).digest("hex")
     const image_lock = createHash("sha256").update(readFileSync(join(application, "package-lock.json"))).digest("hex")
-    if (!existsSync(join(work, "node_modules")) && lock === image_lock) cpSync(join(application, "node_modules"), join(work, "node_modules"), { recursive: true })
-    if (lock !== image_lock && (!existsSync(join(work, "node_modules/.jazu_container_lock")) || readFileSync(join(work, "node_modules/.jazu_container_lock"), "utf8") !== lock)) {
+    const marker = join(options.data, "engine-dependencies")
+    const stamp = `${process.platform}/${process.arch}:${lock}`
+    const modules = join(work, "node_modules")
+    if (!existsSync(modules) && lock === image_lock) {
+        cpSync(join(application, "node_modules"), modules, { recursive: true })
+        writeFileSync(marker, stamp)
+    } else if (!existsSync(modules) || !existsSync(marker) || readFileSync(marker, "utf8") !== stamp) {
         run("npm", ["ci", "--include=dev", "--no-audit", "--no-fund"], work)
-        writeFileSync(join(work, "node_modules/.jazu_container_lock"), lock)
+        writeFileSync(marker, stamp)
     }
     process.env.JAZU_LISTEN_HOST = options.host
     if (!options.runner) process.env.JAZU_DISABLE_RUNNER = "1"
