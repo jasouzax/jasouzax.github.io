@@ -103,7 +103,7 @@ export function expand_objects(model: site_model): void {
         for (const expertise of page.node.children.filter(node => node.tag === "expertise")) {
             const events = model.objects.filter(node => node.tag === "event" && node.attrs.lang === page.lang)
             // The existing timeline uses periods as contextual filters as well as skills.
-            expertise.children.push(...events.map(node => ({ ...node, attrs: { ...node.attrs, resume: ["education", "experience"].includes(node.attrs.type) ? node.attrs.type : "" } })))
+            expertise.children.push(...events.map(node => ({ ...node, attrs: { ...node.attrs, resume: node.attrs.resume ?? (["education", "experience"].includes(node.attrs.type) ? node.attrs.type : "") } })))
         }
     }
 }

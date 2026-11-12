@@ -18,6 +18,7 @@ Required: `id`, `name`, `date`. Child: nested `<event>` for sub-events.
 | `type` | `education`, `experience`, `certification`, `competition` or `other` (keyword; never translated) |
 | `skill`, `stack` | `list`; vocabulary used by the timeline filters |
 | `featured` | `bool` |
+| `resume` | `license` places this event's date and name in the 履歴書 Licenses area; education and experience default from `type` |
 | `lang` | Language of this root |
 | `resume_start`, `resume_end` | Override the start/end text printed in the 履歴書 history table |
 | *shared pool* | `rank`, `short`, `role`, `media`, `poster`, `alt`, `tags`, `feature_stack`, `website`, `paper`, `event`, `source`, `path`, `menu`, SEO overrides — accepted by the validator |

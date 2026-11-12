@@ -65,7 +65,7 @@ Object.assign(rules, {
     research: { attrs: [], required: [], children: Object.keys(research_sections) },
     point: { attrs: ["name"], required: ["name"], children: ["point"] },
     slide: { attrs: ["media", "poster", "alt", "info", "description", "skill", "stack", "feature_stack", "hashtags", "tags", "featured", "private"], required: ["skill"], children: [], bools: ["featured", "private"] },
-    event: { attrs: [...page_attrs, "id", "type", "lang", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
+    event: { attrs: [...page_attrs, "id", "type", "lang", "resume", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
     blog: { attrs: ["id", "name", "date", "icon", "info", "lang"], required: ["id", "name"], children: ["menu", "window"] },
     print: { attrs: ["name", "lang", "size", "layout"], required: ["name"], children: ["style", "font"] },
     map: { attrs: ["layout"], required: [], children: ["node", "edge"] },

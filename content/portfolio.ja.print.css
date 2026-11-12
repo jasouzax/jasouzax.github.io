@@ -170,3 +170,29 @@ body.page_portfolio .rireki_svg .rf_box { stroke-width: 1.5 !important; }
 body.page_portfolio .rireki_svg .rf_line { stroke-width: 1 !important; }
 body.page_portfolio .rireki_svg .rf_dash { stroke-width: 1 !important; stroke-dasharray: 3 3 !important; }
 body.page_portfolio .rireki_svg .rf_dots { stroke-width: 1.4 !important; stroke-dasharray: 0.8 1.1 !important; }
+
+/* Transparent hit targets in Chrome print emulation. The SVG carries all printed values. */
+body.page_portfolio .rireki_sheet { position: relative; }
+body.page_portfolio .rireki_editor {
+    all: initial;
+    display: block !important;
+    position: absolute !important;
+    box-sizing: border-box !important;
+    opacity: 0 !important;
+    cursor: text !important;
+    z-index: 1 !important;
+}
+body.page_portfolio .rireki_editor:hover,
+body.page_portfolio .rireki_editor:focus {
+    opacity: 1 !important;
+    background: #fff !important;
+    color: #000 !important;
+    outline: 1px dashed #777 !important;
+    font: 10pt/1.4 serif !important;
+    resize: none !important;
+}
+body.page_portfolio .rireki_photo_editor { cursor: pointer !important; }
+body.page_portfolio .rireki_photo_editor:hover { opacity: .4 !important; }
+html[data-rireki-printing] body.page_portfolio .rireki_editor {
+    display: none !important;
+}
