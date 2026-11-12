@@ -27,6 +27,7 @@ Children: `<style>`, `<font>` (same as in [themes](theme.md), but scoped to prin
 
 - Personal details come from the website's **first `<hero>`**: `name`, `profile`, and `<item print="label">` entries.
 - History comes from `<expertise>`: events by `type`, featured projects, skills with their stacks.
+- Events marked `resume="license"` supply dated rows in the rirekisho Licenses area.
 - Any missing value prints as an empty box or line. Nothing is invented and no other personal source exists. A form such as the 履歴書 can therefore never expose more than the owner chose to publish.
 - Labels a layout reads from hero items: for `rirekisho` — `name`, `kana`, `birth`, `gender`, `postal`, `address`, `phone`, `email`.
 - The sample personal values that used to be in the old form (birth date, phone numbers, postal code, family and commute fields, application text) were removed on purpose and must not be restored.
@@ -38,3 +39,5 @@ Dates and age in a printed form are the build date until the browser's `beforepr
 ## Related
 
 [Contract and status](../feat/print.md) · [hero `print` labels](hero.md#item)
+
+The Japanese portfolio's 履歴書 can be completed in Chrome DevTools: open Rendering and set **Emulate CSS media type** to **print**. Click a value or empty row to edit it, and click the photo box to select a PNG, JPEG, or WebP. Changes update the two SVG sheets immediately. Print normally when finished; editing controls disappear during printing. These additions stay in the current document only, are never uploaded or saved, and reset on reload.

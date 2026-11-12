@@ -24,6 +24,8 @@ import { run_pipeline } from "../src/node/ci_jazu.ts"
 import type { Pipeline_Steps, Run_Record } from "../src/node/ci_jazu.ts"
 import { plan_batch, list_runs } from "../src/node/runner.ts"
 import { fingerprint_pages, publish_pages, stage_pages } from "../src/node/publish.ts"
+import { poll_upstream, read_sync_state } from "../src/node/repo_sync.ts"
+import { start_runner } from "../src/node/runner.ts"
 
 const secret = "s".repeat(64)
 const identity = ["-c", "user.name=Test", "-c", "user.email=t@example.com"]
@@ -474,4 +476,193 @@ test("publication uploads oversized Git packs before Pages and tracks hashes of 
         else process.env.CLOUDFLARE_API_TOKEN = previous
         rmSync(root, { recursive: true, force: true })
     }
+})
+
+
+// Local bare repositories stand in for GitHub: these tests never contact a real remote or Cloudflare.
+function upstream_fixture() {
+    const p = pipeline_fixture()
+    const remote = join(p.f.dir, "github.git")
+    execFileSync("git", ["clone", "--bare", "--quiet", join(p.f.config.repos_dir, "jazu.git"), remote])
+    const github_work = join(p.f.dir, "github_work")
+    execFileSync("git", ["clone", "--quiet", remote, github_work])
+    p.f.config.upstream = { remote, branch: "master", poll_seconds: 60 }
+    const upstream_commit = (message: string) => {
+        writeFileSync(join(github_work, "github.txt"), message)
+        git(github_work, "add", "github.txt")
+        git(github_work, "commit", "-q", "-m", message)
+        git(github_work, "push", "-q", "origin", "master")
+        return git(github_work, "rev-parse", "HEAD")
+    }
+    return { ...p, remote, github_work, upstream_commit }
+}
+
+test("upstream configuration is opt-in and rejects credential URLs and invalid intervals", () => {
+    const f = fixture()
+    try {
+        assert.equal(load_server_config(f.config.file).upstream, undefined)
+        for (const upstream of [
+            { remote: "https://user:secret@github.com/a/b.git" },
+            { remote: "ext::sh bad" }, { remote: "-option" },
+            { remote: "git@github.com:a/b.git", poll_seconds: 1 },
+            { remote: "git@github.com:a/b.git", branch: "../master" },
+        ]) {
+            update_server_file(f.config.file, raw => { raw.upstream = upstream })
+            assert.throws(() => load_server_config(f.config.file), /upstream/)
+        }
+        update_server_file(f.config.file, raw => { raw.upstream = { remote: "git@github.com:jasouzax/jasouzax.github.io.git" } })
+        assert.deepEqual(load_server_config(f.config.file).upstream, { remote: "git@github.com:jasouzax/jasouzax.github.io.git", branch: "master", poll_seconds: 60 })
+        update_server_file(f.config.file, raw => { raw.upstream = { enabled: false } })
+        assert.equal(load_server_config(f.config.file).upstream, undefined)
+    } finally { f.cleanup() }
+})
+
+test("personal pushes reach the upstream only after successful CI and never create a sync loop", async () => {
+    const p = upstream_fixture()
+    try {
+        const before = git(p.remote, "rev-parse", "master")
+        const commit = p.push_commit("feat: personal push")
+        const failed = await execute(p, commit, p.steps("tests"))
+        assert.equal(failed.record.state, "failed")
+        assert.equal(git(p.remote, "rev-parse", "master"), before)
+        const passed = await execute(p, commit, p.steps())
+        assert.equal(passed.record.state, "passed", passed.log)
+        assert.equal(git(p.remote, "rev-parse", "master"), commit)
+        assert(passed.record.steps.some(step => step.name === "upstream sync" && step.ok))
+        const count = pending(p.f.config.state_dir).length
+        assert.equal((await poll_upstream(p.f.config))?.status, "unchanged")
+        assert.equal(pending(p.f.config.state_dir).length, count, "our own GitHub push must not queue another run")
+    } finally { p.cleanup() }
+})
+
+test("GitHub changes enter the hub and automatically run the normal pipeline exactly once", { timeout: 30000 }, async () => {
+    const p = upstream_fixture()
+    let runner: ReturnType<typeof start_runner> | undefined
+    try {
+        const before = git(p.f.config.site.dir, "rev-parse", "HEAD")
+        const commit = p.upstream_commit("feat: from github")
+        assert.equal((await poll_upstream(p.f.config))?.status, "imported")
+        const queued = pending(p.f.config.state_dir)
+        assert.equal(queued.length, 1)
+        assert.equal(queued[0].job.kind, "upstream")
+        assert.equal(queued[0].job.commit, commit)
+        assert.equal(git(join(p.f.config.repos_dir, "jazu.git"), "rev-parse", "master"), commit)
+        assert.equal(git(p.f.config.site.dir, "rev-parse", "HEAD"), before, "fetch must not advance the deployment checkout before CI")
+        runner = start_runner(p.f.config, { steps: p.steps(), poll_ms: 10000, server_env: {} })
+        const deadline = Date.now() + 25000
+        while (!list_runs(p.f.config.state_dir, "jazu", 1)[0]?.finished_at && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20))
+        assert.equal(list_runs(p.f.config.state_dir, "jazu", 1)[0]?.state, "passed")
+        assert.equal(git(p.f.config.site.dir, "rev-parse", "HEAD"), commit)
+        assert.equal((await poll_upstream(p.f.config))?.status, "unchanged")
+        assert.equal(pending(p.f.config.state_dir).length, 0)
+        assert.equal(list_runs(p.f.config.state_dir, "jazu", 20).length, 1)
+    } finally { runner?.stop(); p.cleanup() }
+})
+
+test("divergent or rewritten upstream histories are reported without replacing either branch", async () => {
+    const p = upstream_fixture()
+    try {
+        const base = git(p.remote, "rev-parse", "master")
+        await poll_upstream(p.f.config)
+        const hub = p.push_commit("feat: personal branch")
+        const github = p.upstream_commit("feat: concurrent github branch")
+        assert.equal((await poll_upstream(p.f.config))?.status, "error")
+        assert.match(read_sync_state(p.f.config)!.message!, /diverged/)
+        assert.equal(git(join(p.f.config.repos_dir, "jazu.git"), "rev-parse", "master"), hub)
+        assert.equal(git(p.remote, "rev-parse", "master"), github)
+        git(p.remote, "update-ref", "refs/heads/master", base)
+        assert.equal((await poll_upstream(p.f.config))?.status, "error")
+        assert.match(read_sync_state(p.f.config)!.message!, /rewritten/)
+        assert.equal(git(p.remote, "rev-parse", "master"), base)
+    } finally { p.cleanup() }
+})
+
+test("a newer GitHub commit arriving during CI blocks the outgoing stale push and is imported next", async () => {
+    const p = upstream_fixture()
+    try {
+        const stale = p.push_commit("feat: personal change")
+        git(p.github_work, "fetch", "-q", join(p.f.config.repos_dir, "jazu.git"), "master")
+        git(p.github_work, "merge", "--ff-only", "FETCH_HEAD")
+        const newer = p.upstream_commit("feat: newer github change")
+        const result = await execute(p, stale, p.steps())
+        assert.equal(result.record.state, "failed")
+        assert.match(result.record.message!, /Upstream has newer/)
+        assert(!result.record.steps.some(step => step.name === "publish"))
+        assert.equal(git(p.remote, "rev-parse", "master"), newer)
+        assert.equal((await poll_upstream(p.f.config))?.status, "imported")
+        assert.equal(pending(p.f.config.state_dir).at(-1)?.job.commit, newer)
+    } finally { p.cleanup() }
+})
+
+test("an interrupted upstream import recovers its missing CI job without repeatedly queuing it", async () => {
+    const p = upstream_fixture()
+    try {
+        const commit = p.upstream_commit("feat: interrupted import")
+        const hub = join(p.f.config.repos_dir, "jazu.git")
+        git(hub, "fetch", "-q", p.remote, "master")
+        git(hub, "update-ref", "refs/heads/master", commit)
+        mkdirSync(p.f.config.state_dir, { recursive: true })
+        writeFileSync(join(p.f.config.state_dir, "upstream.json"), JSON.stringify({ status: "imported", checked_at: 0, pending_commit: commit }))
+        await poll_upstream(p.f.config)
+        assert.equal(pending(p.f.config.state_dir).length, 1)
+        assert.equal(pending(p.f.config.state_dir)[0].job.commit, commit)
+        await poll_upstream(p.f.config)
+        assert.equal(pending(p.f.config.state_dir).length, 1)
+    } finally { p.cleanup() }
+})
+
+test("uncommitted file-change builds never update GitHub and ahead checkouts cannot deploy untested code", async () => {
+    const p = upstream_fixture()
+    try {
+        const before = git(p.remote, "rev-parse", "master")
+        writeFileSync(join(p.f.config.site.dir, "package.json"), '{"edited":true}')
+        assert.equal((await execute(p, undefined, p.steps())).record.state, "passed")
+        assert.equal(git(p.remote, "rev-parse", "master"), before)
+        git(p.f.config.site.dir, "checkout", "--", "package.json")
+        git(p.f.config.site.dir, "commit", "-q", "--allow-empty", "-m", "unvalidated checkout commit")
+        const result = await execute(p, before, p.steps())
+        assert.equal(result.record.state, "failed")
+        assert.match(result.record.message!, /ahead of the tested commit/)
+        assert.equal(git(p.remote, "rev-parse", "master"), before)
+    } finally { p.cleanup() }
+})
+
+
+test("sync coalescing prefers the real hub tip over an import enqueued later by a racing fetch", () => {
+    const job = { kind: "push" as const, project: "jazu", id: "1", queued_at: 0, commit: "new" }
+    const result = plan_batch([{ name: "1", job }, { name: "2", job: { ...job, id: "2", kind: "upstream", commit: "old" } }], "new")
+    assert.equal(result.run[0].job.commit, "new")
+    assert.equal(result.superseded[0].job.commit, "old")
+})
+
+test("upstream polling recovers from an unavailable remote and failed incoming CI leaves the site unchanged", async () => {
+    const p = upstream_fixture()
+    try {
+        const before = git(p.f.config.site.dir, "rev-parse", "HEAD")
+        const commit = p.upstream_commit("feat: incoming with failing tests")
+        p.f.config.upstream!.remote = join(p.f.dir, "unavailable.git")
+        assert.equal((await poll_upstream(p.f.config))?.status, "error")
+        assert.equal(pending(p.f.config.state_dir).length, 0)
+        p.f.config.upstream!.remote = p.remote
+        assert.equal((await poll_upstream(p.f.config))?.status, "imported")
+        const result = await execute(p, commit, p.steps("tests"))
+        assert.equal(result.record.state, "failed")
+        assert.equal(git(p.f.config.site.dir, "rev-parse", "HEAD"), before)
+        assert(!result.record.steps.some(step => step.name === "upstream sync" || step.name === "publish"))
+    } finally { p.cleanup() }
+})
+
+test("runner polls the configured upstream on startup without a webhook or an operator import", { timeout: 30000 }, async () => {
+    const p = upstream_fixture()
+    let runner: ReturnType<typeof start_runner> | undefined
+    try {
+        const commit = p.upstream_commit("feat: automatic polling")
+        runner = start_runner(p.f.config, { steps: p.steps(), poll_ms: 10000, server_env: {} })
+        const deadline = Date.now() + 25000
+        while (!list_runs(p.f.config.state_dir, "jazu", 1)[0]?.finished_at && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20))
+        const record = list_runs(p.f.config.state_dir, "jazu", 1)[0]
+        assert.equal(record?.kind, "upstream")
+        assert.equal(record?.commit, commit)
+        assert.equal(record?.state, "passed")
+    } finally { runner?.stop(); p.cleanup() }
 })

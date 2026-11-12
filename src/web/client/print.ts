@@ -2,6 +2,7 @@
 // The page ships the build date as a fallback; the browser fires beforeprint just before it lays the page out for the printer.
 // The 履歴書 writes the date as era + year + month + day (令和8年10月31日), one <text> per part, marked data-print_part="era|year|month|day".
 import { era_of } from "../../era.ts"
+import { init_rireki_editor } from "./rireki_editor.ts"
 
 function fill_print_fields(): void {
     const now = new Date()
@@ -16,5 +17,11 @@ function fill_print_fields(): void {
 }
 
 export function init_print(): void {
-    addEventListener("beforeprint", fill_print_fields)
+    init_rireki_editor()
+    document.addEventListener("jazu:page", init_rireki_editor)
+    addEventListener("beforeprint", () => {
+        document.documentElement.setAttribute("data-rireki-printing", "")
+        fill_print_fields()
+    })
+    addEventListener("afterprint", () => document.documentElement.removeAttribute("data-rireki-printing"))
 }

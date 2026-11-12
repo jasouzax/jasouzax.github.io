@@ -40,7 +40,7 @@ function parse_args(args: string[]): { words: string[], flags: flags } {
         }
         const name = arg.slice(2)
         const next = args[index + 1]
-        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role"].includes(name)) {
+        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role", "project"].includes(name)) {
             flags[name] = next
             index++
         } else flags[name] = true
@@ -84,9 +84,10 @@ async function main(): Promise<void> {
     if (command === "publish") {
         // CD: build, compare with the last successful deploy, upload with wrangler only when something differs.
         load_env(root)
-        const result = await run_build(root, flags, false)
-        show(result)
-        const outcome = publish_pages(root, output_directory(root, String(flags.out ?? "dist")), result.model.config.deploy.pages_project, {
+        const result = flags.skip_build ? undefined : await run_build(root, flags, false)
+        if (result) show(result)
+        const config = result?.model.config ?? await load_config(root)
+        const outcome = publish_pages(root, output_directory(root, String(flags.out ?? "dist")), config.deploy.pages_project, {
             overlay_dir: flags.overlay ? resolve(String(flags.overlay)) : undefined, state_file: flags.state_file ? resolve(String(flags.state_file)) : undefined,
             dry_run: Boolean(flags.dry_run), force: Boolean(flags.force), commit: flags.commit ? String(flags.commit) : undefined, message: flags.message ? String(flags.message) : undefined,
         })

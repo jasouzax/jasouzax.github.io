@@ -263,6 +263,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     const model = load_site(options.root, config, diag, options.build_date, options.mode)
     synthesize(model)
     const files: output_files = new Map()
+    files.set("projects/git.json", JSON.stringify([...new Set(model.objects.filter(node => node.tag === "project" && (node.attrs.repo || node.children.some(child => child.tag === "pipeline"))).map(node => node.attrs.id))]))
     await compile_plugins(model, files)
     const expertise_by_lang = new Map<string, expertise_model | null>(Object.keys(config.languages).map(lang => [lang, build_expertise(model, lang)]))
     fail_on_errors(diag)

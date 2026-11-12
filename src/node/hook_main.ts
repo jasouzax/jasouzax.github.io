@@ -2,8 +2,8 @@
  * Entry point of the generated git hooks: `node hook_main.ts <pre-receive|post-receive> <project>`.
  *
  * Responsibility: read the pushed ref updates from stdin, apply the policy in git_hooks.ts, and either exit 1
- * with a message (shown to the pusher as `remote: ...`) or queue a pipeline job. Needs only server.json.
- * Scope: deliberately tiny and dependency-free so a hook starts in milliseconds under plain node.
+ * with a message (shown to the pusher as `remote: ...`) or queue a pipeline job. Reads server.json and the reviewed engine project catalog.
+ * Scope: fixed engine entry point under plain node; the engine dependencies must be installed.
  */
 import { readFileSync } from "node:fs"
 import { check_push, jobs_for_push, parse_updates } from "./git_hooks.ts"

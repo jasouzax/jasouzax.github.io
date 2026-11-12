@@ -10,6 +10,8 @@
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
+- [x] Provider-independent per-project `repo` synchronization and XML `<pipeline>` commands, isolated branches/state, loop prevention and CI-gated export (real Git integration tests)
+- [x] Activate and verify XML project pipelines/repository sync on the production Pi after review and commit (2026-11-12, `8d39520`; 157 tests passed, upstream synchronized, Pages/R2 deployed; job `1794453724599_16490bb4`)
 - [x] HMAC origin verification, replay bounds and Access service-token forwarding (4.8)
 - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters
 - [x] Loopback-only listener; unsigned requests (including `/health`) return `401`
@@ -21,7 +23,7 @@
 - [ ] Dashboard snapshots (`GET /dashboards/{client}/{name}`)
 - [x] CI/CD pipeline for `jazu`: tests gate the build, deploy only when the output changed (pipeline tested with fake steps; failing CI blocks deploy)
 - [x] Real run of types/tests/check/build, R2 uploads and `wrangler pages deploy` on the Pi: 136 tests passed, none skipped
-- [ ] Per-project pipelines for the archived projects (intentionally not built)
+- [x] Generic project CI/build/deploy pipelines declared in XML; undeclared repositories remain archived
 - [ ] AI agents with repository access
 - [x] Contributor authentication (tokens) and private-repository clone via the node (tested)
 - [ ] SSH access to the repository hub (not built)

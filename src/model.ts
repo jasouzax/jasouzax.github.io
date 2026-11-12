@@ -12,6 +12,7 @@ import { year_fraction } from "./dates.ts"
 import { normalize_path, parent_path, path_depth } from "./util.ts"
 import { expand_objects, collect_resources } from "./objects.ts"
 import { configured_resource } from "./resources.ts"
+import { project_declarations } from "./pipeline_types.ts"
 
 export type page = {
     path: string
@@ -105,6 +106,7 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
             if (node.tag === "plugin") model.plugins.push(node)
         }
     }
+    try { project_declarations(model.objects) } catch (error) { report_error(diag, "project catalog", (error as Error).message) }
     for (const name of ["signature", "icon", "favicon"] as const) {
         if (config.resources[name] && !configured_resource(model, name)) report_warning(diag, "config.json", `resources.${name}: missing or unsafe content resource ${config.resources[name]}`)
     }

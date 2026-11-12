@@ -21,6 +21,7 @@
     "test:desk:browser": "playwright test --config tests/desk_browser.config.ts",
     "test:loading:browser": "playwright test --config tests/loading_browser.config.ts",
     "test:expertise:browser": "playwright test --config tests/expertise_browser.config.ts",
+    "test:rireki:browser": "playwright test --config tests/rireki_browser.config.ts",
     "deploy:dry": "node src/main.ts deploy --dry_run",
     "deploy": "node src/main.ts deploy",
     "tf:fmt": "terraform -chdir=terraform fmt",

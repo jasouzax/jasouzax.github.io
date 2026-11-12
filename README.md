@@ -17,7 +17,7 @@ This repository is generation 12. Nothing in it is specific to one person: owner
 | **Themes** | Same DOM, many looks: CSS + generated icon/text fonts + optional canvas script, switched live, with an inline skeleton so no page is ever blank. | [themes](docs/content/theme.md) |
 | **Desk** | A desktop-like workspace in the browser (`/desk`, project and blog desks): tiled windows, file manager, editors, and a real BusyBox shell and C programs compiled to WebAssembly, running over a shared virtual filesystem. A visitor's files never leave their browser. | [desk runtime](docs/src/desk.md) |
 | **Cloud** | Static files on Cloudflare Pages; one Worker routes subdomains, large media (R2) and a versioned JSON API; D1/KV hold data. Everything is provisioned by Terraform. The site keeps working if every owner-run server is offline. | [nodes](docs/src/node.md), [infrastructure](docs/infra.md) |
-| **Personal server** | The owner's own machine, running this same repository, reachable only through Cloudflare Tunnel + Zero Trust: repository hub, and later CI/CD and AI agents. | [personal server](docs/feat/personal_server.md) |
+| **Personal server** | The owner's own machine, running this same repository, reachable only through Cloudflare Tunnel + Zero Trust: repository hub, XML-defined project CI/CD and synchronization, with AI agents planned. | [personal server](docs/feat/personal_server.md) |
 | **Work portal** | `/work`: a per-client page for messages, files, dashboards and receipts. Static shell today; backend is **not implemented** yet. | [work](docs/feat/work.md) |
 
 What works today and what does not is tracked as checkboxes in **[docs/feat/README.md](docs/feat/README.md)**. In short: the public static site, themes, expertise timeline, desk with WASM shell, print layouts, Terraform/Worker routing and the signed read-only Git node work; client authentication, chat, receipts, dashboards and agents are not built. Personal Git pushes and Jazu CI/CD are implemented; see Server Use.
@@ -149,7 +149,7 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 
 Set up the **personal server**: your own machine running an instance of this repository, connected to Cloudflare through a Tunnel protected by Zero Trust, so the public Worker can reach it securely and (later) your Git repository, CI/CD and AI agents can work on it. The public website never depends on it.
 
-**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Every other project is archived: no pushes, no CI, no CD. **Not built yet:** dashboards, AI agents, SSH, pipelines for other projects ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The Git hub and push-triggered CI/CD are verified on the Pi and the real Cloudflare Worker, Access, Tunnel, Pages and R2 deployment (2026-11-12).
+**What works now:** the loopback-only node answers HMAC-signed requests for health, read-only Git (`refs`, `tree`, `blob`, `log`) and, with a `server.json`, **git push** (per-user tokens), a static mirror so `git clone {domain}/projects/jazu` is served by Pages, and the **CI/CD pipeline of `jazu`** (push → tests → build → `wrangler pages deploy` only if the site changed). Projects declaring `repo` or `<pipeline>` in content XML are managed independently; entries without either declaration remain archive-only. **Not built yet:** dashboards, AI agents and SSH ([status](docs/feat/personal_server.md), [design](docs/src/node.md#git-hub)). The prior Jazu Git hub and push-triggered CI/CD were verified on the Pi and real Cloudflare deployment (2026-11-12); the generic XML pipelines and repository synchronization were activated on the Pi at `8d39520` (2026-11-12): all 157 tests passed, GitHub synchronized, and Pages/R2 publication succeeded.
 
 1. **Install** Node.js 22.18+, Git and [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). Clone this repository (the server is an instance of it) and run `npm ci`.
 2. **Configure `.env`** (copy `.env.example`):
@@ -186,11 +186,11 @@ git remote add server https://you:<token>@<domain>/projects/jazu.git && git push
 node src/main.ts server status                       # queue and last runs; `server run` re-runs by hand
 ```
 
-`site.dir` must be a normal clone on `site.checkout_branch` (defaults to the deploy branch; it keeps the git-ignored `build/` artifacts and `content/media`); the pipeline only fast-forwards it. Collaborators: `server user add friend --role write` (branches only; owners merge). Existing archived repositories: put them in `projects` in `server.json` (`path` to a bare repo) and they are mirrored read-only. Also add `<project id="jazu">` to `content/` (included) so the Worker treats it as public.
+`site.dir` must be a normal clone on `site.checkout_branch` (defaults to the deploy branch; it keeps the git-ignored `build/` artifacts and `content/media`); the pipeline only fast-forwards it. Collaborators: `server user add friend --role write` (branches only; owners merge). Existing archived repositories: put them in `projects` in `server.json` (`path` to a bare repo) and they are mirrored read-only. Managed projects are declared in content XML; the published public catalog informs the Worker.
 
 **Using the server as the build/deploy machine manually (no pipeline).** The server may also run `git pull && npm ci && npm run deploy -- --target all`. That machine then needs Node, Terraform, `npm ci`, the same `.env`, **and the Terraform state** (use a remote backend).
 
-**Planned:** SSH transport, AI agents, dashboards and pipelines for projects other than Jazu. HTTPS Git transport, contributor tokens and the Jazu push pipeline are implemented.
+**Planned:** SSH transport, AI agents and dashboards. HTTPS Git transport, contributor tokens and the Jazu push pipeline are implemented.
 
 ---
 
@@ -261,3 +261,43 @@ git push origin master
 Create tokens on the Pi with `node src/main.ts server user add <name> --role owner` (trusted deployers) or `--role write` (contributors who push review branches). Owners can push master and execute CI code on the Pi. Tokens are separate from SSH passwords and Cloudflare credentials. Restart `jazu-node` after changing collaborators in `server.json`, because the running node keeps its authentication configuration in memory. Store tokens in your Git credential manager. Public clones continue working when the Pi is stopped; pushes and origin-backed APIs return an unavailable response.
 
 The production resources provisioned for this branch use Wrangler and the Cloudflare API. Import them into Terraform before using `npm run deploy`; no Terraform state was created by this setup. CI/CD uploads large website assets and oversized historical Git packs to `jazu-assets` before publishing Pages. Clones use Pages plus static R2 objects, and continue working with the Pi offline. Set `JAZU_ASSETS_BUCKET` if using another bucket.
+
+
+### Project repositories and pipelines
+
+Define external synchronization with a project's `repo` attribute and its CI/CD with `<pipeline>`; these work with ordinary HTTPS/SSH remotes on GitHub, GitLab and other Git platforms:
+
+```xml
+<project id="example" name="Example" date="Jan 2026" repo="github.com/team/example">
+    <pipeline branch="main" poll_seconds="60">
+        <step name="Test" command="node" args='["--test"]'/>
+        <step name="Build" phase="build" command="node" args='["scripts/build.mjs"]'/>
+        <step name="Deploy" phase="deploy" command="node" args='["scripts/deploy.mjs"]' credentials="HOSTING_TOKEN"/>
+    </pipeline>
+</project>
+```
+
+Jazu's actual npm/tests/build/Pages pipeline is now declared in `content/projects.xml`. See [the complete project and pipeline rules](docs/content/project.md#pipeline--repository-synchronization-and-cicd) for argument arrays, phases, variables, timeouts, credentials, private projects and local path mappings. A repo without pipeline steps synchronizes commits without a deployment.
+
+The server creates each managed bare hub, polls its external remote and existing local checkout, and queues CI for new commits. CI runs on the exact commit; after success the working checkout and external repository advance, followed by build/deploy steps. Matching tips do not loop. Divergence and upstream rewrites are reported for manual reconciliation. Failed CI does not advance the working checkout or public mirror. Projects have separate branches, working copies, sync state and publication fingerprints. Ordinary contributors may push review branches; only owner tokens may update a pipeline's deploy branch.
+
+Private settings remain in `server.json`: `projects.<id>.dir` can point to `/home/jason/<project>`, `path` can select its bare repository, `visibility: "private"` restricts access and `active: false` archives it. Otherwise the server uses its managed state directory. `site.project` identifies the engine whose Pages/R2 deployment carries the shared public Git mirrors.
+
+A schemeless `repo="github.com/org/repo"` uses HTTPS. For an existing SSH key, use `repo="git@github.com:org/repo.git"`, or configure the service account's private Git URL rewrite before enabling synchronization:
+
+```sh
+git config --global url."git@github.com:".insteadOf https://github.com/
+```
+
+Other providers can use their own SSH URLs or HTTPS credential helper. The service account needs read/write access and verified SSH host keys. Credential values stay in the private service environment/Git setup. Writers to an external deploy branch are trusted CI code authors, like personal-hub owners. Only deploy steps receive explicitly requested secret environment variables.
+
+After committing and installing the reviewed implementation, restart `jazu-node`. The runner reloads project declarations from its approved engine checkout between jobs. Deploy the updated Worker configuration once so `PUBLIC_PROJECTS_MANIFEST=/projects/git.json` enables automatic discovery of future public project mirrors. Pipeline and repo metadata are excluded from page payloads, and private projects are excluded from the public catalog.
+
+```sh
+node src/main.ts server status                    # all active projects
+node src/main.ts server status --project example
+node src/main.ts server run --project example    # retry its current deploy-branch tip
+journalctl -u jazu-node -f
+```
+
+Detailed logs remain in `<state_dir>/runs/`. Non-engine project sync/approval/publication state is under `<state_dir>/projects/<id>/`. Production activation was verified on 2026-11-12 at `8d39520`: the Pi checkout, personal Git hub, and GitHub `master` agree; all 157 tests passed and Pages/R2 publication succeeded. The node is enabled at boot.

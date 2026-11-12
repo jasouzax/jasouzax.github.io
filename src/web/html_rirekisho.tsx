@@ -10,7 +10,7 @@ import type { expertise_model, bar } from "../expertise.ts"
 import { parse_date } from "../dates.ts"
 import { era_of, era_of_month } from "../era.ts"
 import { render_form } from "./rireki_form.tsx"
-import type { form_date, form_row } from "./rireki_form.tsx"
+import type { form_date, form_row, form_input } from "./rireki_form.tsx"
 import { select_print, print_person } from "../prints.ts"
 import { report_error, report_warning } from "../diag.ts"
 
@@ -141,7 +141,9 @@ function history_rows_of(ctx: render_ctx, data: expertise_model): form_row[] {
 }
 
 function licence_rows_of(ctx: render_ctx, resume: xml_node): form_row[] {
-    return child_nodes(resume, "license").map((item) => {
+    const expertise = section_of(ctx.page, "expertise")
+    const events = expertise ? child_nodes(expertise, "event").filter(item => item.attrs.resume === "license") : []
+    return [...child_nodes(resume, "license"), ...events].map((item) => {
         const span = item.attrs.date ? parse_date(item.attrs.date, ctx.model.now) : null
         if (item.attrs.date && !span)
             report_error(ctx.model.diag, where_of(item), `invalid date "${item.attrs.date}"`)
@@ -150,7 +152,7 @@ function licence_rows_of(ctx: render_ctx, resume: xml_node): form_row[] {
         return {
             year: year ? era_year_text(year, month) : "",
             month: month ? two(month) : "",
-            text: item.attrs.text,
+            text: item.attrs.text ?? item.attrs.name,
             kind: "line" as const
         }
     })
@@ -176,8 +178,9 @@ export function render_rirekisho_body(ctx: render_ctx, data: expertise_model, re
     const landing = section_of(ctx.page, "hero")
     const full_name =
         resume.attrs.name ?? [landing?.attrs.name, landing?.attrs.family].filter(Boolean).join(" ")
-    const sheets = render_form({
-        t: (key) => ui_text(ctx.model, ctx.lang, key),
+    const labels: Record<string, string> = {}
+    const input: form_input = {
+        t: (key) => labels[key] = ui_text(ctx.model, ctx.lang, key),
         as_of: as_of_date(ctx),
         kana: field(resume.attrs.kana),
         name: field(full_name),
@@ -204,7 +207,8 @@ export function render_rirekisho_body(ctx: render_ctx, data: expertise_model, re
         spouse: yes_no(ctx, resume.attrs.spouse),
         spouse_support: yes_no(ctx, resume.attrs.spouse_support),
         warn: (message) => report_warning(ctx.model.diag, where_of(resume), message)
-    })
+    }
+    const sheets = render_form(input)
     const pages = sheets.map((sheet) => (
         <>
             <div class={"rireki_sheet"}>{sheet}</div>
@@ -212,7 +216,7 @@ export function render_rirekisho_body(ctx: render_ctx, data: expertise_model, re
     ))
     return (
         <>
-            <div class={"expertise_resume rireki"} hidden={""} data-format={"rirekisho"}>
+            <div class={"expertise_resume rireki"} hidden={""} data-format={"rirekisho"} data-rireki={JSON.stringify({ ...input, labels })}>
                 {pages}
             </div>
         </>

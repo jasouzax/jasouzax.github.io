@@ -3,7 +3,7 @@
     "state_dir": "/var/lib/jazu",
     "site": { "project": "jazu", "dir": "/srv/jazu", "branch": "master", "checkout_branch": "master" },
     "projects": {
-        "calculator": { "visibility": "public", "path": "/srv/repo/calculator.git" }
+        "calculator": { "visibility": "public", "path": "/srv/repo/calculator.git", "dir": "/home/jason/calculator" }
     },
     "collaborators": {}
 }
