@@ -1,0 +1,22 @@
+# Persistent personal-server service. Copy .env and the recovered data directory outside the checkout.
+services:
+  personal:
+    image: registry.jasouza.com/jazu:latest
+    container_name: jazu-personal
+    profiles: [personal]
+    restart: unless-stopped
+    init: true
+    ports: ["127.0.0.1:8788:8788"]
+    env_file: ["${JAZU_ENV_FILE:-./runtime.env}"]
+    volumes: ["${JAZU_DATA_DIRECTORY:-./data}:/data"]
+    command: ["--personal-server"]
+    stop_grace_period: 60s
+  website:
+    image: registry.jasouza.com/jazu:latest
+    profiles: [website]
+    restart: unless-stopped
+    init: true
+    ports: ["8080:8080"]
+    volumes: [website-data:/data]
+volumes:
+  website-data:

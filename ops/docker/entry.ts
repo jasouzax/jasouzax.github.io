@@ -62,7 +62,7 @@ function personal(options: Docker_Options): void {
     process.env.HOME = join(options.data, "home")
     mkdirSync(process.env.HOME, { recursive: true })
     const secret_file = join(options.data, "origin-secret")
-    process.env.ORIGIN_HMAC_SECRET ||= existsSync(secret_file) ? readFileSync(secret_file, "utf8").trim() : randomBytes(32).toString("hex")
+    process.env.ORIGIN_HMAC_SECRET ||= process.env.HMAC_SECRET || (existsSync(secret_file) ? readFileSync(secret_file, "utf8").trim() : randomBytes(32).toString("hex"))
     writeFileSync(secret_file, process.env.ORIGIN_HMAC_SECRET, { mode: 0o600 })
     const file = resolve(options.config ?? join(options.data, "server.json"))
     const project = process.env.JAZU_ENGINE_PROJECT ?? "jazu"
