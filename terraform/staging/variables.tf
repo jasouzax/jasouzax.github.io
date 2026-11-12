@@ -46,6 +46,12 @@ variable "public_projects" {
   default = "[\"jazu\"]"
 }
 
+variable "project_clone_origins" {
+  type        = string
+  default     = "{}"
+  description = "Public HTTPS Git read origins derived from the project's XML repo attributes."
+}
+
 variable "compatibility_date" {
   type    = string
   default = "2026-11-04"

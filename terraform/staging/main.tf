@@ -40,6 +40,7 @@ resource "cloudflare_workers_script" "router" {
     { name = "PAGES_ORIGIN", type = "plain_text", text = "https://${cloudflare_pages_project.site.subdomain}" },
     { name = "PUBLIC_PROJECTS", type = "plain_text", text = var.public_projects },
     { name = "PUBLIC_PROJECTS_MANIFEST", type = "plain_text", text = "/projects/git.json" },
+    { name = "PROJECT_CLONE_ORIGINS", type = "plain_text", text = var.project_clone_origins },
     { name = "PERSONAL_ORIGIN", type = "plain_text", text = var.personal_origin },
     { name = "ASSETS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.assets.name },
     { name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret },

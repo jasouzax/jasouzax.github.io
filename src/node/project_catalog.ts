@@ -22,7 +22,7 @@ function xml_files(path: string): string[] {
     })
 }
 
-export function apply_project_catalog(config: Server_Config, catalog_dir = config.site.dir): void {
+export function load_project_declarations(catalog_dir: string): ReturnType<typeof project_declarations> {
     const projects: xml_node[] = []
     for (const file of xml_files(join(catalog_dir, "content"))) {
         const source = readFileSync(file, "utf8")
@@ -33,7 +33,11 @@ export function apply_project_catalog(config: Server_Config, catalog_dir = confi
         if (diag.errors.length) throw new Error(diag.errors.join("\n"))
         projects.push(...roots.filter(node => node.tag === "project"))
     }
-    const declarations = project_declarations(projects)
+    return project_declarations(projects)
+}
+
+export function apply_project_catalog(config: Server_Config, catalog_dir = config.site.dir): void {
+    const declarations = load_project_declarations(catalog_dir)
     config.catalog = declarations.size > 0
     for (const [id, declaration] of declarations) {
         const local = config.projects[id]

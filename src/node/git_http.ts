@@ -12,7 +12,7 @@
  * Scope:
  *   Reached only after the HMAC check in personal.ts (Worker -> Tunnel -> Access), so the caller is the Worker.
  *   Token auth decides *who pushed*; the pre-receive hook then decides *what* they may push.
- *   Public clones never come here: they are static files on Pages (git_mirror.ts). Request bodies are streamed,
+ *   Public clones use this backend when their external Git provider is missing/unavailable. Request bodies are streamed,
  *   capped at `max_body`, and never buffered in memory. No arbitrary git command can be reached: the CGI
  *   program is fixed and PATH_INFO is built from a validated project id and one of three fixed operations.
  */
@@ -103,9 +103,11 @@ function cgi_environment(config: Server_Config, id: string, operation: string, i
     const home = join(config.state_dir, "home")
     mkdirSync(home, { recursive: true })
     const header = (name: string) => String(incoming.headers[name] ?? "")
+    const settings = [["http.receivepack", "true"], ["uploadpack.allowFilter", "true"], ["uploadpack.hideRefs", "refs/jazu-sync"], ["uploadpack.hideRefs", "refs/remotes"]]
+    const git_config = Object.fromEntries(settings.flatMap(([key, value], index) => [[`GIT_CONFIG_KEY_${index}`, key], [`GIT_CONFIG_VALUE_${index}`, value]]))
     return {
         PATH: process.env.PATH, HOME: home, GIT_CONFIG_NOSYSTEM: "1",
-        GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "http.receivepack", GIT_CONFIG_VALUE_0: "true",
+        GIT_CONFIG_COUNT: String(settings.length), ...git_config,
         GIT_PROJECT_ROOT: dirname(repository), GIT_HTTP_EXPORT_ALL: "1",
         PATH_INFO: `/${basename(repository)}/${operation}`, REQUEST_METHOD: incoming.method, QUERY_STRING: url.search.slice(1),
         CONTENT_TYPE: header("content-type"), CONTENT_LENGTH: header("content-length"),

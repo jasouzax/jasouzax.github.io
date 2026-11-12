@@ -85,6 +85,8 @@ A project with `repo` or `<pipeline>` becomes a managed personal-server project.
 
 The real Jazu definition in [content/projects.xml](../../content/projects.xml) declares its npm installation, types, tests, content check, build and Cloudflare Pages/R2 publication with these same generic rules. No project-specific pipeline commands are hardcoded in the server. Projects without a pipeline synchronize committed changes without running build/deploy commands. `<pipeline branch="main"/>` can select a non-default branch for a sync-only repository.
 
+For public projects, `repo` also supplies the preferred clone/fetch provider when deploying the Worker through Terraform. HTTPS providers and standard GitHub SSH URLs are supported for public read routing; absent/unavailable providers fall back to the Pi. Reapply Worker infrastructure after changing these declarations. Only the Worker receives the routing map; repository metadata remains excluded from public page payloads. Pushes always use the personal server. See [Git read routing](../src/node.md#provider-first-git-reads).
+
 ### Pipeline attributes
 
 | Attribute | Default | Rule |

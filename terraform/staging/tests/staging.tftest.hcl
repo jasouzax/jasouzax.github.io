@@ -5,12 +5,13 @@ mock_provider "cloudflare" {
 }
 
 variables {
-  account_id           = "test-account"
-  zone_id              = "test-zone"
-  worker_bundle        = "tests/fixtures/worker.js"
-  origin_hmac_secret   = "test-hmac-secret-with-more-than-32-characters"
-  access_client_id     = "test-client-id"
-  access_client_secret = "test-client-secret"
+  account_id            = "test-account"
+  zone_id               = "test-zone"
+  worker_bundle         = "tests/fixtures/worker.js"
+  origin_hmac_secret    = "test-hmac-secret-with-more-than-32-characters"
+  access_client_id      = "test-client-id"
+  access_client_secret  = "test-client-secret"
+  project_clone_origins = "{\"demo\":\"https://github.com/team/demo.git\"}"
 }
 
 run "staging_resources_and_routing" {
@@ -43,6 +44,10 @@ run "staging_resources_and_routing" {
   assert {
     condition     = one([for binding in cloudflare_workers_script.router.bindings : binding.bucket_name if binding.name == "ASSETS"]) == cloudflare_r2_bucket.assets.name
     error_message = "The staging Worker must serve its own R2 bucket."
+  }
+  assert {
+    condition     = one([for binding in cloudflare_workers_script.router.bindings : binding.text if binding.name == "PROJECT_CLONE_ORIGINS"]) == var.project_clone_origins
+    error_message = "The Worker needs the XML-derived public clone origins for provider-first reads."
   }
   assert {
     condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET"])

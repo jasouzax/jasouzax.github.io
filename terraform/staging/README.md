@@ -13,6 +13,8 @@ npm run tf:staging -- apply
 
 The generated Worker bundle contains no injected secrets. Only Terraform state/plan contain the sensitive bindings. Local state, tfvars, saved plans and provider caches are ignored; the provider lock file is committed. The initial static Pages deployment remains the job of the staging XML pipeline. Domain/certificate activation may remain pending until Cloudflare completes verification.
 
+The setup command also reads public project `repo` declarations into the Worker's `PROJECT_CLONE_ORIGINS` binding. Clone/fetch reads prefer those HTTPS providers and fall back to Pi Smart HTTP; pushes remain on the Pi. This mapping is not published in Pages output. Reapply this root after changing the routing code or repo declarations. A static Pages CI deployment alone does not update Worker code/bindings.
+
 ## Validation without provisioning
 
 ```sh

@@ -7,6 +7,7 @@ locals {
       { name = "PAGES_ORIGIN", type = "plain_text", text = local.pages_origin },
       { name = "PUBLIC_PROJECTS", type = "plain_text", text = var.public_projects },
       { name = "PUBLIC_PROJECTS_MANIFEST", type = "plain_text", text = "/projects/git.json" },
+      { name = "PROJECT_CLONE_ORIGINS", type = "plain_text", text = var.project_clone_origins },
     ],
     var.personal_origin == null ? [] : [{ name = "PERSONAL_ORIGIN", type = "plain_text", text = var.personal_origin }],
   )

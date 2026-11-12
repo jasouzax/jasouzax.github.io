@@ -101,7 +101,7 @@ test("deployment staging separates oversized R2 assets from the Pages upload", a
         writeFileSync(join(root, "dist/index.html"), "home")
         writeFileSync(join(root, "dist/stray_secret.txt"), "do not deploy")
         writeFileSync(join(root, "dist/.jazu_output.json"), JSON.stringify(["index.html", "assets/media/large.mp4"]))
-        const result = { model: { config: { base_url: "https://example.com", deploy: { worker_name: "router", pages_project: "pages" } }, objects: [] } } as unknown as build_result
+        const result = { model: { config: { base_url: "https://example.com", deploy: { worker_name: "router", pages_project: "pages" } }, objects: [{ tag: "project", attrs: { id: "demo", repo: "github.com/team/demo" }, children: [] }, { tag: "project", attrs: { id: "private", repo: "github.com/team/private", private: "true" }, children: [] }] } } as unknown as build_result
         const stage = await prepare_deploy(root, join(root, "dist"), result, 10)
         const pages = stage.pages_dir
         assert(existsSync(join(pages, "index.html")))
@@ -109,5 +109,7 @@ test("deployment staging separates oversized R2 assets from the Pages upload", a
         assert(!existsSync(join(pages, "stray_secret.txt")))
         assert.equal(stage.uploads[0].key, "assets/media/large.mp4")
         assert.equal(stage.uploads[0].content_type, "video/mp4")
+        const vars = JSON.parse(readFileSync(stage.var_file, "utf8"))
+        assert.deepEqual(JSON.parse(vars.project_clone_origins), { demo: "https://github.com/team/demo.git" })
     } finally { rmSync(root, { recursive: true, force: true }) }
 })
