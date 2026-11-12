@@ -8,17 +8,23 @@ import type { xml_node } from "./xml.ts"
 export type Pipeline_Phase = "ci" | "build" | "deploy"
 export type Pipeline_Step = { name: string, phase: Pipeline_Phase, command: string, args: string[], timeout_ms: number, credentials: string[] }
 export type Project_Pipeline = { branch: string, poll_seconds: number, steps: Pipeline_Step[] }
-export type Project_Declaration = { remote?: string, pipeline?: Project_Pipeline, private: boolean }
+export type Project_Declaration = { remote?: string, pipeline?: Project_Pipeline, pipelines: Record<string, Project_Pipeline>, private: boolean }
 export const pipeline_variables = ["project", "branch", "commit", "mirror_dir", "publish_state"]
 
 export function project_declarations(nodes: xml_node[]): Map<string, Project_Declaration> {
     const declarations = new Map<string, Project_Declaration>()
     for (const node of nodes.filter(node => node.tag === "project")) {
-        const pipeline = node.children.find(child => child.tag === "pipeline")
-        if (!node.attrs.repo && !pipeline) continue
+        const nodes = node.children.filter(child => child.tag === "pipeline")
+        if (!node.attrs.repo && !nodes.length) continue
         const id = node.attrs.id
         if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id)) throw new Error(`Invalid managed project id ${id}`)
-        const declaration: Project_Declaration = { remote: node.attrs.repo ? repository_remote(node.attrs.repo) : undefined, pipeline: pipeline ? parse_pipeline(pipeline) : undefined, private: node.attrs.private === "true" }
+        const pipelines: Record<string, Project_Pipeline> = Object.create(null)
+        for (const node of nodes) {
+            const pipeline = parse_pipeline(node)
+            if (Object.hasOwn(pipelines, pipeline.branch)) throw new Error(`Duplicate pipeline branch ${pipeline.branch}`)
+            pipelines[pipeline.branch] = pipeline
+        }
+        const declaration: Project_Declaration = { remote: node.attrs.repo ? repository_remote(node.attrs.repo) : undefined, pipeline: Object.values(pipelines)[0], pipelines, private: node.attrs.private === "true" }
         const previous = declarations.get(id)
         if (previous && JSON.stringify(previous) !== JSON.stringify(declaration)) throw new Error(`Conflicting repo/pipeline declarations for project ${id}; translations must agree or declare server metadata only once`)
         declarations.set(id, declaration)

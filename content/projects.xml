@@ -6,7 +6,18 @@
             <step name="Content check" phase="ci" command="npm" args='["run","check"]'/>
             <step name="Prepare build dependencies" phase="build" command="npm" args='["ci","--no-audit","--no-fund"]' timeout_seconds="900"/>
             <step name="Build website" phase="build" command="npm" args='["run","build"]' timeout_seconds="1200"/>
-            <step name="Publish Pages and R2" phase="deploy" command="node" args='["src/main.ts","publish","--skip_build","--overlay","${mirror_dir}","--state_file","${publish_state}","--commit","${commit}"]' credentials="CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,JAZU_ASSETS_BUCKET" timeout_seconds="1200"/>
+            <step name="Publish Pages and R2" phase="deploy" command="node" args='["src/main.ts","publish","--skip_build","--overlay","${mirror_dir}","--state_file","${publish_state}","--commit","${commit}","--branch","${branch}"]' credentials="CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,JAZU_ASSETS_BUCKET" timeout_seconds="1200"/>
+        </pipeline>
+        <pipeline branch="staging" poll_seconds="60">
+            <step name="Install CI dependencies" phase="ci" command="npm" args='["ci","--no-audit","--no-fund"]' timeout_seconds="900"/>
+            <!-- For fast deployment
+            <step name="Types" phase="ci" command="npm" args='["run","types"]'/>
+            <step name="Tests" phase="ci" command="npm" args='["test"]' timeout_seconds="900"/>
+            <step name="Content check" phase="ci" command="npm" args='["run","check"]'/>
+            -->
+            <step name="Prepare build dependencies" phase="build" command="npm" args='["ci","--no-audit","--no-fund"]' timeout_seconds="900"/>
+            <step name="Build website" phase="build" command="npm" args='["run","build","--","--base_url","https://staging.jasouza.com"]' timeout_seconds="1200"/>
+            <step name="Publish Pages and R2" phase="deploy" command="node" args='["src/main.ts","publish","--skip_build","--overlay","${mirror_dir}","--state_file","${publish_state}","--commit","${commit}","--branch","${branch}","--pages_project","jazu-staging","--assets_bucket","jazu-staging-assets"]' credentials="CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID,JAZU_ASSETS_BUCKET" timeout_seconds="1200"/>
         </pipeline>
         <slide alt="JAZU website generated from files" stack="ts, sass, nodejs" skill="web-app, cloud" info="File-authored portfolio, browser workspace and technical showcase: a TypeScript engine turns XML and Markdown into a static multilingual site on Cloudflare Pages, with a Worker, a Tunnel-connected personal server for git and CI/CD, and infrastructure as code." />
     </project>

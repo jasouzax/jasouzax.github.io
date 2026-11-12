@@ -4,17 +4,18 @@
  * Build steps run without server secrets; deploy steps receive only their explicitly requested credentials.
  * Public mirrors share the engine's Pages/R2 overlay. Jobs and logs remain in the common durable queue.
  */
-import { spawn, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import type { Job } from "./queue.ts"
 import { mirror_dir, refresh_mirror, refresh_mirrors } from "./git_mirror.ts"
 import type { Mirror_Result } from "./git_mirror.ts"
-import { is_public, project_view, queue_root, repository_path } from "./server_config.ts"
+import { is_public, project_view, project_branches, project_branch, queue_root, repository_path } from "./server_config.ts"
 import { enqueue } from "./queue.ts"
 import type { Server_Config } from "./server_config.ts"
 import { push_upstream } from "./repo_sync.ts"
+import { child_environment, run_command } from "./pipeline_process.ts"
 
 export type Step_Command = { name: string, command: string, args: string[], timeout_ms?: number, credentials?: string[] }
 export type Pipeline_Steps = { install?: Step_Command, ci: Step_Command[], build?: Step_Command[], deploy?: Step_Command[], publish?: Step_Command }
@@ -26,10 +27,6 @@ export type Run_Record = {
     steps: Step_Result[], deployed?: boolean, message?: string, mirrors?: Mirror_Result[]
 }
 export type Log = (text: string) => void
-type Command_Output = { result: Step_Result, tail: string }
-
-const minutes = (count: number) => count * 60_000
-
 export function project_steps(config: Server_Config): Pipeline_Steps {
     const steps = config.pipeline?.steps ?? []
     return { ci: steps.filter(step => step.phase === "ci"), build: steps.filter(step => step.phase === "build"), deploy: steps.filter(step => step.phase === "deploy") }
@@ -41,50 +38,6 @@ function expand_command(step: Step_Command, config: Server_Config, commit: strin
         if (!(name in variables)) throw new Error(`Unknown pipeline variable ${name}`)
         return variables[name]
     })) }
-}
-
-// Execute npm through its Node CLI on Windows so arguments never pass through cmd.exe.
-function executable(step: Step_Command): { command: string, args: string[] } {
-    if (step.command === "node") return { command: process.execPath, args: step.args }
-    if (process.platform === "win32" && ["npm", "npx", "npm.cmd", "npx.cmd"].includes(step.command)) {
-        const name = step.command.startsWith("npx") ? "npx-cli.js" : "npm-cli.js"
-        const candidates = [join(dirname(process.execPath), "node_modules/npm/bin", name), join(dirname(process.execPath), "../lib/node_modules/npm/bin", name)]
-        if (process.env.npm_execpath) candidates.unshift(join(dirname(process.env.npm_execpath), name))
-        const entry = candidates.find(file => existsSync(file))
-        if (!entry) throw new Error("Cannot locate npm's Node CLI; run the node through the installed Node/npm environment")
-        return { command: process.execPath, args: [entry, ...step.args] }
-    }
-    if (process.platform === "win32" && /\.(cmd|bat)$/i.test(step.command)) throw new Error("Use an executable or node script instead of a cmd/bat pipeline command")
-    return { command: step.command, args: step.args }
-}
-
-function child_environment(config: Server_Config, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-    const home = join(config.state_dir, "home")
-    mkdirSync(home, { recursive: true })
-    const kept: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: home, CI: "true" }
-    for (const name of ["SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP", "LANG", "LC_ALL"]) if (process.env[name]) kept[name] = process.env[name]
-    return { ...kept, ...extra }
-}
-
-function run_command(step: Step_Command, cwd: string, env: NodeJS.ProcessEnv, log: Log, extra_args: string[] = []): Promise<Command_Output> {
-    return new Promise(resolve_output => {
-        const started = Date.now()
-        log(`\n$ ${step.command} ${[...step.args, ...extra_args].join(" ")}   (${cwd})\n`)
-        const resolved = executable({ ...step, args: [...step.args, ...extra_args] })
-        const child = spawn(resolved.command, resolved.args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
-        let tail = ""
-        const timer = setTimeout(() => { log(`\n[timeout after ${step.timeout_ms}ms]\n`); child.kill("SIGKILL") }, step.timeout_ms ?? minutes(10))
-        const forward = (chunk: Buffer) => { const text = chunk.toString("utf8"); log(text); tail = (tail + text).slice(-20_000) }
-        child.stdout.on("data", forward)
-        child.stderr.on("data", forward)
-        const done = (code: number | null, note?: string) => {
-            clearTimeout(timer)
-            if (note) log(`\n[${note}]\n`)
-            resolve_output({ result: { name: step.name, ok: code === 0, code, ms: Date.now() - started }, tail })
-        }
-        child.on("error", error => done(null, `could not start: ${error.message}`))
-        child.on("close", code => done(code))
-    })
 }
 
 function git(args: string[], cwd: string, env: NodeJS.ProcessEnv, log: Log): { code: number | null, stdout: string } {
@@ -117,7 +70,7 @@ async function ensure_dependencies(dir: string, steps: Pipeline_Steps, env: Node
 
 // A separate clone per project keeps CI from touching the working copy: that only advances after everything passed.
 function checkout_for_ci(config: Server_Config, commit: string, env: NodeJS.ProcessEnv, log: Log): string {
-    const dir = join(config.state_dir, "ci", config.site.project)
+    const dir = join(config.work_state_dir ?? config.state_dir, "ci", config.site.project)
     if (!existsSync(join(dir, ".git"))) {
         mkdirSync(dir, { recursive: true })
         git_must(["clone", "--no-checkout", "--quiet", repository_path(config, config.site.project), dir], config.state_dir, env, log, "cannot clone the repository for CI")
@@ -145,6 +98,18 @@ function advance_working_copy(config: Server_Config, commit: string, env: NodeJS
         git_must(["checkout", "--quiet", "-B", config.site.checkout_branch ?? config.site.branch, commit], dir, env, log, "cannot initialize the working checkout at the tested commit")
     }
     const branch = git_must(["symbolic-ref", "--short", "-q", "HEAD"], dir, env, log, "working copy has a detached HEAD")
+    if (config.shared_checkout) {
+        if (!project_branches(config, config.site.project).includes(branch)) throw new Error(`working copy is on unmanaged branch ${branch}; switch to a declared pipeline branch first`)
+        if (git_must(["status", "--porcelain", "--untracked-files=no"], dir, env, log, "cannot read working copy status")) throw new Error("working copy has uncommitted changes; refusing to switch branches")
+        git_must(["fetch", "--quiet", repository_path(config, config.site.project), `+refs/heads/${config.site.branch}:refs/remotes/jazu-hub/${config.site.branch}`], dir, env, log, "cannot fetch the pipeline branch")
+        const target = `refs/heads/${config.site.branch}`
+        if (git(["show-ref", "--verify", "--quiet", target], dir, env, log).code === 0) {
+            if (git(["merge-base", "--is-ancestor", target, commit], dir, env, log).code !== 0) throw new Error("target working branch is ahead of or diverged from the tested commit; refusing to overwrite it")
+            git_must(["switch", "--no-guess", config.site.branch], dir, env, log, "cannot switch to the pipeline branch")
+            git_must(["merge", "--ff-only", "--quiet", commit], dir, env, log, "cannot advance the pipeline branch")
+        } else git_must(["switch", "--no-guess", "-c", config.site.branch, commit], dir, env, log, "cannot create the pipeline branch")
+        return
+    }
     if (branch !== (config.site.checkout_branch ?? config.site.branch)) throw new Error(`working copy is on ${branch}, expected ${config.site.checkout_branch ?? config.site.branch}`)
     if (git_must(["status", "--porcelain", "--untracked-files=no"], dir, env, log, "cannot read working copy status")) throw new Error("working copy has uncommitted changes; commit or discard them, then run `server run`")
     const tracking = `refs/remotes/jazu-hub/${config.site.branch}`
@@ -192,7 +157,8 @@ async function run_cd(config: Server_Config, job: Job, steps: Pipeline_Steps, se
     }
     const approved = commit ?? read_last_green(config)
     const root = config.root_config ?? config
-    const mirrors = config.site.project === root.site.project
+    const primary = config.site.branch === (config.primary_branch ?? config.site.branch)
+    const mirrors = !primary ? { results: [], errors: [] } : config.site.project === root.site.project
         ? refresh_mirrors(config, approved ? { [config.site.project]: approved } : undefined)
         : { results: [refresh_mirror(root, config.site.project, approved)], errors: [] }
     record.mirrors = mirrors.results
@@ -219,7 +185,7 @@ async function run_cd(config: Server_Config, job: Job, steps: Pipeline_Steps, se
     }
     record.deployed = outcome?.deployed ?? deployments.length > 0
     record.message = outcome && !outcome.deployed ? `nothing to deploy (${outcome.reason})` : deployments.length ? "deployment completed" : "repository synchronized; no deployment steps"
-    if (config.site.project !== root.site.project && is_public(root, config.site.project)) enqueue(queue_root(config), { kind: "site_changed", project: root.site.project })
+    if (primary && config.site.project !== root.site.project && is_public(root, config.site.project)) enqueue(queue_root(config), { kind: "site_changed", project: root.site.project, ref: `refs/heads/${root.site.branch}` })
 
 }
 
@@ -228,9 +194,18 @@ export async function run_pipeline(config: Server_Config, job: Job, record: Run_
     record.started_at = Date.now()
     save()
     try {
-        config = project_view(config, job.project)
+        const branch = job.ref?.replace(/^refs\/heads\//, "") ?? project_branch(config.root_config ?? config, job.project)
+        config = project_view(config, job.project, branch)
         mkdirSync(config.state_dir, { recursive: true })
         steps ??= project_steps(config)
+        if (job.kind === "site_changed" && config.shared_checkout) {
+            const current = git_must(["symbolic-ref", "--short", "HEAD"], config.site.dir, child_environment(config), log, "cannot read current branch")
+            if (current !== branch) {
+                record.state = "superseded"
+                record.message = `publication deferred until ${branch} updates; shared checkout remains on ${current}`
+                return
+            }
+        }
         if (job.kind !== "site_changed") {
             if (!job.commit) throw new Error("job has no commit")
             if (!await run_ci(config, job.commit, steps, log, record)) {

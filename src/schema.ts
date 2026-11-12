@@ -87,7 +87,8 @@ function check_node(node: xml_node, diag: diagnostics): void {
     if (node.tag === "project" && node.children.filter(child => child.tag === "research").length > 1)
         report_error(diag, where_of(node), "project may contain only one <research>")
     if (node.tag === "project") {
-        if (node.children.filter(child => child.tag === "pipeline").length > 1) report_error(diag, where_of(node), "project may contain only one <pipeline>")
+        const branches = node.children.filter(child => child.tag === "pipeline").map(child => child.attrs.branch ?? "master")
+        if (new Set(branches).size !== branches.length) report_error(diag, where_of(node), "project pipeline branches must be unique")
         if (node.attrs.repo) try { repository_remote(node.attrs.repo) } catch (error) { report_error(diag, where_of(node), (error as Error).message) }
     }
     if (node.tag === "pipeline") try { parse_pipeline(node) } catch (error) { report_error(diag, where_of(node), (error as Error).message) }

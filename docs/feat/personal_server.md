@@ -11,6 +11,10 @@
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Provider-independent per-project `repo` synchronization and XML `<pipeline>` commands, isolated branches/state, loop prevention and CI-gated export (real Git integration tests)
+- [x] Fresh-process catalogs and exact-commit engine workers; idle listener restart on runtime updates (four real Git/process regressions, including service exit 75)
+- [x] Project-independent branch pipelines for staging, one shared deployment checkout, separate sync/publication state and primary mirror protection (real Git/process and publication tests)
+- [x] Standalone staging Terraform automation for Pages/R2, DNS/domain, Worker routing and existing secret bindings (provider validation and mocked resource tests)
+- [ ] Provision and verify `staging.jasouza.com` after merging to master ([setup](../infra-staging.md))
 - [x] Activate and verify XML project pipelines/repository sync on the production Pi after review and commit (2026-11-12, `8d39520`; 157 tests passed, upstream synchronized, Pages/R2 deployed; job `1794453724599_16490bb4`)
 - [x] HMAC origin verification, replay bounds and Access service-token forwarding (4.8)
 - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters

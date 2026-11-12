@@ -3,7 +3,8 @@
  *   poll_upstream: fetch into a private ref, fast-forward the hub atomically, and enqueue ordinary CI/CD.
  *   push_upstream: publish only the exact commit whose CI passed; ordinary Git push protects concurrent writers.
  *   read_sync_state: private operator status, including errors and a durable import intent for restart recovery.
- * Only the configured branch is synchronized. Never force-push, merge divergent histories, or copy secrets/hooks.
+ * Each branch view synchronizes only its configured ref, with separate state/tracking and a shared deployment checkout.
+ * Never force-push, merge divergent histories, or copy secrets/hooks.
  * Git network commands use the server user's SSH/credential configuration, independently of the scrubbed CI HOME.
  */
 import { execFile } from "node:child_process"
@@ -24,7 +25,7 @@ export type Sync_State = {
     message?: string
 }
 
-const tracking_ref = "refs/jazu-sync/upstream"
+const tracking_ref = (config: Server_Config) => config.primary_branch && config.site.branch !== config.primary_branch ? `refs/jazu-sync/upstream-branches/${Buffer.from(config.site.branch).toString("hex")}` : "refs/jazu-sync/upstream"
 const state_file = (config: Server_Config) => join(config.state_dir, "upstream.json")
 
 export function read_sync_state(config: Server_Config): Sync_State | undefined {
@@ -72,8 +73,13 @@ async function ancestor(config: Server_Config, older: string, newer: string): Pr
 
 async function fetch_upstream(config: Server_Config): Promise<string> {
     const upstream = config.upstream!
-    await must_git(config, ["fetch", "--quiet", "--no-tags", "--no-write-fetch-head", upstream.remote, `+refs/heads/${upstream.branch}:${tracking_ref}`], "Cannot fetch upstream")
-    const commit = await must_git(config, ["rev-parse", `${tracking_ref}^{commit}`], "Cannot read upstream commit")
+    const fetched = await git(config, ["fetch", "--quiet", "--no-tags", "--no-write-fetch-head", upstream.remote, `+refs/heads/${upstream.branch}:${tracking_ref(config)}`])
+    if (fetched.code !== 0) {
+        const missing = await git(config, ["ls-remote", "--exit-code", upstream.remote, `refs/heads/${upstream.branch}`])
+        if (missing.code === 2 && !read_sync_state(config)?.observed_commit) return zero_oid
+        throw new Error(`Cannot fetch upstream: ${fetched.text.slice(-600)}`)
+    }
+    const commit = await must_git(config, ["rev-parse", `${tracking_ref(config)}^{commit}`], "Cannot read upstream commit")
     const observed = read_sync_state(config)?.observed_commit
     if (observed && !await ancestor(config, observed, commit)) throw new Error("Upstream history was rewritten; reconcile the branches manually")
     return commit
@@ -83,7 +89,7 @@ function already_queued(config: Server_Config, commit: string): boolean {
     return ["queue", "running", "done"].some(folder => {
         const path = join(queue_root(config), folder)
         return existsSync(path) && readdirSync(path).filter(name => name.endsWith(".json")).some(name => {
-            try { const job = JSON.parse(readFileSync(join(path, name), "utf8")); return job.project === config.site.project && job.commit === commit } catch { return false }
+            try { const job = JSON.parse(readFileSync(join(path, name), "utf8")); return job.project === config.site.project && job.commit === commit && (job.ref ?? `refs/heads/${config.primary_branch ?? config.site.branch}`) === `refs/heads/${config.site.branch}` } catch { return false }
         })
     })
 }
@@ -133,6 +139,11 @@ export async function poll_upstream(config: Server_Config): Promise<Sync_State |
         // Complete an interrupted update-ref/enqueue pair before another fetch can replace the saved intent.
         if (state?.pending_commit === current) queue_import(config, current, undefined, state.pending_source)
         const remote = await fetch_upstream(config)
+        if (remote === zero_oid) {
+            state = { status: current === zero_oid ? "unchanged" : "ahead", checked_at: Date.now(), commit: current === zero_oid ? undefined : current, message: "upstream branch does not exist yet" }
+            save_state(config, state)
+            return state
+        }
         state = { status: "unchanged", checked_at: Date.now(), commit: remote, observed_commit: remote }
         if (current !== remote && await ancestor(config, current, remote)) {
             state.pending_commit = remote

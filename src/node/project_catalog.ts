@@ -22,9 +22,9 @@ function xml_files(path: string): string[] {
     })
 }
 
-export function apply_project_catalog(config: Server_Config): void {
+export function apply_project_catalog(config: Server_Config, catalog_dir = config.site.dir): void {
     const projects: xml_node[] = []
-    for (const file of xml_files(join(config.site.dir, "content"))) {
+    for (const file of xml_files(join(catalog_dir, "content"))) {
         const source = readFileSync(file, "utf8")
         if (!/<project\b/.test(source)) continue
         const roots = parse_xml(source, file)
@@ -42,11 +42,12 @@ export function apply_project_catalog(config: Server_Config): void {
         config.projects[id] = {
             ...local, path: local?.path ?? join(config.repos_dir, `${id}.git`),
             visibility: declaration.private || local?.visibility === "private" ? "private" : "public",
-            active: local?.active !== false, branch, pipeline: declaration.pipeline, upstream,
+            active: local?.active !== false, branch, pipeline: declaration.pipeline, pipelines: declaration.pipelines, upstream,
         }
         if (id === config.site.project) {
             config.site.branch = branch
             config.pipeline = declaration.pipeline
+            config.pipelines = declaration.pipelines
             if (upstream) config.upstream = upstream
         }
     }

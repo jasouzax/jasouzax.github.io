@@ -60,7 +60,7 @@ function read_response(request: Request, options: personal_options): Response {
     if (url.pathname === "/health") return Response.json({ status: "ok", generation: 12 })
     if (match && options.config && (match[1] === options.config.site.project || Object.hasOwn(options.config.projects, match[1])) && is_public(options.config, match[1])) return git_read(repository_path(options.config, match[1]), match[2], url)
     if (match && !options.config && Object.hasOwn(options.repositories, match[1])) return git_read(options.repositories[match[1]], match[2], url)
-    if (runs && options.config && is_active(options.config, runs[1]) && is_public(options.config, runs[1])) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20) })
+    if (runs && options.config && is_active(options.config, runs[1]) && is_public(options.config, runs[1])) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20, url.searchParams.get("branch") ?? undefined) })
     return api_error("not_found", "Unknown repository or route", 404)
 }
 
