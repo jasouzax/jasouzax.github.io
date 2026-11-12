@@ -1,5 +1,5 @@
 <page lang="en" path="/" name="Portfolio" icon="[briefcase]" rank="100" info="Jason D'Souza, computer engineer in Iloilo, Philippines: firmware, circuit boards, graphics and the web." print="resume">
-        <hero tab="Home" name="Jason Catalan D'Souza" status="Available for new projects" info="I build across the stack, from firmware and circuit boards to shaders and the web, and I like writing about the math and physics underneath." tags="Computer Engineer, Embedded Systems, Graphics Programmer, Math &amp; Physics Nerd">
+        <hero tab="Home" name="Jason Catalan D'Souza" info="I build across the stack, from firmware and circuit boards to shaders and the web, and I like writing about the math and physics underneath." tags="Computer Engineer, Embedded Systems, Graphics Programmer, Math &amp; Physics Nerd">
             <item icon="[github]" name="GitHub" text="jasouzax" print="github" link="https://github.com/jasouzax" />
             <item icon="[contact]" name="E-Mail" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="email" />
             <item icon="[location]" name="Location" text="Iloilo, Philippines" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
