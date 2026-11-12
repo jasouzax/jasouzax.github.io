@@ -9,18 +9,21 @@
  *   make_token / hash_token / verify_token   collaborator git tokens (scrypt, constant-time compare)
  *
  * Scope:
- *   Only one project is *active* (`site.project`, normally "jazu"): it accepts pushes and has CI/CD.
- *   Every other project is archived by construction, so a config typo can never enable another pipeline.
+ *   site.project identifies the engine; repo/pipeline XML declarations activate independent managed projects.
+ *   Private server settings supply paths, visibility restrictions and explicit archive overrides.
  *   Contains token hashes only, never tokens. No network, no git, no process spawning.
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
+import type { Project_Pipeline } from "../pipeline_types.ts"
+import { apply_project_catalog } from "./project_catalog.ts"
 
 export type Role = "owner" | "write" | "read"
 export type Action = "read" | "write"
-export type Project_Entry = { visibility: "public" | "private", path: string }
+export type Project_Entry = { visibility: "public" | "private", path: string, active?: boolean, dir?: string, branch?: string, checkout_branch?: string, pipeline?: Project_Pipeline, upstream?: Upstream_Config }
 export type Collaborator = { role: Role, token_hash: string }
+export type Upstream_Config = { remote: string, branch: string, poll_seconds: number }
 export type Server_Config = {
     file: string
     repos_dir: string
@@ -28,6 +31,10 @@ export type Server_Config = {
     site: { project: string, dir: string, branch: string, checkout_branch?: string }
     projects: Record<string, Project_Entry>
     collaborators: Record<string, Collaborator>
+    upstream?: Upstream_Config
+    pipeline?: Project_Pipeline
+    root_config?: Server_Config
+    catalog?: boolean
 }
 
 const id_pattern = /^[a-z0-9][a-z0-9_-]{0,63}$/
@@ -48,7 +55,22 @@ export function repository_path(config: Server_Config, id: string): string {
     return config.projects[id]?.path ?? join(config.repos_dir, `${id}.git`)
 }
 
-export function is_active(config: Server_Config, id: string): boolean { return id === config.site.project }
+export function is_active(config: Server_Config, id: string): boolean { return config.projects[id]?.active ?? id === config.site.project }
+
+export function project_branch(config: Server_Config, id: string): string { return config.projects[id]?.branch ?? (id === config.site.project ? config.site.branch : "master") }
+
+export function project_ids(config: Server_Config): string[] { return [...new Set([config.site.project, ...Object.keys(config.projects)])] }
+
+export function project_view(config: Server_Config, id: string): Server_Config {
+    const root = config.root_config ?? config
+    if (!is_active(root, id)) throw new Error(`${id} is archived and has no active pipeline`)
+    if (id === root.site.project) return root
+    const entry = root.projects[id]
+    const branch = project_branch(root, id)
+    return { ...root, root_config: root, state_dir: join(root.state_dir, "projects", id), site: { project: id, dir: entry.dir ?? join(root.state_dir, "work", id), branch, checkout_branch: entry.checkout_branch ?? branch }, pipeline: entry.pipeline, upstream: entry.upstream }
+}
+
+export function queue_root(config: Server_Config): string { return (config.root_config ?? config).state_dir }
 
 export function is_public(config: Server_Config, id: string): boolean { return (config.projects[id]?.visibility ?? "public") === "public" }
 
@@ -75,12 +97,29 @@ export function load_server_config(file: string, legacy: Record<string, string> 
         projects: {},
         collaborators: {},
     }
+    if (raw.upstream && raw.upstream.enabled !== false) {
+        const remote = raw.upstream.remote
+        const branch = raw.upstream.branch ?? site.branch
+        const poll_seconds = raw.upstream.poll_seconds ?? 60
+        if (typeof remote !== "string" || !remote || /[\x00-\x1f]/.test(remote) || (!isAbsolute(remote) && /\s/.test(remote)) || remote.startsWith("-")) throw new Error("upstream.remote must be a credential-free Git URL or absolute local path")
+        if (!isAbsolute(remote) && !/^[a-zA-Z0-9_.-]+@[a-zA-Z0-9.-]+:[a-zA-Z0-9_./-]+$/.test(remote)) {
+            let url: URL
+            try { url = new URL(remote) } catch { throw new Error("upstream.remote must use HTTPS or SSH") }
+            if (!["https:", "ssh:"].includes(url.protocol) || url.password || (url.protocol === "https:" && url.username)) throw new Error("upstream.remote must use HTTPS or SSH without embedded credentials")
+        }
+        if (typeof branch !== "string" || !branch_pattern.test(branch) || branch.includes("..")) throw new Error("upstream.branch is not a safe branch name")
+        if (!Number.isInteger(poll_seconds) || poll_seconds < 10 || poll_seconds > 86400) throw new Error("upstream.poll_seconds must be an integer between 10 and 86400")
+        config.upstream = { remote, branch, poll_seconds }
+    }
     for (const [id, source] of Object.entries(legacy)) config.projects[id] = { visibility: "public", path: absolute(base, source, "") }
     for (const [id, entry] of Object.entries<any>(raw.projects ?? {})) {
         if (!id_pattern.test(id)) throw new Error(`projects: invalid id "${id}"`)
         const visibility = entry?.visibility ?? "public"
         if (visibility !== "public" && visibility !== "private") throw new Error(`projects.${id}.visibility must be public or private`)
-        config.projects[id] = { visibility, path: entry?.path ? absolute(base, entry.path, "") : join(config.repos_dir, `${id}.git`) }
+        if (entry.active !== undefined && typeof entry.active !== "boolean") throw new Error(`projects.${id}.active must be boolean`)
+        if (entry.branch !== undefined && (!branch_pattern.test(entry.branch) || entry.branch.includes(".."))) throw new Error(`projects.${id}.branch is not safe`)
+        if (entry.checkout_branch !== undefined && (!branch_pattern.test(entry.checkout_branch) || entry.checkout_branch.includes(".."))) throw new Error(`projects.${id}.checkout_branch is not safe`)
+        config.projects[id] = { visibility, path: entry?.path ? absolute(base, entry.path, "") : join(config.repos_dir, `${id}.git`), active: entry.active, dir: entry.dir ? absolute(base, entry.dir, "") : undefined, branch: entry.branch, checkout_branch: entry.checkout_branch }
     }
     for (const [name, entry] of Object.entries<any>(raw.collaborators ?? {})) {
         if (!user_pattern.test(name)) throw new Error(`collaborators: invalid name "${name}"`)
@@ -88,6 +127,8 @@ export function load_server_config(file: string, legacy: Record<string, string> 
         if (!/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(String(entry?.token_hash))) throw new Error(`collaborators.${name}.token_hash is not a scrypt hash (use "server user add")`)
         config.collaborators[name] = { role: entry.role, token_hash: entry.token_hash }
     }
+    apply_project_catalog(config)
+    if (site.checkout_branch === undefined) config.site.checkout_branch = config.site.branch
     return config
 }
 

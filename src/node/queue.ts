@@ -14,7 +14,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 
-export type Job_Kind = "push" | "manual" | "site_changed"
+export type Job_Kind = "push" | "manual" | "upstream" | "site_changed"
 export type Job = {
     id: string
     kind: Job_Kind
