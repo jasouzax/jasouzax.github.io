@@ -1,7 +1,7 @@
 /* Publish a local Distribution registry's immutable blobs and final repository indexes to the public R2 registry. */
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -54,6 +54,7 @@ async function main(): Promise<void> {
         child.on("error", reject)
         child.on("exit", code => code === 0 ? resolve_upload() : reject(new Error(`R2 upload failed for ${key}`)))
     })
+    for (const file of Object.values(blobs)) if (statSync(file).size > 100 * 1024 * 1024) throw new Error("Compressed registry layer exceeds 100 MiB; split its inputs before publishing")
     const pending = Object.entries(blobs).filter(([digest]) => !done[digest])
     let next = 0
     await Promise.all(Array.from({ length: 3 }, async () => {
