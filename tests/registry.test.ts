@@ -7,7 +7,13 @@ const digest = `sha256:${"a".repeat(64)}`
 const index = JSON.stringify({ schema: 1, tags: { latest: digest }, manifests: { [digest]: "application/vnd.oci.image.index.v1+json" }, blobs: [digest] })
 const values: Record<string, string> = { "repos/jazu/index.json": index, [`blobs/sha256/${digest.slice(7)}`]: "{}" }
 const env: Registry_Env = { DOMAIN: "registry.jasouza.com", BLOBS: {
-    async get(key) { const text = values[key]; return text === undefined ? null : { size: text.length, httpEtag: '"test"', body: new Response(text).body!, text: async () => text } },
+    async get(key, options) {
+        const text = values[key]
+        if (text === undefined) return null
+        const ranged = options?.range?.has("range"), body = ranged ? text.slice(0, 1) : text
+        // R2 can include a full-object range even when no Range header was requested.
+        return { size: text.length, httpEtag: '\"test\"', range: { offset: 0, length: body.length }, body: new Response(body).body!, text: async () => text }
+    },
     async head(key) { const text = values[key]; return text === undefined ? null : { size: text.length, httpEtag: '"test"' } },
 } }
 const request = (path: string, method = "GET") => registry_route(new Request(`https://${env.DOMAIN}/v2/${path}`, { method }), env)
@@ -63,4 +69,16 @@ test("release indexes retain platform manifests and reject references to absent 
         put(join(repository, "_layers/sha256", "b".repeat(64), "link"), `sha256:${"b".repeat(64)}`)
         assert.throws(() => registry_indexes(storage), /Missing or invalid/)
     } finally { rmSync(storage, { recursive: true, force: true }) }
+})
+
+
+test("R2 full-object metadata stays HTTP 200 while explicit byte ranges receive 206", async () => {
+    const path = `https://${env.DOMAIN}/v2/jazu/blobs/${digest}`
+    const full = await registry_route(new Request(path), env)
+    assert.equal(full.status, 200)
+    assert.equal(full.headers.get("content-range"), null)
+    const partial = await registry_route(new Request(path, { headers: { range: "bytes=0-0" } }), env)
+    assert.equal(partial.status, 206)
+    assert.equal(partial.headers.get("content-range"), "bytes 0-0/2")
+    assert.equal(await partial.text(), "{")
 })

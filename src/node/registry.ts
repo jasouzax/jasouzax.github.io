@@ -42,10 +42,11 @@ export async function registry_route(request: Request, env: Registry_Env): Promi
     const key = `blobs/sha256/${digest.slice(7)}`
     const value = head ? await env.BLOBS.head(key) : await env.BLOBS.get(key, request.headers.has("range") ? { range: request.headers } : undefined)
     if (!value) return failure(kind === "blobs" ? "BLOB_UNKNOWN" : "MANIFEST_UNKNOWN", "Registry object is unavailable")
-    const headers = new Headers({ ...api_headers, "content-type": kind === "manifests" ? index.manifests[digest] : "application/octet-stream", "docker-content-digest": digest, etag: `"${digest}"`, "accept-ranges": "bytes", "content-length": String(value.range?.length ?? value.size), "cache-control": kind === "blobs" || digest_pattern.test(reference) ? "public, max-age=31536000, immutable" : "no-store" })
+    const partial = !head && request.headers.has("range") ? value.range : undefined
+    const headers = new Headers({ ...api_headers, "content-type": kind === "manifests" ? index.manifests[digest] : "application/octet-stream", "docker-content-digest": digest, etag: `"${digest}"`, "accept-ranges": "bytes", "content-length": String(partial?.length ?? value.size), "cache-control": kind === "blobs" || digest_pattern.test(reference) ? "public, max-age=31536000, immutable" : "no-store" })
     if (request.headers.get("if-none-match") === headers.get("etag")) return new Response(null, { status: 304, headers })
-    if (value.range) headers.set("content-range", `bytes ${value.range.offset}-${value.range.offset + value.range.length - 1}/${value.size}`)
-    return new Response(head ? null : (value as Object_Body).body, { status: value.range ? 206 : 200, headers })
+    if (partial) headers.set("content-range", `bytes ${partial.offset}-${partial.offset + partial.length - 1}/${value.size}`)
+    return new Response(head ? null : (value as Object_Body).body, { status: partial ? 206 : 200, headers })
 }
 
 export default {
