@@ -11,7 +11,8 @@ import { kernel, reset_kernel, start_process, make_sink, kill } from "../src/web
 import { cleanup_llvm } from "../src/web/client/llvm_service.ts"
 import type { fs_api } from "../src/web/client/proc_types.ts"
 
-test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 300000 }, async t => {
+// ARM personal servers run the compiler and interpreter WASMs substantially slower than desktop CPUs.
+test("compiled BusyBox shares binary files, forks shells and connects real pipes", { timeout: 600000 }, async t => {
     const worker_file = resolve(".cache/desk-test-worker.cjs")
     mkdirSync(resolve(".cache"), { recursive: true })
     await build({ stdin: { contents: `import {parentPort} from 'node:worker_threads'; import {run_worker} from './src/web/client/wasm_worker.ts'; parentPort.on('message', data => run_worker(data, value => parentPort.postMessage(value)));`, resolveDir: process.cwd() }, outfile: worker_file, platform: "node", format: "cjs", bundle: true, logLevel: "silent" })

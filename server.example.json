@@ -1,7 +1,7 @@
 {
     "repos_dir": "/srv/repo",
     "state_dir": "/var/lib/jazu",
-    "site": { "project": "jazu", "dir": "/srv/jazu", "branch": "master" },
+    "site": { "project": "jazu", "dir": "/srv/jazu", "branch": "master", "checkout_branch": "master" },
     "projects": {
         "calculator": { "visibility": "public", "path": "/srv/repo/calculator.git" }
     },

@@ -35,5 +35,7 @@ test("inline styles receive their own CSP hash without permitting arbitrary inli
     const css = "body{display:flex}"
     const headers = headers_file([inline_script_hash("boot()")], [inline_script_hash(css)])
     assert(headers.includes(`style-src 'self' 'sha256-${inline_script_hash(css)}'`))
-    assert(headers.includes(`script-src 'self' 'wasm-unsafe-eval' 'sha256-${inline_script_hash("boot()")}'`))
+    const scripts = headers.match(/script-src ([^;]+)/)![1]
+    assert(scripts.includes("'self'") && scripts.includes("'wasm-unsafe-eval'") && scripts.includes(`'sha256-${inline_script_hash("boot()")}'`))
+    assert(!scripts.includes("'unsafe-inline'"))
 })

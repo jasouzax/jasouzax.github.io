@@ -525,7 +525,7 @@
     "electronics": "E33B",
     "embedded": "F2DB"
   },
-  "personal_server": "",
+  "personal_server": "https://personal-server.jasouza.com",
   "deploy": {
     "pages_project": "jazu",
     "worker_name": "jazu_router"

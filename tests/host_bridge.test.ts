@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import vm from "node:vm"
+import { fileURLToPath } from "node:url"
 import { spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { build } from "esbuild"
@@ -8,7 +9,7 @@ import { Frame_Reader, encode_frame } from "../extension/host/frame.ts"
 
 // Runs the real content.js, background.js and desk_host.ts against the real host process, with only the browser faked.
 
-const root = new URL("..", import.meta.url).pathname
+const root = fileURLToPath(new URL("..", import.meta.url))
 const stubs = { "desk_view.ts": "export const terminal_hooks = { uri: 'pid:' }; (globalThis as any).terminal_hooks_probe = terminal_hooks", "desk.ts": "export const text = (key: string) => key" }
 
 async function bundle_page_client(): Promise<string> {
@@ -64,7 +65,7 @@ function make_browser(origin: string, bridge_code: string): Harness {
     return { context, stop: () => children.forEach(child => child.kill("SIGKILL")) }
 }
 
-test("page -> content script -> service worker -> real host: a shell opens, echoes, and exits with its code", async () => {
+test("page -> content script -> service worker -> real host: a shell opens, echoes, and exits with its code", { skip: process.platform === "win32" && "requires a POSIX PTY" }, async () => {
     const browser = make_browser("http://localhost:8080", await bundle_page_client())
     try {
         const info = await vm.runInContext("bridge.connect_host()", browser.context)

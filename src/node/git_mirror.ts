@@ -10,7 +10,7 @@
  *   Works on a private staging copy (`<state>/mirror_src/{id}.git`), so the source repository is never repacked or
  *   modified. The staging copy is repacked into few packs (Pages allows 20,000 files and 25 MiB per file) and only an
  *   allow-list of files is published: HEAD, info/refs, objects/info/packs, objects/pack/*.pack|idx. Config, hooks,
- *   logs and private refs can never leak.
+ *   logs and private refs can never leak. Oversized packs containing indivisible historical blobs go to R2.
  *   Active project: only the deploy branch (pinned to the commit CI approved) and tags are public; collaborator
  *   branches stay private until an owner merges them. Archived projects publish all branches and tags.
  *   Private projects are never mirrored (clones go through git_http.ts with a token).
@@ -19,7 +19,6 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameS
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
-import { pages_file_limit } from "./publish.ts"
 import { is_active, is_public, repository_path } from "./server_config.ts"
 import type { Server_Config } from "./server_config.ts"
 
@@ -86,7 +85,7 @@ export function refresh_mirror(config: Server_Config, id: string, pin?: string):
     let bytes = 0
     for (const name of files) {
         const size = statSync(join(stage, name)).size
-        if (size > pages_file_limit) throw new Error(`${id}: ${name} is ${size} bytes, over the Cloudflare Pages file limit`)
+        // A single historical blob can exceed the pack target; publish.ts uploads oversized packs to R2.
         bytes += size
     }
     // Built outside the published tree and swapped in, so a failed copy never leaves a half-published mirror.

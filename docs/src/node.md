@@ -74,9 +74,9 @@ The node binds loopback; reach it with a Cloudflare Tunnel protected by an Acces
 ## <a id="git-hub"></a>Git hub, CI/CD and the static mirror
 
 ```
-git clone https://{domain}/projects/jazu.git   ->  Worker -> Pages (static files from git_mirror.ts; the node is never contacted)
+git clone https://{domain}/projects/jazu   ->  Worker -> Pages (static files from git_mirror.ts; the node is never contacted)
 git push  https://{user}:{token}@{domain}/projects/jazu.git
-          ->  Worker (route /projects/{id}.git/...: info/refs?service=git-receive-pack, POST git-receive-pack)
+          ->  Worker (route /projects/{id}[.git]/...: info/refs?service=git-receive-pack, POST git-receive-pack)
           ->  Tunnel + Access service token, HMAC "stream" signature
           ->  node: token auth (git_http.ts) -> `git http-backend` -> pre-receive policy -> post-receive -> queue job
           ->  runner: CI (clean checkout of the pushed commit) -> CD (mirror, fast-forward working copy, publish)
@@ -88,7 +88,7 @@ git push  https://{user}:{token}@{domain}/projects/jazu.git
 
 **CI** (`ci_jazu.ts`, push to the deploy branch only): clean checkout of that exact commit in `<state>/ci/jazu`, `npm ci` only when `package-lock.json` changed, then `npm run types`, `npm test`, `npm run check`. Any failure marks the run `failed`, deploys nothing, and leaves the working copy where it was. **CD**: refresh the mirror (pinned to the vetted commit), `git merge --ff-only` the working copy (`site.dir`; refuses if it has uncommitted tracked changes, never resets), then `node src/main.ts publish`: build, stage `dist` + mirror, compare a content fingerprint with `<state>/published.json`, run `wrangler pages deploy` only if it differs, and write the fingerprint only after wrangler succeeded.
 
-**File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) assets are not uploaded by `publish`; they live in R2 from `npm run deploy`.
+**File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) website assets and Git packs are uploaded to R2 before Pages; unchanged large objects are skipped using recorded content hashes.
 
 **Environment of commands.** CI and git run with `PATH`, `HOME=<state>/home`, `CI=true` only. The publish step additionally gets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
 
@@ -110,3 +110,12 @@ Terraform targets: `pages` → `cloudflare_pages_project.site`, `aws_s3_object.l
 ## D1 migrations (`d1_migrate.ts`)
 
 Runs as a script (`node src/node/d1_migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
+
+### Personal-server deployment
+
+`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/v1/health` works while the Pi is offline.
+
+Set `site.branch` to `master` for the hub's public deploy branch. Set optional `site.checkout_branch` to `feature/personal-server` to keep the server checkout on the development branch while fast-forwarding commits accepted on the hub's master. It defaults to `site.branch`. CI restores the ignored `build/` artifacts and `content/media/` from the deployment checkout after cleaning its isolated checkout. Mirror failures block publication.
+
+
+Oversized Git packs (a historical blob cannot be split across packs) are staged for R2 under `projects/{id}.git/objects/pack/`. The Worker resolves these static pack reads against R2 before Pages, including Range and conditional requests. No pack read contacts the personal node. Publication uploads oversized assets with Wrangler before uploading Pages, and records SHA-256 hashes to avoid uploading unchanged large files again. A failed R2 upload blocks Pages publication. Set `JAZU_ASSETS_BUCKET` on the server if using a bucket other than `jazu-assets`.

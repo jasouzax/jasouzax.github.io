@@ -1,4 +1,5 @@
 import { test } from "node:test"
+import { fileURLToPath } from "node:url"
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import type { ChildProcess } from "node:child_process"
@@ -44,7 +45,7 @@ test("extension id and native manifest are derived from the manifest key and all
 })
 
 function start_host(backend: "python" | "script"): { child: ChildProcess, replies: Reply[], send: (message: unknown) => void, wait_for: (test: (reply: Reply) => boolean) => Promise<Reply>, stop: () => void } {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", new URL("../extension/host/host.ts", import.meta.url).pathname], { env: { ...process.env, JAZU_HOST_SHELL: "/bin/sh", JAZU_HOST_PTY: backend }, stdio: ["pipe", "pipe", "inherit"] })
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("../extension/host/host.ts", import.meta.url))], { env: { ...process.env, JAZU_HOST_SHELL: "/bin/sh", JAZU_HOST_PTY: backend }, stdio: ["pipe", "pipe", "inherit"] })
     const reader = new Frame_Reader()
     const replies: Reply[] = []
     const watchers: (() => void)[] = []
@@ -70,7 +71,7 @@ function start_host(backend: "python" | "script"): { child: ChildProcess, replie
 const printed = (replies: Reply[]): string => replies.filter(reply => reply.type === "output").map(reply => Buffer.from(reply.data as string, "base64").toString("utf8")).join("")
 
 for (const backend of ["python", "script"] as const) {
-    test(`host runs a real shell on a pty (${backend} backend): tty, input, exit code`, async () => {
+    test(`host runs a real shell on a pty (${backend} backend): tty, input, exit code`, { skip: process.platform === "win32" && "requires a POSIX PTY" }, async () => {
         const host = start_host(backend)
         try {
             const ready = await host.wait_for(reply => reply.type === "host_ready")
@@ -93,7 +94,7 @@ for (const backend of ["python", "script"] as const) {
     })
 }
 
-test("host reports bad requests without dying, and hangs up shells when the page goes away", async () => {
+test("host reports bad requests without dying, and hangs up shells when the page goes away", { skip: process.platform === "win32" && "requires a POSIX PTY" }, async () => {
     const host = start_host("python")
     try {
         await host.wait_for(reply => reply.type === "host_ready")

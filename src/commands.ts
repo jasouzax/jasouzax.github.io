@@ -90,7 +90,7 @@ async function main(): Promise<void> {
             overlay_dir: flags.overlay ? resolve(String(flags.overlay)) : undefined, state_file: flags.state_file ? resolve(String(flags.state_file)) : undefined,
             dry_run: Boolean(flags.dry_run), force: Boolean(flags.force), commit: flags.commit ? String(flags.commit) : undefined, message: flags.message ? String(flags.message) : undefined,
         })
-        if (outcome.large_assets.length) console.warn(`warning: ${outcome.large_assets.length} file(s) over 25 MiB are served from R2 and were not uploaded; run "npm run deploy -- --target pages" if they changed`)
+        if (outcome.large_assets.length) console.warn(`warning: ${outcome.large_assets.length} file(s) over 25 MiB are served from R2`)
         console.log(`JAZU_PUBLISH ${JSON.stringify(outcome)}`)
         return
     }
