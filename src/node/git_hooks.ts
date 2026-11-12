@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { Job } from "./queue.ts"
-import { is_active, repository_path, zero_oid } from "./server_config.ts"
+import { is_active, project_branch, project_ids, repository_path, zero_oid } from "./server_config.ts"
 import type { Role, Server_Config } from "./server_config.ts"
 
 export type Ref_Update = { old: string, new: string, ref: string }
@@ -34,7 +34,7 @@ export function check_push(config: Server_Config, project: string, role: Role | 
     if (!is_active(config, project)) return `${project} is archived and no longer accepts pushes`
     if (role === "read") return "this token is read-only"
     if (role !== "write") return null
-    const deploy_ref = `refs/heads/${config.site.branch}`
+    const deploy_ref = `refs/heads/${project_branch(config, project)}`
     const blocked = updates.find(update => update.ref === deploy_ref || update.ref.startsWith("refs/tags/"))
     return blocked ? `only owners may update ${blocked.ref}; push a branch and ask an owner to merge it` : null
 }
@@ -42,7 +42,7 @@ export function check_push(config: Server_Config, project: string, role: Role | 
 // Only the deploy branch starts a pipeline; branches pushed by collaborators never run code on this machine.
 export function jobs_for_push(config: Server_Config, project: string, pusher: string, updates: Ref_Update[]): Omit<Job, "id" | "queued_at">[] {
     if (!is_active(config, project)) return []
-    const deploy_ref = `refs/heads/${config.site.branch}`
+    const deploy_ref = `refs/heads/${project_branch(config, project)}`
     return updates.filter(update => update.ref === deploy_ref && update.new !== zero_oid).map(update => ({ kind: "push" as const, project, ref: update.ref, old: update.old, commit: update.new, pusher }))
 }
 
@@ -77,10 +77,22 @@ export function sync_repository(config: Server_Config, id: string): boolean {
     git(repository, ["config", "receive.denyNonFastForwards", "true"])
     git(repository, ["config", "receive.denyDeletes", "true"])
     git(repository, ["config", "core.logAllRefUpdates", "true"])
+    if (is_active(config, id)) {
+        git(repository, ["config", "jazu.managed", "true"])
+        git(repository, ["config", "jazu.branch", project_branch(config, id)])
+        git(repository, ["symbolic-ref", "HEAD", `refs/heads/${project_branch(config, id)}`])
+    }
     return true
 }
 
 export function sync_repositories(config: Server_Config): string[] {
-    const ids = new Set([config.site.project, ...Object.keys(config.projects)])
+    const ids = project_ids(config)
+    for (const id of ids.filter(id => is_active(config, id))) {
+        const repository = repository_path(config, id)
+        if (existsSync(join(repository, "HEAD"))) continue
+        mkdirSync(repository, { recursive: true })
+        git(repository, ["init", "--bare", "--quiet"])
+        git(repository, ["symbolic-ref", "HEAD", `refs/heads/${project_branch(config, id)}`])
+    }
     return [...ids].filter(id => sync_repository(config, id))
 }

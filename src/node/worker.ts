@@ -11,6 +11,7 @@ export type worker_env = {
     DOMAIN: string
     PAGES_ORIGIN: string
     PUBLIC_PROJECTS?: string
+    PUBLIC_PROJECTS_MANIFEST?: string
     PERSONAL_ORIGIN?: string
     ORIGIN_HMAC_SECRET?: string
     ACCESS_CLIENT_ID?: string
@@ -19,6 +20,25 @@ export type worker_env = {
     REGISTRY?: { get(key: string): Promise<string | null> }
 }
 type fetcher = (request: Request) => Promise<Response>
+const catalog_cache = new Map<string, { expires: number, ids: string[] }>()
+
+async function catalog_projects(request: Request, env: worker_env, upstream: fetcher): Promise<string[]> {
+    if (!env.PUBLIC_PROJECTS_MANIFEST) return []
+    const pages = new URL(env.PAGES_ORIGIN)
+    if (pages.hostname === new URL(request.url).hostname || pages.origin !== env.PAGES_ORIGIN || (pages.protocol !== "https:" && pages.hostname !== "127.0.0.1")) return []
+    if (!env.PUBLIC_PROJECTS_MANIFEST.startsWith("/") || env.PUBLIC_PROJECTS_MANIFEST.startsWith("//")) return []
+    const target = new URL(env.PUBLIC_PROJECTS_MANIFEST, pages).href
+    const cached = catalog_cache.get(target)
+    if (cached && cached.expires > Date.now()) return cached.ids
+    try {
+        const response = await upstream(new Request(target, { redirect: "manual", signal: AbortSignal.timeout(5000) }))
+        if (!response.ok) return []
+        const ids: unknown = await response.json()
+        if (!Array.isArray(ids) || ids.length > 10000 || ids.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id))) return []
+        catalog_cache.set(target, { ids, expires: Date.now() + 60_000 })
+        return ids
+    } catch { return [] }
+}
 
 function add_access_headers(headers: Headers, env: worker_env): void {
     if (!env.ACCESS_CLIENT_ID || !env.ACCESS_CLIENT_SECRET) return
@@ -76,6 +96,10 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         if (path !== "/.well-known/security.txt") return api_error("bad_path", "Invalid path", 400)
     }
     const projects: string[] = JSON.parse(env.PUBLIC_PROJECTS ?? "[]")
+    const candidate = /^\/(?:projects\/([a-z0-9_-]+)(?:\.git)?\/|api\/v1\/(?:git|ci)\/([a-z0-9_-]+)(?:\/|$))/.exec(path)
+    const subdomain = url.hostname.endsWith(`.${env.DOMAIN}`) ? url.hostname.slice(0, -(env.DOMAIN.length + 1)) : undefined
+    const requested_project = candidate?.[1] ?? candidate?.[2] ?? subdomain
+    if (requested_project && !projects.includes(requested_project)) projects.push(...await catalog_projects(request, env, upstream))
     if (url.hostname !== env.DOMAIN && url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
         if (!url.hostname.endsWith(`.${env.DOMAIN}`)) return api_error("unknown_host", "Unknown host", 404)
         const subdomain = url.hostname.slice(0, -(env.DOMAIN.length + 1))

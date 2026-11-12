@@ -6,6 +6,7 @@ import { api_error, verify_origin } from "./security.ts"
 import { git_route, handle_git_http, make_throttle } from "./git_http.ts"
 import { list_runs } from "./runner.ts"
 import type { Server_Config } from "./server_config.ts"
+import { is_active, is_public, repository_path } from "./server_config.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
 export type personal_options = { secret: string, repositories: Record<string, string>, port: number, config?: Server_Config }
@@ -57,8 +58,9 @@ function read_response(request: Request, options: personal_options): Response {
     const match = /^\/git\/([a-z0-9_-]+)\/(refs|tree|blob|log)$/.exec(url.pathname)
     const runs = /^\/ci\/([a-z0-9_-]+)\/runs$/.exec(url.pathname)
     if (url.pathname === "/health") return Response.json({ status: "ok", generation: 12 })
-    if (match && Object.hasOwn(options.repositories, match[1])) return git_read(options.repositories[match[1]], match[2], url)
-    if (runs && options.config && runs[1] === options.config.site.project) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20) })
+    if (match && options.config && (match[1] === options.config.site.project || Object.hasOwn(options.config.projects, match[1])) && is_public(options.config, match[1])) return git_read(repository_path(options.config, match[1]), match[2], url)
+    if (match && !options.config && Object.hasOwn(options.repositories, match[1])) return git_read(options.repositories[match[1]], match[2], url)
+    if (runs && options.config && is_active(options.config, runs[1]) && is_public(options.config, runs[1])) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20) })
     return api_error("not_found", "Unknown repository or route", 404)
 }
 

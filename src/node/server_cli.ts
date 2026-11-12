@@ -18,8 +18,9 @@ import { dirname, join, resolve } from "node:path"
 import { sync_repositories, sync_repository } from "./git_hooks.ts"
 import { enqueue, pending } from "./queue.ts"
 import { list_runs } from "./runner.ts"
-import { hash_token, is_project_id, is_user_name, load_server_config, make_token, repository_path, update_server_file } from "./server_config.ts"
+import { hash_token, is_active, is_project_id, is_user_name, load_server_config, make_token, project_branch, project_ids, project_view, repository_path, update_server_file } from "./server_config.ts"
 import type { Role } from "./server_config.ts"
+import { read_sync_state } from "./repo_sync.ts"
 
 export function server_config_file(root: string, flags: Record<string, string | boolean>): string {
     return resolve(String(flags.config ?? process.env.JAZU_SERVER_CONFIG ?? join(root, "server.json")))
@@ -41,9 +42,9 @@ export function server_command(words: string[], flags: Record<string, string | b
         if (existsSync(join(path, "HEAD"))) throw new Error(`${path} already exists`)
         mkdirSync(dirname(path), { recursive: true })
         execFileSync("git", ["init", "--bare", "--quiet", path], { stdio: "inherit" })
-        execFileSync("git", ["-C", path, "symbolic-ref", "HEAD", `refs/heads/${config.site.branch}`])
+        execFileSync("git", ["-C", path, "symbolic-ref", "HEAD", `refs/heads/${project_branch(config, name)}`])
         sync_repository(config, name)
-        console.log(`created ${path}${name === config.site.project ? "" : " (archived: this project accepts no pushes)"}`)
+        console.log(`created ${path}${is_active(config, name) ? "" : " (archived: declare repo or pipeline in project XML to activate)"}`)
         return
     }
     if (sub === "user" && action === "add" && name) {
@@ -61,20 +62,29 @@ export function server_command(words: string[], flags: Record<string, string | b
         return
     }
     if (sub === "run") {
-        const repository = repository_path(config, config.site.project)
-        const commit = String(flags.commit ?? execFileSync("git", ["-C", repository, "rev-parse", `refs/heads/${config.site.branch}`], { encoding: "utf8" }).trim())
-        const job = enqueue(config.state_dir, { kind: "manual", project: config.site.project, commit, ref: `refs/heads/${config.site.branch}`, pusher: "operator" })
+        const id = String(flags.project ?? config.site.project)
+        if (!is_active(config, id)) throw new Error(`${id} is not an active project`)
+        const repository = repository_path(config, id)
+        const branch = project_branch(config, id)
+        const commit = String(flags.commit ?? execFileSync("git", ["-C", repository, "rev-parse", `refs/heads/${branch}`], { encoding: "utf8" }).trim())
+        const job = enqueue(config.state_dir, { kind: "manual", project: id, commit, ref: `refs/heads/${branch}`, pusher: "operator" })
         console.log(`queued ${job.id} for ${commit.slice(0, 8)}; the node picks it up within seconds`)
         return
     }
     if (sub === "status") {
         console.log(`queued: ${pending(config.state_dir).length}`)
-        for (const run of list_runs(config.state_dir, config.site.project, 10)) console.log(`${new Date(run.queued_at ?? 0).toISOString()}  ${run.state}  ${run.kind}  ${run.commit?.slice(0, 8) ?? "-"}  ${run.deployed ? "deployed" : ""}  ${run.steps?.map(step => `${step.name}${step.ok ? "" : "(FAILED)"}`).join(", ")}`)
+        const ids = flags.project ? [String(flags.project)] : project_ids(config).filter(id => is_active(config, id))
+        for (const id of ids) {
+            const view = project_view(config, id)
+            const sync = read_sync_state(view)
+            console.log(`${id}: ${sync?.status ?? "not checked"}${sync?.commit ? ` ${sync.commit.slice(0, 8)}` : ""}${sync?.message ? ` — ${sync.message}` : ""}`)
+            for (const run of list_runs(config.state_dir, id, 10)) console.log(`${new Date(run.queued_at ?? 0).toISOString()}  ${run.state}  ${run.kind}  ${run.commit?.slice(0, 8) ?? "-"}  ${run.deployed ? "deployed" : ""}  ${run.steps?.map(step => `${step.name}${step.ok ? "" : "(FAILED)"}`).join(", ")}`)
+        }
         return
     }
     if (sub === "sync") {
         console.log(`hooks installed in: ${sync_repositories(config).join(", ") || "(no repositories yet)"}`)
         return
     }
-    throw new Error("usage: server init | repo init <id> | user add <name> [--role] | user remove <name> | run [--commit sha] | status | sync")
+    throw new Error("usage: server init | repo init <id> | user add <name> [--role] | user remove <name> | run [--project id] [--commit sha] | status [--project id] | sync")
 }

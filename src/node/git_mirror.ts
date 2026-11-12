@@ -11,20 +11,20 @@
  *   modified. The staging copy is repacked into few packs (Pages allows 20,000 files and 25 MiB per file) and only an
  *   allow-list of files is published: HEAD, info/refs, objects/info/packs, objects/pack/*.pack|idx. Config, hooks,
  *   logs and private refs can never leak. Oversized packs containing indivisible historical blobs go to R2.
- *   Active project: only the deploy branch (pinned to the commit CI approved) and tags are public; collaborator
- *   branches stay private until an owner merges them. Archived projects publish all branches and tags.
+ *   Managed projects publish only the CI-approved deploy branch and tags; review branches stay private.
+ *   Archiving a managed project retains that policy; original archive-only repositories publish their existing refs.
  *   Private projects are never mirrored (clones go through git_http.ts with a token).
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
-import { is_active, is_public, repository_path } from "./server_config.ts"
+import { is_active, is_public, project_branch, project_ids, repository_path } from "./server_config.ts"
 import type { Server_Config } from "./server_config.ts"
 
 export type Mirror_Result = { id: string, status: "updated" | "unchanged" | "skipped", reason?: string, files?: number, bytes?: number }
 
-export function mirror_dir(config: Server_Config): string { return join(config.state_dir, "mirror") }
+export function mirror_dir(config: Server_Config): string { return join((config.root_config ?? config).state_dir, "mirror") }
 
 function git(cwd: string, args: string[]): string {
     try { return execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true }) }
@@ -32,9 +32,16 @@ function git(cwd: string, args: string[]): string {
 }
 
 function patterns(config: Server_Config, id: string): { refspecs: string[], head: string | null, listing: string[] } {
-    if (!is_active(config, id)) return { refspecs: ["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"], head: null, listing: ["refs/heads", "refs/tags"] }
-    const branch = `refs/heads/${config.site.branch}`
+    if (!managed(config, id)) return { refspecs: ["+refs/heads/*:refs/heads/*", "+refs/tags/*:refs/tags/*"], head: null, listing: ["refs/heads", "refs/tags"] }
+    let name = config.projects[id]?.branch
+    if (!name) try { name = git(repository_path(config, id), ["config", "--get", "jazu.branch"]).trim() } catch { /* original archived repository */ }
+    const branch = `refs/heads/${name || project_branch(config, id)}`
     return { refspecs: [`+${branch}:${branch}`, "+refs/tags/*:refs/tags/*"], head: branch, listing: [branch, "refs/tags"] }
+}
+
+function managed(config: Server_Config, id: string): boolean {
+    if (is_active(config, id) || config.projects[id]?.pipeline || config.projects[id]?.upstream) return true
+    try { return git(repository_path(config, id), ["config", "--get", "jazu.managed"]).trim() === "true" } catch { return false }
 }
 
 function published_files(stage: string): string[] {
@@ -53,6 +60,7 @@ function read_state(config: Server_Config): Record<string, string> {
 }
 
 export function refresh_mirror(config: Server_Config, id: string, pin?: string): Mirror_Result {
+    config = config.root_config ?? config
     const source = repository_path(config, id)
     const target = join(mirror_dir(config), "projects", `${id}.git`)
     if (!is_public(config, id)) { rmSync(target, { recursive: true, force: true }); return { id, status: "skipped", reason: "private" } }
@@ -60,7 +68,7 @@ export function refresh_mirror(config: Server_Config, id: string, pin?: string):
     const { refspecs, head, listing } = patterns(config, id)
     const refs = git(source, ["for-each-ref", "--format=%(refname) %(objectname)", ...listing]).trim()
     if (!refs) return { id, status: "skipped", reason: "no commits to publish" }
-    const pinned = is_active(config, id) ? pin : undefined
+    const pinned = managed(config, id) ? pin : undefined
     const fingerprint = createHash("sha256").update(`${refs}\n${head ?? source_head(source)}\n${pinned ?? ""}`).digest("hex")
     const state = read_state(config)
     if (state[id] === fingerprint && existsSync(target)) return { id, status: "unchanged" }
@@ -102,15 +110,24 @@ export function refresh_mirror(config: Server_Config, id: string, pin?: string):
     return { id, status: "updated", files: files.length, bytes }
 }
 
-export function refresh_mirrors(config: Server_Config, pin?: string): { results: Mirror_Result[], errors: string[] } {
+export function refresh_mirrors(config: Server_Config, pin?: string | Record<string, string>): { results: Mirror_Result[], errors: string[] } {
+    config = config.root_config ?? config
     const results: Mirror_Result[] = []
     const errors: string[] = []
-    const ids = new Set([config.site.project, ...Object.keys(config.projects)])
+    const ids = new Set(project_ids(config))
     const published = join(mirror_dir(config), "projects")
     // A mirror of a project that left the config must stop being published.
     if (existsSync(published)) for (const name of readdirSync(published)) if (!ids.has(name.replace(/\.git$/, ""))) rmSync(join(published, name), { recursive: true, force: true })
     for (const id of ids) {
-        try { results.push(refresh_mirror(config, id, pin)) } catch (error) { errors.push(`${id}: ${error instanceof Error ? error.message : error}`) }
+        try {
+            let approved = typeof pin === "string" ? (id === config.site.project ? pin : undefined) : pin?.[id]
+            if (managed(config, id) && !approved) {
+                const state = id === config.site.project ? config.state_dir : join(config.state_dir, "projects", id)
+                try { approved = JSON.parse(readFileSync(join(state, "last_green.json"), "utf8")).commit } catch { /* no successful CI yet */ }
+                if (!approved) { results.push({ id, status: "skipped", reason: "no CI-approved commit" }); continue }
+            }
+            results.push(refresh_mirror(config, id, approved))
+        } catch (error) { errors.push(`${id}: ${error instanceof Error ? error.message : error}`) }
     }
     return { results, errors }
 }

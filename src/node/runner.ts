@@ -9,7 +9,7 @@
  *   make_log(...)           append-only run log with a size cap
  *
  * Scope:
- *   Strictly sequential: two pipelines never overlap, because they share the working copy and the Pages deploy.
+ *   Strictly sequential: pipelines have separate working copies but share the mirror overlay and engine publication.
  *   A burst of pushes runs only the newest commit per project (older ones are marked superseded, their commits are
  *   still in the repository). Watches only content/, src/ and config.json like `npm run watch`; watching the whole
  *   tree would add an inotify watch for every file in node_modules and .git.
@@ -19,9 +19,12 @@ import type { FSWatcher } from "node:fs"
 import { join } from "node:path"
 import { claim, enqueue, finish, pending, recover } from "./queue.ts"
 import type { Job, Queued } from "./queue.ts"
-import { jazu_steps, run_pipeline } from "./ci_jazu.ts"
-import type { Log, Pipeline_Steps, Run_Record } from "./ci_jazu.ts"
+import { run_pipeline } from "./pipeline.ts"
+import type { Log, Pipeline_Steps, Run_Record } from "./pipeline.ts"
 import type { Server_Config } from "./server_config.ts"
+import { is_active, load_server_config, project_ids, project_view } from "./server_config.ts"
+import { sync_repositories } from "./git_hooks.ts"
+import { hub_tip, poll_project } from "./repo_sync.ts"
 
 export type Runner = { stop(): void, drain(): Promise<void>, busy(): boolean }
 const log_cap = 2 * 1024 * 1024
@@ -42,13 +45,15 @@ export function make_log(file: string, cap = log_cap): Log {
 }
 
 // Newest job per project wins; a site_changed job is redundant when a push/manual job is in the same batch, because its CD builds the working copy anyway.
-export function plan_batch(queued: Queued[]): { run: Queued[], superseded: Queued[] } {
+export function plan_batch(queued: Queued[], tip?: string | Record<string, string>): { run: Queued[], superseded: Queued[] } {
     const run: Queued[] = []
     const superseded: Queued[] = []
-    const has_commit_job = queued.some(item => item.job.kind !== "site_changed")
     for (const item of queued) {
+        const has_commit_job = queued.some(other => other.job.project === item.job.project && other.job.kind !== "site_changed")
         const same = (other: Queued) => other.job.project === item.job.project && (other.job.kind === "site_changed") === (item.job.kind === "site_changed")
-        const newer = queued.some(other => other.name > item.name && same(other))
+        // A push hook and an upstream import can enqueue out of ref-update order. Prefer the actual branch tip.
+        const preferred = (other: Queued) => Boolean(tip && other.job.commit === (typeof tip === "string" ? tip : tip[other.job.project]))
+        const newer = queued.some(other => same(other) && ((preferred(other) && !preferred(item)) || (preferred(other) === preferred(item) && other.name > item.name)))
         if (newer || (item.job.kind === "site_changed" && has_commit_job)) superseded.push(item)
         else run.push(item)
     }
@@ -77,6 +82,8 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
     let again = false
     let watcher: FSWatcher | undefined
     let timer: NodeJS.Timeout | undefined
+    const last_upstream_poll = new Map<string, number>()
+    const watch_catalog = Boolean(config.catalog)
 
     const process_job = async (item: Queued): Promise<void> => {
         if (!claim(state, item.name)) return
@@ -86,7 +93,7 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
         const log = make_log(join(runs_dir(state), `${item.job.id}.log`))
         save()
         console.log(`[ci] ${item.job.kind} ${item.job.commit?.slice(0, 8) ?? ""} started`)
-        await run_pipeline(config, item.job, record, log, save, options.steps ?? jazu_steps, options.server_env ?? process.env)
+        await run_pipeline(config, item.job, record, log, save, options.steps, options.server_env ?? process.env)
         console.log(`[ci] ${item.job.kind} ${item.job.commit?.slice(0, 8) ?? ""} ${record.state}${record.message ? `: ${record.message}` : ""}`)
         finish(state, item.name)
     }
@@ -106,7 +113,30 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
         try {
             do {
                 again = false
-                const { run, superseded } = plan_batch(pending(state))
+                if (watch_catalog) {
+                    const fresh = load_server_config(config.file, JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}"))
+                    if (JSON.stringify(fresh.projects) !== JSON.stringify(config.projects)) {
+                        config.projects = fresh.projects
+                        config.pipeline = fresh.pipeline
+                        config.upstream = fresh.upstream
+                        config.site.branch = fresh.site.branch
+                        sync_repositories(config)
+                    }
+                }
+                const active = project_ids(config).filter(id => is_active(config, id))
+                for (const id of active) {
+                    const view = project_view(config, id)
+                    const interval = (view.upstream?.poll_seconds ?? view.pipeline?.poll_seconds ?? 60) * 1000
+                    if (Date.now() - (last_upstream_poll.get(id) ?? 0) < interval) continue
+                    last_upstream_poll.set(id, Date.now())
+                    const sync = await poll_project(view)
+                    if (sync?.status === "error") console.error(`[sync:${id}] ${sync.message}`)
+                    if (sync?.status === "imported") console.log(`[sync:${id}] imported ${sync.commit?.slice(0, 8)}; CI/CD queued`)
+                }
+                const queued = pending(state)
+                const tips: Record<string, string> = {}
+                for (const id of new Set(queued.map(item => item.job.project))) if (is_active(config, id)) tips[id] = await hub_tip(project_view(config, id))
+                const { run, superseded } = plan_batch(queued, tips)
                 superseded.forEach(supersede)
                 for (const item of run) await process_job(item)
                 if (run.length || superseded.length) again = true

@@ -3,6 +3,7 @@ import { walk_nodes, where_of } from "./xml.ts"
 import type { diagnostics } from "./diag.ts"
 import { report_error } from "./diag.ts"
 import { plugin_hosts } from "./plugin_types.ts"
+import { parse_pipeline, repository_remote } from "./pipeline_types.ts"
 
 type rule = {
     attrs: string[]
@@ -58,7 +59,9 @@ export const rules: Record<string, rule> = {
 Object.assign(rules, {
     hero: { attrs: ["status", "name", "tab", "tags", "info", "profile"], required: [], children: ["item", "action"] },
     item: { attrs: ["icon", "name", "text", "link", "print"], required: [], children: [] },
-    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window", "action", "research"], bools: ["featured", "private"] },
+    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window", "action", "research", "pipeline"], bools: ["featured", "private"] },
+    pipeline: { attrs: ["branch", "poll_seconds"], required: [], children: ["step"] },
+    step: { attrs: ["name", "phase", "command", "args", "timeout_seconds", "credentials"], required: ["name", "command"], children: [] },
     research: { attrs: [], required: [], children: Object.keys(research_sections) },
     point: { attrs: ["name"], required: ["name"], children: ["point"] },
     slide: { attrs: ["media", "poster", "alt", "info", "description", "skill", "stack", "feature_stack", "hashtags", "tags", "featured", "private"], required: ["skill"], children: [], bools: ["featured", "private"] },
@@ -83,6 +86,11 @@ function check_node(node: xml_node, diag: diagnostics): void {
     }
     if (node.tag === "project" && node.children.filter(child => child.tag === "research").length > 1)
         report_error(diag, where_of(node), "project may contain only one <research>")
+    if (node.tag === "project") {
+        if (node.children.filter(child => child.tag === "pipeline").length > 1) report_error(diag, where_of(node), "project may contain only one <pipeline>")
+        if (node.attrs.repo) try { repository_remote(node.attrs.repo) } catch (error) { report_error(diag, where_of(node), (error as Error).message) }
+    }
+    if (node.tag === "pipeline") try { parse_pipeline(node) } catch (error) { report_error(diag, where_of(node), (error as Error).message) }
     if (node.tag === "research") {
         const sections = new Set<string>()
         for (const child of node.children) {

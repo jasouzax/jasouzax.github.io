@@ -147,6 +147,9 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 ## Personal server
 
 - [ ] **[Personal server](personal_server.md)** — open items below
+  - [x] Provider-independent per-project `repo` synchronization and XML `<pipeline>` commands, isolated branches/state, loop prevention and CI-gated export (real Git integration tests)
+  - [x] Generic project CI/build/deploy pipelines declared in XML; undeclared repositories remain archived
+  - [ ] Activate and verify XML project pipelines/repository sync on the production Pi after review and commit
   - [x] HMAC origin verification, replay bounds and Access service-token forwarding (4.8)
   - [x] Explicitly allow-listed public Git refs/tree/blob/log read adapters
   - [x] Loopback-only listener; unsigned requests (including `/health`) return `401`

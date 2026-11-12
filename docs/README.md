@@ -88,7 +88,7 @@ These figures were recorded by the previous author and **were not re-run** when 
 ## Known limitations (summary)
 
 - Client authentication, chat, receipts and dashboards are unimplemented; those APIs return `501` and accept no client data.
-- The personal node supports signed Git reads, authenticated HTTPS pushes, a static Pages/R2 Git mirror and Jazu CI/CD. Dashboards, agents and other projects’ pipelines remain unimplemented.
+- The personal node supports signed Git reads, authenticated HTTPS pushes, a static Pages/R2 Git mirror and XML-defined project synchronization/CI/CD (generic runtime tested locally; production activation pending). Dashboards and agents remain unimplemented.
 - Terraform has not been validated against a real account; state is local.
 - Plugins: no WASM manifest verification before execution beyond build-time hashes; conversion graph not implemented.
 - Expertise radio filters, `#all/{id}` fragments and search deduplication are pending.

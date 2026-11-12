@@ -8,12 +8,13 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 | `worker.ts` | Cloudflare Worker (`{domain}/*`, `*.{domain}/*`) | Central router |
 | `security.ts` | Worker + personal node | Security headers, API error shape, HMAC sign/verify |
 | `personal.ts` | Personal server | HTTP listener: signed read-only Git adapter, health, CI run list, and the smart-HTTP route family |
-| `server_config.ts` | Personal server | `server.json`: paths, collaborators, token hashing; only `site.project` is active, all others archived |
+| `server_config.ts` | Personal server | Private paths/collaborators, project views and XML catalog loading |
 | `git_http.ts` | Personal server | `git http-backend` CGI bridge for push (and private clone): Basic-token auth, throttle, role/archive checks |
 | `git_hooks.ts`, `hook_main.ts` | Personal server (inside each bare repo) | pre-receive policy + post-receive job queueing; hooks are generated and rewritten at node start |
 | `git_mirror.ts` | Personal server | Builds the static dumb-HTTP mirror (`projects/{id}.git/`) that Pages serves for `git clone` |
 | `queue.ts`, `runner.ts` | Personal server | Durable job queue, sequential runner, run records, working-copy watcher |
-| `ci_jazu.ts` | Personal server | The one CI/CD pipeline (project `jazu`): tests gate a build + conditional `wrangler pages deploy` |
+| `pipeline.ts`, `project_catalog.ts` | Personal server | Generic XML ci/build/deploy execution, per-project checkouts and catalog reload; `ci_jazu.ts` is an import compatibility shim |
+| `repo_sync.ts` | Personal server | Provider-independent external/local commit imports and CI-gated upstream export |
 | `publish.ts` | Deploy machine / personal server | Pages staging with overlay, content fingerprint, wrangler call; shared by `deploy` and `publish` |
 | `server_cli.ts` | Operator | `node src/main.ts server …`: init, repo init, user add/remove, run, status, sync |
 | `deploy.ts` | Deploy machine | Stage `dist`, bundle Worker, run Terraform and the Pages upload |
@@ -82,15 +83,16 @@ git push  https://{user}:{token}@{domain}/projects/jazu.git
           ->  runner: CI (clean checkout of the pushed commit) -> CD (mirror, fast-forward working copy, publish)
 ```
 
-**Projects.** Only `site.project` (`jazu`) is active. Every other project is archived by construction: pushes are refused by the node and by a generated pre-receive hook; there is no CI/CD for it. Archived public repositories are still mirrored for `git clone`. A project with `"visibility": "private"` is never mirrored; the Worker sends *all* its git traffic (clone included) to the node and it needs a token.
+**Projects.** A `<project repo="…">` or `<project><pipeline>…</pipeline></project>` declaration activates a managed repository. Every project has its own branch and policy, private working-directory override, isolated CI checkout and sync/publication state. Undeclared legacy entries remain archived. Private projects never enter the public mirror or catalog. Archived managed repositories retain approved refs; their review branches stay private.
 
 **Roles** (tokens created with `server user add`; only scrypt hashes are stored in `server.json`): `owner` pushes anything; `write` pushes branches but not the deploy branch or tags (owners merge, because CI executes pushed code on this machine); `read` can clone private projects. Non-fast-forward and deletion are blocked by repository config. Failed logins are throttled (8/min per user).
 
-**CI** (`ci_jazu.ts`, push to the deploy branch only): clean checkout of that exact commit in `<state>/ci/jazu`, `npm ci` only when `package-lock.json` changed, then `npm run types`, `npm test`, `npm run check`. Any failure marks the run `failed`, deploys nothing, and leaves the working copy where it was. **CD**: refresh the mirror (pinned to the vetted commit), `git merge --ff-only` the working copy (`site.dir`; refuses if it has uncommitted tracked changes, never resets), then `node src/main.ts publish`: build, stage `dist` + mirror, compare a content fingerprint with `<state>/published.json`, run `wrangler pages deploy` only if it differs, and write the fingerprint only after wrangler succeeded.
+**CI** (`pipeline.ts`, each project's deploy branch): clean exact-commit checkout, then the project's XML `ci` steps. Any failure marks the run `failed`, deploys nothing and leaves the working copy unchanged. **CD**: create or fast-forward the matching working checkout, export the tested SHA upstream, refresh that project's approved mirror, execute `build`, then `deploy` steps. Engine publication collects the shared approved mirror overlay. Jazu's concrete npm/types/tests/check/build/Pages commands live in its XML declaration; install frequency and command selection are author-defined rather than hardcoded. Its `publish --skip_build` step compares fingerprints and uploads Pages/R2 only when the prepared output differs.
+
 
 **File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) website assets and Git packs are uploaded to R2 before Pages; unchanged large objects are skipped using recorded content hashes.
 
-**Environment of commands.** CI and git run with `PATH`, `HOME=<state>/home`, `CI=true` only. The publish step additionally gets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
+**Environment of commands.** Pipeline steps run with a scrubbed `PATH`, `HOME=<project-state>/home` and `CI=true` environment. Each deploy step receives its explicitly requested credential names. Network Git/SSH separately uses the service user’s credential setup. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
 
 **Wire details.** The Worker signs git requests with `x-jazu-body: stream`, which leaves the (huge, binary) body out of the HMAC; the node accepts that mode only on `/git-http/*`. Request bodies are capped at 512 MiB by the node, and Cloudflare's own request-size limit for your plan applies first.
 
@@ -119,3 +121,18 @@ Set `site.branch` to `master` for the hub's public deploy branch. Set optional `
 
 
 Oversized Git packs (a historical blob cannot be split across packs) are staged for R2 under `projects/{id}.git/objects/pack/`. The Worker resolves these static pack reads against R2 before Pages, including Range and conditional requests. No pack read contacts the personal node. Publication uploads oversized assets with Wrangler before uploading Pages, and records SHA-256 hashes to avoid uploading unchanged large files again. A failed R2 upload blocks Pages publication. Set `JAZU_ASSETS_BUCKET` on the server if using a bucket other than `jazu-assets`.
+
+
+## Per-project repositories and XML pipelines
+
+The authoring contract is [project.md](../content/project.md#pipeline--repository-synchronization-and-cicd). `pipeline_types.ts` shares repository normalization and pipeline validation between the schema and server. `project_catalog.ts` reads project roots from the engine checkout's content XML without rendering them; conflicting translated declarations fail closed. `server_config.ts` merges portable behavior with private path/visibility/archive overrides. `project_view()` selects an individual project without changing the common queue or engine identity.
+
+The idle sequential runner reloads catalog changes, initializes bare repositories/hooks, and polls each project's configured branch. `repo_sync.ts` detects committed clean local checkout changes and external upstream advances. A private tracking ref and compare-and-swap update prevent overwriting a concurrent hub push; a durable import intent recovers interrupted queueing. Incoming external jobs have `kind: "upstream"`; committed checkout changes use `kind: "push"`. Identical tips produce no job. Network commands are asynchronous, time-limited and use the service account's SSH/credential setup separately from CI HOME.
+
+`pipeline.ts` executes the XML steps. `ci` uses a clean exact-commit clone; failures stop before working-copy advancement, upstream export, mirror update, build or deploy. After success the working copy advances and the same tested SHA is pushed upstream with a non-force refspec. An independently advanced working copy is rejected. `build` runs without server credentials; `deploy` receives only the environment names explicitly requested by each step. Commands and JSON argument arrays run without an implicit shell. Only trusted engine-catalog changes can change pipeline policy. The legacy `ci_jazu.ts` path re-exports the generic executor and contains no Jazu command list.
+
+Project state is isolated under `<state>/projects/<id>/` for non-engine projects. Logs/jobs remain in the common queue/runs directories. Mirror files share `<state>/mirror/projects/<id>.git`; refresh uses each project's own branch and CI approval, including managed repos later archived or removed from XML. Successful public project workflows queue an engine CD job so its declared publication command ships the updated mirrors. Jazu's XML build runs `npm run build`; its deploy step calls `publish --skip_build` with the shared overlay and its fingerprint state, avoiding a second build.
+
+The build emits `projects/git.json` containing only public managed ids. With `PUBLIC_PROJECTS_MANIFEST` set, the Worker discovers public ids from this static Pages file, caches it for up to 60 seconds and routes their clone reads to Pages/R2 without contacting the node. The manifest request receives no client credentials. Explicit `PUBLIC_PROJECTS` bindings remain supported. The production Wrangler config and Terraform binding enable the manifest; newly added public projects then require no per-project Worker deployment.
+
+The top-level private `upstream` field is retained only as an engine compatibility input; `<project repo>` takes precedence. Old hardcoded Jazu pipeline defaults have been removed, so the committed XML declaration must be installed with the runtime update. The generic implementation and provider simulation are verified using temporary real Git repositories; production activation is pending review/commit.

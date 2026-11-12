@@ -76,7 +76,8 @@ export function expand_objects(model: site_model): void {
             auto: "true",
             ...(object.tag === "project" ? { cwd: `/srv/projects/${id}` } : {}),
         }, object, children)
-        const node = element("page", { ...object.attrs, info, path }, object, [desk])
+        const { repo: _server_repo, ...public_attrs } = object.attrs
+        const node = element("page", { ...public_attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))
     }
     for (const lang of Object.keys(model.config.languages)) {
