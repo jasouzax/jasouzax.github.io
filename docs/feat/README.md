@@ -11,6 +11,15 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 
 ## Content
 
+## Docker distribution
+
+- [ ] **[Docker](docker.md)** — image distribution and recovery
+  - [x] Container entry selects prebuilt website, custom content or persistent personal-server mode; static assets stream with byte ranges (runtime contract tests).
+  - [ ] Publish and pull native ARM64 and AMD64 images through `registry.jasouza.com`.
+  - [ ] Verify custom content and both image architectures on the Raspberry Pi.
+  - [ ] Move the Pi listener to Docker, preserving the old checkout/service and documenting rollback.
+  - [ ] Verify Git/CI after cutover and a container restart.
+
 - [ ] **[Content](content.md)** — open items below
   - [x] Scan XML recursively anywhere below `content/` and parse multiple strict XML roots (1.0, 2.2)
   - [x] Wrap multi-root files in a synthetic `<jazu>` element; one file may hold several roots
