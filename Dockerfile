@@ -16,9 +16,11 @@ RUN npm run build && rm -rf node_modules .cache
 
 FROM operating_system AS payload
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=website_build /app/ ./
 COPY ops/docker/ ./ops/docker/
-RUN npm ci --omit=dev --no-audit --no-fund && node ops/docker/layers.ts /app /layers
+RUN node ops/docker/layers.ts /app /layers
 
 FROM operating_system AS runtime
 ARG JAZU_REVISION=unknown

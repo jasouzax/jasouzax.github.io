@@ -14,17 +14,20 @@ function visit(path: string): void {
         const file = join(path, entry), stat = lstatSync(file)
         if (stat.isDirectory()) { visit(file); continue }
         const name = relative(source, file)
-        if (stat.isFile() && stat.size > 99 * 1024 * 1024 && gzipSync(readFileSync(file)).length > 99 * 1024 * 1024) throw new Error(`Compressed image input exceeds 99 MiB: ${name}; store it separately or split it before packaging`)
-        if (bytes && bytes + stat.size > 64 * 1024 * 1024) { index++; bytes = 0 }
-        if (index >= 20) throw new Error("Image payload exceeds the supported 20 layers")
-        const output = join(destination, String(index).padStart(2, "0"), name)
-        mkdirSync(dirname(output), { recursive: true })
+        let duplicate: string | undefined
         if (stat.isFile() && stat.size > 65536) {
             const hash = createHash("sha256").update(readFileSync(file)).digest("hex")
-            const existing = hashes.get(hash)
-            if (existing) { symlinkSync(relative(dirname(name), existing), output); continue }
-            hashes.set(hash, name)
+            duplicate = hashes.get(hash)
+            if (!duplicate) hashes.set(hash, name)
         }
+        if (!duplicate) {
+            if (stat.isFile() && stat.size > 99 * 1024 * 1024 && gzipSync(readFileSync(file)).length > 99 * 1024 * 1024) throw new Error(`Compressed image input exceeds 99 MiB: ${name}; store it separately or split it before packaging`)
+            if (bytes && bytes + stat.size > 64 * 1024 * 1024) { index++; bytes = 0 }
+            if (index >= 20) throw new Error("Image payload exceeds the supported 20 layers")
+        }
+        const output = join(destination, String(index).padStart(2, "0"), name)
+        mkdirSync(dirname(output), { recursive: true })
+        if (duplicate) { symlinkSync(relative(dirname(name), duplicate), output); continue }
         cpSync(file, output, { dereference: false, verbatimSymlinks: true })
         bytes += stat.size
     }
