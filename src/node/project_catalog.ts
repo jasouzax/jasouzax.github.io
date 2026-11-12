@@ -22,9 +22,9 @@ function xml_files(path: string): string[] {
     })
 }
 
-export function apply_project_catalog(config: Server_Config): void {
+export function apply_project_catalog(config: Server_Config, catalog_dir = config.site.dir): void {
     const projects: xml_node[] = []
-    for (const file of xml_files(join(config.site.dir, "content"))) {
+    for (const file of xml_files(join(catalog_dir, "content"))) {
         const source = readFileSync(file, "utf8")
         if (!/<project\b/.test(source)) continue
         const roots = parse_xml(source, file)

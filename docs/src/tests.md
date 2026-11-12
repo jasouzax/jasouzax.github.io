@@ -20,6 +20,8 @@ Node 22.18+ is required (`tests/nodes.test.ts` uses `node:sqlite`). Tests build 
 | `layout.test.ts` | Shared geometry extraction, CSP hashes for inline styles |
 | `font.test.ts` | Independent decode of generated TTF/WOFF/WOFF2/COLRv0 (`fontkit`), writer validation |
 | `gitignore.test.ts` | `.gitignore` semantics used by `pack` |
+| `git_server.test.ts`, `project_pipeline.test.ts` | Real Git transport, repository synchronization, CI-gated mirrors and XML project pipelines |
+| `listener_process.test.ts` | Incoming schema/engine isolation, failed-worker recovery, catalog failure recovery and real service exit 75 after a committed runtime update |
 | `desk_*.test.ts` | Desk logic: rename tokens, ZIP, folder covers, paths, permissions, previews, selection; `desk_wasm.test.ts` runs the real BusyBox WASM in `worker_threads` (needs the `.wasm` artifacts) |
 
 ## Browser tests (Playwright, Chromium)

@@ -189,7 +189,7 @@ test("runner reloads the project catalog and executes multiple independent proje
     const f = fixture()
     let runner: ReturnType<typeof start_runner> | undefined
     try {
-        runner = start_runner(f.config, { server_env: { DEPLOY_TOKEN: "test-secret" }, poll_ms: 10000 })
+        runner = start_runner(f.config, { isolated: false, server_env: { DEPLOY_TOKEN: "test-secret" }, poll_ms: 10000 })
         const deadline = Date.now() + 45000
         while ((!list_runs(f.config.state_dir, "alpha", 1)[0]?.finished_at || !list_runs(f.config.state_dir, "beta", 1)[0]?.finished_at || runner.busy()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20))
         assert.equal(list_runs(f.config.state_dir, "alpha", 1)[0]?.state, "passed")

@@ -79,7 +79,7 @@ export function can(role: Role, action: Action): boolean {
 }
 
 // Reads server.json; `legacy` is the older JAZU_REPOSITORIES_JSON map, whose entries are read-only archived public repositories.
-export function load_server_config(file: string, legacy: Record<string, string> = {}): Server_Config {
+export function load_server_config(file: string, legacy: Record<string, string> = {}, catalog_dir?: string): Server_Config {
     const path = resolve(file)
     if (!existsSync(path)) throw new Error(`Missing ${path}; copy server.example.json and edit it`)
     let raw: any
@@ -127,7 +127,7 @@ export function load_server_config(file: string, legacy: Record<string, string> 
         if (!/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(String(entry?.token_hash))) throw new Error(`collaborators.${name}.token_hash is not a scrypt hash (use "server user add")`)
         config.collaborators[name] = { role: entry.role, token_hash: entry.token_hash }
     }
-    apply_project_catalog(config)
+    apply_project_catalog(config, catalog_dir)
     if (site.checkout_branch === undefined) config.site.checkout_branch = config.site.branch
     return config
 }

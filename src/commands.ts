@@ -20,12 +20,8 @@ import { realpathSync } from "node:fs"
 import { dependency_graph } from "./graph.ts"
 import { collect_unignored } from "./gitignore.ts"
 import { deploy, load_env } from "./node/deploy.ts"
-import { personal_server } from "./node/personal.ts"
 import { publish_pages } from "./node/publish.ts"
-import { server_command, server_config_file } from "./node/server_cli.ts"
-import { load_server_config, is_public, repository_path } from "./node/server_config.ts"
-import { sync_repositories } from "./node/git_hooks.ts"
-import { start_runner, start_site_watcher } from "./node/runner.ts"
+import { server_command } from "./node/server_cli.ts"
 
 type flags = Record<string, string | boolean>
 
@@ -64,17 +60,7 @@ async function main(): Promise<void> {
     const root = resolve(String(flags.root ?? process.cwd()))
     const command = words[0] ?? "build"
     if (command === "node") {
-        const legacy: Record<string, string> = JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}")
-        const file = server_config_file(root, flags)
-        // Without server.json the node stays the read-only adapter; with it, it also serves pushes and runs CI/CD.
-        const config = existsSync(file) ? load_server_config(file, legacy) : undefined
-        const repositories = config ? Object.fromEntries(Object.keys({ ...config.projects, [config.site.project]: 1 }).filter(id => is_public(config, id)).map(id => [id, repository_path(config, id)])) : legacy
-        personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), config })
-        if (!config) return console.log(`no ${file}: push and CI/CD are disabled (read-only Git API only)`)
-        console.log(`hooks synced for: ${sync_repositories(config).join(", ") || "(no repositories yet)"}`)
-        const runner = start_runner(config)
-        const watcher = start_site_watcher(config, runner.busy)
-        for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => { watcher.close(); runner.stop(); process.exit(0) })
+        (await import("./node/listener_main.ts")).start_listener(root, flags)
         return
     }
     if (command === "server") {

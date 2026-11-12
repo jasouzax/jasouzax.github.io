@@ -19,12 +19,12 @@ import type { FSWatcher } from "node:fs"
 import { join } from "node:path"
 import { claim, enqueue, finish, pending, recover } from "./queue.ts"
 import type { Job, Queued } from "./queue.ts"
-import { run_pipeline } from "./pipeline.ts"
 import type { Log, Pipeline_Steps, Run_Record } from "./pipeline.ts"
 import type { Server_Config } from "./server_config.ts"
 import { is_active, load_server_config, project_ids, project_view } from "./server_config.ts"
 import { sync_repositories } from "./git_hooks.ts"
 import { hub_tip, poll_project } from "./repo_sync.ts"
+import { fresh_catalog, listener_fingerprint, listener_updated, run_job_process } from "./job_process.ts"
 
 export type Runner = { stop(): void, drain(): Promise<void>, busy(): boolean }
 const log_cap = 2 * 1024 * 1024
@@ -76,12 +76,16 @@ export function list_runs(state: string, project: string, limit: number): Partia
     }).slice(0, limit)
 }
 
-export function start_runner(config: Server_Config, options: { steps?: Pipeline_Steps, server_env?: NodeJS.ProcessEnv, poll_ms?: number } = {}): Runner {
+export function start_runner(config: Server_Config, options: { steps?: Pipeline_Steps, server_env?: NodeJS.ProcessEnv, poll_ms?: number, isolated?: boolean, on_restart?: () => void } = {}): Runner {
     const state = config.state_dir
     let running = false
     let again = false
     let watcher: FSWatcher | undefined
     let timer: NodeJS.Timeout | undefined
+    let stopped = false
+    let catalog_error = ""
+    const isolated = options.isolated !== false && !options.steps
+    const fingerprint = listener_fingerprint(config.site.dir)
     const last_upstream_poll = new Map<string, number>()
     const watch_catalog = Boolean(config.catalog)
 
@@ -91,9 +95,20 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
         const file = join(runs_dir(state), `${item.job.id}.json`)
         const save = () => writeFileSync(file, JSON.stringify(record, null, 2))
         const log = make_log(join(runs_dir(state), `${item.job.id}.log`))
+        record.state = "running"
+        record.started_at = Date.now()
         save()
         console.log(`[ci] ${item.job.kind} ${item.job.commit?.slice(0, 8) ?? ""} started`)
-        await run_pipeline(config, item.job, record, log, save, options.steps, options.server_env ?? process.env)
+        try {
+            if (isolated) await run_job_process(config, item.job, record, log, options.server_env ?? process.env)
+            else await (await import("./pipeline.ts")).run_pipeline(config, item.job, record, log, save, options.steps, options.server_env ?? process.env)
+        } catch (error) {
+            record.state = "failed"
+            record.finished_at = Date.now()
+            record.message = error instanceof Error ? error.message : String(error)
+            log(`\n[worker error] ${record.message}\n`)
+            save()
+        }
         console.log(`[ci] ${item.job.kind} ${item.job.commit?.slice(0, 8) ?? ""} ${record.state}${record.message ? `: ${record.message}` : ""}`)
         finish(state, item.name)
     }
@@ -108,19 +123,35 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
     }
 
     const drain = async (): Promise<void> => {
+        if (stopped) return
         if (running) { again = true; return }
         running = true
         try {
             do {
                 again = false
-                if (watch_catalog) {
-                    const fresh = load_server_config(config.file, JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}"))
-                    if (JSON.stringify(fresh.projects) !== JSON.stringify(config.projects)) {
-                        config.projects = fresh.projects
-                        config.pipeline = fresh.pipeline
-                        config.upstream = fresh.upstream
-                        config.site.branch = fresh.site.branch
-                        sync_repositories(config)
+                if (options.on_restart && listener_updated(config.site.dir, fingerprint)) {
+                    stopped = true
+                    watcher?.close()
+                    clearInterval(timer)
+                    console.log("[listener] engine runtime changed; restarting before the next job")
+                    options.on_restart()
+                    break
+                }
+                if (watch_catalog || isolated) {
+                    try {
+                        const fresh = isolated ? await fresh_catalog(config) : load_server_config(config.file, JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}"))
+                        if (JSON.stringify(fresh.projects) !== JSON.stringify(config.projects)) {
+                            config.projects = fresh.projects
+                            config.pipeline = fresh.pipeline
+                            config.upstream = fresh.upstream
+                            config.site.branch = fresh.site.branch
+                            sync_repositories(config)
+                        }
+                        catalog_error = ""
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error)
+                        if (message !== catalog_error) console.error(`[catalog] ${message}; retaining last valid catalog and continuing repository polling`)
+                        catalog_error = message
                     }
                 }
                 const active = project_ids(config).filter(id => is_active(config, id))
@@ -138,9 +169,12 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
                 for (const id of new Set(queued.map(item => item.job.project))) if (is_active(config, id)) tips[id] = await hub_tip(project_view(config, id))
                 const { run, superseded } = plan_batch(queued, tips)
                 superseded.forEach(supersede)
-                for (const item of run) await process_job(item)
+                for (const item of run) {
+                    await process_job(item)
+                    if (options.on_restart && listener_updated(config.site.dir, fingerprint)) break
+                }
                 if (run.length || superseded.length) again = true
-            } while (again)
+            } while (again && !stopped)
         } catch (error) { console.error(`[ci] runner error: ${error instanceof Error ? error.message : error}`) }
         finally { running = false }
     }
@@ -151,7 +185,7 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
     watcher = watch(join(state, "queue"), () => void drain())
     timer = setInterval(() => void drain(), options.poll_ms ?? 5000)
     void drain()
-    return { stop: () => { watcher?.close(); clearInterval(timer) }, drain, busy: () => running }
+    return { stop: () => { stopped = true; watcher?.close(); clearInterval(timer) }, drain, busy: () => running }
 }
 
 const ignored_edit = /(~|\.swp|\.swx|\.tmp|\.#.*|^\.DS_Store|Thumbs\.db)$/

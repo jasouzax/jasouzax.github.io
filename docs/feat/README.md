@@ -148,6 +148,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 
 - [ ] **[Personal server](personal_server.md)** — open items below
   - [x] Provider-independent per-project `repo` synchronization and XML `<pipeline>` commands, isolated branches/state, loop prevention and CI-gated export (real Git integration tests)
+  - [x] Fresh-process catalogs and exact-commit engine workers; idle listener restart on runtime updates (four real Git/process regressions, including service exit 75)
   - [x] Generic project CI/build/deploy pipelines declared in XML; undeclared repositories remain archived
   - [x] Activate and verify XML project pipelines/repository sync on the production Pi after review and commit (2026-11-12, `8d39520`; 157 tests passed, upstream synchronized, Pages/R2 deployed; job `1794453724599_16490bb4`)
   - [x] HMAC origin verification, replay bounds and Access service-token forwarding (4.8)

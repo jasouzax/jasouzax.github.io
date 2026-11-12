@@ -249,6 +249,8 @@ node --env-file=.env node_modules/wrangler/bin/wrangler.js deploy --config wrang
 
 Use `ops/jazu-node.service.example` as the systemd service, adjusting the user, checkout and Node paths. The node must run with Node 22.18+; Node 24 is recommended. Keep `build/` WASM artifacts and `content/media/` in the checkout: CI restores these ignored inputs into its isolated clone. Keep `server.json`, `.env` and state private and backed up.
 
+The node listens and orchestrates jobs in one persistent process; catalogs and pipelines execute in fresh child processes. Engine pushes stage their exact commit and use its own schema, dependencies and pipeline implementation before promoting the checkout. A failed catalog reload keeps repository polling alive with the last valid catalog. Runtime changes request exit `75` after the job finishes so systemd loads the updated listener; keep `Restart=on-failure` or `always` enabled. Installing this mechanism initially requires one service restart. See [runtime isolation](docs/src/node.md#per-project-repositories-and-xml-pipelines) for the worker protocol and upgrade limits.
+
 For a hub that accepts `git push origin master` while this feature is developed, set `site.branch` to `master` and `site.checkout_branch` to `feature/personal-server`. The hub's bare `master` is seeded from this feature branch; the server's working checkout stays on the feature branch. The GitHub remote remains the source backup and is separate from the personal Git hub.
 
 ```sh

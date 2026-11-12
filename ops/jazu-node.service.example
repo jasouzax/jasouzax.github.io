@@ -9,6 +9,7 @@ User=jason
 WorkingDirectory=/home/jason/jasouzax.github.io
 Environment=PATH=/home/jason/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/jason/.local/bin/node --env-file=.env src/main.ts node --port 8788
+# Exit 75 hands off to fresh listener code after an accepted runtime update.
 Restart=on-failure
 RestartSec=5
 KillMode=control-group
