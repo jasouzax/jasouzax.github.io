@@ -104,6 +104,12 @@ test("guest claims require the original browser; existing account conversations 
         assert.equal((await f.api(path, guest)).status, 404)
         assert.equal((await f.api(path, client)).status, 200)
         assert.equal((await f.api(path, stranger)).status, 404)
+        const fresh_session = await f.api("/api/v1/work/session", guest, {})
+        const fresh_guest = { cookie: fresh_session.headers.get("set-cookie")!.split(";")[0], csrf: (await fresh_session.json() as any).csrf }
+        assert.notEqual(fresh_guest.cookie, guest.cookie, "sign-out after linking creates a new anonymous identity")
+        const fresh_room = await f.room(fresh_guest)
+        assert.notEqual(fresh_room.id, room.id)
+        assert.equal((await f.api(path, fresh_guest)).status, 404)
         const later_guest = await f.guest(), later_room = await f.room(later_guest)
         const conflicted = { cookie: `${client.cookie}; ${later_guest.cookie}`, csrf: client.csrf }
         assert.equal((await f.api(`${base}/${later_room.id}/bind`, conflicted, {})).status, 409)

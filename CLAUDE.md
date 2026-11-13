@@ -106,6 +106,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 - **Opening client windows:** `new_window()` already focuses its result; `activate()` then minimizes it. Use `focus_window()` for client selection (hand off maximization when needed). Open `#head_menu` when revealing Clients so its controls are not covered by the chat window. Browser screenshots after reload must wait for `#main-content` to leave `inert`, otherwise the captured screen can still be the loading skeleton.
 
+- **Guest identity after linking:** `/work/session` must issue a fresh guest cookie after Google sign-out when the previous guest room is bound or closed. Reusing that cookie would prevent a new anonymous room because guest IDs are unique per room. Both SQLite and browser regressions cover linking, signing out, then sending as a new guest.
+
 - **Edge OAuth fetch:** Cloudflare rejects `redirect: "error"` before making a token request. Use `manual` and reject 3xx before reading tokens, so secrets never follow redirects. `tests/auth_runtime.test.ts` exercises bundled auth with real workerd/D1, mocked Google tokens/JWKS and real RSA; Node-only fetch mocks miss this incompatibility. Keep safe `auth_error` codes visible across desk/auth reinitialization.
 
 - **Account controls:** `data-auth="guest|user"` gates header rows; Work uses the same `data-sign="out|delete"` actions. Account deletion uses a CSRF/intent-protected D1 `batch` transaction to revoke all sessions, anonymize/close linked rooms, and remove the profile/admin binding. Preserve shared encrypted history and unrelated clients. Never test deletion against a real user's account; synthetic SQLite/D1 browser fixtures cover confirmation, rollback and tenant isolation.

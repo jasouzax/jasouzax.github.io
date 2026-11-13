@@ -104,6 +104,10 @@ test("first Google sign-in saves the guest key, links history and restores it on
             await send(restored, "Another device")
             await expect(client.locator(".desk_messages_log")).toContainText("Another device", { timeout: 15000 })
         } finally { await device.close() }
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator('.desk_messages [data-sign="google"]')).toBeVisible()
+        await send(client, "New guest after linking and signing out")
+        await expect(client.locator(".desk_messages_log")).not.toContainText("Message before Google")
     } finally { await context.close() }
 })
 

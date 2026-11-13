@@ -84,6 +84,11 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
     const base = "/api/v1/work/rooms"
     if (url.pathname === "/api/v1/work/session" && request.method === "POST") {
         if (session && !valid_csrf(request, session)) return api_error("forbidden", "Refresh the workspace", 403)
+        if (!session && guest_row) {
+            const previous = await env.DB.prepare("SELECT google_subject, revoked FROM work_rooms WHERE guest_id = ?").bind(guest_row.id).first<{ google_subject: string | null, revoked: number }>()
+            // A linked/closed room must never remain the signed-out browser's writable guest identity.
+            if (previous?.google_subject || previous?.revoked) guest_row = null
+        }
         if (!session && !guest_row) {
             const ip_day = await auth_hash(`${new Date().toISOString().slice(0, 10)}\n${request.headers.get("cf-connecting-ip") ?? "unknown"}`)
             guest = encode_key(crypto.getRandomValues(new Uint8Array(32)))
