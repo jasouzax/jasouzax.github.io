@@ -47,6 +47,7 @@ COPY --from=payload /layers/17/ ./
 COPY --from=payload /layers/18/ ./
 COPY --from=payload /layers/19/ ./
 RUN mkdir -p /data && chown node:node /data
+COPY --chmod=755 ops/docker/python /usr/local/bin/python
 USER node
 ENV NODE_ENV=production
 EXPOSE 8080 8788
