@@ -2,6 +2,7 @@ import { createServer } from "node:http"
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs"
 import { join, extname, resolve } from "node:path"
 import { inside } from "../paths.ts"
+import { is_work_path } from "./security.ts"
 
 const types: Record<string, string> = {
     ".wasm": "application/wasm",
@@ -55,7 +56,7 @@ export function serve(out: string, port: number, host = "127.0.0.1") {
             response.end(existsSync(missing) ? readFileSync(missing) : "Not found")
             return
         }
-        const work = new URL(request.url ?? "/", "http://localhost").pathname === "/work"
+        const work = is_work_path(new URL(request.url ?? "/", "http://localhost").pathname)
         const size = statSync(file).size
         let start = 0, end = size - 1, status = 200
         const range = request.headers.range

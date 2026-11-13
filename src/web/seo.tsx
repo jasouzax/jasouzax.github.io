@@ -377,6 +377,7 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "/work/*",
         "  Referrer-Policy: no-referrer",
         "  X-Robots-Tag: noindex",
+        "  Cache-Control: no-store",
         "/assets/*",
         "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/wasm/manifest.json",

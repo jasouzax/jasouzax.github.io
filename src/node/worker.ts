@@ -1,4 +1,4 @@
-import { api_error, secure_response, sign_origin } from "./security.ts"
+import { api_error, secure_response, sign_origin, is_work_path } from "./security.ts"
 import { public_git_read } from "./git_read_proxy.ts"
 import { work_route, type Work_Env } from "./work.ts"
 
@@ -178,7 +178,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     const pages = new URL(env.PAGES_ORIGIN)
     if (pages.hostname === url.hostname || pages.origin !== env.PAGES_ORIGIN || (pages.protocol !== "https:" && pages.hostname !== "127.0.0.1")) return api_error("bad_origin", "Configure a distinct Pages HTTPS origin", 503)
     // Only public request headers are forwarded to Pages; UUID query secrets never reach it.
-    const target = new URL(url.pathname === "/work" ? "/work" : url.pathname + url.search, pages)
+    const target = new URL(is_work_path(path) ? url.pathname : url.pathname + url.search, pages)
     const headers = new Headers()
     for (const name of ["accept", "accept-encoding", "range", "if-none-match", "if-modified-since"]) if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
     return upstream(new Request(target, { method: request.method, headers, redirect: "manual" }))
@@ -186,7 +186,8 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
 
 export default {
     async fetch(request: Request, env: worker_env): Promise<Response> {
-        try { return secure_response(await route(request, env), new URL(request.url).pathname === "/work") }
-        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503)) }
+        const work = is_work_path(new URL(request.url).pathname)
+        try { return secure_response(await route(request, env), work) }
+        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), work) }
     },
 }

@@ -104,6 +104,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Work canonical paths:** Pages redirects `/work` to `/work/`. Use `is_work_path()` in origin forwarding and security wrappers so trailing slashes and `/work/index.json` strip query secrets and retain `no-store`/`no-referrer`, including errors. Keep generated `/work/*` headers equally private. Browser tests must wait for `#main-content` to leave `inert` after boot; otherwise Playwright fill can report success while typing nowhere.
+
 - **Encrypted Work chat:** `node/work.ts` uses D1 `work_rooms`/`work_messages` from migration 0002, separate from the future Google/UUID schema. `WORK_OWNER_TOKEN` enables provisioning; client tokens are hashed. `src/work_crypto.ts` is shared AES-GCM code; never send keys to the API. `desk_messages.ts` is the `messages` host for `message/cpim` at `im:` URIs. Invitations use URL fragments and tab session storage, never VFS/desk persistence. Staging Terraform owns its dedicated D1 and migrations; Pages publication alone cannot enable the API.
 
 - **Provider-first clone routing:** Worker `PROJECT_CLONE_ORIGINS` comes from public XML `repo` declarations during Terraform deployment; never put this private routing map into public Pages payloads or forward personal credentials upstream. `git_read_proxy.ts` streams provider reads and redirects failed discovery to the same site's `/_git/pi/` path, pinning subsequent Git requests to Pi. Pushes always use the signed node. Pages CI does not deploy Worker code/bindings; reapply standalone staging Terraform after a routing change. Legacy Workers without the binding retain static clone behavior.
