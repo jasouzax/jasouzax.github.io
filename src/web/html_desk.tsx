@@ -590,6 +590,8 @@ const runtime_keys = [
     "save_download",
     "edit_too_large",
     "hex_invalid",
+    "pdf_loading", "pdf_download", "pdf_previous", "pdf_next", "pdf_zoom_out", "pdf_zoom_in", "pdf_failed",
+    "convert_pdf_loading", "convert_pdf_noedit", "conversion_failed", "conversion_unavailable",
     "files_toolbar",
     "files_name_label",
     "files_file",

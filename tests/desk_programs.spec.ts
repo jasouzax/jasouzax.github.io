@@ -1,4 +1,4 @@
-import { test, expect as base_expect, type Page } from "@playwright/test"
+import { test, expect as base_expect, type Page } from "./desk_fixture.ts"
 const expect = base_expect.configure({ timeout: 30000 })
 
 async function terminal(page: Page) {

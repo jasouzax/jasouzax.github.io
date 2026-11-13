@@ -1,3 +1,13 @@
+<plugin id="image_pdf" name="Image to PDF" version="1.0.0" flow="convert">
+    <case file mime="image/*" child_mime="application/pdf" host="image_pdf" />
+</plugin>
+<plugin id="compare" name="Text comparison" version="1.0.0" flow="compare">
+    <case file mime="text/*" child_file child_edit child_mime="text/*" host="text" />
+    <case file mime="text/*" child_file child_view child_mime="text/plain" host="text" />
+</plugin>
+<plugin id="mirror" name="Mirror" version="1.0.0" flow="mirror">
+    <case child_view child_edit host="mirror" />
+</plugin>
 <plugin id="shell" name="Shell" version="1.0.0">
     <case view mime="application/x-pid" host="shell" />
 </plugin>
@@ -5,14 +15,20 @@
     <case view file="false" mime="inode/directory" host="folder" />
 </plugin>
 <plugin id="code" name="Code" version="1.0.0">
-    <case file edit mime="text/markdown" host="text" />
-    <case file view edit mime="text/*,application/json,application/*+json,application/xml,application/*+xml,application/javascript,application/typescript,application/x-sh,application/x-yaml,application/sql" host="text" />
+    <case file view edit mime="text/plain" host="text" />
+    <case file edit mime="text/*,application/json,application/*+json,application/xml,application/*+xml,application/javascript,application/typescript,application/x-sh,application/x-yaml,application/sql" host="text" />
 </plugin>
 <plugin id="hex" name="Hex" version="1.0.0">
     <case file edit host="hex" />
 </plugin>
-<plugin id="markdown" name="Markdown" version="1.0.0">
-    <case file view mime="text/markdown" host="markdown" />
+<plugin id="html" name="HTML preview" version="1.0.0">
+    <case file view mime="text/html" host="html" />
+</plugin>
+<plugin id="pdf" name="PDF" version="1.0.0">
+    <case file view mime="application/pdf" host="pdf" />
+</plugin>
+<plugin id="markdown" name="Authored documents" version="1.0.0">
+    <case file view mime="text/markdown" url="file:///srv/*" host="markdown" />
 </plugin>
 <plugin id="media" name="Media" version="1.0.0">
     <case file view mime="image/*,audio/*,video/*" host="media" />

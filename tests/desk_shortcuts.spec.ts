@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from "@playwright/test"
+import { test, expect, type Locator } from "./desk_fixture.ts"
 
 async function open(window: Locator, path: string) {
     const input = window.locator(".desk_wbox_head_path")

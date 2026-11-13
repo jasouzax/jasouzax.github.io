@@ -219,6 +219,20 @@ async function bundle_runtime(root: string, files: output_files, mode: string): 
         }
     }
     files.set("assets/wasm/manifest.json", JSON.stringify(images))
+    // PDF.js stays out of the page bundle and is fetched only when a PDF is opened.
+    const pdf_root = dirname(fileURLToPath(import.meta.resolve("pdfjs-dist/package.json")))
+    const pdf_version = JSON.parse(readFileSync(join(pdf_root, "package.json"), "utf8")).version
+    const pdf_base = `assets/pdfjs/${pdf_version}`
+    for (const folder of ["build", "cmaps", "standard_fonts", "wasm"]) {
+        for (const name of readdirSync(join(pdf_root, folder), { recursive: true })) {
+            const path = join(pdf_root, folder, String(name))
+            if (statSync(path).isFile() && !String(name).endsWith(".map") && (folder !== "build" || ["pdf.min.mjs", "pdf.worker.min.mjs"].includes(String(name)))) {
+                files.set(`${pdf_base}/${folder}/${String(name).replace(/\\/g, "/")}`, readFileSync(path))
+            }
+        }
+    }
+    files.set(`${pdf_base}/LICENSE`, readFileSync(join(pdf_root, "LICENSE")))
+    files.set("assets/pdfjs.json", JSON.stringify({ base: `/${pdf_base}/`, module: `/${pdf_base}/build/pdf.min.mjs`, worker: `/${pdf_base}/build/pdf.worker.min.mjs` }))
     const page = await bundle_script(root, "page", files, mode)
     const theme_switch = await bundle_script(root, "theme_switch", files, mode)
     // Executable registration is small; WASM bytes remain lazy until a process starts.

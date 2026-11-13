@@ -127,6 +127,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Keep uploads strictly in memory (`/tmp`); remove inherited OPFS `/tmp` behaviour
   - [ ] Map/window toggling, pan and zoom (1.4.3, 3.6)
   - [ ] Offer a destination picker on Save for new/read-only windows
+  - [x] Empty split children, shared live editors/HTML preview, independent text comparisons and image-to-PDF WASM conversion with a local PDF viewer
   - [ ] Complete the plugin flow graph, MIME conversions, map resources and hidden processes (3.5–3.6)
   - [ ] Bundle further programs (htop/fastfetch/tcc artifacts exist; ffmpeg and ImageMagick are not bundled)
   - [ ] Shell session restoration and persistent Unix permission metadata

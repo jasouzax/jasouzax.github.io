@@ -39,8 +39,7 @@ Case matching:
   match it. Thus the first Markdown case above excludes Markdown from Code in
   view mode, even though the second case allows `text/*` in view mode.
 - Plugin order breaks ties across plugins; `default` remains the final fallback.
-  The shipped Hex plugin comes before Code so all file editing starts in hex
-  mode. Close its hex toggle to edit text. Markdown view has a separate plugin.
+  Code handles recognized text first; Hex handles other files. Visitor text opens in Edit. Authored `/srv` Markdown documents keep their explicit viewer case.
 
 Available hosts:
 
@@ -52,6 +51,10 @@ Available hosts:
 | `media` | Image viewer or audio/video player |
 | `shell` | Terminal for the selected process |
 | `markdown` | Rendered Markdown document |
+| `html` | Sandboxed live HTML preview |
+| `pdf` | Lazy local PDF.js canvas viewer |
+| `image_pdf` | Image to JPEG normalization, img2pdf WASM, PDF |
+| `mirror` | Ordinary viewer selection over a shared parent document |
 | `default` | Upload area, resource error or unsupported-resource message |
 
 Double-click a sidebar folder, or enter a folder URI such as
@@ -102,3 +105,7 @@ invalid, and dispatch bubbling input events to mark edits.
 compiles it after checking SHA-256. The build verifies the hash too. `from`, `to`,
 `flow` and `options` remain available in the manifest and script context;
 conversion behavior and any options/menu/map UI belong to that script.
+
+## Split windows
+
+See [the shipped flow declarations and limits](../../docs/content/plugin.md#shipped-split-behavior). A `mirror` case delegates to ordinary cases with the child's mode. It shares the parent's current bytes, not its DOM, so navigation and scrolling remain independent. `text` renders line comparison annotations for independent text resources. `image_pdf` executes the existing registered WASM tool; a plugin script must use the injected host factories rather than bundling another copy of the page kernel or document registry.

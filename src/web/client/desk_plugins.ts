@@ -1,7 +1,12 @@
-import { plugin_matches, select_case, type plugin_info, type plugin_case } from "../../plugin_types.ts"
+import { plugin_matches, select_case, select_flow_case, plugin_serves_flow, type plugin_info, type plugin_case } from "../../plugin_types.ts"
+import { flow_kind_of } from "./desk_flow.ts"
 import type { desk_window, state as desk_state } from "./desk.ts"
 
 export type plugin_host = {
+    html: (item: desk_window, signal: AbortSignal) => HTMLElement
+    pdf: (item: desk_window, signal: AbortSignal) => HTMLElement
+    image_pdf: (item: desk_window, signal: AbortSignal) => HTMLElement
+    mirror: (item: desk_window, signal: AbortSignal) => HTMLElement
     code: (item: desk_window, hex_mode?: boolean) => HTMLElement
     media: (item: desk_window) => HTMLElement
     terminal: (item: desk_window) => HTMLElement | null
@@ -61,15 +66,19 @@ async function load_wasm(plugin: plugin_info): Promise<WebAssembly.Module> {
 
 // XML order resolves ties; Default is always the last fallback. Scripts can refine a
 // trigger, install desk contributions, and release them when the body is replaced.
-export async function prepare_plugins(item: desk_window, host: plugin_context["host"], signal: AbortSignal): Promise<{ context: plugin_context, module: plugin_module }[]> {
+export async function prepare_plugins(item: desk_window, host: plugin_context["host"], signal: AbortSignal, ordinary = false): Promise<{ context: plugin_context, module: plugin_module }[]> {
     const plugins = await plugin_registry()
+    const kind = ordinary ? "" : flow_kind_of(item)
     const candidates = plugins.filter(plugin => plugin_matches(plugin, item))
         .sort((a, b) => Number(a.id === "default") - Number(b.id === "default"))
     const result = []
     for (const plugin of candidates) {
         if (signal.aborted) break
         try {
-            const entry = plugin.cases?.length ? select_case(plugin.cases, item) : undefined
+            const flow_entry = kind && item.parent && plugin_serves_flow(plugin, kind)
+                ? select_flow_case(plugin.cases ?? [], kind, item.parent, item) : null
+            // Own resources still have ordinary viewers when no comparator applies.
+            const entry = flow_entry ?? ((!kind || kind === "compare") ? (plugin.cases?.length ? select_case(plugin.cases, item) : undefined) : null)
             if (entry === null) continue
             const script = entry?.script ?? plugin.script
             const module = script ? { ...await load_module(script) } : {}
@@ -87,6 +96,10 @@ export async function prepare_plugins(item: desk_window, host: plugin_context["h
 
 function render_host(name: NonNullable<plugin_case["host"]>, { item, host, signal }: plugin_context): HTMLElement | null {
     switch (name) {
+        case "html": return host.html(item, signal)
+        case "pdf": return host.pdf(item, signal)
+        case "image_pdf": return host.image_pdf(item, signal)
+        case "mirror": return host.mirror(item, signal)
         case "text": return host.code(item)
         case "hex": return host.code(item, true)
         case "media": return host.media(item)

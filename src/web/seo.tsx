@@ -352,7 +352,7 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "font-src 'self'",
         "media-src 'self' blob:",
         "connect-src 'self' https://*.googleapis.com https://accounts.google.com",
-        "frame-src https://accounts.google.com",
+        "frame-src 'self' blob: https://accounts.google.com",
         "frame-ancestors 'none'"
     ].join("; ")
     const text = (path: string, type: string, age: number): string[] => [
@@ -380,6 +380,8 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "/assets/*",
         "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/wasm/manifest.json",
+        "  Cache-Control: no-cache",
+        "/assets/pdfjs.json",
         "  Cache-Control: no-cache",
         "/assets/plugins.json",
         "  Cache-Control: no-cache",

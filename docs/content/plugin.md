@@ -37,7 +37,7 @@ Ordered children that declare when the plugin applies. **A case needs a `host` o
 | `error` | `bool`; `true` matches error windows only; default excludes them |
 | `view`, `edit` | `bool`; allowed modes. Omit both = either; only `view` = view-only; a flag set to `false` disallows |
 | `mime`, `url` | Comma-separated patterns with `*`; each defaults to `*`. `url` matches the window's resource URI |
-| `host` | Built-in body: `text`, `hex`, `folder`, `media`, `shell`, `markdown`, `default` (anything else is an error) |
+| `host` | Built-in body: `text`, `hex`, `folder`, `media`, `shell`, `markdown`, `html`, `pdf`, `image_pdf`, `mirror`, `default` (anything else is an error) |
 | `script` | Case-specific script; overrides the plugin's |
 | `child_file`, `child_view`, `child_edit`, `child_mime`, `child_url` | The same conditions, but for the **child** of a split window. A case with any of them is a *flow case*: it never applies to an ordinary window, and the plain attributes (`mime`, `url`, `view`, `edit`, `file`, `error`) then describe the **parent**. See [Split flows](#split-flows) |
 
@@ -46,7 +46,7 @@ Ordered children that declare when the plugin applies. **A case needs a `host` o
 1. Plugin-level triggers (if present) are checked first.
 2. Cases are checked **in document order; the first full match wins**.
 3. An **exact** `mime` or `url` (no `*`) *reserves* that resource: if its file/error/mode conditions fail, the whole plugin declines it instead of trying later wildcard cases. So `<case file edit mime="text/markdown" …/>` before `<case file view edit mime="text/*" …/>` keeps Markdown out of view-mode Code, while another plugin can still take it.
-4. Plugin order breaks ties between plugins; `default` is always the final fallback. The Hex plugin is listed before Code so file editing starts in hex mode.
+4. Plugin order breaks ties between plugins; `default` is always the final fallback. Code precedes Hex, so recognized text opens in the text editor; other files can use Hex.
 
 ### Split flows
 
@@ -70,6 +70,10 @@ Flow cases are matched in document order with the same reservation rule as ordin
 | `media` | Image viewer or audio/video player |
 | `shell` | Terminal for the selected process |
 | `markdown` | Rendered Markdown (HTML disabled) |
+| `html` | Sandboxed HTML preview of shared unsaved bytes; scripts and same-origin access disabled |
+| `pdf` | Lazy local PDF.js canvas viewer with page navigation, zoom and download |
+| `image_pdf` | `image/*` parent to PDF child through the registered img2pdf WASM process |
+| `mirror` | Ordinary plugin selection over shared parent bytes with an independent mode and viewport |
 | `default` | Upload area, resource error or unsupported message |
 
 ## Scripts
@@ -79,3 +83,28 @@ Flow cases are matched in document order with the same reservation rule as ordin
 ## Related
 
 [Contract and status](../feat/plugins.md) · [desk](desk.md) · [WASM toolchain](../src/desk.md)
+
+## Shipped split behavior
+
+Split starts empty: no source, type or selected mode, with Open folder and upload/drop actions. Picking a mode mirrors the parent's resource; picking a type chooses conversion; picking an independent file or URI chooses comparison. Own resources take priority over type, then mode. Folder navigation in a child stays in that child and becomes an independent resource.
+
+```xml
+<plugin id="image_pdf" version="1" flow="convert">
+    <case file mime="image/*" child_mime="application/pdf" host="image_pdf"/>
+</plugin>
+<plugin id="compare" version="1" flow="compare">
+    <case file mime="text/*" child_file child_edit child_mime="text/*" host="text"/>
+    <case file mime="text/*" child_file child_view child_mime="text/plain" host="text"/>
+</plugin>
+<plugin id="mirror" version="1" flow="mirror">
+    <case child_view child_edit host="mirror"/>
+</plugin>
+```
+
+Mirrors share a live document, including edits made before splitting, while each window keeps its mode, selection and scroll. Save writes through the original resource callback; a save completing after another edit does not clear that newer edit. Giving a mirror its own resource detaches its buffer. Closing a parent retains the mirrored draft in its children.
+
+Opened text/code defaults to Edit. View shows `text/html` in a sandbox and `text/plain` in a readonly editor; other visitor text types show an unsupported message. The explicit Markdown case for the site's readonly `file:///srv/*` documents preserves authored pages such as Privacy; it does not handle uploads or home files. Hosts remain configurable by the owner.
+
+Text comparisons mark added child lines green and removed source lines with a small red bottom arrow. They update as either document changes. Editing remains limited to 2 MB; comparison also requires a source no larger than 2 MB and has a bounded diff budget. On budget exhaustion annotations are omitted (`data-comparison="limited"`). General non-text comparisons and multi-hop conversion search remain future work.
+
+Image conversion decodes browser-supported images, normalizes them to JPEG on white (first frame for animated inputs), then invokes img2pdf. This avoids passing compressed PNG bytes to its raw-image path. It is a raster conversion, limited to 40 megapixels. Closing or replacing the child cancels its process and removes its private temporary directory. PDF.js, its worker, fonts, CMaps and WASM assets are published locally under a package-versioned URL and fetched only for PDFs. The viewer renders one page at a time with a 32-megapixel limit; a download remains available on rendering errors.

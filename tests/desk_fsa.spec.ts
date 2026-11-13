@@ -1,4 +1,4 @@
-import { test, expect as base_expect, type Page, type Locator } from "@playwright/test"
+import { test, expect as base_expect, type Page, type Locator } from "./desk_fixture.ts"
 const expect = base_expect.configure({ timeout: 15000 })
 
 // Use native handles in a separate storage bucket so reads, writes, serialization,

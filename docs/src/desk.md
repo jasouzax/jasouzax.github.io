@@ -76,3 +76,11 @@ npm test                      # includes tests/desk_wasm.test.ts: real WASM in w
 npx playwright install chromium
 npm run test:desk:browser     # isolation, lazy loading, terminal, shared FS, cancellation, OPFS, programs
 ```
+
+## Split document runtime
+
+`desk_flow_rules.ts` chooses compare > convert > mirror from child picks. `desk_flow.ts` owns parent/child links, canonical mirror documents, current byte buffers, dirty state and subscriptions. Ordinary renders retain drafts; explicit new resources discard only their own buffer. Resource snapshots avoid rerendering children for a parent mode change. `desk_plugins.ts` matches `child_*` cases with `select_flow_case`; the mirror host delegates back to ordinary selection without creating a second document registry.
+
+`desk_view.ts` publishes text/hex edits and subscribes editors to shared bytes while retaining selection and scroll. Saves capture their source and write callback and clear dirty state only for the saved revision. `desk_compare.ts` uses bounded jsdiff line comparison. `desk_preview.ts` provides sandboxed HTML and cancellable image conversion through the page's existing kernel and binary VFS. `desk_pdf.ts` dynamically imports the locally published PDF.js runtime, owns its worker/document/render lifecycle, and releases it on window replacement. `build.ts` publishes versioned PDF.js assets plus a revalidated manifest; no PDF code is bundled into the normal page runtime.
+
+Checks: `tests/desk_flow.test.ts`, `tests/desk_compare.test.ts`, `tests/plugins.test.ts` and `tests/desk_split.spec.ts` cover shared drafts, save races, detach/close, flow selection, line changes, empty children, mode rules, sandboxed live HTML, actual img2pdf output and PDF canvas pixels.
