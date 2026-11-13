@@ -104,6 +104,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Edge OAuth fetch:** Cloudflare rejects `redirect: "error"` before making a token request. Use `manual` and reject 3xx before reading tokens, so secrets never follow redirects. `tests/auth_runtime.test.ts` exercises bundled auth with real workerd/D1, mocked Google tokens/JWKS and real RSA; Node-only fetch mocks miss this incompatibility. Keep safe `auth_error` codes visible across desk/auth reinitialization.
+
 - **Account controls:** `data-auth="guest|user"` gates header rows; Work uses the same `data-sign="out|delete"` actions. Account deletion uses a CSRF/intent-protected D1 `batch` transaction to revoke all sessions, anonymize/close linked rooms, and remove the profile/admin binding. Preserve shared encrypted history and unrelated clients. Never test deletion against a real user's account; synthetic SQLite/D1 browser fixtures cover confirmation, rollback and tenant isolation.
 
 - **Google authentication:** `node/auth.ts` owns full-page OIDC code/PKCE/nonce flow and `__Host-` HttpOnly sessions (migration 0003). `GOOGLE_ADMIN_EMAIL` bootstraps a pinned Google subject; OAuth project ownership grants no app role. Client linking requires the invited email, Google session, invitation bearer and CSRF; thereafter the bearer alone fails closed. Google tokens and encryption keys never enter browser profile storage or server key storage. `sign.ts` gets identity from `/api/v1/auth/session`, never unverified JWT decoding. Browser tests use a dedicated D1 state, synthetic sessions with an HTTPS cookie source URL, and intercept the first OAuth-start request with `maxRedirects: 0`; redirect-target routing alone does not block the entire chain.

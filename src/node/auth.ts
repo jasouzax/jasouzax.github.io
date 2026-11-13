@@ -110,11 +110,17 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     const code = url.searchParams.get("code") ?? ""
     if (!code || code.length > 4096) return redirect_work("invalid_response")
     let identity: Identity
+    let id_token: string
     try {
-        const response = await (dependencies.fetch ?? fetch)("https://oauth2.googleapis.com/token", { method: "POST", redirect: "error", signal: AbortSignal.timeout(10000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri, grant_type: "authorization_code", code_verifier: flow.verifier }) })
+        // Workers only supports manual/follow. Never forward the code or secret to a redirect target.
+        const response = await (dependencies.fetch ?? fetch)("https://oauth2.googleapis.com/token", { method: "POST", redirect: "manual", signal: AbortSignal.timeout(10000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri, grant_type: "authorization_code", code_verifier: flow.verifier }) })
+        if (response.status >= 300 && response.status < 400) return redirect_work("token_exchange")
         const result = await response.json() as { id_token?: string, error?: string }
         if (!response.ok || !result.id_token) return redirect_work(result.error === "invalid_client" ? "client_configuration" : "token_exchange")
-        identity = await verify_google_token(result.id_token, env.GOOGLE_CLIENT_ID, flow.nonce, dependencies.keys)
+        id_token = result.id_token
+    } catch { return redirect_work("token_exchange_network") }
+    try {
+        identity = await verify_google_token(id_token, env.GOOGLE_CLIENT_ID, flow.nonce, dependencies.keys)
     } catch { return redirect_work("identity_verification") }
     const now = Date.now()
     await env.DB.prepare("INSERT INTO auth_users (subject, email, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(subject) DO UPDATE SET email = excluded.email, name = excluded.name").bind(identity.subject, identity.email, identity.name, now).run()

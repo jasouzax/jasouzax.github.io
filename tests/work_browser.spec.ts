@@ -1,6 +1,16 @@
 import { test, expect } from "@playwright/test"
 const owner_token = "work_browser_test_owner_01234567890123456789"
 
+test("Google callback errors remain visible after authentication refresh", async ({ page }) => {
+    await page.goto("/work?auth_error=token_exchange")
+    const status = page.locator('.desk_messages [role="status"]')
+    await expect(status).toContainText("token_exchange")
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent("jazu:auth")))
+    await expect(status).toContainText("token_exchange")
+    await page.reload()
+    await expect(status).toContainText("token_exchange")
+})
+
 test("owner and client chat through encrypted D1 with correct im addresses and safe retries", async ({ browser, page }) => {
     const errors: string[] = []
     page.on("pageerror", error => errors.push(error.message))

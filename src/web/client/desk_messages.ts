@@ -343,7 +343,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         const url = new URL(location.href)
         if (url.searchParams.has("auth_error")) {
             status.textContent = label("google_failed") + " (" + url.searchParams.get("auth_error") + ")"
-            url.searchParams.delete("auth_error"); history.replaceState(history.state, "", url.pathname + url.search + url.hash)
+            // Keep this non-secret code in the URL so a desk/auth refresh cannot erase the failure.
         }
     }
 
