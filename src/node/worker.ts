@@ -1,6 +1,7 @@
 import { api_error, secure_response, sign_origin, is_work_path } from "./security.ts"
 import { public_git_read } from "./git_read_proxy.ts"
 import { work_route, type Work_Env } from "./work.ts"
+import { auth_route } from "./auth.ts"
 
 type object_result = {
     body?: ReadableStream<Uint8Array>
@@ -151,8 +152,9 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         return new Response(response.body, { status: response.status, statusText: response.statusText, headers: output })
     }
     if (path === "/api" || path.startsWith("/api/")) {
+        if (path.startsWith("/api/v1/auth/")) return auth_route(request, env)
         if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
-        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && (env.WORK_OWNER_TOKEN?.length ?? 0) >= 32 ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
+        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && ((env.WORK_OWNER_TOKEN?.length ?? 0) >= 32 || (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)) ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
         if (path === "/api/v1/work" || path.startsWith("/api/v1/work/")) return work_route(request, env)
         const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
         if (read && projects.includes(read[2]) && request.method === "GET") {
@@ -186,8 +188,9 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
 
 export default {
     async fetch(request: Request, env: worker_env): Promise<Response> {
-        const work = is_work_path(new URL(request.url).pathname)
-        try { return secure_response(await route(request, env), work) }
-        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), work) }
+        const path = new URL(request.url).pathname
+        const private_response = is_work_path(path) || path.startsWith("/api/v1/auth/")
+        try { return secure_response(await route(request, env), private_response) }
+        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), private_response) }
     },
 }

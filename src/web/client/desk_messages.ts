@@ -7,6 +7,7 @@ import type { desk_window } from "./desk.ts"
 import { text, refresh_tab } from "./desk.ts"
 import { sync_navigation } from "./desk_navigation.ts"
 import { encrypt_message, decrypt_message, encode_key, decode_key, type Work_Envelope } from "../../work_crypto.ts"
+import { get_auth, sign_out, type Auth_State } from "./sign.ts"
 
 type Invitation = { room: string, token: string, key: string }
 type Message = { seq: number, id: string, author: "owner" | "client", envelope: Work_Envelope, created_at: number }
@@ -56,7 +57,7 @@ function recalled(room: string): Invitation | null {
 }
 
 function validate_invitation(value: Invitation): Invitation {
-    if (!value || typeof value.room !== "string" || !/^[a-f0-9-]{36}$/i.test(value.room) || typeof value.token !== "string" || !/^[A-Za-z0-9_-]{32,256}$/.test(value.token) || typeof value.key !== "string" || decode_key(value.key).length !== 32) throw new Error(label("invalid_invitation"))
+    if (!value || typeof value.room !== "string" || !/^[a-f0-9-]{36}$/i.test(value.room) || typeof value.token !== "string" || (value.token !== "" && !/^[A-Za-z0-9_-]{32,256}$/.test(value.token)) || typeof value.key !== "string" || decode_key(value.key).length !== 32) throw new Error(label("invalid_invitation"))
     return { room: value.room, token: value.token, key: value.key }
 }
 
@@ -82,11 +83,14 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
     let current: AbortController | null = null
     let timer: ReturnType<typeof setTimeout> | undefined
     let generation = 0
+    let auth: Auth_State = { user: null, csrf: "", google_enabled: false }
     const stop = () => { generation++; current?.abort(); clearTimeout(timer) }
     signal.addEventListener("abort", stop, { once: true })
 
     const api = async (path: string, token: string, body?: unknown, abort = signal): Promise<any> => {
-        const response = await fetch(path, { method: body === undefined ? "GET" : "POST", credentials: "omit", cache: "no-store", signal: AbortSignal.any([abort, AbortSignal.timeout(15000)]), headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "x-jazu-work": "1" }, body: body === undefined ? undefined : JSON.stringify(body) })
+        const headers: Record<string, string> = { "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }
+        if (token) headers.authorization = `Bearer ${token}`
+        const response = await fetch(path, { method: body === undefined ? "GET" : "POST", credentials: "same-origin", cache: "no-store", signal: AbortSignal.any([abort, AbortSignal.timeout(15000)]), headers, body: body === undefined ? undefined : JSON.stringify(body) })
         const data = await response.json()
         if (!response.ok) throw new Error(data.error?.message ?? label("unavailable"))
         return data
@@ -99,6 +103,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         stop(); owner_token = ""; invitations.clear(); pending.clear(); drafts.clear(); provisioning.clear()
         try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
         entry()
+        void sign_out().catch(error => { root.append(element("p", error_text(error))) })
     }
     const error_text = (error: unknown) => error instanceof Error ? error.message : label("unavailable")
 
@@ -119,7 +124,14 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             const toolbar = element("div", "", "desk_messages_toolbar")
             const heading = element("strong", owner ? info.room.email : info.owner_email)
             toolbar.append(heading, button(label("lock"), logout))
-            if (owner) toolbar.append(button(label("conversations"), () => void owner_rooms()))
+            if (owner || auth.user) toolbar.append(button(label("conversations"), () => void owner_rooms()))
+            if (!owner && auth.user && !info.room.google_bound) toolbar.append(button(label("link_google"), () => {
+                void api(`${base}/${invitation.room}/bind`, token, {}, abort).then(() => conversation(invitation, "", false)).catch(error => { status.textContent = error_text(error) })
+            }))
+            if (!auth.user && auth.google_enabled) {
+                const login = button(label("google_signin"), () => location.assign("/api/v1/auth/google/start"))
+                toolbar.append(login)
+            }
             const note = element("p", label("encrypted"), "desk_messages_notice")
             const log = element("ol", "", "desk_messages_log")
             log.setAttribute("role", "log"); log.setAttribute("aria-label", label("messages")); log.setAttribute("aria-live", "polite")
@@ -136,7 +148,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             root.replaceChildren(toolbar, note, empty, log, status, composer)
             if (owner) {
                 const tools = element("details", "", "desk_messages_tools")
-                tools.append(element("summary", label("invitation")))
+                tools.append(element("summary", label(invitation.token ? "invitation" : "shared_key")))
                 const backup = element("textarea")
                 backup.readOnly = true; backup.rows = 3; backup.value = invitation.token ? invitation_link(invitation) : invitation.key
                 backup.setAttribute("aria-label", label("invitation"))
@@ -212,7 +224,10 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             if (pending.has(invitation.room)) input.readOnly = true
             void poll()
         } catch (error) {
-            if (!abort.aborted) root.replaceChildren(element("p", error_text(error)), button(label("back"), entry))
+            if (!abort.aborted) {
+                root.replaceChildren(element("p", error_text(error)), button(label("back"), entry))
+                if (!auth.user && auth.google_enabled) root.append(button(label("google_signin"), () => location.assign("/api/v1/auth/google/start")))
+            }
         }
     }
 
@@ -227,11 +242,12 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             const heading = element("div", "", "desk_messages_toolbar")
             heading.append(element("strong", label("conversations")), button(label("lock"), logout))
             const list = element("ul", "", "desk_messages_rooms")
+            const owner = Boolean(owner_token) || auth.user?.role === "owner"
             for (const room of data.rooms as Room[]) {
                 const row = element("li")
                 row.append(button(room.email + (room.revoked ? ` (${label("closed")})` : ""), () => {
                     const saved = recalled(room.id)
-                    if (saved) { void conversation(saved, owner_token, true); return }
+                    if (saved) { void conversation(saved, owner_token, owner); return }
                     const form = element("form")
                     const key = field(form, label("shared_key"), "password")
                     const submit = element("button", label("open")); submit.type = "submit"
@@ -243,8 +259,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
                             if (key.value.includes("#")) invitation = import_invitation(key.value)
                             else { if (decode_key(key.value).length !== 32) throw new Error(label("invalid_invitation")); invitation = { room: room.id, token: "", key: key.value } }
                             if (invitation.room !== room.id) throw new Error(label("invalid_invitation"))
-                            invitations.set(room.id, invitation)
-                            void conversation(invitation, owner_token, true)
+                            remember(invitation)
+                            void conversation(invitation, owner_token, owner)
                         } catch (error) { status.textContent = error_text(error) }
                     })
                     row.replaceChildren(element("strong", room.email), form); key.focus()
@@ -273,8 +289,20 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
                     if (!signal.aborted && revision === generation) await conversation(invitation, owner_token, true)
                 })().catch(error => { status.textContent = error_text(error); create.disabled = false })
             })
-            status.textContent = label("owner_help")
-            root.replaceChildren(heading, status, list, form)
+            status.textContent = label(owner ? "owner_help" : "client_help")
+            root.replaceChildren(heading, status, list)
+            if (owner) root.append(form)
+            else {
+                const restore = element("form")
+                const link = field(restore, label("invitation"), "password")
+                const open = element("button", label("open")); open.type = "submit"; restore.append(open)
+                restore.addEventListener("submit", event => {
+                    event.preventDefault()
+                    try { const invitation = import_invitation(link.value); void conversation(invitation, invitation.token, false) }
+                    catch (error) { status.textContent = error_text(error) }
+                })
+                root.append(restore)
+            }
         } catch (error) {
             if (!signal.aborted && revision === generation) root.replaceChildren(element("p", error_text(error)), button(label("back"), entry))
         }
@@ -301,25 +329,46 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         login.addEventListener("submit", event => { event.preventDefault(); owner_token = token.value.trim(); token.value = ""; void owner_rooms() })
         owner.append(login)
         root.replaceChildren(element("h2", label("messages")), intro, form, status, owner)
+        if (auth.google_enabled) root.prepend(button(label("google_signin"), () => location.assign("/api/v1/auth/google/start")))
+        const url = new URL(location.href)
+        if (url.searchParams.has("auth_error")) {
+            status.textContent = label("google_failed") + " (" + url.searchParams.get("auth_error") + ")"
+            url.searchParams.delete("auth_error"); history.replaceState(history.state, "", url.pathname + url.search + url.hash)
+        }
     }
 
     if (!globalThis.isSecureContext || !crypto.subtle) { root.append(element("p", label("secure_context"))); return root }
-    try {
-        if (location.hash.startsWith("#room=")) {
-            const value = location.href
-            history.replaceState(history.state, "", location.pathname + location.search)
-            const invitation = import_invitation(value)
-            void conversation(invitation, invitation.token, false)
-        } else if (owner_token) void owner_rooms()
-        else {
-            let active = ""
-            try { active = sessionStorage.getItem("jazu_work_active") ?? "" } catch {}
-            const invitation = recalled(active)
-            let role = "client"
-            try { role = sessionStorage.getItem("jazu_work_role") ?? "client" } catch {}
-            if (invitation?.token && role !== "owner") void conversation(invitation, invitation.token, false)
-            else entry()
-        }
-    } catch { entry() }
+    const initialize = async () => {
+        const revision = generation
+        try {
+            const next = await get_auth()
+            if (auth.user && !next.user) { owner_token = ""; invitations.clear(); pending.clear(); drafts.clear(); provisioning.clear() }
+            auth = next
+        } catch { /* Invitations and emergency owner access still work without Google. */ }
+        if (signal.aborted || revision !== generation) return
+        try {
+            if (location.hash.startsWith("#room=")) {
+                const value = location.href
+                history.replaceState(history.state, "", location.pathname + location.search)
+                const invitation = import_invitation(value)
+                void conversation(invitation, auth.user?.role === "owner" ? "" : invitation.token, auth.user?.role === "owner")
+            } else if (owner_token || auth.user?.role === "owner") void owner_rooms()
+            else {
+                let active = ""
+                try { active = sessionStorage.getItem("jazu_work_active") ?? "" } catch {}
+                const invitation = recalled(active)
+                let role = "client"
+                try { role = sessionStorage.getItem("jazu_work_role") ?? "client" } catch {}
+                if (invitation && role !== "owner") void conversation(invitation, invitation.token, false)
+                else if (auth.user) void owner_rooms()
+                else entry()
+            }
+        } catch { entry() }
+    }
+    document.addEventListener("jazu:auth", () => { stop(); void initialize() }, { signal })
+    window.addEventListener("hashchange", () => {
+        if (location.hash.startsWith("#room=")) { stop(); void initialize() }
+    }, { signal })
+    void initialize()
     return root
 }

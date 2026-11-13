@@ -5,6 +5,7 @@
  */
 import { api_error } from "./security.ts"
 import { decode_key, type Work_Envelope } from "../work_crypto.ts"
+import { read_session, valid_csrf } from "./auth.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -16,8 +17,11 @@ export type Work_Env = {
     DB?: { prepare(sql: string): Work_Statement }
     WORK_OWNER_TOKEN?: string
     WORK_OWNER_EMAIL?: string
+    GOOGLE_CLIENT_ID?: string
+    GOOGLE_CLIENT_SECRET?: string
+    GOOGLE_ADMIN_EMAIL?: string
 }
-type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number }
+type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } })
@@ -53,17 +57,23 @@ function valid_envelope(value: unknown): value is Work_Envelope {
 }
 
 export async function work_route(request: Request, env: Work_Env): Promise<Response> {
-    if (!env.DB || !env.WORK_OWNER_TOKEN || env.WORK_OWNER_TOKEN.length < 32) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
+    if (!env.DB || (!(env.WORK_OWNER_TOKEN && env.WORK_OWNER_TOKEN.length >= 32) && !env.GOOGLE_CLIENT_ID)) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
     const url = new URL(request.url)
     if (request.headers.has("origin") && request.headers.get("origin") !== url.origin) return api_error("forbidden", "Use the workspace on this origin", 403)
     if (!["GET", "POST"].includes(request.method)) return api_error("method_not_allowed", "Use GET or POST", 405)
     if (request.method === "POST" && request.headers.get("x-jazu-work") !== "1") return api_error("forbidden", "Missing workspace request header", 403)
     const bearer = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,256})$/)?.[1]
-    if (!bearer) return api_error("unauthorized", "Open your invitation or enter the owner token", 401)
-    const hashed = await token_hash(bearer)
-    const owner = hashed === await token_hash(env.WORK_OWNER_TOKEN)
+    const session = await read_session(request, env)
+    if (!bearer && !session) return api_error("unauthorized", "Sign in with Google or open your invitation", 401)
+    if (request.method === "POST" && session && !valid_csrf(request, session)) return api_error("forbidden", "Refresh the workspace before making changes", 403)
+    const hashed = bearer ? await token_hash(bearer) : ""
+    const owner = bearer ? Boolean(env.WORK_OWNER_TOKEN && hashed === await token_hash(env.WORK_OWNER_TOKEN)) : session?.role === "owner"
     const base = "/api/v1/work/rooms"
     if (url.pathname === base) {
+        if (!owner && request.method === "GET" && session && !bearer) {
+            const { results } = await env.DB.prepare("SELECT id, email, created_at, revoked FROM work_rooms WHERE google_subject = ? AND revoked = 0 ORDER BY created_at DESC LIMIT 200").bind(session.subject).all()
+            return reply({ rooms: results, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
+        }
         if (!owner) return api_error("forbidden", "Owner access required", 403)
         if (request.method === "GET") {
             const { results } = await env.DB.prepare("SELECT id, email, created_at, revoked FROM work_rooms ORDER BY created_at DESC LIMIT 200").all()
@@ -85,16 +95,22 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
             return reply({ room: { id, email }, token, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" }, 201)
         } catch { return api_error("invalid_request", "Could not create conversation; check the email and request", 400) }
     }
-    const match = /^\/api\/v1\/work\/rooms\/([^/]+)(\/messages|\/revoke)?$/.exec(url.pathname)
+    const match = /^\/api\/v1\/work\/rooms\/([^/]+)(\/messages|\/revoke|\/bind)?$/.exec(url.pathname)
     if (!match || !uuid.test(match[1])) return api_error("not_found", "Unknown workspace route", 404)
     const room = await env.DB.prepare("SELECT * FROM work_rooms WHERE id = ?").bind(match[1]).first<Room>()
-    if (!room || (!owner && (room.revoked || room.token_hash !== hashed))) return api_error("not_found", "Conversation is unavailable", 404)
+    const client_access = room && !room.revoked && (bearer ? room.token_hash === hashed && (!room.google_subject || room.google_subject === session?.subject) : Boolean(session && room.google_subject === session.subject))
+    if (!room || (!owner && !client_access)) return api_error("not_found", "Conversation is unavailable; linked invitations require Google sign-in", 404)
+    if (match[2] === "/bind" && request.method === "POST") {
+        if (!session || session.role !== "client" || room.email !== session.email || !bearer || room.token_hash !== hashed || room.revoked) return api_error("forbidden", "Sign in with the Google email invited to this conversation", 403)
+        const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) RETURNING id").bind(session.subject, room.id, session.subject).first()
+        return linked ? reply({ linked: true }) : api_error("already_linked", "This conversation belongs to another Google account", 409)
+    }
     if (match[2] === "/revoke" && request.method === "POST") {
         if (!owner) return api_error("forbidden", "Owner access required", 403)
         await env.DB.prepare("UPDATE work_rooms SET revoked = 1 WHERE id = ?").bind(room.id).run()
         return reply({ revoked: true })
     }
-    if (!match[2] && request.method === "GET") return reply({ room: { id: room.id, email: room.email, revoked: room.revoked }, role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
+    if (!match[2] && request.method === "GET") return reply({ room: { id: room.id, email: room.email, revoked: room.revoked, google_bound: Boolean(room.google_subject) }, role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
     if (match[2] !== "/messages") return api_error("not_found", "Unknown workspace route", 404)
     if (request.method === "GET") {
         const after = url.searchParams.get("after") ?? "0"

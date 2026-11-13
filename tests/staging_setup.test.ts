@@ -18,4 +18,8 @@ test("staging setup maps existing private environment names and preserves explic
     assert.equal(env.TF_VAR_staging_pages_project, undefined, "production variable names must not override staging defaults")
     assert.equal(staging_environment({ HMAC_SECRET: "legacy-test" }, "/worker.js").TF_VAR_origin_hmac_secret, "legacy-test")
     assert.equal("TF_VAR_account_id" in source, false)
+    const google = staging_environment({ GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "google-test-secret", GOOGLE_ADMIN_EMAIL: "admin@example.com" }, "/worker.js")
+    assert.equal(google.TF_VAR_google_client_id, "test.apps.googleusercontent.com")
+    assert.equal(google.TF_VAR_google_client_secret, "google-test-secret")
+    assert.equal(google.TF_VAR_google_admin_email, "admin@example.com")
 })

@@ -2,7 +2,7 @@
 
 Plain TypeScript bundled by esbuild into IIFE scripts (classic scripts, not modules, so a wrong MIME type on `.js` cannot break them). No framework. Bundles produced by `bundle_runtime()` in `build.ts`: `page` (main), `theme_switch` (lazy), `desk_shell` (lazy shell registration), one `wasm_worker*` per program, and the inline `boot`. Back to [site developer guide](README.md).
 
-> Some file headers still say `client_desk_*.ts`, `jazu.config.ts` or `client_proc_types.ts`: those are generation-11 names. The files are now `desk_*.ts`, `proc_types.ts`, and `google_client_id` comes from the `GOOGLE_CLIENT_ID` environment variable at build time.
+> Some file headers still say `client_desk_*.ts`, `jazu.config.ts` or `client_proc_types.ts`: those are generation-11 names. The files are now `desk_*.ts` and `proc_types.ts`. Google sign-in uses the Worker's configured client/secret and `/api/v1/auth/session`; browser profile data is not trusted as authentication. See [the Work sign-in guide](../feat/work.md#google-sign-in).
 
 ## File map
 

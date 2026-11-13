@@ -45,6 +45,7 @@
     "@xterm/xterm": "^5.5.0",
     "diff": "^9.0.0",
     "esbuild": "^0.28.2",
+    "jose": "^6.2.17",
     "markdown-it": "^15.0.3",
     "parse5": "^8.1.0",
     "pdfjs-dist": "^6.5.438",

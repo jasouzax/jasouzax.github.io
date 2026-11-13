@@ -17,6 +17,10 @@
   },
   "languages": {
     "en": {
+      "work_google_signin": "Sign in with Google",
+      "work_link_google": "Link to my Google account",
+      "work_client_help": "Your linked conversations appear here. Open a conversation with its shared key, or restore an invitation to link it to your Google account.",
+      "work_google_failed": "Google sign-in did not complete. Please retry or report this code to the owner.",
       "work_messages": "Messages",
       "work_work_only": "Open /work to use encrypted messaging.",
       "work_invalid_invitation": "This invitation or shared key is invalid.",
@@ -244,6 +248,10 @@
       "conversion_unavailable": "No conversion from {from} to {to}"
     },
     "ja": {
+      "work_google_signin": "Googleでログイン",
+      "work_link_google": "Googleアカウントにリンク",
+      "work_client_help": "リンク済みの会話を表示します。共有鍵で会話を開くか、招待リンクを復元してGoogleアカウントにリンクしてください。",
+      "work_google_failed": "Googleログインが完了しませんでした。再試行するか、このコードを担当者に伝えてください。",
       "work_messages": "メッセージ",
       "work_work_only": "暗号化メッセージは /work で利用できます。",
       "work_invalid_invitation": "招待リンクまたは共有鍵が無効です。",
