@@ -33,6 +33,14 @@ function fixture() {
             async run() { return db.prepare(sql).run(...values) },
         }
         return statement
+    }, async batch(statements) {
+        db.exec("BEGIN")
+        try {
+            const results = []
+            for (const statement of statements) results.push(await statement.run())
+            db.exec("COMMIT")
+            return results
+        } catch (error) { db.exec("ROLLBACK"); throw error }
     } } }
     const request = (path: string, cookie = "", body?: unknown, extra: Record<string, string> = {}) => new Request(origin + path, { method: body === undefined ? "GET" : "POST", headers: { cookie, origin, "content-type": "application/json", "x-jazu-work": "1", ...extra }, body: body === undefined ? undefined : JSON.stringify(body) })
     const start = async () => {
@@ -139,5 +147,57 @@ test("Google clients must possess an invitation to link a room, then its bearer 
         assert.equal(other_list.rooms.length, 0)
         f.db.prepare("UPDATE auth_sessions SET last_seen = 0").run()
         assert.equal((await (await auth_route(f.request("/api/v1/auth/session", client.cookie), f.env)).json() as any).user, null)
+    } finally { f.db.close() }
+})
+
+
+test("account deletion requires CSRF and explicit intent, revokes all devices and anonymizes only its linked rooms", async () => {
+    const f = fixture()
+    try {
+        const admin = await f.login("jason@jasouza.com", "owner")
+        const client = await f.login("client@example.com", "client")
+        const second_device = await f.login("client@example.com", "client")
+        const other = await f.login("other@example.com", "other")
+        const room = crypto.randomUUID()
+        const other_room = crypto.randomUUID()
+        f.db.prepare("INSERT INTO work_rooms (id,email,token_hash,created_at,google_subject) VALUES (?, ?, ?, ?, ?)").run(room, "client@example.com", "old-token-hash", Date.now(), "client")
+        f.db.prepare("INSERT INTO work_rooms (id,email,token_hash,created_at,google_subject) VALUES (?, ?, ?, ?, ?)").run(other_room, "other@example.com", "other-token-hash", Date.now(), "other")
+        f.db.prepare("INSERT INTO work_messages (room_id,id,author,envelope,created_at) VALUES (?, ?, 'client', '{}', ?)").run(room, crypto.randomUUID(), Date.now())
+        const path = "/api/v1/auth/account/delete"
+        const headers = { "x-jazu-csrf": client.session.csrf, "x-jazu-confirm-delete": "account" }
+        assert.equal((await auth_route(f.request(path, "", {}, headers), f.env)).status, 403)
+        assert.equal((await auth_route(f.request(path, client.cookie, {}, { "x-jazu-csrf": client.session.csrf }), f.env)).status, 403)
+        assert.equal((await auth_route(f.request(path, client.cookie, {}, { ...headers, origin: "https://evil.example" }), f.env)).status, 403)
+        const deleted = await auth_route(f.request(path, client.cookie, {}, headers), f.env)
+        assert.equal(deleted.status, 200)
+        assert.match(deleted.headers.get("set-cookie")!, /Max-Age=0/)
+        assert.equal(f.db.prepare("SELECT subject FROM auth_users WHERE subject = 'client'").get(), undefined)
+        assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_sessions WHERE subject = 'client'").get() as any).n, 0)
+        assert.equal((await (await auth_route(f.request("/api/v1/auth/session", second_device.cookie), f.env)).json() as any).user, null)
+        const closed = f.db.prepare("SELECT * FROM work_rooms WHERE id = ?").get(room) as any
+        assert.equal(closed.revoked, 1)
+        assert.equal(closed.google_subject, null)
+        assert.notEqual(closed.email, "client@example.com")
+        assert.match(closed.token_hash, /^deleted:/)
+        assert.equal((f.db.prepare("SELECT count(*) AS n FROM work_messages WHERE room_id = ?").get(room) as any).n, 1)
+        assert.equal((await work_route(f.request(`/api/v1/work/rooms/${room}`, admin.cookie), f.env)).status, 200)
+        assert.equal((await work_route(f.request(`/api/v1/work/rooms/${other_room}`, other.cookie), f.env)).status, 200)
+        const admin_delete = await auth_route(f.request(path, admin.cookie, {}, { "x-jazu-csrf": admin.session.csrf, "x-jazu-confirm-delete": "account" }), f.env)
+        assert.equal(admin_delete.status, 200)
+        assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_owner").get() as any).n, 0)
+        assert.ok(f.db.prepare("SELECT subject FROM auth_users WHERE subject = 'other'").get())
+    } finally { f.db.close() }
+})
+
+test("account deletion rolls back every change if the transaction fails", async () => {
+    const f = fixture()
+    try {
+        const client = await f.login("client@example.com", "client")
+        const room = crypto.randomUUID()
+        f.db.prepare("INSERT INTO work_rooms (id,email,token_hash,created_at,google_subject) VALUES (?, 'client@example.com', 'keep-token', ?, 'client')").run(room, Date.now())
+        f.db.exec("CREATE TRIGGER reject_delete BEFORE DELETE ON auth_users BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END")
+        await assert.rejects(auth_route(f.request("/api/v1/auth/account/delete", client.cookie, {}, { "x-jazu-csrf": client.session.csrf, "x-jazu-confirm-delete": "account" }), f.env))
+        assert.equal((f.db.prepare("SELECT revoked FROM work_rooms WHERE id = ?").get(room) as any).revoked, 0)
+        assert.equal((await (await auth_route(f.request("/api/v1/auth/session", client.cookie), f.env)).json() as any).user.email, "client@example.com")
     } finally { f.db.close() }
 })

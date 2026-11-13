@@ -73,6 +73,21 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response
     }
+    if (url.pathname === "/api/v1/auth/account/delete" && request.method === "POST") {
+        const session = await read_session(request, env)
+        if (!session || !valid_csrf(request, session) || request.headers.get("x-jazu-confirm-delete") !== "account") return api_error("forbidden", "Confirm account deletion from the signed-in account menu", 403)
+        if (!env.DB.batch) return api_error("unavailable", "Account deletion is temporarily unavailable", 503)
+        // A single transaction revokes every device and invitation while preserving the other participant's encrypted history.
+        await env.DB.batch([
+            env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_sessions WHERE subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_users WHERE subject = ?").bind(session.subject),
+        ])
+        const response = reply({ deleted: true })
+        response.headers.set("set-cookie", cookie(session_cookie, "", 0))
+        return response
+    }
     if (request.method !== "GET") return api_error("method_not_allowed", "Use GET", 405)
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_ADMIN_EMAIL) return api_error("auth_unconfigured", "Google sign-in is not configured", 503)
     const redirect_uri = `${url.origin}${callback_path}`

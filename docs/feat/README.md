@@ -186,6 +186,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Static `/work` shell served with `no-referrer`/`no-store`
   - [x] Shared-key encrypted text chat: owner-created invitations, tenant authorization, idempotent sends, catch-up polling, invitation revocation and `message/cpim` / `im:` windows
   - [x] Google OIDC code flow, verified identities, pinned admin subject, hashed HttpOnly sessions, CSRF, sign-out and invitation-to-Google linking
+  - [x] Signed-in sign-out/account deletion controls, confirmation, all-device revocation and atomic profile deletion with closed/anonymized client links
   - [x] D1 schema and migration for clients, sessions, messages, files, receipts, pins, dashboards, desk state and audit; tests enforce idempotency and cross-tenant pin constraints
   - [x] Unfinished work APIs return `501` and accept no client data
   - [ ] Google JWT verification, UUID claim, hashed cookie sessions, tenant filtering, CSRF and rate limits (4.5)

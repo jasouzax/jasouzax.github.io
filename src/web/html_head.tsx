@@ -220,15 +220,24 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
         ctx.page.path === `/projects/${node.attrs.id}` && ctx.lang === node.attrs.lang)
     const account = (
         <>
-        <li class="list_drop_li">
+        <li class="list_drop_li" data-auth="guest">
             <button
                 type="button"
                 data-sign="google"
-                data-client={ctx.model.config.google_client_id}
-                data-out-text={t(ctx, "sign_out")}
             >
                 {glyph(ctx, "[google]", "list_drop_icon")}
                 <span class="sign_text">{t(ctx, "sign_google")}</span>
+            </button>
+        </li>
+        <li class="list_drop_li" data-auth="user" hidden="true">
+            <button type="button" data-sign="out" title={t(ctx, "sign_out_google_title")}>
+                {glyph(ctx, "[google]", "list_drop_icon")}
+                <span class="sign_text">{t(ctx, "sign_out_google")}</span>
+            </button>
+        </li>
+        <li class="list_drop_li" data-auth="user" hidden="true">
+            <button type="button" data-sign="delete" data-confirm={t(ctx, "delete_account_confirm")}>
+                <span class="sign_text">{t(ctx, "delete_account")}</span>
             </button>
         </li>
         <li class="list_drop_separator" role="separator" />

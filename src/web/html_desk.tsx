@@ -515,6 +515,10 @@ function render_map(ctx: render_ctx, node: xml_node): html {
 
 // Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
+    "sign_out_google",
+    "sign_out_google_title",
+    "delete_account",
+    "delete_account_confirm",
     "new_window",
     "no_mime",
     "filter_mimes",

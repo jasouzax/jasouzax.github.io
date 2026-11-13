@@ -15,15 +15,16 @@ export function get_auth(): Promise<Auth_State> {
 }
 
 function paint(): void {
-    for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-sign="google"]')) {
-        const text = button.querySelector<HTMLElement>(".sign_text")
-        if (!text) continue
-        const idle = button.dataset.idle ?? text.textContent ?? ""
-        button.dataset.idle = idle
-        button.dataset.signed = current?.user ? "out" : "in"
-        text.textContent = current?.user ? `${button.dataset.outText ?? "Sign out"} (${current.user.name})` : idle
-        button.title = current?.user?.email ?? ""
-    }
+    const signed_in = Boolean(current?.user)
+    for (const item of document.querySelectorAll<HTMLElement>("[data-auth]")) item.hidden = (item.dataset.auth === "user") !== signed_in
+}
+
+function clear_identity(google_enabled: boolean): void {
+    current = { user: null, csrf: "", google_enabled }
+    pending = Promise.resolve(current)
+    try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
+    paint()
+    document.dispatchEvent(new Event("jazu:auth"))
 }
 
 export async function sign_out(): Promise<void> {
@@ -32,11 +33,15 @@ export async function sign_out(): Promise<void> {
         const response = await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers: { "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }, signal: AbortSignal.timeout(10000) })
         if (!response.ok) throw new Error("Could not sign out; please try again")
     }
-    current = { user: null, csrf: "", google_enabled: auth.google_enabled }
-    pending = Promise.resolve(current)
-    try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
-    paint()
-    document.dispatchEvent(new Event("jazu:auth"))
+    clear_identity(auth.google_enabled)
+}
+
+async function delete_account(): Promise<void> {
+    const auth = await get_auth()
+    if (!auth.user) throw new Error("Sign in before deleting your account")
+    const response = await fetch("/api/v1/auth/account/delete", { method: "POST", credentials: "same-origin", headers: { "x-jazu-work": "1", "x-jazu-csrf": auth.csrf, "x-jazu-confirm-delete": "account" }, signal: AbortSignal.timeout(15000) })
+    if (!response.ok) throw new Error("Could not delete the account; please try again")
+    clear_identity(auth.google_enabled)
 }
 
 export function init_sign(): void {
@@ -44,13 +49,15 @@ export function init_sign(): void {
     try { localStorage.removeItem("jazu_user"); sessionStorage.removeItem("jazu_nonce") } catch {}
     void get_auth().then(() => { paint(); document.dispatchEvent(new Event("jazu:auth")) }).catch(() => {})
     document.addEventListener("click", event => {
-        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-sign="google"]')
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-sign]")
         if (!button) return
         event.preventDefault()
         button.disabled = true
         void get_auth().then(async auth => {
-            if (auth.user) await sign_out()
-            else {
+            if (button.dataset.sign === "out") await sign_out()
+            else if (button.dataset.sign === "delete") {
+                if (auth.user && button.dataset.confirm && window.confirm(button.dataset.confirm)) await delete_account()
+            } else if (button.dataset.sign === "google" && !auth.user) {
                 if (!auth.google_enabled) throw new Error("Google sign-in is not configured on this site")
                 location.assign("/api/v1/auth/google/start")
             }

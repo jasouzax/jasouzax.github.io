@@ -104,6 +104,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Account controls:** `data-auth="guest|user"` gates header rows; Work uses the same `data-sign="out|delete"` actions. Account deletion uses a CSRF/intent-protected D1 `batch` transaction to revoke all sessions, anonymize/close linked rooms, and remove the profile/admin binding. Preserve shared encrypted history and unrelated clients. Never test deletion against a real user's account; synthetic SQLite/D1 browser fixtures cover confirmation, rollback and tenant isolation.
+
 - **Google authentication:** `node/auth.ts` owns full-page OIDC code/PKCE/nonce flow and `__Host-` HttpOnly sessions (migration 0003). `GOOGLE_ADMIN_EMAIL` bootstraps a pinned Google subject; OAuth project ownership grants no app role. Client linking requires the invited email, Google session, invitation bearer and CSRF; thereafter the bearer alone fails closed. Google tokens and encryption keys never enter browser profile storage or server key storage. `sign.ts` gets identity from `/api/v1/auth/session`, never unverified JWT decoding. Browser tests use a dedicated D1 state, synthetic sessions with an HTTPS cookie source URL, and intercept the first OAuth-start request with `maxRedirects: 0`; redirect-target routing alone does not block the entire chain.
 
 - **Work canonical paths:** Pages redirects `/work` to `/work/`. Use `is_work_path()` in origin forwarding and security wrappers so trailing slashes and `/work/index.json` strip query secrets and retain `no-store`/`no-referrer`, including errors. Keep generated `/work/*` headers equally private. Browser tests must wait for `#main-content` to leave `inert` after boot; otherwise Playwright fill can report success while typing nowhere.

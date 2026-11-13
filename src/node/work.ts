@@ -14,7 +14,7 @@ export type Work_Statement = {
     run(): Promise<unknown>
 }
 export type Work_Env = {
-    DB?: { prepare(sql: string): Work_Statement }
+    DB?: { prepare(sql: string): Work_Statement, batch?(statements: Work_Statement[]): Promise<unknown> }
     WORK_OWNER_TOKEN?: string
     WORK_OWNER_EMAIL?: string
     GOOGLE_CLIENT_ID?: string

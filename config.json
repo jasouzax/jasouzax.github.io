@@ -17,6 +17,10 @@
   },
   "languages": {
     "en": {
+      "sign_out_google": "Sign out of Google",
+      "sign_out_google_title": "Sign out of this website; your Google account remains signed in to Google.",
+      "delete_account": "Delete Account",
+      "delete_account_confirm": "Delete your account on this website? This removes your profile, signs out all devices, and closes and anonymizes your linked client conversations. Shared encrypted message history remains available to the owner. Other clients are unaffected. Your Google account is not deleted.",
       "work_google_signin": "Sign in with Google",
       "work_link_google": "Link to my Google account",
       "work_client_help": "Your linked conversations appear here. Open a conversation with its shared key, or restore an invitation to link it to your Google account.",
@@ -248,6 +252,10 @@
       "conversion_unavailable": "No conversion from {from} to {to}"
     },
     "ja": {
+      "sign_out_google": "Googleからログアウト",
+      "sign_out_google_title": "このサイトからログアウトします。Google自体のログイン状態は変わりません。",
+      "delete_account": "アカウントを削除",
+      "delete_account_confirm": "このサイトのアカウントを削除しますか？プロフィールを削除し、すべての端末からログアウトし、リンク済みの会話を終了して匿名化します。共有の暗号化メッセージ履歴はオーナー側に残ります。他のクライアントには影響しません。Googleアカウント自体は削除されません。",
       "work_google_signin": "Googleでログイン",
       "work_link_google": "Googleアカウントにリンク",
       "work_client_help": "リンク済みの会話を表示します。共有鍵で会話を開くか、招待リンクを復元してGoogleアカウントにリンクしてください。",

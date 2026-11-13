@@ -15,6 +15,7 @@
 - [x] Unfinished work APIs return `501` and accept no client data
 - [x] Shared-key encrypted text chat: owner-created invitations, tenant authorization, idempotent sends, catch-up polling, invitation revocation and `message/cpim` / `im:` windows
 - [x] Google OIDC code flow, verified identities, pinned admin subject, hashed HttpOnly sessions, CSRF, sign-out and invitation-to-Google linking
+- [x] Signed-in sign-out/account deletion controls, confirmation, all-device revocation and atomic profile deletion with closed/anonymized client links
 - [ ] Google JWT verification, UUID claim, hashed cookie sessions, tenant filtering, CSRF and rate limits (4.5)
 - [ ] Chat idempotency, reconnect, soft deletion, file upload policy, owner audit and mail debounce (4.6)
 - [ ] Per-client durable chat and database API adapters
@@ -34,6 +35,12 @@ Invitation secrets travel in the URL fragment, which is removed from browser his
 
 The Worker authenticates each request, derives the author, enforces same-origin mutations and a custom header, accepts bounded ciphertext only, and stores client token hashes in D1. Signed-in clients can list only their linked rooms. Sends have UUID idempotency and a durable 30-message/minute/role/room limit. The browser retains an unacknowledged encrypted envelope for explicit retry, polls every five seconds with backoff to thirty, and catches up by database sequence, 100 messages per page. Messaging works with the personal server offline. WebSockets, attachments, edits/deletes, audit, authentication rate limits and notification email remain future work.
 
+### Account controls and deletion
+
+When signed out, the account menu shows **Sign in with Google**. Signing in hides that action and shows **Sign out of Google** and **Delete Account**, both in the account menu and the Work toolbar. Sign-out ends this website session and clears this tab's invitations; it does not sign the user out of Google globally.
+
+**Delete Account** requires confirmation and an authenticated, same-origin CSRF-protected POST to `/api/v1/auth/account/delete`, plus an explicit deletion-intent header. One D1 transaction removes the current account profile and admin binding, revokes every device session, and closes/anonymizes its linked client rooms while invalidating their invitation tokens. Shared encrypted message history remains available to the owner, and other clients are unaffected. Deleting the admin account does not delete client accounts or their conversations. Signing in again creates a new website account; the configured admin email can bootstrap the admin binding again. The Google account itself is never deleted. Tests cover cancel/confirm behavior, tenant isolation, all-device revocation, retained shared history and transaction rollback.
+
 ### Google sign-in
 
 `src/node/auth.ts` implements `/api/v1/auth/google/start`, `/api/v1/auth/google/callback`, `/api/v1/auth/session` and `/api/v1/auth/logout`. This is a full-page OIDC authorization-code flow with 256-bit state, a separate browser-binding cookie, PKCE S256 and a nonce. State expires in ten minutes and is atomically consumed once. `jose` verifies Google's RS256 signature, issuer, audience, authorized party, token age, verified email and nonce against Google's pinned JWKS endpoint. Access/ID tokens are not retained or returned to the browser. Opaque session tokens are hashed in D1 and sent only as `__Host-`, HttpOnly, Secure, SameSite=Lax cookies. Sessions expire after thirty idle days; authenticated mutations need the same-origin CSRF token returned by the session API. Sign-out revokes the current session and clears this tab's stored invitations.
@@ -48,7 +55,7 @@ Code: `src/work_crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_mes
 
 Set the Google values above, plus an optional `WORK_OWNER_TOKEN` emergency credential, in the private `.env`. Run `npm run tf:staging -- plan` / `apply` from the `staging` checkout. The standalone root creates `jazu-staging-work`, applies SQL migrations and binds D1/credentials to the staging Worker. Production resources are untouched. Publish the static shell through staging CI. Locally, put credentials in `.dev.vars`, register the local backend callback if testing with real Google, then run `npm run db:local`, `npm run serve`, and `npm run cloud:dev`. Never deploy the local Wrangler config.
 
-Verified locally: TypeScript, content validation (37 existing description warnings), staging Terraform validation/mocked tests, and the full Node suite with `--test-concurrency=2` (192 passed, four POSIX-only skips, zero failures). Browser tests against real local Worker/D1 cover desktop/mobile encrypted chat, Google-session admin/client separation, linking, sign-out, reloads, both `im:` addresses, a lost send acknowledgement with deduplicated retry, inert text rendering, mobile width, and the exact OAuth code-flow redirect. Google signature verification uses real RSA signatures in unit tests. Browser authentication sessions are synthetic fixtures; real Google account consent remains a user action.
+Verified locally: TypeScript, content validation (37 existing description warnings), staging Terraform validation/mocked tests, and the full Node suite with `--test-concurrency=2` (194 passed, four POSIX-only skips, zero failures). Browser tests against real local Worker/D1 cover desktop/mobile encrypted chat, Google-session admin/client separation, linking, sign-out, reloads, both `im:` addresses, a lost send acknowledgement with deduplicated retry, inert text rendering, mobile width, and the exact OAuth code-flow redirect. Google signature verification uses real RSA signatures in unit tests. Browser authentication sessions are synthetic fixtures; real Google account consent remains a user action.
 
 Suggested next features: encrypted attachments with size limits, read/unread indicators, browser-side history search and secure invitation rotation/device management.
 

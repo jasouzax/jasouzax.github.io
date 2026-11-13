@@ -106,6 +106,14 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         void sign_out().catch(error => { root.append(element("p", error_text(error))) })
     }
     const error_text = (error: unknown) => error instanceof Error ? error.message : label("unavailable")
+    const account_controls = (toolbar: HTMLElement) => {
+        if (!auth.user) { toolbar.append(button(label("lock"), logout)); return }
+        const out = element("button", text("sign_out_google")); out.type = "button"
+        out.dataset.sign = "out"; out.title = text("sign_out_google_title")
+        const remove = element("button", text("delete_account")); remove.type = "button"
+        remove.dataset.sign = "delete"; remove.dataset.confirm = text("delete_account_confirm")
+        toolbar.append(out, remove)
+    }
 
     const conversation = async (invitation: Invitation, token: string, owner: boolean): Promise<void> => {
         stop()
@@ -123,7 +131,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             address(owner ? info.room.email : info.owner_email)
             const toolbar = element("div", "", "desk_messages_toolbar")
             const heading = element("strong", owner ? info.room.email : info.owner_email)
-            toolbar.append(heading, button(label("lock"), logout))
+            toolbar.append(heading)
+            account_controls(toolbar)
             if (owner || auth.user) toolbar.append(button(label("conversations"), () => void owner_rooms()))
             if (!owner && auth.user && !info.room.google_bound) toolbar.append(button(label("link_google"), () => {
                 void api(`${base}/${invitation.room}/bind`, token, {}, abort).then(() => conversation(invitation, "", false)).catch(error => { status.textContent = error_text(error) })
@@ -240,7 +249,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             const data = await api(base, owner_token)
             if (signal.aborted || revision !== generation) return
             const heading = element("div", "", "desk_messages_toolbar")
-            heading.append(element("strong", label("conversations")), button(label("lock"), logout))
+            heading.append(element("strong", label("conversations")))
+            account_controls(heading)
             const list = element("ul", "", "desk_messages_rooms")
             const owner = Boolean(owner_token) || auth.user?.role === "owner"
             for (const room of data.rooms as Room[]) {
