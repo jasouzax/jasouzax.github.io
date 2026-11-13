@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync, symlinkSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { docker_options, refresh_content, restore_inputs } from "../ops/docker/entry.ts"
@@ -70,7 +70,15 @@ test("personal bootstrap restores missing artifacts into tracked build directori
         writeFileSync(join(image, "build/tool/tool.wasm"), "compiled artifact")
         writeFileSync(join(image, "content/media/photo.png"), "image photo")
         writeFileSync(join(work, "content/media/photo.png"), "owner photo")
+        mkdirSync(join(image, "build/alias/custom"), { recursive: true })
+        mkdirSync(join(work, "build/alias/custom"), { recursive: true })
+        symlinkSync("../../tool/custom/tool.c", join(image, "build/alias/custom/tool.c"), "file")
+        writeFileSync(join(work, "build/alias/custom/tool.c"), "newer alias source")
+        symlinkSync("missing", join(work, "build/tool/owner-link"), "file")
+        writeFileSync(join(image, "build/tool/owner-link"), "image file")
         restore_inputs(image, work)
+        assert.equal(readFileSync(join(work, "build/alias/custom/tool.c"), "utf8"), "newer alias source")
+        assert.ok(lstatSync(join(work, "build/tool/owner-link")).isSymbolicLink())
         assert.equal(readFileSync(join(work, "build/tool/tool.wasm"), "utf8"), "compiled artifact")
         assert.equal(readFileSync(join(work, "build/tool/custom/tool.c"), "utf8"), "newer Git source")
         assert.equal(readFileSync(join(work, "content/media/photo.png"), "utf8"), "owner photo")
