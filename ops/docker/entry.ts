@@ -5,11 +5,12 @@
  */
 import { spawn, spawnSync } from "node:child_process"
 import { randomBytes, createHash } from "node:crypto"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, lstatSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, lstatSync, realpathSync, readlinkSync, statSync, unlinkSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { serve } from "../../src/node/serve.ts"
 import { load_project_declarations } from "../../src/node/project_catalog.ts"
+import { inside } from "../../src/paths.ts"
 
 const application = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 export type Docker_Options = { personal: boolean, runner: boolean, content?: string, config?: string, data: string, host: string, port: number, base_url?: string }
@@ -45,7 +46,11 @@ export function refresh_content(source: string, root: string): void {
     mkdirSync(root, { recursive: true })
     const pending = mkdtempSync(join(root, ".content-"))
     try {
-        cpSync(source, pending, { recursive: true })
+        const origin = realpathSync(source)
+        cpSync(source, pending, { recursive: true, dereference: true, filter: path => {
+            if (!inside(origin, realpathSync(path))) throw new Error(`Custom content symlink escapes its mounted directory: ${path}`)
+            return true
+        } })
         rmSync(join(root, "content"), { recursive: true, force: true })
         renameSync(pending, join(root, "content"))
     } finally { rmSync(pending, { recursive: true, force: true }) }
@@ -67,10 +72,20 @@ export function custom_site(options: Docker_Options): string {
 }
 
 export function restore_inputs(image: string, work: string): void {
+    const repair_image_links = (path: string): void => {
+        let stat
+        try { stat = lstatSync(path) } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return; throw error }
+        if (stat.isSymbolicLink()) {
+            const target = resolve(dirname(path), readlinkSync(path))
+            // Earlier images copied their deduplication links into /data. Materialize those links before restoring.
+            if (inside(resolve(image), target)) unlinkSync(path)
+        } else if (stat.isDirectory()) for (const name of readdirSync(path)) repair_image_links(join(path, name))
+    }
     for (const name of ["build", "content/media"]) if (existsSync(join(image, name))) {
         // Git tracks custom compiler sources inside build/; its existence does not mean artifacts were restored.
-        cpSync(join(image, name), join(work, name), { recursive: true, force: false, errorOnExist: false, filter: (source, destination) => {
-            try { const destination_stat = lstatSync(destination); return destination_stat.isDirectory() && lstatSync(source).isDirectory() }
+        repair_image_links(join(work, name))
+        cpSync(join(image, name), join(work, name), { recursive: true, dereference: true, force: false, errorOnExist: false, filter: (source, destination) => {
+            try { const destination_stat = lstatSync(destination); return destination_stat.isDirectory() && statSync(source).isDirectory() }
             catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return true; throw error }
         } })
     }

@@ -76,11 +76,36 @@ test("personal bootstrap restores missing artifacts into tracked build directori
         writeFileSync(join(work, "build/alias/custom/tool.c"), "newer alias source")
         symlinkSync("missing", join(work, "build/tool/owner-link"), "file")
         writeFileSync(join(image, "build/tool/owner-link"), "image file")
+        symlinkSync("tool.wasm", join(image, "build/tool/shared.wasm"), "file")
+        symlinkSync(join(image, "build/tool/tool.wasm"), join(work, "build/tool/image-link.wasm"), "file")
+        writeFileSync(join(image, "build/tool/image-link.wasm"), "repaired artifact")
         restore_inputs(image, work)
+        assert.equal(lstatSync(join(work, "build/tool/shared.wasm")).isSymbolicLink(), false)
+        assert.equal(readFileSync(join(work, "build/tool/shared.wasm"), "utf8"), "compiled artifact")
+        assert.equal(lstatSync(join(work, "build/tool/image-link.wasm")).isSymbolicLink(), false)
+        assert.equal(readFileSync(join(work, "build/tool/image-link.wasm"), "utf8"), "repaired artifact")
         assert.equal(readFileSync(join(work, "build/alias/custom/tool.c"), "utf8"), "newer alias source")
         assert.ok(lstatSync(join(work, "build/tool/owner-link")).isSymbolicLink())
         assert.equal(readFileSync(join(work, "build/tool/tool.wasm"), "utf8"), "compiled artifact")
         assert.equal(readFileSync(join(work, "build/tool/custom/tool.c"), "utf8"), "newer Git source")
         assert.equal(readFileSync(join(work, "content/media/photo.png"), "utf8"), "owner photo")
+    } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+
+test("custom snapshots materialize internal links and reject links escaping the content directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "jazu_content_links_")), source = join(root, "source"), work = join(root, "work")
+    mkdirSync(source)
+    try {
+        writeFileSync(join(source, "photo.txt"), "public image")
+        symlinkSync("photo.txt", join(source, "alias.txt"), "file")
+        refresh_content(source, work)
+        assert.equal(lstatSync(join(work, "content/alias.txt")).isSymbolicLink(), false)
+        assert.equal(readFileSync(join(work, "content/alias.txt"), "utf8"), "public image")
+        writeFileSync(join(root, "private.txt"), "private")
+        symlinkSync(join(root, "private.txt"), join(source, "outside.txt"), "file")
+        assert.throws(() => refresh_content(source, work), /symlink escapes/)
+        assert.equal(existsSync(join(work, "content/outside.txt")), false)
+        assert.equal(readFileSync(join(work, "content/photo.txt"), "utf8"), "public image")
     } finally { rmSync(root, { recursive: true, force: true }) }
 })
