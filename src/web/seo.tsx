@@ -352,7 +352,7 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "font-src 'self'",
         "media-src 'self' blob:",
         "connect-src 'self' https://*.googleapis.com https://accounts.google.com",
-        "frame-src https://accounts.google.com",
+        "frame-src 'self' blob: https://accounts.google.com",
         "frame-ancestors 'none'"
     ].join("; ")
     const text = (path: string, type: string, age: number): string[] => [

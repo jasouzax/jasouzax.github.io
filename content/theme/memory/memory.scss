@@ -3216,3 +3216,12 @@
     background: color-mix(in srgb, var(--accent, #3b82f6) 35%, transparent);
     -webkit-text-fill-color: transparent;
 }
+
+// Split resources retain their own viewport; comparison annotations sit underneath the editing surface.
+.desk_mirror_body { display: contents; }
+.desk_preview { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.desk_preview iframe { flex: 1; width: 100%; min-height: 12em; border: 0; background: white; }
+.desk_preview a, .desk_preview_status { padding: .5em; }
+.desk_diff_line { position: relative; }
+.desk_diff_added { background: #157b3638; box-shadow: inset 3px 0 #22883f; }
+.desk_diff_removed::after { content: "\25bc"; position: absolute; left: 0; bottom: -.4em; color: #d32f2f; font-size: .65em; }

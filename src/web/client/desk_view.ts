@@ -11,7 +11,9 @@ import { markdown_body } from "./desk_markdown.ts"
 import { folder_body } from "./desk_folder.ts"
 import { bind_navigation, sync_navigation } from "./desk_navigation.ts"
 import { desk_drag_type } from "./desk_fs.ts"
-import { link_hooks, refresh_children } from "./desk_flow.ts"
+import { link_hooks, refresh_children, flow_kind_of, document_of, latest_bytes, announce_edit, subscribe_edits, forget_edits, is_dirty, accept_save } from "./desk_flow.ts"
+import { html_body, pdf_body, image_pdf_body } from "./desk_preview.ts"
+import { comparison_lines } from "./desk_compare.ts"
 import { no_picks } from "./desk_flow_rules.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
@@ -105,6 +107,10 @@ export function fill_mime_list(item: desk_window, query: string = ""): void {
 
 export function set_mime(item: desk_window, mime: string): void {
     if (item.parent) item.picks.mime = true
+    if (flow_kind_of(item) === "convert") {
+        item.file = null; item.path = item.name = ""; item.save = null
+        forget_edits(item)
+    }
     item.mime = mime
     item.icon = mime_icon(mime)
     render_window(item)
@@ -146,6 +152,9 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
     const file = item.file!
     if (file.size > edit_limit) return too_large(item)
     const editable = item.mode === "edit"
+    const signal = renders.get(item)!.signal
+    const comparing = flow_kind_of(item) === "compare" && item.parent?.mime.startsWith("text/") && item.mime.startsWith("text/") && !!item.parent.file && item.parent.file.size <= edit_limit
+    let source_text: string | null = null
     const box = document.createElement("div")
     box.className = "desk_wbox_body_text"
     const part = (tag: string, name: string): HTMLElement => {
@@ -195,7 +204,20 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
     const draw = (): void => {
         const value = area.value
         const map = token_map(value, item.mime)
-        holder.classList.toggle("is_coloured", map !== null)
+        holder.classList.toggle("is_coloured", map !== null || !!comparing)
+        if (comparing && source_text !== null) {
+            const changes = comparison_lines(source_text, value)
+            layer.replaceChildren(...value.split("\n").map((value, index) => {
+                const row = document.createElement("span")
+                row.className = "desk_diff_line"
+                if (changes.added.has(index)) row.classList.add("desk_diff_added")
+                const removed = changes.removed.get(index)
+                if (removed) { row.classList.add("desk_diff_removed"); row.dataset.removed = String(removed); row.title = `${removed} removed line(s)` }
+                row.textContent = value + "\n"
+                return row
+            }))
+            box.dataset.comparison = changes.limited ? "limited" : "ready"
+        } else
         layer.replaceChildren(...(map ? coloured_nodes(value, map, 0, value.length, false) : [document.createTextNode(value)]), document.createTextNode("\n"))
         dec.textContent = value.split("\n").map((_, index) => index + 1).join("\n")
         const count = Math.max(1, Math.ceil(bytes.length / 16))
@@ -215,6 +237,7 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
         bytes_input.value = hex_lines(bytes)
         valid("")
         draw()
+        announce_edit(item, bytes)
     })
     bytes_input.addEventListener("input", () => {
         const parsed = parse_hex(bytes_input.value)
@@ -223,6 +246,7 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
         bytes = new Uint8Array(parsed.bytes)
         area.value = new TextDecoder().decode(bytes)
         draw()
+        announce_edit(item, bytes)
     })
     toggle.addEventListener("toggle", () => {
         if (item.problem) { toggle.open = true; return }
@@ -237,7 +261,7 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
     })
     void file.arrayBuffer().then(buffer => {
         if (!box.isConnected) return
-        bytes = new Uint8Array(buffer)
+        bytes = new Uint8Array(latest_bytes(item) ?? buffer)
         area.value = new TextDecoder().decode(bytes)
         bytes_input.value = hex_lines(bytes)
         area.disabled = bytes_input.disabled = false
@@ -246,6 +270,32 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
         draw()
         sync_save(item)
     }).catch(() => valid(text("files_failed")))
+    const receive = (next: Uint8Array): void => {
+        item.dirty = is_dirty(item)
+        sync_save(item)
+        if (!ready || signal.aborted) return
+        const selection = [area.selectionStart, area.selectionEnd] as const
+        const scroll = [box.scrollTop, box.scrollLeft]
+        bytes = new Uint8Array(next)
+        const value = new TextDecoder().decode(bytes)
+        if (area.value !== value) { area.value = value; area.setSelectionRange(...selection) }
+        bytes_input.value = hex_lines(bytes)
+        draw()
+        box.scrollTop = scroll[0]; box.scrollLeft = scroll[1]
+    }
+    signal.addEventListener("abort", subscribe_edits(item, receive), { once: true })
+    if (comparing && item.parent?.file) {
+        const parent = item.parent
+        void parent.file!.text().then(value => {
+            if (signal.aborted) return
+            source_text = latest_bytes(parent) ? new TextDecoder().decode(latest_bytes(parent)!) : value
+            if (ready) draw()
+        })
+        signal.addEventListener("abort", subscribe_edits(parent, bytes => {
+            source_text = new TextDecoder().decode(bytes)
+            if (ready) draw()
+        }), { once: true })
+    }
     const viewport = editable
         ? edit_shell(item, box, async () => ready && !item.problem ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null)
         : document.createElement("div")
@@ -301,14 +351,17 @@ function announce(item: desk_window, message: string): void {
 export async function save_window(item: desk_window): Promise<void> {
     const commit = item.commit
     if (!commit || item.problem !== "") return
+    const root = document_of(item), original = root.file, save = root.save, mime = root.mime
+    const bytes = latest_bytes(root)
     try {
         const blob = await commit()
-        if (!blob) return
-        item.file = new Blob([blob], { type: item.mime })
-        await item.save?.(item.file)
-        item.dirty = false
-        // a file that only lives in this window has no place to be written to: it is kept in the window, and the message says so
-        announce(item, text(item.save ? "text_saved" : "text_kept"))
+        if (!blob || root.file !== original) return
+        const file = new Blob([blob], { type: mime })
+        await save?.(file)
+        if (root.file !== original) return
+        accept_save(root, file, bytes)
+        item.dirty = is_dirty(item)
+        announce(item, text(save ? "text_saved" : "text_kept"))
     } catch {
         announce(item, text("files_failed"))
     }
@@ -358,6 +411,13 @@ export const uri_handlers: ((item: desk_window, uri: string, current?: () => boo
 const renders = new WeakMap<desk_window, AbortController>()
 
 function fallback_body(item: desk_window): HTMLElement {
+    if (flow_kind_of(item) === "convert") {
+        const note = document.createElement("div")
+        note.className = "desk_wbox_body_none"
+        note.setAttribute("role", "status")
+        note.textContent = `No conversion from ${item.parent!.mime} to ${item.mime}`
+        return note
+    }
     if (item.error) {
         const note = unknown_body(item)
         note.classList.add("desk_wbox_body_error")
@@ -405,6 +465,7 @@ export function fail_window(item: desk_window, path: string, message: string): v
     process_hooks.release(item)
     item.path = path
     item.name = path.split("/").pop() || path
+    forget_edits(item)
     item.file = null
     item.save = null
     item.error = message
@@ -419,6 +480,7 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     renders.get(item)?.abort()
     item.error = ""
     if (!uri.trim()) {
+        forget_edits(item)
         process_hooks.release(item)
         item.file = null
         item.path = item.name = ""
@@ -448,6 +510,25 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     }
 }
 
+function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
+    const body = document.createElement("div")
+    body.className = "desk_mirror_body"
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
+        media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
+        state, text, render_window, save_window }
+    void prepare_plugins(item, host, signal, true).then(candidates => {
+        if (signal.aborted) return
+        for (const { context, module } of candidates) {
+            const rendered = module.render?.(context)
+            const cleanup = module.setup?.(context)
+            if (cleanup) signal.addEventListener("abort", cleanup, { once: true })
+            if (rendered) { body.replaceChildren(rendered); sync_save(item); return }
+        }
+        body.replaceChildren(fallback_body(item))
+    }).catch(error => { if (!signal.aborted) body.textContent = String(error) })
+    return body
+}
+
 function body_for(item: desk_window): void {
     renders.get(item)?.abort()
     process_hooks.release_body(item)
@@ -465,7 +546,7 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
-    const host = { code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, state, text, render_window, save_window }
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
@@ -494,6 +575,12 @@ function body_for(item: desk_window): void {
 }
 
 export function render_window(item: desk_window): void {
+    if (item.parent && flow_kind_of(item) === "mirror") {
+        const source = document_of(item)
+        for (const key of ["file", "name", "path", "mime", "icon", "candidates", "save", "pid", "error"] as const) {
+            Object.assign(item, { [key]: source[key] })
+        }
+    }
     refresh_tab(item)
     sync_navigation(item)
     const summary = head_part(item, ".desk_wbox_head_mime > summary")
@@ -508,7 +595,7 @@ export function render_window(item: desk_window): void {
     fill_mime_list(item)
     // a new body starts with nothing to save; an editor claims the save button when it is made
     item.commit = null
-    item.dirty = false
+    item.dirty = is_dirty(item)
     item.problem = ""
     body_for(item)
     sync_save(item)
@@ -519,6 +606,8 @@ export function render_window(item: desk_window): void {
 export async function load_file(item: desk_window, file: Blob, name: string, path: string = "", current = () => true): Promise<void> {
     if (!current()) return
     if (item.parent) item.picks.own = true
+    forget_edits(item)
+    item.dirty = false
     process_hooks.release(item)
     item.error = ""
     item.pid = null
@@ -531,12 +620,14 @@ export async function load_file(item: desk_window, file: Blob, name: string, pat
     item.candidates = candidates
     item.mime = item.candidates[0] ?? ""
     item.icon = mime_icon(item.mime)
-    item.mode = "view"
+    item.mode = /^(text\/|application\/(?:.*json|.*xml|javascript|typescript|x-sh|x-yaml|sql)$)/.test(item.mime) ? "edit" : "view"
     render_window(item)
 }
 
 export function load_folder(item: desk_window, path: string, name: string): void {
     if (item.parent) item.picks.own = true
+    forget_edits(item)
+    item.dirty = false
     process_hooks.release(item)
     item.error = ""; item.pid = null; item.file = null; item.save = null
     item.path = path; item.name = name; item.mode = "view"
@@ -602,7 +693,7 @@ function wire_head(item: desk_window): void {
     })
     // closing the list forgets the search
     head_part<HTMLDetailsElement>(item, ".desk_wbox_head_mime")?.addEventListener("toggle", () => {
-        if (search && search.value !== "") {
+        if (!head_part<HTMLDetailsElement>(item, ".desk_wbox_head_mime")?.open && search && search.value !== "") {
             search.value = ""
             fill_mime_list(item)
         }

@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { flow_of, no_picks } from "../src/web/client/desk_flow_rules.ts"
-import { adopt, announce_edit, children_of, flow_kind_of, forget_edits, latest_bytes, link_hooks, refresh_children, release_links, subscribe_edits } from "../src/web/client/desk_flow.ts"
+import { adopt, announce_edit, children_of, flow_kind_of, document_of, is_dirty, accept_save, forget_edits, latest_bytes, link_hooks, refresh_children, release_links, subscribe_edits } from "../src/web/client/desk_flow.ts"
 import type { desk_window } from "../src/web/client/desk.ts"
 import { case_flow, is_child_case, plugin_serves_flow, select_case, select_flow_case, type plugin_case, type plugin_target } from "../src/plugin_types.ts"
 
@@ -109,6 +109,9 @@ test("links: a child is its parent's child until either closes", () => {
     const drawn: desk_window[] = []
     link_hooks.render = item => { drawn.push(item) }
     refresh_children(parent)
+    assert.deepEqual(drawn, [])
+    parent.file = new Blob(["new resource"])
+    refresh_children(parent)
     assert.deepEqual(drawn, [child])
     // the parent closes: the child is an ordinary window again, drawn once
     drawn.length = 0
@@ -148,4 +151,30 @@ test("edits reach subscribers and the newest bytes are kept until forgotten", ()
     assert.equal(seen.length, 2)
     forget_edits(source)
     assert.equal(latest_bytes(source), null)
+})
+
+
+test("mirrors share current edits both ways; comparisons keep independent bytes", () => {
+    const parent = fake_window(), mirror = fake_window(), sibling = fake_window(), compare = fake_window()
+    for (const child of [mirror, sibling, compare]) adopt(parent, child)
+    mirror.picks.mode = sibling.picks.mode = true
+    compare.picks.own = true
+    const seen: number[][] = []
+    const stop = subscribe_edits(parent, bytes => seen.push([...bytes]))
+    announce_edit(mirror, new Uint8Array([10]))
+    assert.equal(document_of(mirror), parent)
+    assert.deepEqual([...latest_bytes(sibling)!], [10])
+    assert.equal(latest_bytes(compare), null)
+    const pending = latest_bytes(parent)
+    announce_edit(sibling, new Uint8Array([20]))
+    accept_save(parent, new Blob(["old save"]), pending)
+    assert.equal(is_dirty(parent), true, "a slow save must not clear newer edits")
+    accept_save(parent, new Blob(["new save"]), latest_bytes(parent))
+    assert.equal(is_dirty(mirror), false)
+    announce_edit(compare, new Uint8Array([30]))
+    assert.deepEqual([...latest_bytes(parent)!], [20])
+    release_links(parent, false)
+    assert.deepEqual([...latest_bytes(mirror)!], [20], "orphan retains the shared document")
+    stop()
+    assert.deepEqual(seen.slice(0, 2), [[10], [20]])
 })
