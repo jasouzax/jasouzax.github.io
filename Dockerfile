@@ -51,5 +51,5 @@ USER node
 ENV NODE_ENV=production
 EXPOSE 8080 8788
 VOLUME /data
-HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 CMD ["node", "ops/docker/health.ts"]
+HEALTHCHECK --interval=30s --timeout=30s --start-period=300s --retries=3 CMD ["node", "ops/docker/health.ts"]
 ENTRYPOINT ["node", "ops/docker/entry.ts"]
