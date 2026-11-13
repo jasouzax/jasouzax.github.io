@@ -101,7 +101,7 @@ Entries nest without depth limit. Sticky nesting: an entry sticks to the top whi
 Head controls:
 
 - **Save** writes the window's data to the virtual filesystem (3.7), at its own path if writable, otherwise at a path the visitor picks (default in `/home/user`). Saving a file from `/tmp` into `/home/user` is how an upload becomes persistent.
-- **Split** creates a child window tied to the parent (`path="window:N"`). What the pair does is decided by a **plugin**, from the mimes, paths, types and modes of both windows: for example a converter (child given a mime), a comparator (child given its own resource), or a mirror (child given a mode, such as a text editor beside its live preview). Even a mirror is a plugin, because updating one window must update the other live.
+- **Split** creates an empty child tied to the parent, with its source, MIME and mode unset. What the pair does is decided by a **plugin**, from the mimes, paths, types and modes of both windows: for example a converter (child given a mime), a comparator (child given its own resource), or a mirror (child given a mode, such as a text editor beside its live preview). Even a mirror is a plugin, because updating one window must update the other live.
 - **Drag** moves the window: choose left, right, top or bottom of another window, or drag the head.
 
 Window ids: `window:N` is 1-based in document order. Processes are addressed by `pid://name` or `pid:N` (3.5.5).
@@ -159,3 +159,9 @@ Text windows color code by mime (C, C++, JavaScript, TypeScript, Python, shell, 
 **Objective.** Draw and navigate the map (1.4.3).
 
 **Solution.** For an automatic map, builds the graph from the active menu's content and from the live resource table (windows, processes, plugin-provided intermediate nodes, hidden nodes for running processes without a window); for a manual map, reads the authored nodes and edges. Lays it out with the map's `layout`, renders pan, zoom and click, subscribes to window, split and process events so automatic maps stay live, and falls back to the static link list without JavaScript. The menu head's map button toggles between the map and the windows.
+
+## Split prototype verification (2026-11-13)
+
+The split demos and lifecycle checks pass in Chromium: empty children, unsaved shared HTML editors with independent scrolling, sandboxed live HTML, readonly plain text and unsupported visitor text views, independent uploaded/folder-selected text comparisons, saving, parent closure, unsupported conversion, actual img2pdf WASM output, PDF canvas pixel checks, multipage navigation/zoom and Japanese labels. The wider desk regressions were checked too; startup waits and cold-WASM timeouts are handled by the shared test fixture. The focused contract/render/filesystem suite passed 31 tests and content validation passed with 37 existing description warnings.
+
+A real deployment from Docker on the Pi published the split prototype to staging; a browser at `https://staging.jasouza.com/desk` uploaded an image, selected the child's PDF MIME, executed img2pdf and verified the rendered PDF pixels. Docker production remains on master; the split feature is committed only to staging.

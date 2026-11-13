@@ -1,4 +1,10 @@
-/* Sandboxed HTML, lazy PDF viewing and image-to-PDF conversion. Conversion runs the existing img2pdf WASM process against owned temporary files. */
+/*
+ * Local resource previews; no input is uploaded.
+ * html_body shows shared bytes in a sandbox without script or origin privileges.
+ * pdf_body delegates local bytes to the lazy PDF viewer.
+ * image_pdf_body owns derived output and a cancellable img2pdf process in a private VFS directory.
+ * Browser-supported images are rasterized to JPEG on white; conversion is limited to 40 megapixels.
+ */
 import { text, type desk_window } from "./desk.ts"
 import { render_window } from "./desk_view.ts"
 import { latest_bytes, subscribe_edits } from "./desk_flow.ts"

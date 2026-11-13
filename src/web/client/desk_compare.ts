@@ -1,4 +1,8 @@
-/* Line comparison for independently opened split resources. Bounded Myers diff avoids freezing the editor on unrelated large files. */
+/*
+ * comparison_lines maps a source/output pair to added output lines and removal counts at output boundaries.
+ * A bounded Myers line diff protects typing latency; limited=true means annotations are unavailable.
+ * Pure byte-independent comparison only: callers own decoding, rendering and document subscriptions.
+ */
 import { diffLines } from "diff"
 
 export function comparison_lines(source: string, output: string): { added: Set<number>, removed: Map<number, number>, limited: boolean } {

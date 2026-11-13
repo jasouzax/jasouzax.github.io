@@ -1,4 +1,9 @@
-/* Lazy, browser-independent PDF viewer. PDF.js renders local bytes; no document is uploaded or allowed to execute actions. */
+/*
+ * Local PDF viewing without browser plugin dependencies or document actions.
+ * load_pdf caches the package-versioned library and worker asset manifest.
+ * pdf_viewer owns one document, one visible page, navigation/zoom, download and rendering cancellation.
+ * Rendering is serialized and limited to 32 megapixels; replacing a body destroys its worker and object URL.
+ */
 import { text } from "./desk.ts"
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 
