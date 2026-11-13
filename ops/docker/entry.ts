@@ -70,7 +70,7 @@ export function restore_inputs(image: string, work: string): void {
     for (const name of ["build", "content/media"]) if (existsSync(join(image, name))) {
         // Git tracks custom compiler sources inside build/; its existence does not mean artifacts were restored.
         cpSync(join(image, name), join(work, name), { recursive: true, force: false, errorOnExist: false, filter: (source, destination) => {
-            try { return lstatSync(source).isDirectory() && lstatSync(destination).isDirectory() }
+            try { const destination_stat = lstatSync(destination); return destination_stat.isDirectory() && lstatSync(source).isDirectory() }
             catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return true; throw error }
         } })
     }
