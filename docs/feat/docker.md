@@ -3,8 +3,8 @@
 - [x] Container entry selects prebuilt website, custom content or persistent personal-server mode; static assets stream with byte ranges (runtime contract tests).
 - [x] Publish and pull native ARM64 and AMD64 images through `registry.jasouza.com`.
 - [x] Verify custom content and both image architectures on the Raspberry Pi.
-- [ ] Move the Pi listener to Docker, preserving the old checkout/service and documenting rollback.
-- [ ] Verify Git/CI after cutover and a container restart.
+- [x] Move the Pi listener to Docker, preserving the old checkout/service and documenting rollback.
+- [x] Verify Git/CI after cutover and a container restart.
 
 The image includes prepared WASM packages and a prebuilt default website. Compilation belongs to release builds, never an ordinary default startup. Building the image requires the release `build/` artifacts and public media archive; a missing WASM input fails the build. Runtime credentials and repositories are excluded from the image context.
 
@@ -44,3 +44,8 @@ The personal service also mounts its persistent `home/` at the image user's logi
 Pi release verification (2026-11-13): candidate `docker-52e579c`, multi-platform index `sha256:eb0fd47551008fd99e04f7cb09e13cafeff9feae073ae8e00459e48ffc7c7984`, pulled anonymously through the public registry. ARM64 and emulated AMD64 both served the website and passed health checks. An independent read-only custom-content/config fixture built and served; restarting removed a deleted content file. Signed transport health, master/staging Git advertisements and GitHub SSH access passed before cutover. An 86,109,341-byte public registry blob passed a complete SHA-256 check; full-object reads return 200 and explicit byte ranges return 206. The 56 server regression tests and Docker/registry contracts passed locally.
 
 For a startup-only correction on a constrained builder, `ops/docker/runtime.Dockerfile` reuses a tested image and replaces only the startup/health wrapper, Compose example and registry source. Use this only when website sources, content, WASM inputs and dependencies are unchanged from that base; use the root Dockerfile for all other releases. The corrected AMD64 prototype uses this path because the Pi must also retain its original native installation. Both recipes produce the same runtime interfaces and are tested through public pulls.
+
+
+Final Docker runtime: `registry.jasouza.com/jazu:docker-7eb6764`, index `sha256:283ba6c6e334024712f457e05ec024e0ca0d08183c8455ce73a8ff12a4124b55`. Both architectures were pulled publicly. ARM64 cold bootstrap restored all 135 compiled inputs and completed a full website build; AMD64 served the website and built independent custom content under emulation. Health checks allow 30 seconds for slower CPUs/emulators. Restoration materializes image links into writable files, repairs legacy links pointing into the image, and preserves existing project files; custom content rejects links leaving its mounted directory.
+
+The Pi now runs container `jazu-personal` at loopback port 8788 using `~/jazu-docker`; `jazu-node` is disabled and the original `~/jasouzax.github.io`, repositories and state remain available. An authenticated push through the staging Worker reached Docker, synchronized to GitHub, built and deployed Pages/R2 successfully (`fe36924`); Docker restarts retained the repositories and credentials. Logs: `docker logs -f jazu-personal`, detailed runs at `~/jazu-docker/state/runs/`. The original service is a cutover fallback; retain the current Docker data before rolling back after accepting newer pushes.
