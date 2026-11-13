@@ -5,6 +5,7 @@ import { build as esbuild_build } from "esbuild"
 import type { build_result } from "../build.ts"
 import { stage_pages, wrangler_pages_deploy } from "./publish.ts"
 import type { Asset_Upload } from "./publish.ts"
+import { clone_origins, project_declarations } from "../pipeline_types.ts"
 
 export type asset_upload = Asset_Upload
 
@@ -22,6 +23,7 @@ export async function prepare_deploy(root: string, out: string, result: build_re
         pages_project: result.model.config.deploy.pages_project,
         domain: new URL(result.model.config.base_url).hostname,
         public_projects: JSON.stringify(projects),
+        project_clone_origins: JSON.stringify(clone_origins(project_declarations(result.model.objects))),
         personal_origin: result.model.config.personal_server || null,
         worker_bundle,
         large_assets: uploads.map(upload => ({ key: upload.key, file: upload.file, content_type: upload.content_type })),

@@ -9,7 +9,7 @@ import type { Server_Config } from "./server_config.ts"
 import { is_active, is_public, repository_path } from "./server_config.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
-export type personal_options = { secret: string, repositories: Record<string, string>, port: number, config?: Server_Config }
+export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config }
 
 export function git_read(repository: string, action: string, url: URL): Response {
     const ref = url.searchParams.get("ref") ?? "HEAD"
@@ -92,5 +92,5 @@ export function personal_server(options: personal_options) {
             outgoing.writeHead(500, { "content-type": "application/json", "cache-control": "no-store" })
             outgoing.end(JSON.stringify({ error: { code: "internal", message: "Personal node failed" } }))
         }
-    }).listen(options.port, "127.0.0.1", () => console.log(`personal node listening on 127.0.0.1:${options.port}`))
+    }).listen(options.port, options.host ?? "127.0.0.1", () => console.log(`personal node listening on ${options.host ?? "127.0.0.1"}:${options.port}`))
 }

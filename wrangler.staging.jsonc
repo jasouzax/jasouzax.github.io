@@ -10,6 +10,7 @@
         "PAGES_ORIGIN": "https://jazu-staging.pages.dev",
         "PUBLIC_PROJECTS": "[\"jazu\"]",
         "PUBLIC_PROJECTS_MANIFEST": "/projects/git.json",
+        "PROJECT_CLONE_ORIGINS": "{}",
         "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
     },
     "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-staging-assets" }]

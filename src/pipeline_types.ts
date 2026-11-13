@@ -11,6 +11,21 @@ export type Project_Pipeline = { branch: string, poll_seconds: number, steps: Pi
 export type Project_Declaration = { remote?: string, pipeline?: Project_Pipeline, pipelines: Record<string, Project_Pipeline>, private: boolean }
 export const pipeline_variables = ["project", "branch", "commit", "mirror_dir", "publish_state"]
 
+// Public HTTPS Git reads can use HTTPS remotes or GitHub's equivalent HTTPS URL for its SSH remotes.
+export function clone_origins(declarations: Map<string, Project_Declaration>): Record<string, string> {
+    const origins: Record<string, string> = Object.create(null)
+    for (const [id, declaration] of declarations) {
+        if (declaration.private || !declaration.remote) continue
+        let remote = declaration.remote.replace(/^git@github\.com:/, "https://github.com/").replace(/^ssh:\/\/git@github\.com\//, "https://github.com/")
+        let url: URL
+        try { url = new URL(remote) } catch { continue }
+        if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.port || url.pathname === "/") continue
+        remote = url.href.replace(/\/+$/, "")
+        origins[id] = remote.endsWith(".git") ? remote : `${remote}.git`
+    }
+    return origins
+}
+
 export function project_declarations(nodes: xml_node[]): Map<string, Project_Declaration> {
     const declarations = new Map<string, Project_Declaration>()
     for (const node of nodes.filter(node => node.tag === "project")) {

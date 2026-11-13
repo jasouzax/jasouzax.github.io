@@ -1,5 +1,5 @@
 import { createServer } from "node:http"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs"
 import { join, extname, resolve } from "node:path"
 import { inside } from "../paths.ts"
 
@@ -40,8 +40,14 @@ export function resolve_request(out: string, url_path: string): string | null {
     return null
 }
 
-export function serve(out: string, port: number) {
+export function serve(out: string, port: number, host = "127.0.0.1") {
     return createServer((request, response) => {
+        if (!["GET", "HEAD"].includes(request.method ?? "GET")) { response.writeHead(405, { allow: "GET, HEAD" }); response.end(); return }
+        if ((request.url ?? "").split("?")[0] === "/api/v1/health") {
+            response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" })
+            response.end(request.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", role: "website" }))
+            return
+        }
         const file = resolve_request(out, request.url ?? "/")
         if (!file || !existsSync(file)) {
             const missing = join(out, "404.html")
@@ -50,7 +56,24 @@ export function serve(out: string, port: number) {
             return
         }
         const work = new URL(request.url ?? "/", "http://localhost").pathname === "/work"
-        response.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream", ...static_headers(out, new URL(request.url ?? "/", "http://localhost").pathname), "x-content-type-options": "nosniff", "referrer-policy": work ? "no-referrer" : "strict-origin-when-cross-origin", ...(work ? { "x-robots-tag": "noindex, nofollow", "cache-control": "no-store" } : {}) })
-        response.end(request.method === "HEAD" ? undefined : readFileSync(file))
-    }).listen(port, "127.0.0.1", () => console.log(`serving ${out} at http://127.0.0.1:${port}`))
+        const size = statSync(file).size
+        let start = 0, end = size - 1, status = 200
+        const range = request.headers.range
+        if (range) {
+            const match = /^bytes=(\d*)-(\d*)$/.exec(range)
+            if (!match || (!match[1] && !match[2])) { response.writeHead(416, { "content-range": `bytes */${size}` }); response.end(); return }
+            start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]))
+            end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1
+            if (start > end || start >= size || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)) { response.writeHead(416, { "content-range": `bytes */${size}` }); response.end(); return }
+            status = 206
+        }
+        response.writeHead(status, { "content-type": types[extname(file)] ?? "application/octet-stream", ...static_headers(out, new URL(request.url ?? "/", "http://localhost").pathname), "content-length": Math.max(0, end - start + 1), "accept-ranges": "bytes", ...(status === 206 ? { "content-range": `bytes ${start}-${end}/${size}` } : {}), "x-content-type-options": "nosniff", "referrer-policy": work ? "no-referrer" : "strict-origin-when-cross-origin", ...(work ? { "x-robots-tag": "noindex, nofollow", "cache-control": "no-store" } : {}) })
+        if (request.method === "HEAD" || size === 0) response.end()
+        else {
+            const stream = createReadStream(file, { start, end })
+            stream.on("error", () => response.destroy())
+            response.on("close", () => stream.destroy())
+            stream.pipe(response)
+        }
+    }).listen(port, host, () => console.log(`serving ${out} at http://${host}:${port}`))
 }

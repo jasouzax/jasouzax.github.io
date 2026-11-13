@@ -145,6 +145,14 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 
 ---
 
+## Docker use
+
+```sh
+docker run --rm --init -p 8080:8080 registry.jasouza.com/jazu:latest
+```
+
+The image serves its prebuilt website at `http://localhost:8080`, including prepared WASM packages and public assets. Custom content uses a read-only host mount and `--content=/content`. Personal-server mode uses `--personal-server`, external credentials and a persistent `/data` volume. See [Docker installation, custom content, registry releases and recovery](docs/feat/docker.md) for commands, Compose profiles, migration and rollback. Back up the data volume separately from the image.
+
 ## Server Use
 
 Set up the **personal server**: your own machine running an instance of this repository, connected to Cloudflare through a Tunnel protected by Zero Trust, so the public Worker can reach it securely and (later) your Git repository, CI/CD and AI agents can work on it. The public website never depends on it.
@@ -252,6 +260,8 @@ Use `ops/jazu-node.service.example` as the systemd service, adjusting the user, 
 The node listens and orchestrates jobs in one persistent process; catalogs and pipelines execute in fresh child processes. Engine pushes stage their exact commit and use its own schema, dependencies and pipeline implementation before promoting the checkout. A failed catalog reload keeps repository polling alive with the last valid catalog. Runtime changes request exit `75` after the job finishes so systemd loads the updated listener; keep `Restart=on-failure` or `always` enabled. Installing this mechanism initially requires one service restart. See [runtime isolation](docs/src/node.md#per-project-repositories-and-xml-pipelines) for the worker protocol and upgrade limits.
 
 **Staging:** a project may declare several `<pipeline>` entries with unique branches. The first is primary; Jazu declares `master` and `staging`. Jobs share one deployment checkout, switch branches only after CI passes, and leave the selected branch checked out. Sync/approval/publication state is isolated by branch; staging does not replace the primary Git clone mirror. Use `server run --project jazu --branch staging` or `server status --project jazu --branch staging`. Follow the [post-merge Pi and Cloudflare setup](docs/infra-staging.md) before the first staging push. `npm run tf:staging -- plan` / `apply` automate the separate Pages project, Worker, R2 bucket, DNS, domain association and secrets through [terraform/staging](terraform/staging/README.md), using the existing private `.env` inputs.
+
+**Provider-first clones:** newly deployed Workers receive `PROJECT_CLONE_ORIGINS`, derived from public `<project repo="...">` declarations. Public Git clone/fetch requests use that HTTPS provider (including GitHub) first. Missing repositories, unavailable providers and invalid Git responses fall back to the Pi's Smart HTTP backend. Discovery fallback redirects to a Pi-specific path on the same website so the clone stays on that backend; pack responses stream. Pushes and private reads always use the Pi. Reapply the Worker infrastructure after changing `repo`; the mapping remains in Worker configuration, outside public page payloads. Existing Workers without this binding retain static-mirror reads. See [Git read routing](docs/src/node.md#provider-first-git-reads).
 
 For a hub that accepts `git push origin master` while this feature is developed, set `site.branch` to `master` and `site.checkout_branch` to `feature/personal-server`. The hub's bare `master` is seeded from this feature branch; the server's working checkout stays on the feature branch. The GitHub remote remains the source backup and is separate from the personal Git hub.
 

@@ -15,9 +15,10 @@ export function start_listener(root: string, flags: Record<string, string | bool
     const file = resolve(root, String(flags.config ?? process.env.JAZU_SERVER_CONFIG ?? "server.json"))
     const config = existsSync(file) ? load_server_config(file, legacy) : undefined
     const repositories = config ? Object.fromEntries(Object.keys({ ...config.projects, [config.site.project]: 1 }).filter(id => is_public(config, id)).map(id => [id, repository_path(config, id)])) : legacy
-    const server = personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), config })
+    const server = personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), host: String(flags.host ?? process.env.JAZU_LISTEN_HOST ?? "127.0.0.1"), config })
     if (!config) return console.log(`no ${file}: push and CI/CD are disabled (read-only Git API only)`)
     console.log(`hooks synced for: ${sync_repositories(config).join(", ") || "(no repositories yet)"}`)
+    if (process.env.JAZU_DISABLE_RUNNER === "1") return console.log("transport-only mode: repository polling and CI/CD disabled")
     const runner = start_runner(config, { on_restart: () => {
         watcher.close()
         server.close(() => process.exit(75))
@@ -34,7 +35,7 @@ export function listener_command(): void {
     const flags: Record<string, string> = {}
     for (let index = 0; index < args.length; index += 2) {
         const name = args[index].replace(/^--/, "")
-        if (!["root", "port", "config"].includes(name) || !args[index + 1]) throw new Error(`Unknown listener argument ${args[index]}`)
+        if (!["root", "port", "config", "host"].includes(name) || !args[index + 1]) throw new Error(`Unknown listener argument ${args[index]}`)
         flags[name] = args[index + 1]
     }
     start_listener(resolve(flags.root ?? process.cwd()), flags)

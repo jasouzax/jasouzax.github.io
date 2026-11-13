@@ -126,6 +126,18 @@ Oversized Git packs (a historical blob cannot be split across packs) are staged 
 
 ## Per-project repositories and XML pipelines
 
+### Provider-first Git reads
+
+`PROJECT_CLONE_ORIGINS` is a Worker JSON binding mapping public project ids to HTTPS Git repository URLs. `pipeline_types.clone_origins()` derives it from reviewed `<project repo>` declarations, excludes private projects, normalizes `.git`, and maps GitHub SSH forms to their HTTPS equivalent. Other SSH-only origins use the Pi fallback. `prepare_deploy()` emits the binding input for production Terraform; `terraform/staging/setup.ts` generates it for standalone staging Terraform. Repository URLs are not added to static pages or public manifests. Update the Worker infrastructure when declarations change; public projects added later without a map entry still use the Pi.
+
+For configured public repositories, `GET /projects/{id}/info/refs?service=git-upload-pack` and `POST /projects/{id}/git-upload-pack` use `git_read_proxy.ts`. The provider gets only Git content/protocol/accept headers, never personal tokens, cookies, origin signatures or Access credentials. Provider redirects are limited to three on the same HTTPS origin, supporting renamed repositories. Only valid Git content types with status 200 are accepted. Connection failures, a 15-second response-header timeout, authentication/rate-limit/server errors and HTML responses trigger fallback before streaming begins. Dynamic negotiation responses use `no-store`.
+
+Discovery fallback returns a non-cacheable 307 to `/projects/{id}/_git/pi/info/refs?service=git-upload-pack`. Git follows this initial redirect and uses the corresponding Pi path for subsequent negotiation. Provider recovery therefore cannot move an already-fallback clone onto a different repository. Both `.git` and extensionless URLs are supported. The pinned path is also available for explicitly selecting the Pi. All push operations, including those on a pinned URL, still use the signed personal backend.
+
+POST negotiation bodies are bounded to 8 MiB and retained for an upstream-failure retry; Git pack responses are streamed without buffering. An upstream failure after response bytes have already reached the client cannot transparently switch pack streams: retry the clone/fetch. A Pi retry can only serve objects actually present in its synchronized repository. Private external repositories do not receive personal-server tokens; they fall back to the Pi's own authentication. Private projects never use provider routing. Workers without `PROJECT_CLONE_ORIGINS` preserve the legacy static mirror path for compatibility; an empty map explicitly selects Pi fallback for public clones.
+
+The Pi already uses `git http-backend`. It now advertises filtering support for partial clones and hides internal `refs/jazu-sync` and `refs/remotes` refs. Public provider/Pi Smart HTTP reads can advertise staging and other actual Git branches; the retained static mirror still publishes only the primary approved branch. This is transport ref hiding, not a confidentiality boundary between branches: private data belongs in a separate private repository.
+
 ### Multiple branch pipelines
 
 `Project_Declaration.pipelines` and `Server_Config.pipelines` index definitions by branch; `pipeline` retains the first/primary entry for compatibility. `project_branches()` enumerates deployment refs, and `project_view(config, id, branch)` selects commands, upstream branch and private state while preserving the same working directory. The first pipeline remains primary and controls public clone refs. Pipeline branch names must be unique, including the implicit `master` default.

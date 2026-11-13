@@ -24,6 +24,7 @@
     "test:rireki:browser": "playwright test --config tests/rireki_browser.config.ts",
     "deploy:dry": "node src/main.ts deploy --dry_run",
     "deploy": "node src/main.ts deploy",
+    "tf:registry": "node --env-file=.env terraform/registry/setup.ts",
     "tf:staging": "node --env-file=.env terraform/staging/setup.ts",
     "tf:fmt": "terraform -chdir=terraform fmt -recursive",
     "tf:validate": "terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate",

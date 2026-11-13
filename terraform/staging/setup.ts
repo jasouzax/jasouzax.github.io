@@ -8,6 +8,8 @@ import { mkdirSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { build } from "esbuild"
+import { clone_origins } from "../../src/pipeline_types.ts"
+import { load_project_declarations } from "../../src/node/project_catalog.ts"
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const root = resolve(directory, "../..")
@@ -40,6 +42,7 @@ async function main(): Promise<void> {
     const bundle = await prepare_staging()
     if (action === "prepare") return console.log("Staging Worker bundled; infrastructure unchanged.")
     const env = staging_environment(process.env, bundle)
+    env.TF_VAR_project_clone_origins = JSON.stringify(clone_origins(load_project_declarations(root)))
     const run = (args: string[]) => {
         const result = spawnSync(env.TERRAFORM_BIN ?? "terraform", args, { cwd: directory, env, stdio: "inherit", windowsHide: true })
         if (result.error) throw new Error(`Cannot run Terraform: ${result.error.message}. Install Terraform >=1.7 or set TERRAFORM_BIN.`)

@@ -1,4 +1,5 @@
 import { api_error, secure_response, sign_origin } from "./security.ts"
+import { public_git_read } from "./git_read_proxy.ts"
 
 type object_result = {
     body?: ReadableStream<Uint8Array>
@@ -12,6 +13,7 @@ export type worker_env = {
     PAGES_ORIGIN: string
     PUBLIC_PROJECTS?: string
     PUBLIC_PROJECTS_MANIFEST?: string
+    PROJECT_CLONE_ORIGINS?: string
     PERSONAL_ORIGIN?: string
     ORIGIN_HMAC_SECRET?: string
     ACCESS_CLIENT_ID?: string
@@ -118,11 +120,15 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         }
         return api_error("unknown_host", "Unassigned subdomain", 404)
     }
-    // `git clone` of a public project is static (dumb HTTP on Pages). Pushes, and every access to a private project, go to the node.
-    const smart = /^\/projects\/([a-z0-9_-]+)(?:\.git)?\/(info\/refs|git-upload-pack|git-receive-pack)$/.exec(path)
+    // Configured public reads prefer their provider, then Pi. Legacy deployments retain the static mirror.
+    // Writes and private reads always use the signed personal backend, including after a Pi discovery redirect.
+    const smart = /^\/projects\/([a-z0-9_-]+)(?:\.git)?(?:\/(_git\/pi))?\/(info\/refs|git-upload-pack|git-receive-pack)$/.exec(path)
     if (smart) {
-        const writes = smart[2] === "git-receive-pack" || (smart[2] === "info/refs" && url.searchParams.get("service") === "git-receive-pack")
-        if (writes || !projects.includes(smart[1])) return forward_git(request, env, smart[1], smart[2], url.search, upstream)
+        const [, id, pinned, operation] = smart
+        const writes = operation === "git-receive-pack" || (operation === "info/refs" && url.searchParams.get("service") === "git-receive-pack")
+        if (writes || !projects.includes(id) || pinned) return forward_git(request, env, id, operation, url.search, upstream)
+        if (env.PROJECT_CLONE_ORIGINS !== undefined && (operation === "git-upload-pack" || url.searchParams.get("service") === "git-upload-pack"))
+            return public_git_read(request, env, id, operation, upstream, retry => forward_git(retry, env, id, operation, url.search, upstream))
     }
     // Both clone URLs use the same static mirror. The project HTML at /projects/{id} stays a normal page.
     const mirror = /^\/projects\/([a-z0-9_-]+)(?:\.git)?\/(HEAD|info\/refs|objects\/info\/packs|objects\/pack\/pack-[0-9a-f]+\.(?:pack|idx))$/.exec(path)

@@ -51,6 +51,7 @@ The setup command bundles `src/node/worker.ts` into `.cache/staging-infra/worker
 - The `staging.jasouza.com` Pages custom-domain association and a proxied DNS CNAME.
 - Worker `jazu_staging_router`, its staging route and R2 binding, with workers.dev disabled.
 - `DOMAIN`, the actual allocated Pages origin, public Git discovery and the personal origin bindings.
+- `PROJECT_CLONE_ORIGINS`, generated privately from public XML project `repo` declarations, for provider-first cloning with Pi fallback.
 - The existing `ORIGIN_HMAC_SECRET`, `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` as Worker secrets.
 
 No dashboard domain registration or separate Wrangler secret upload is needed. Terraform reads the allocated Pages hostname directly, including any Cloudflare-added suffix. TLS/domain activation can take time; the site receives its first static content when staging CI runs.

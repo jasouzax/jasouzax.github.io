@@ -95,6 +95,12 @@ variable "public_projects" {
   default     = "[]"
 }
 
+variable "project_clone_origins" {
+  type        = string
+  default     = "{}"
+  description = "Public project id to HTTPS Git origin map, generated from project repo declarations."
+}
+
 variable "personal_origin" {
   type    = string
   default = null
