@@ -372,8 +372,9 @@ async function write_blob(handle: file_handle, blob: Blob): Promise<void> {
 }
 
 async function save_file(item: desk_window, handle: file_handle, blob: Blob): Promise<void> {
-    const node = await resolve_node(item.path.replace(/^file:\/\//, ""))
-    if (local_file_path(item.path)?.startsWith("/home/user/")) {
+    const path = item.path
+    const node = await resolve_node(path.replace(/^file:\/\//, ""))
+    if (local_file_path(path)?.startsWith("/home/user/")) {
         if (!node?.handle || !can_create(node.parent)) throw new Error(text("files_no_save"))
         handle = node.handle as file_handle
     }

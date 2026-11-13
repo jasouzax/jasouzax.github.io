@@ -178,3 +178,17 @@ test("mirrors share current edits both ways; comparisons keep independent bytes"
     stop()
     assert.deepEqual(seen.slice(0, 2), [[10], [20]])
 })
+
+
+test("closing a middle mirror retains its current draft in nested children", () => {
+    const root = fake_window(), middle = fake_window(), leaf = fake_window()
+    adopt(root, middle); middle.picks.mode = true
+    adopt(middle, leaf); leaf.picks.mode = true
+    announce_edit(root, new Uint8Array([42]))
+    release_links(middle, false)
+    assert.equal(leaf.parent, null)
+    assert.deepEqual([...latest_bytes(leaf)!], [42])
+    assert.equal(is_dirty(leaf), true)
+    announce_edit(root, new Uint8Array([43]))
+    assert.deepEqual([...latest_bytes(leaf)!], [42])
+})

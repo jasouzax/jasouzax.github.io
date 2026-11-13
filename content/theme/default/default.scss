@@ -8300,3 +8300,8 @@ body:has(#motion_pause:checked) {
 .desk_diff_line { position: relative; }
 .desk_diff_added { background: #157b3638; box-shadow: inset 3px 0 #22883f; }
 .desk_diff_removed::after { content: "\25bc"; position: absolute; left: 0; bottom: -.4em; color: #d32f2f; font-size: .65em; }
+
+.desk_pdf_controls { display: flex; flex-wrap: wrap; gap: .35em; align-items: center; padding: .5em; }
+.desk_pdf_controls button { padding: .2em .4em; }
+.desk_pdf_viewport { flex: 1; min-height: 0; overflow: auto; padding: 1em; background: #555; }
+.desk_pdf_viewport canvas { display: block; margin: auto; background: white; }

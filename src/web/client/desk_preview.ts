@@ -1,7 +1,8 @@
-/* Sandboxed HTML, native PDF viewing and image-to-PDF conversion. Conversion runs the existing img2pdf WASM process against owned temporary files. */
+/* Sandboxed HTML, lazy PDF viewing and image-to-PDF conversion. Conversion runs the existing img2pdf WASM process against owned temporary files. */
 import type { desk_window } from "./desk.ts"
 import { render_window } from "./desk_view.ts"
 import { latest_bytes, subscribe_edits } from "./desk_flow.ts"
+import { pdf_viewer } from "./desk_pdf.ts"
 import { kernel, start_process, make_sink, kill } from "./kernel.ts"
 
 function preview(): HTMLDivElement {
@@ -23,14 +24,7 @@ export function html_body(item: desk_window, signal: AbortSignal): HTMLElement {
 }
 
 export function pdf_body(item: desk_window, signal: AbortSignal): HTMLElement {
-    const box = preview(), frame = document.createElement("iframe"), download = document.createElement("a")
-    const url = URL.createObjectURL(new Blob([item.file!], { type: "application/pdf" }))
-    signal.addEventListener("abort", () => URL.revokeObjectURL(url), { once: true })
-    frame.title = `PDF: ${item.name}`
-    frame.src = url
-    download.href = url; download.download = item.name; download.textContent = "Download PDF"
-    box.append(frame, download)
-    return box
+    return pdf_viewer(item.file!, item.name, signal)
 }
 
 type Conversion = { file: Blob, bytes: Uint8Array | null, result: Promise<Blob> }
@@ -40,7 +34,7 @@ const conversions = new WeakMap<desk_window, Conversion>()
 export function image_pdf_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const box = preview(), status = document.createElement("p")
     status.className = "desk_preview_status"; status.setAttribute("role", "status")
-    status.textContent = "Converting image to PDFâ€¦"
+    status.textContent = "Converting image to PDFÃ¢â‚¬Â¦"
     box.append(status)
     const parent = item.parent!, file = parent.file!, bytes = latest_bytes(parent)
     const cached = outputs.get(item)

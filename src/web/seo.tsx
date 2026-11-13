@@ -381,6 +381,8 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/wasm/manifest.json",
         "  Cache-Control: no-cache",
+        "/assets/pdfjs.json",
+        "  Cache-Control: no-cache",
         "/assets/plugins.json",
         "  Cache-Control: no-cache",
         ...text("/manifest.json", "application/manifest+json; charset=utf-8", 3600),
