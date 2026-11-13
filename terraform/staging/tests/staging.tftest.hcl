@@ -5,6 +5,7 @@ mock_provider "cloudflare" {
 }
 
 variables {
+  work_migrations_enabled = false
   account_id            = "test-account"
   zone_id               = "test-zone"
   worker_bundle         = "tests/fixtures/worker.js"
@@ -50,7 +51,11 @@ run "staging_resources_and_routing" {
     error_message = "The Worker needs the XML-derived public clone origins for provider-first reads."
   }
   assert {
-    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET"])
-    error_message = "Provision all three personal-origin secrets with the Worker."
+    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "WORK_OWNER_TOKEN"])
+    error_message = "Provision personal-origin and Work secrets with the Worker."
+  }
+  assert {
+    condition     = cloudflare_d1_database.work.name == "jazu-staging-work" && one([for binding in cloudflare_workers_script.router.bindings : binding.id if binding.name == "DB"]) == cloudflare_d1_database.work.id
+    error_message = "Work must use a separate staging D1 database."
   }
 }

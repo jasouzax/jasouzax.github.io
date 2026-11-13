@@ -2,6 +2,10 @@ output "staging_url" {
   value = "https://${var.staging_domain}"
 }
 
+output "work_database_id" {
+  value = cloudflare_d1_database.work.id
+}
+
 output "pages_origin" {
   value = "https://${cloudflare_pages_project.site.subdomain}"
 }

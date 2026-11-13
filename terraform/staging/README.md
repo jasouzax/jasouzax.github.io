@@ -17,6 +17,8 @@ The setup command also reads public project `repo` declarations into the Worker'
 
 ## Validation without provisioning
 
+Encrypted Work messaging also provisions the separate `jazu-staging-work` D1 database and applies `migrations/*.sql`. Set `WORK_OWNER_TOKEN` in the private `.env` to a random 32–256-character URL-safe token; `WORK_OWNER_EMAIL` defaults to `jason@jasouza.com`. The helper maps both to Terraform inputs. An empty token leaves messaging disabled. See [the Work guide](../../docs/feat/work.md#encrypted-messaging-implementation) for invitations and key backup. Mocked tests disable `work_migrations_enabled` so the migration runner never calls D1 during tests; normal provisioning keeps its default `true`.
+
 ```sh
 node terraform/staging/setup.ts validate
 node terraform/staging/setup.ts test

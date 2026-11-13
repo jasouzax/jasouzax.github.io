@@ -1,0 +1,12 @@
+import { defineConfig } from "@playwright/test"
+import { fileURLToPath } from "node:url"
+const cwd = fileURLToPath(new URL("../", import.meta.url))
+export default defineConfig({
+    testDir: ".", testMatch: "work_browser.spec.ts", timeout: 90000, workers: 1,
+    use: { baseURL: "http://localhost:8787", viewport: { width: 1280, height: 900 } },
+    webServer: [
+        { command: "node --import tsx -e \"import { serve } from './src/node/serve.ts'; import { resolve } from 'node:path'; serve(resolve('dist'), 8080)\"", cwd, url: "http://127.0.0.1:8080/work", reuseExistingServer: !process.env.CI, timeout: 30000 },
+        { command: "node node_modules/wrangler/bin/wrangler.js dev --local --config wrangler.local.jsonc --ip 127.0.0.1 --port 8787 --var WORK_OWNER_TOKEN:work_browser_test_owner_01234567890123456789", cwd, url: "http://127.0.0.1:8787/api/v1/health", reuseExistingServer: false, timeout: 120000 },
+    ],
+    outputDir: "../.cache/work-browser-results", reporter: "line",
+})

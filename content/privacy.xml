@@ -1,10 +1,10 @@
-<page lang="en" path="/privacy" name="Privacy" icon="[privacy]" info="What this site stores: your theme choice, and a session cookie on the workspace.">
+<page lang="en" path="/privacy" name="Privacy" icon="[privacy]" info="How this site stores browser preferences and shared-key encrypted workspace messages.">
         <desk name="Privacy" icon="[privacy]" info="Plain words about data" auto="true">
             <window path="privacy.md" type="text/markdown" mode="view" />
         </desk>
     </page>
 
-<page path="/privacy" lang="ja" name="プライバシー" icon="[page]" info="このサイトが保存する情報：テーマの選択と、ワークスペース用のセッションCookie。">
+<page path="/privacy" lang="ja" name="プライバシー" icon="[page]" info="ブラウザの設定と、共有鍵で暗号化したワークスペースのメッセージの保存について。">
         <desk name="プライバシー" icon="[page]" info="データについて、平易な言葉で" auto="true">
             <window path="privacy.ja.md" type="text/markdown" mode="view" />
         </desk>

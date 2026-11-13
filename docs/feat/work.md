@@ -13,12 +13,35 @@
 - [x] Static `/work` shell served with `no-referrer`/`no-store`
 - [x] D1 schema and migration for clients, sessions, messages, files, receipts, pins, dashboards, desk state and audit; tests enforce idempotency and cross-tenant pin constraints
 - [x] Unfinished work APIs return `501` and accept no client data
+- [x] Shared-key encrypted text chat: owner-created invitations, tenant authorization, idempotent sends, catch-up polling, invitation revocation and `message/cpim` / `im:` windows
 - [ ] Google JWT verification, UUID claim, hashed cookie sessions, tenant filtering, CSRF and rate limits (4.5)
 - [ ] Chat idempotency, reconnect, soft deletion, file upload policy, owner audit and mail debounce (4.6)
 - [ ] Per-client durable chat and database API adapters
 - [ ] Work client: sessions, messages, pins, receipts, dashboards and state versioning (3.9)
 
 ## Contract
+
+## Encrypted messaging implementation
+
+`/work` opens a `message/cpim` window at `im:jason@jasouza.com`. The owner uses the same page and selects a client; the window address becomes `im:{client email}`. This MIME identifies the conversation viewer; the transport is encrypted JSON, not an interoperable CPIM/SIP service.
+
+This first release uses owner-created bearer invitations. The Google/UUID cookie-session design below remains planned. Configure a random `WORK_OWNER_TOKEN` (32–256 URL-safe characters) as a Worker secret. Open **Owner access**, enter that token, then create a conversation with the client's email. **Invitation link** exposes the link to copy, back up privately and share through a trusted channel. The same link lets the owner restore the key after signing in on another device; a raw shared key also works. No email is sent automatically.
+
+The browser generates a random 256-bit shared key and encrypts each message with AES-GCM, a fresh 96-bit IV and a 128-bit authentication tag. Additional authenticated data binds protocol version, room, message UUID and authenticated author. The server stores encrypted message envelopes; keys never enter HTTP requests or server storage. Email, author, timestamps and ciphertext lengths remain visible to the service. Shared keys provide no forward secrecy or protection against compromised devices or malicious site JavaScript. Anyone holding an invitation can read history and send as that client. The server cannot recover lost keys.
+
+Invitation secrets travel in the URL fragment, which is removed from browser history after import. They are kept in tab session storage; plaintext drafts and pending sends stay in memory only. **Lock workspace** clears the tab's invitations and owner token: keep an external private backup first. Owner-created invitations do not silently reopen as the client after reload; the owner must authenticate again. Closing a conversation revokes its client token and prevents further sends; the owner retains read access. Reopening/key rotation is not implemented.
+
+The Worker authenticates each request, derives the author, enforces same-origin mutations and a custom header, accepts bounded ciphertext only, and stores client token hashes in D1. Clients cannot list rooms or access other clients. Sends have UUID idempotency and a durable 30-message/minute/role/room limit. The browser retains an unacknowledged encrypted envelope for explicit retry, polls every five seconds with backoff to thirty, and catches up by database sequence, 100 messages per page. Messaging works with the personal server offline. Google sign-in, cookie sessions, WebSockets, attachments, edits/deletes, audit and notification email remain future work.
+
+Code: `src/work_crypto.ts`, `src/node/work.ts`, `src/web/client/desk_messages.ts`, `migrations/0002_work_chat.sql`. Tests: `tests/work.test.ts`; `npm run db:local` then `npm run test:work:browser` exercises separate owner/client contexts against local Worker/D1, including a lost acknowledgement and safe retry.
+
+### Staging setup
+
+Set `WORK_OWNER_TOKEN` in the provisioning machine's private `.env` (generate using `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Run `npm run tf:staging -- plan` / `apply` from the `staging` checkout. Its standalone root creates `jazu-staging-work`, applies SQL migrations and binds D1/the secret to the staging Worker. Production resources are untouched. An empty owner token disables chat with `503`. Publish the static shell through staging CI. Locally, put the secret in `.dev.vars`, then run `npm run db:local`, `npm run serve`, and `npm run cloud:dev`. Never deploy the local Wrangler config.
+
+Verified locally: TypeScript, Work crypto/SQL/authorization tests, adjacent Worker/plugin tests, staging Terraform validation/mocked tests, and a desktop-owner/mobile-client browser test against real local Worker/D1. The browser test checks both addresses, bidirectional encrypted text, a lost send acknowledgement with deduplicated retry, history after reload, inert HTML text rendering and mobile width. The full Windows suite reported existing WASM toolchain failures and pipeline timeouts under concurrent load; the targeted listener timeout case passed on rerun.
+
+Suggested next features: verified account sign-in, encrypted attachments with size limits, read/unread indicators, browser-side history search and secure invitation rotation/device management.
 
 *This is the target contract; a described capability is not a claim that it has shipped. The status list above is authoritative.*
 

@@ -111,7 +111,7 @@ export function expand_objects(model: site_model): void {
 export function collect_resources(model: site_model): void {
     const base = resolve(model.content_dir)
     function publish(node: xml_node, value: string, owner: string, window: boolean): string {
-        if (/^(?:https?:|mailto:|data:|window:|pid:|shell:|#)/.test(value) || value.startsWith("/api/")) return value
+        if (/^(?:https?:|mailto:|im:|data:|window:|pid:|shell:|#)/.test(value) || value.startsWith("/api/")) return value
         if (value === "file:///" || value.startsWith("file:///home/user")) return value
         if (model.resources.has(value.replace(/^file:\/\//, ""))) return value
         let source: string

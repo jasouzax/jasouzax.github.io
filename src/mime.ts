@@ -2,6 +2,7 @@ export type mime_info = { mime: string, icon: string, label: string, extensions:
 
 export const mime_table: mime_info[] = [
     { mime: "inode/directory", icon: "[folder]", label: "Folder", extensions: [] },
+    { mime: "message/cpim", icon: "[contact]", label: "Messages", extensions: [] },
     { mime: "text/x-c", icon: "[code]", label: "C source", extensions: ["c", "h"] },
     { mime: "text/x-c++src", icon: "[code]", label: "C++ source", extensions: ["cpp", "cc", "hpp"] },
     { mime: "text/x-python", icon: "[code]", label: "Python", extensions: ["py"] },

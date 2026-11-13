@@ -37,7 +37,7 @@ Ordered children that declare when the plugin applies. **A case needs a `host` o
 | `error` | `bool`; `true` matches error windows only; default excludes them |
 | `view`, `edit` | `bool`; allowed modes. Omit both = either; only `view` = view-only; a flag set to `false` disallows |
 | `mime`, `url` | Comma-separated patterns with `*`; each defaults to `*`. `url` matches the window's resource URI |
-| `host` | Built-in body: `text`, `hex`, `folder`, `media`, `shell`, `markdown`, `html`, `pdf`, `image_pdf`, `mirror`, `default` (anything else is an error) |
+| `host` | Built-in body: `text`, `hex`, `folder`, `media`, `shell`, `markdown`, `html`, `pdf`, `image_pdf`, `mirror`, `messages`, `default` (anything else is an error). `messages` handles `message/cpim` at `im:*` on a server-enabled desk. |
 | `script` | Case-specific script; overrides the plugin's |
 | `child_file`, `child_view`, `child_edit`, `child_mime`, `child_url` | The same conditions, but for the **child** of a split window. A case with any of them is a *flow case*: it never applies to an ordinary window, and the plain attributes (`mime`, `url`, `view`, `edit`, `file`, `error`) then describe the **parent**. See [Split flows](#split-flows) |
 

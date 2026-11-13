@@ -651,6 +651,7 @@ function action_icons(ctx: render_ctx): Record<string, string> {
 function render_runtime_data(ctx: render_ctx): html {
     const text: Record<string, string> = {}
     for (const key of runtime_keys) text[key] = ui_text(ctx.model, ctx.lang, key)
+    for (const key of Object.keys(ctx.model.config.languages[ctx.model.config.default_language] ?? {}).filter(key => key.startsWith("work_"))) text[key] = ui_text(ctx.model, ctx.lang, key)
     const mimes = mime_table.map((info) => ({
         mime: info.mime,
         label: info.label,

@@ -15,6 +15,7 @@ import { link_hooks, refresh_children, flow_kind_of, document_of, latest_bytes, 
 import { html_body, pdf_body, image_pdf_body } from "./desk_preview.ts"
 import { comparison_lines } from "./desk_compare.ts"
 import { no_picks } from "./desk_flow_rules.ts"
+import { message_body } from "./desk_messages.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -493,6 +494,15 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     }
     if (item.parent) item.picks.own = true
     try {
+        if (/^im:[^\s@]+@[^\s@]+$/i.test(uri)) {
+            process_hooks.release(item)
+            forget_edits(item)
+            item.file = null; item.save = null; item.pid = null
+            item.path = uri; item.name = uri.slice(3); item.mode = "view"
+            item.mime = "message/cpim"; item.candidates = [item.mime]; item.icon = mime_icon(item.mime)
+            render_window(item)
+            return
+        }
         for (const handler of uri_handlers) {
             if (!current()) return
             if (await handler(item, uri, current)) return
@@ -515,7 +525,7 @@ function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     body.className = "desk_mirror_body"
     const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
-        state, text, render_window, save_window }
+        messages: message_body, state, text, render_window, save_window }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
         for (const { context, module } of candidates) {
@@ -546,7 +556,7 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, state, text, render_window, save_window }
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return

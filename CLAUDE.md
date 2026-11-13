@@ -104,6 +104,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Encrypted Work chat:** `node/work.ts` uses D1 `work_rooms`/`work_messages` from migration 0002, separate from the future Google/UUID schema. `WORK_OWNER_TOKEN` enables provisioning; client tokens are hashed. `src/work_crypto.ts` is shared AES-GCM code; never send keys to the API. `desk_messages.ts` is the `messages` host for `message/cpim` at `im:` URIs. Invitations use URL fragments and tab session storage, never VFS/desk persistence. Staging Terraform owns its dedicated D1 and migrations; Pages publication alone cannot enable the API.
+
 - **Provider-first clone routing:** Worker `PROJECT_CLONE_ORIGINS` comes from public XML `repo` declarations during Terraform deployment; never put this private routing map into public Pages payloads or forward personal credentials upstream. `git_read_proxy.ts` streams provider reads and redirects failed discovery to the same site's `/_git/pi/` path, pinning subsequent Git requests to Pi. Pushes always use the signed node. Pages CI does not deploy Worker code/bindings; reapply standalone staging Terraform after a routing change. Legacy Workers without the binding retain static clone behavior.
 
 - **Staging infrastructure:** `terraform/staging/` is a standalone root with separate local state; do not apply the production root or import production resources to provision staging. `npm run tf:staging -- plan|apply` bundles the Worker, maps `.env` aliases into child TF_VAR inputs and manages Pages, R2, DNS/domain, Worker routing and secrets. Never generate secret var-files or use Wrangler to overwrite this Terraform-owned Worker. Terraform tests use a mocked provider.

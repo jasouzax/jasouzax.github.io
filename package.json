@@ -19,6 +19,7 @@
     "clean": "node src/main.ts clean",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:desk:browser": "playwright test --config tests/desk_browser.config.ts",
+    "test:work:browser": "npm run build && playwright test --config tests/work_browser.config.ts",
     "test:loading:browser": "playwright test --config tests/loading_browser.config.ts",
     "test:expertise:browser": "playwright test --config tests/expertise_browser.config.ts",
     "test:rireki:browser": "playwright test --config tests/rireki_browser.config.ts",

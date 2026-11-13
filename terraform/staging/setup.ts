@@ -21,6 +21,7 @@ export function staging_environment(source: NodeJS.ProcessEnv, bundle: string): 
         origin_hmac_secret: ["ORIGIN_HMAC_SECRET", "HMAC_SECRET"],
         access_client_id: ["ACCESS_CLIENT_ID"], access_client_secret: ["ACCESS_CLIENT_SECRET"],
         personal_origin: ["PERSONAL_ORIGIN"],
+        work_owner_token: ["WORK_OWNER_TOKEN"], work_owner_email: ["WORK_OWNER_EMAIL"],
     }
     for (const [name, alternatives] of Object.entries(aliases)) {
         const key = `TF_VAR_${name}`
