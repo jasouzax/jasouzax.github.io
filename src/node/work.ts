@@ -1,11 +1,11 @@
 /*
  * Encrypted Work API backed by D1, independent of the personal server.
- * Owner bearer secret provisions rooms; per-room random invitation tokens authenticate clients.
- * Only token hashes and authenticated ciphertext are stored. Encryption keys never enter this API.
+ * Automatic guest cookies or verified Google sessions authenticate participants.
+ * Only cookie hashes, public keys, wrapped conversation keys and ciphertext are stored.
  */
 import { api_error } from "./security.ts"
-import { decode_key, type Work_Envelope } from "../work_crypto.ts"
-import { read_session, valid_csrf } from "./auth.ts"
+import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
+import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -15,20 +15,15 @@ export type Work_Statement = {
 }
 export type Work_Env = {
     DB?: { prepare(sql: string): Work_Statement, batch?(statements: Work_Statement[]): Promise<unknown> }
-    WORK_OWNER_TOKEN?: string
     WORK_OWNER_EMAIL?: string
     GOOGLE_CLIENT_ID?: string
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
 }
-type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null }
+type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } })
-
-async function token_hash(value: string): Promise<string> {
-    return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, "0")).join("")
-}
 
 async function read_json(request: Request): Promise<Record<string, unknown>> {
     if (!request.headers.get("content-type")?.startsWith("application/json")) throw new Error("Expected application/json")
@@ -56,61 +51,114 @@ function valid_envelope(value: unknown): value is Work_Envelope {
     try { return decode_key(entry.iv).length === 12 && decode_key(entry.ciphertext).length >= 17 && decode_key(entry.ciphertext).length <= 8016 } catch { return false }
 }
 
+type Owner_Key = { key_id: string, public_jwk: string }
+const guest_cookie = "__Host-jazu_guest"
+function guest_token(request: Request): string {
+    const values = (request.headers.get("cookie") ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(guest_cookie + "="))
+    const value = values.length === 1 ? values[0].slice(guest_cookie.length + 1) : ""
+    return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : ""
+}
+async function public_key(value: unknown): Promise<JsonWebKey> {
+    const jwk = value as JsonWebKey
+    if (!jwk || jwk.kty !== "EC" || jwk.crv !== "P-256" || jwk.d || typeof jwk.x !== "string" || typeof jwk.y !== "string" || decode_key(jwk.x).length !== 32 || decode_key(jwk.y).length !== 32) throw new Error("Invalid public key")
+    const clean = { kty: "EC", crv: "P-256", x: jwk.x, y: jwk.y }
+    await crypto.subtle.importKey("jwk", clean, { name: "ECDH", namedCurve: "P-256" }, false, [])
+    return clean
+}
+function room_info(room: Room) {
+    return { id: room.id, email: room.google_subject ? room.email : `guest/${room.guest_id}`, guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
+}
+
 export async function work_route(request: Request, env: Work_Env): Promise<Response> {
-    if (!env.DB || (!(env.WORK_OWNER_TOKEN && env.WORK_OWNER_TOKEN.length >= 32) && !env.GOOGLE_CLIENT_ID)) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
+    if (!env.DB || !env.GOOGLE_CLIENT_ID) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
     const url = new URL(request.url)
+    if (request.headers.has("authorization")) return api_error("forbidden", "Use your browser session", 403)
     if (request.headers.has("origin") && request.headers.get("origin") !== url.origin) return api_error("forbidden", "Use the workspace on this origin", 403)
     if (!["GET", "POST"].includes(request.method)) return api_error("method_not_allowed", "Use GET or POST", 405)
-    if (request.method === "POST" && request.headers.get("x-jazu-work") !== "1") return api_error("forbidden", "Missing workspace request header", 403)
-    const bearer = request.headers.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,256})$/)?.[1]
+    if (request.method === "POST" && (request.headers.get("origin") !== url.origin || request.headers.get("x-jazu-work") !== "1")) return api_error("forbidden", "Use the workspace on this origin", 403)
     const session = await read_session(request, env)
-    if (!bearer && !session) return api_error("unauthorized", "Sign in with Google or open your invitation", 401)
-    if (request.method === "POST" && session && !valid_csrf(request, session)) return api_error("forbidden", "Refresh the workspace before making changes", 403)
-    const hashed = bearer ? await token_hash(bearer) : ""
-    const owner = bearer ? Boolean(env.WORK_OWNER_TOKEN && hashed === await token_hash(env.WORK_OWNER_TOKEN)) : session?.role === "owner"
+    let guest = guest_token(request)
+    let guest_row = guest ? await env.DB.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ?").bind(await auth_hash(guest), Date.now() - 365 * 86400000).first<{ id: number }>() : null
+    const owner = session?.role === "owner"
+    const owner_key = await env.DB.prepare("SELECT key_id, public_jwk FROM work_owner_keys WHERE id = 1").first<Owner_Key>()
     const base = "/api/v1/work/rooms"
-    if (url.pathname === base) {
-        if (!owner && request.method === "GET" && session && !bearer) {
-            const { results } = await env.DB.prepare("SELECT id, email, created_at, revoked FROM work_rooms WHERE google_subject = ? AND revoked = 0 ORDER BY created_at DESC LIMIT 200").bind(session.subject).all()
-            return reply({ rooms: results, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
+    if (url.pathname === "/api/v1/work/session" && request.method === "POST") {
+        if (session && !valid_csrf(request, session)) return api_error("forbidden", "Refresh the workspace", 403)
+        if (!session && !guest_row) {
+            const ip_day = await auth_hash(`${new Date().toISOString().slice(0, 10)}\n${request.headers.get("cf-connecting-ip") ?? "unknown"}`)
+            guest = encode_key(crypto.getRandomValues(new Uint8Array(32)))
+            guest_row = await env.DB.prepare("INSERT INTO work_guests (cookie_hash, ip_day, created_at) SELECT ?, ?, ? WHERE (SELECT count(*) FROM work_guests WHERE ip_day = ?) < 20 RETURNING id").bind(await auth_hash(guest), ip_day, Date.now(), ip_day).first<{ id: number }>()
+            if (!guest_row) return api_error("rate_limited", "Please try again later or sign in with Google", 429)
         }
+        const room = session && !owner ? await env.DB.prepare("SELECT * FROM work_rooms WHERE google_subject = ? AND revoked = 0 AND owner_wrap IS NOT NULL").bind(session.subject).first<Room>() : null
+        const guest_room = guest_row ? await env.DB.prepare("SELECT * FROM work_rooms WHERE guest_id = ? AND google_subject IS NULL AND revoked = 0").bind(guest_row.id).first<Room>() : null
+        const response = reply({ csrf: session?.csrf ?? await auth_hash(`guest-csrf\n${guest}`), owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com", owner_key: owner_key ? { key_id: owner_key.key_id, public_jwk: JSON.parse(owner_key.public_jwk) } : null, room: room ? room_info(room) : null, guest_room: guest_room ? room_info(guest_room) : null })
+        if (!session) response.headers.set("set-cookie", `${guest_cookie}=${guest}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000`)
+        return response
+    }
+    if (!session && !guest_row) return api_error("unauthorized", "Refresh the messaging window", 401)
+    if (request.method === "POST" && (session ? !valid_csrf(request, session) : request.headers.get("x-jazu-csrf") !== await auth_hash(`guest-csrf\n${guest}`))) return api_error("forbidden", "Refresh the messaging window", 403)
+    if (url.pathname === "/api/v1/work/key-file") {
+        if (!session) return api_error("forbidden", "Sign in to use private Google Drive storage", 403)
+        if (request.method === "POST") {
+            try {
+                const data = await read_json(request)
+                if (typeof data.file_id !== "string" || !/^[A-Za-z0-9_-]{10,200}$/.test(data.file_id)) throw new Error("Invalid file id")
+                await env.DB.prepare("INSERT OR IGNORE INTO work_key_files (subject, file_id) VALUES (?, ?)").bind(session.subject, data.file_id).run()
+            } catch { return api_error("invalid_request", "Invalid private key file", 400) }
+        }
+        return reply({ file_id: (await env.DB.prepare("SELECT file_id FROM work_key_files WHERE subject = ?").bind(session.subject).first<{ file_id: string }>())?.file_id ?? null })
+    }
+    if (url.pathname === "/api/v1/work/owner-key" && request.method === "POST") {
         if (!owner) return api_error("forbidden", "Owner access required", 403)
-        if (request.method === "GET") {
-            const { results } = await env.DB.prepare("SELECT id, email, created_at, revoked FROM work_rooms ORDER BY created_at DESC LIMIT 200").all()
-            return reply({ rooms: results, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
-        }
         try {
             const data = await read_json(request)
-            const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : ""
-            if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) || email.length > 254) return api_error("bad_email", "Enter the client's email address", 400)
-            if ((data.id !== undefined || data.token !== undefined) && (typeof data.id !== "string" || !uuid.test(data.id) || typeof data.token !== "string" || !/^[A-Za-z0-9_-]{32,256}$/.test(data.token))) return api_error("invalid_invitation", "Invalid invitation credentials", 400)
-            const id = typeof data.id === "string" ? data.id : crypto.randomUUID()
-            const token = typeof data.token === "string" ? data.token : crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
-            const existing = await env.DB.prepare("SELECT * FROM work_rooms WHERE email = ?").bind(email).first<Room>()
-            if (existing) {
-                if (existing.id === id && existing.token_hash === await token_hash(token) && !existing.revoked) return reply({ room: { id, email }, token, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
-                return api_error("room_exists", "A conversation for this email already exists", 409)
-            }
-            await env.DB.prepare("INSERT INTO work_rooms (id, email, token_hash, created_at) VALUES (?, ?, ?, ?)").bind(id, email, await token_hash(token), Date.now()).run()
-            return reply({ room: { id, email }, token, owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" }, 201)
-        } catch { return api_error("invalid_request", "Could not create conversation; check the email and request", 400) }
+            const jwk = await public_key(data.public_jwk)
+            const serialized = JSON.stringify(jwk), key_id = await auth_hash(serialized)
+            if (owner_key && owner_key.key_id !== key_id) return api_error("owner_key_exists", "Restore the owner's existing private key from Google Drive; replacing it would lose access to messages", 409)
+            await env.DB.prepare("INSERT OR IGNORE INTO work_owner_keys (id, subject, key_id, public_jwk, created_at) VALUES (1, ?, ?, ?, ?)").bind(session!.subject, key_id, serialized, Date.now()).run()
+            const stored = await env.DB.prepare("SELECT key_id FROM work_owner_keys WHERE id = 1").first<{ key_id: string }>()
+            return stored?.key_id === key_id ? reply({ key_id }) : api_error("owner_key_exists", "An owner key already exists", 409)
+        } catch { return api_error("invalid_key", "Invalid owner public key", 400) }
     }
-    const match = /^\/api\/v1\/work\/rooms\/([^/]+)(\/messages|\/revoke|\/bind)?$/.exec(url.pathname)
+    if (url.pathname === base) {
+        if (request.method === "GET") {
+            if (!owner) return api_error("forbidden", "Owner access required", 403)
+            const limit = 100
+            const before = url.searchParams.get("before") ?? `${Date.now() + 1}.ffffffff-ffff-ffff-ffff-ffffffffffff`
+            if (!/^\d{1,15}\.[0-9a-f-]{36}$/i.test(before)) return api_error("bad_cursor", "Invalid conversation cursor", 400)
+            const [time, id] = before.split(".")
+            const { results } = await env.DB.prepare("SELECT * FROM work_rooms WHERE (created_at < ? OR (created_at = ? AND id < ?)) AND owner_wrap IS NOT NULL AND EXISTS (SELECT 1 FROM work_messages WHERE room_id = work_rooms.id) ORDER BY created_at DESC, id DESC LIMIT ?").bind(Number(time), Number(time), id, limit).all<Room>()
+            const last = results[results.length - 1]
+            return reply({ rooms: results.map(room_info), next: results.length === limit ? `${last.created_at}.${last.id}` : null })
+        }
+        if (owner) return api_error("forbidden", "Open a client from the Clients panel", 403)
+        if (!owner_key) return api_error("owner_not_ready", "The owner is setting up encrypted messaging. Please try again shortly.", 503)
+        try {
+            const data = await read_json(request)
+            if (typeof data.id !== "string" || !uuid.test(data.id) || data.key_id !== owner_key.key_id) return api_error("invalid_key", "Refresh the owner's encryption key", 400)
+            const wrap = data.owner_wrap as { v: number, iv: string, ciphertext: string, public_jwk: unknown }
+            if (!wrap || wrap.v !== 1 || decode_key(wrap.iv).length !== 12 || decode_key(wrap.ciphertext).length !== 48) return api_error("invalid_key", "Invalid encrypted conversation key", 400)
+            const serialized = JSON.stringify({ v: 1, public_jwk: await public_key(wrap.public_jwk), iv: wrap.iv, ciphertext: wrap.ciphertext })
+            const existing = session ? await env.DB.prepare("SELECT * FROM work_rooms WHERE google_subject = ? AND revoked = 0 AND owner_wrap IS NOT NULL").bind(session.subject).first<Room>() : await env.DB.prepare("SELECT * FROM work_rooms WHERE guest_id = ?").bind(guest_row!.id).first<Room>()
+            if (existing) return existing.id === data.id && existing.owner_wrap === serialized ? reply({ room: room_info(existing) }) : api_error("conversation_exists", "A conversation already exists; restore its key", 409)
+            await env.DB.prepare("INSERT OR IGNORE INTO work_rooms (id, email, token_hash, created_at, google_subject, guest_id, owner_wrap, owner_key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(data.id, session?.email ?? `guest/${guest_row!.id}`, `disabled:${data.id}`, Date.now(), session?.subject ?? null, session ? null : guest_row!.id, serialized, owner_key.key_id).run()
+            const room = await env.DB.prepare("SELECT * FROM work_rooms WHERE id = ?").bind(data.id).first<Room>()
+            const permitted = room && (session ? room.google_subject === session.subject : !room.google_subject && room.guest_id === guest_row!.id)
+            return permitted && room.owner_wrap === serialized ? reply({ room: room_info(room) }, 201) : api_error("conversation_exists", "A conversation already exists; refresh the window", 409)
+        } catch { return api_error("invalid_request", "Could not start the conversation", 400) }
+    }
+    const match = /^\/api\/v1\/work\/rooms\/([^/]+)(\/messages|\/bind)?$/.exec(url.pathname)
     if (!match || !uuid.test(match[1])) return api_error("not_found", "Unknown workspace route", 404)
     const room = await env.DB.prepare("SELECT * FROM work_rooms WHERE id = ?").bind(match[1]).first<Room>()
-    const client_access = room && !room.revoked && (bearer ? room.token_hash === hashed && (!room.google_subject || room.google_subject === session?.subject) : Boolean(session && room.google_subject === session.subject))
-    if (!room || (!owner && !client_access)) return api_error("not_found", "Conversation is unavailable; linked invitations require Google sign-in", 404)
+    const client_access = room && !room.revoked && (room.google_subject ? room.google_subject === session?.subject : Boolean(guest_row && room.guest_id === guest_row.id))
+    if (!room || (!owner && !client_access)) return api_error("not_found", "Conversation is unavailable", 404)
     if (match[2] === "/bind" && request.method === "POST") {
-        if (!session || session.role !== "client" || room.email !== session.email || !bearer || room.token_hash !== hashed || room.revoked) return api_error("forbidden", "Sign in with the Google email invited to this conversation", 403)
-        const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) RETURNING id").bind(session.subject, room.id, session.subject).first()
-        return linked ? reply({ linked: true }) : api_error("already_linked", "This conversation belongs to another Google account", 409)
+        if (!session || owner || !guest_row || room.guest_id !== guest_row.id || room.revoked) return api_error("forbidden", "Use the guest's browser to connect this conversation", 403)
+        const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ?, email = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE google_subject = ? AND id != ? AND revoked = 0 AND owner_wrap IS NOT NULL) RETURNING id").bind(session.subject, session.email, room.id, session.subject, session.subject, room.id).first()
+        return linked ? reply({ linked: true }) : api_error("conversation_exists", "Your Google account already has a conversation. Guest messages were not transferred.", 409)
     }
-    if (match[2] === "/revoke" && request.method === "POST") {
-        if (!owner) return api_error("forbidden", "Owner access required", 403)
-        await env.DB.prepare("UPDATE work_rooms SET revoked = 1 WHERE id = ?").bind(room.id).run()
-        return reply({ revoked: true })
-    }
-    if (!match[2] && request.method === "GET") return reply({ room: { id: room.id, email: room.email, revoked: room.revoked, google_bound: Boolean(room.google_subject) }, role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
+    if (!match[2] && request.method === "GET") return reply({ room: room_info(room), role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
     if (match[2] !== "/messages") return api_error("not_found", "Unknown workspace route", 404)
     if (request.method === "GET") {
         const after = url.searchParams.get("after") ?? "0"

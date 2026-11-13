@@ -28,7 +28,7 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
     }))
     try {
         const db = await runtime.getD1Database("DB")
-        for (const file of ["0002_work_chat.sql", "0003_google_auth.sql"]) {
+        for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql"]) {
             // D1 exec accepts one SQL statement per line.
             await db.exec(readFileSync(`migrations/${file}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
         }

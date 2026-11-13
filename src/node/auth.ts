@@ -7,6 +7,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose"
 import type { Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { encode_key } from "../work_crypto.ts"
+import { google_access, save_google_grant } from "./google_grant.ts"
 
 const session_cookie = "__Host-jazu_session"
 const flow_cookie = "__Host-jazu_oauth"
@@ -68,6 +69,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (url.pathname === "/api/v1/auth/logout" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Invalid sign-out request", 403)
+        await env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
         await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
         const response = reply({ signed_out: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
@@ -77,9 +79,11 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session) || request.headers.get("x-jazu-confirm-delete") !== "account") return api_error("forbidden", "Confirm account deletion from the signed-in account menu", 403)
         if (!env.DB.batch) return api_error("unavailable", "Account deletion is temporarily unavailable", 503)
-        // A single transaction revokes every device and invitation while preserving the other participant's encrypted history.
+        // Revoke every device and linked conversation while preserving the other participant's encrypted history.
         await env.DB.batch([
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
+            env.DB.prepare("DELETE FROM work_key_files WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_sessions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_users WHERE subject = ?").bind(session.subject),
@@ -87,6 +91,12 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         const response = reply({ deleted: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response
+    }
+    if (url.pathname === "/api/v1/auth/drive" && request.method === "POST") {
+        const session = await read_session(request, env)
+        if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before opening your key storage", 403)
+        try { return reply({ access_token: await google_access(env, read_cookie(request, session_cookie), dependencies.fetch) }) }
+        catch { return api_error("drive_consent_required", "Sign in again and allow private app data storage in Google Drive", 403) }
     }
     if (request.method !== "GET") return api_error("method_not_allowed", "Use GET", 405)
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_ADMIN_EMAIL) return api_error("auth_unconfigured", "Google sign-in is not configured", 503)
@@ -98,7 +108,8 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         await env.DB.prepare("DELETE FROM auth_sessions WHERE last_seen < ?").bind(Date.now() - month).run()
         await env.DB.prepare("INSERT INTO auth_flows (state_hash, browser_hash, nonce, verifier, expires_at) VALUES (?, ?, ?, ?, ?)").bind(await auth_hash(state), await auth_hash(browser), nonce, verifier, Date.now() + 600000).run()
         const challenge = encode_key(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))))
-        const query = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri, response_type: "code", scope: "openid email profile", state, nonce, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account" })
+        const query = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri, response_type: "code", scope: "openid email profile https://www.googleapis.com/auth/drive.appdata", state, nonce, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account", access_type: "offline" })
+        if (url.searchParams.get("drive") === "1") query.set("prompt", "consent select_account")
         return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${query}`, "set-cookie": cookie(flow_cookie, browser, 600), "cache-control": "no-store", "referrer-policy": "no-referrer" } })
     }
     if (url.pathname !== callback_path) return api_error("not_found", "Unknown authentication route", 404)
@@ -111,6 +122,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (!code || code.length > 4096) return redirect_work("invalid_response")
     let identity: Identity
     let id_token: string
+    let token_result: Record<string, unknown>
     try {
         // Workers only supports manual/follow. Never forward the code or secret to a redirect target.
         const response = await (dependencies.fetch ?? fetch)("https://oauth2.googleapis.com/token", { method: "POST", redirect: "manual", signal: AbortSignal.timeout(10000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri, grant_type: "authorization_code", code_verifier: flow.verifier }) })
@@ -118,6 +130,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         const result = await response.json() as { id_token?: string, error?: string }
         if (!response.ok || !result.id_token) return redirect_work(result.error === "invalid_client" ? "client_configuration" : "token_exchange")
         id_token = result.id_token
+        token_result = result
     } catch { return redirect_work("token_exchange_network") }
     try {
         identity = await verify_google_token(id_token, env.GOOGLE_CLIENT_ID, flow.nonce, dependencies.keys)
@@ -127,8 +140,12 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (identity.email === env.GOOGLE_ADMIN_EMAIL.toLowerCase()) await env.DB.prepare("INSERT OR IGNORE INTO auth_owner (id, subject) VALUES (1, ?)").bind(identity.subject).run()
     const token = random()
     await env.DB.prepare("INSERT INTO auth_sessions (token_hash, subject, created_at, last_seen) VALUES (?, ?, ?, ?)").bind(await auth_hash(token), identity.subject, now, now).run()
+    await save_google_grant(env, token, token_result)
     const previous = read_cookie(request, session_cookie)
-    if (previous) await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(previous)).run()
+    if (previous) {
+        await env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash = ?").bind(await auth_hash(previous)).run()
+        await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(previous)).run()
+    }
     const response = redirect_work()
     response.headers.append("set-cookie", cookie(session_cookie, token, month / 1000))
     return response

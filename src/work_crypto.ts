@@ -39,3 +39,30 @@ export async function decrypt_message(key: string, envelope: Work_Envelope, cont
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode_key(envelope.iv), additionalData: additional_data(context), tagLength: 128 }, await import_key(key), decode_key(envelope.ciphertext))
     return new TextDecoder("utf-8", { fatal: true }).decode(plain)
 }
+
+export type Owner_Wrap = { v: 1, public_jwk: JsonWebKey, iv: string, ciphertext: string }
+
+export async function generate_owner_key(): Promise<{ private_jwk: JsonWebKey, public_jwk: JsonWebKey }> {
+    const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"])
+    return { private_jwk: await crypto.subtle.exportKey("jwk", pair.privateKey), public_jwk: await crypto.subtle.exportKey("jwk", pair.publicKey) }
+}
+
+async function wrapping_key(private_jwk: JsonWebKey, public_jwk: JsonWebKey): Promise<CryptoKey> {
+    const private_key = await crypto.subtle.importKey("jwk", private_jwk, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveKey"])
+    const public_key = await crypto.subtle.importKey("jwk", public_jwk, { name: "ECDH", namedCurve: "P-256" }, false, [])
+    return crypto.subtle.deriveKey({ name: "ECDH", public: public_key }, private_key, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"])
+}
+
+export async function wrap_room_key(key: string, public_jwk: JsonWebKey, room: string): Promise<Owner_Wrap> {
+    const ephemeral = await generate_owner_key()
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(`jazu-owner-wrap-v1\n${room}`) }, await wrapping_key(ephemeral.private_jwk, public_jwk), decode_key(key))
+    return { v: 1, public_jwk: ephemeral.public_jwk, iv: encode_key(iv), ciphertext: encode_key(new Uint8Array(ciphertext)) }
+}
+
+export async function unwrap_room_key(wrap: Owner_Wrap, private_jwk: JsonWebKey, room: string): Promise<string> {
+    if (wrap.v !== 1 || decode_key(wrap.iv).length !== 12) throw new Error("Invalid wrapped conversation key")
+    const key = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode_key(wrap.iv), additionalData: new TextEncoder().encode(`jazu-owner-wrap-v1\n${room}`) }, await wrapping_key(private_jwk, wrap.public_jwk), decode_key(wrap.ciphertext))
+    if (key.byteLength !== 32) throw new Error("Invalid conversation key")
+    return encode_key(new Uint8Array(key))
+}

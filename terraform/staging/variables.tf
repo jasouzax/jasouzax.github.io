@@ -74,16 +74,6 @@ variable "work_migrations_enabled" {
   description = "Apply D1 migrations before uploading the Worker. Disable only for mocked tests."
 }
 
-variable "work_owner_token" {
-  type      = string
-  sensitive = true
-  default   = ""
-  validation {
-    condition     = var.work_owner_token == "" || can(regex("^[A-Za-z0-9_-]{32,256}$", var.work_owner_token))
-    error_message = "Use a random Work owner token of 32 to 256 URL-safe characters, or leave empty to disable chat."
-  }
-}
-
 variable "work_owner_email" {
   type    = string
   default = "jason@jasouza.com"

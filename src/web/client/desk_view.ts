@@ -494,7 +494,7 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     }
     if (item.parent) item.picks.own = true
     try {
-        if (/^im:[^\s@]+@[^\s@]+$/i.test(uri)) {
+        if (/^im:(?:[^\s@]+@[^\s@]+|guest\/[1-9]\d*)$/i.test(uri)) {
             process_hooks.release(item)
             forget_edits(item)
             item.file = null; item.save = null; item.pid = null

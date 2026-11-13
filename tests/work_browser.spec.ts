@@ -1,84 +1,147 @@
-import { test, expect } from "@playwright/test"
-const owner_token = "work_browser_test_owner_01234567890123456789"
+import { test, expect, type Page } from "@playwright/test"
+import { account, reset, drive_files } from "./work_browser_helpers.ts"
+test.beforeEach(() => reset())
+const writer = (page: Page) => page.getByRole("textbox", { name: "Write a message…", exact: true })
+async function ready(page: Page): Promise<void> { await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 }) }
+async function send(page: Page, message: string): Promise<void> {
+    await ready(page); await writer(page).fill(message)
+    await page.getByRole("button", { name: "Send", exact: true }).click()
+    await expect(page.locator(".desk_messages_log")).toContainText(message, { timeout: 20000 })
+}
+async function owner(page: Page): Promise<void> {
+    await account(page.context(), "jason@jasouza.com", true)
+    await page.goto("/work"); await ready(page)
+    await expect(page.getByText("Choose a client or guest from the Clients panel to open their conversation.", { exact: true })).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('[data-path="im:clients"] summary').first()).toHaveText("Clients")
+}
 
-test("Google callback errors remain visible after authentication refresh", async ({ page }) => {
+test("a signed-out visitor gets a composer with no invitation or token, and callback errors survive refresh", async ({ page }) => {
     await page.goto("/work?auth_error=token_exchange")
-    const status = page.locator('.desk_messages [role="status"]')
-    await expect(status).toContainText("token_exchange")
+    await expect(writer(page)).toBeVisible()
+    await ready(page)
+    await writer(page).fill("Draft before owner setup")
     await page.evaluate(() => document.dispatchEvent(new CustomEvent("jazu:auth")))
-    await expect(status).toContainText("token_exchange")
+    await expect(writer(page)).toHaveValue("Draft before owner setup")
+    await expect(page.locator('.desk_messages [role="alert"]')).toContainText("token_exchange")
+    await expect(page.getByText("Invitation link", { exact: true })).toHaveCount(0)
+    await expect(page.getByText("Owner access", { exact: true })).toHaveCount(0)
+    await expect(page.locator("[data-work-clients]")).toHaveCount(0)
+    await page.getByRole("button", { name: "Send", exact: true }).click()
+    await expect(page.locator(".desk_messages_status")).toContainText("owner is setting up")
+    await expect(writer(page)).toHaveValue("Draft before owner setup")
     await page.reload()
-    await expect(status).toContainText("token_exchange")
+    await expect(page.locator('.desk_messages [role="alert"]')).toContainText("token_exchange")
 })
 
-test("owner and client chat through encrypted D1 with correct im addresses and safe retries", async ({ browser, page }) => {
-    const errors: string[] = []
-    page.on("pageerror", error => errors.push(error.message))
-    await page.goto("/work")
-    await expect(page.locator(".desk_messages")).toBeVisible()
-    await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
-    await page.getByText("Owner access", { exact: true }).click()
-    await page.getByLabel("Owner access token", { exact: true }).fill(owner_token)
-    await page.getByRole("button", { name: "Connect", exact: true }).click()
-    const email = `browser-${Date.now()}@example.com`
-    await page.getByLabel("Client email", { exact: true }).fill(email)
-    await page.getByRole("button", { name: "Create conversation", exact: true }).click()
-    await expect(page.locator(".desk_messages_toolbar strong")).toHaveText(email)
-    await expect(page.locator(".desk_wbox_head_path")).toHaveValue(`im:${email}`)
-    await expect(page.locator(".desk_wbox_head_mime > summary")).toHaveText("message/cpim")
-    await page.getByText("Invitation link", { exact: true }).click()
-    const invitation = await page.getByRole("textbox", { name: "Invitation link", exact: true }).inputValue()
-    const params = new URL(invitation).hash
-    const client_context = await browser.newContext({ viewport: { width: 390, height: 844 } })
-    const client = await client_context.newPage()
-    client.on("pageerror", error => errors.push(error.message))
+test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
+    await owner(page)
+    expect([...drive_files.get("jason@jasouza.com")!.values()][0].owner.private_jwk.d).toBeTruthy()
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+    const guest = await context.newPage()
     try {
-        await client.goto(invitation)
-        await expect(client.locator(".desk_messages_toolbar strong")).toHaveText("jason@jasouza.com")
-        await expect(client.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
-        await expect(client.locator(".desk_wbox_head_path")).toHaveValue("im:jason@jasouza.com")
-        await expect(client).toHaveURL(/\/work$/)
-        const plain = "Hello Jason 👋 <script>window.compromised=true</script>"
-        await client.getByRole("textbox", { name: "Write a message…", exact: true }).fill(plain)
-        await expect(client.getByRole("textbox", { name: "Write a message…", exact: true })).toHaveValue(plain)
-        const sent = client.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/messages"), { timeout: 10000 })
-        await client.getByRole("button", { name: "Send", exact: true }).click()
-        const acknowledged = await sent
-        expect(acknowledged.status(), await acknowledged.text()).toBe(201)
-        await expect(client.locator(".desk_messages_log .desk_message")).toHaveCount(1, { timeout: 15000 })
-        await expect(page.locator(".desk_messages_log")).toContainText(plain, { timeout: 15000 })
-        const fragment = new URLSearchParams(params.slice(1))
-        const response = await client.request.get(new URL(`/api/v1/work/rooms/${fragment.get("room")}/messages`, invitation).href, { headers: { authorization: `Bearer ${fragment.get("token")}` } })
-        const stored = await response.text()
-        expect(stored).not.toContain("Hello Jason")
-        expect(stored).not.toContain(fragment.get("key")!)
-        expect(await client.evaluate(() => (window as any).compromised)).toBeUndefined()
-        let dropped_ack = false
+        await guest.goto("http://localhost:8787/work")
+        const message = "Guest hello 👋 <script>window.compromised=true</script>"
+        await send(guest, message)
+        const key = await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        const info = await guest.evaluate(async () => (await fetch("/api/v1/work/session", { method: "POST", headers: { "x-jazu-work": "1" } })).json())
+        const address = `guest/${info.guest_room.guest_id}`
+        await expect(guest.locator(".desk_wbox_head_path")).toHaveValue("im:jason@jasouza.com")
+        await page.locator("[data-work-clients] details > summary").click()
+        const entry = page.getByRole("button", { name: address, exact: true })
+        await expect(entry).toBeVisible({ timeout: 25000 }); await entry.click()
+        const chat = page.locator(".desk_messages").filter({ has: page.locator(".desk_messages_toolbar strong", { hasText: address }) })
+        await expect(chat.locator(".desk_messages_log")).toContainText(message)
+        await expect(page.locator(`.desk_wbox_head_path`).last()).toHaveValue(`im:${address}`)
+        let dropped = false
         await page.route("**/api/v1/work/rooms/*/messages", async route => {
-            if (route.request().method() === "POST" && !dropped_ack) { dropped_ack = true; await route.fetch(); await route.abort("failed"); return }
+            if (route.request().method() === "POST" && !dropped) { dropped = true; await route.fetch(); await route.abort("failed"); return }
             await route.continue()
         })
-        await page.getByRole("textbox", { name: "Write a message…", exact: true }).fill("Reply from the owner")
-        await page.getByRole("button", { name: "Send", exact: true }).click()
-        await expect(page.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
-        await page.getByRole("button", { name: "Retry send", exact: true }).click()
-        await expect(client.locator(".desk_messages_log .desk_message")).toHaveCount(2, { timeout: 15000 })
-        await expect(client.locator(".desk_messages_log")).toContainText("Reply from the owner")
-        await client.reload()
-        await expect(client.locator(".desk_messages_log .desk_message")).toHaveCount(2)
-        await expect(client.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
-        await expect(client.locator(".desk_messages")).toBeVisible()
-        expect(await client.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-        await client.screenshot({ path: ".cache/work-client-mobile.png", fullPage: true })
-        await page.screenshot({ path: ".cache/work-owner-desktop.png", fullPage: true })
-        await page.reload()
-        await expect(page.getByText("Owner access", { exact: true })).toBeVisible()
-        await expect(page.locator(".desk_messages_composer")).toHaveCount(0)
-        expect(errors).toEqual([])
-    } catch (error) {
-        console.log("Client window:", await client.evaluate(() => document.querySelector(".desk_messages")?.textContent ?? document.body.innerText))
-        console.log("Browser errors:", errors)
-        await client.screenshot({ path: ".cache/work-client-failure.png", fullPage: true })
-        throw error
-    } finally { await client_context.close() }
+        await chat.getByRole("textbox", { name: "Write a message…" }).fill("Reply from Jason")
+        await chat.getByRole("button", { name: "Send", exact: true }).click()
+        await expect(chat.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
+        await chat.getByRole("button", { name: "Retry send", exact: true }).click()
+        await expect(guest.locator(".desk_messages_log .desk_message")).toHaveCount(2, { timeout: 15000 })
+        await guest.reload()
+        await ready(guest)
+        await expect(guest.locator(".desk_messages_log")).toContainText("Reply from Jason")
+        expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(key.key)
+        expect(await guest.evaluate(() => (window as any).compromised)).toBeUndefined()
+        expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        const stored = await guest.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).text(), key.room)
+        expect(stored).not.toContain("Guest hello"); expect(stored).not.toContain(key.key)
+        await guest.screenshot({ path: ".cache/work-guest-mobile.png", fullPage: true })
+        await page.screenshot({ path: ".cache/work-clients-desktop.png", fullPage: true })
+        const stranger = await browser.newContext()
+        try {
+            const other = await stranger.newPage(); await other.goto("http://localhost:8787/work")
+            await expect(other.locator(".desk_messages_status")).toContainText("Connected")
+            expect(await other.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
+        } finally { await stranger.close() }
+    } finally { await context.close() }
+})
+
+test("first Google sign-in saves the guest key, links history and restores it on another device", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), client = await context.newPage()
+    const email = "first-client@example.com"
+    try {
+        await client.goto("http://localhost:8787/work"); await send(client, "Message before Google")
+        const guest_key = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)
+        await account(context, email); await client.reload()
+        await expect(client.locator(".desk_messages_log")).toContainText("Message before Google")
+        expect([...drive_files.get(email)!.values()][0].client.key).toBe(guest_key)
+        expect(await client.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
+        await expect(page.getByRole("button", { name: email, exact: true })).toBeVisible({ timeout: 25000 })
+        await page.getByRole("button", { name: email, exact: true }).click()
+        await expect(page.locator(".desk_wbox_head_path").last()).toHaveValue(`im:${email}`)
+        const device = await browser.newContext()
+        try {
+            await account(device, email)
+            const restored = await device.newPage(); await restored.goto("http://localhost:8787/work")
+            await expect(restored.locator(".desk_messages_log")).toContainText("Message before Google")
+            expect(await restored.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
+            await send(restored, "Another device")
+            await expect(client.locator(".desk_messages_log")).toContainText("Another device", { timeout: 15000 })
+        } finally { await device.close() }
+    } finally { await context.close() }
+})
+
+test("two guest tabs create one conversation without overwriting the browser key", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext()
+    try {
+        const first = await context.newPage(), second = await context.newPage()
+        await Promise.all([first.goto("http://localhost:8787/work"), second.goto("http://localhost:8787/work")])
+        await Promise.all([send(first, "First tab"), send(second, "Second tab")])
+        await expect(first.locator(".desk_messages_log")).toContainText("Second tab", { timeout: 15000 })
+        await expect(second.locator(".desk_messages_log")).toContainText("First tab", { timeout: 15000 })
+        const saved = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        expect(await saved(first)).toEqual(await saved(second))
+        await expect(first.locator(".desk_messages_log .desk_message")).toHaveCount(2)
+    } finally { await context.close() }
+})
+
+test("an existing Google key warns without transferring or overwriting a later guest conversation", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), client = await context.newPage()
+    const email = "returning-client@example.com"
+    try {
+        await account(context, email); await client.goto("http://localhost:8787/work"); await send(client, "Account history")
+        const saved = JSON.stringify([...drive_files.get(email)!.values()][0])
+        await writer(client).fill("Unsent account draft")
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator('.desk_messages [data-sign="google"]')).toBeVisible()
+        await expect(writer(client)).toHaveValue("")
+        await send(client, "Separate anonymous history")
+        const guest_key = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        await account(context, email); await client.reload()
+        await expect(client.locator('.desk_messages [role="alert"]')).toContainText("Guest messages were not transferred")
+        await expect(client.locator(".desk_messages_log")).toContainText("Account history")
+        await expect(client.locator(".desk_messages_log")).not.toContainText("Separate anonymous history")
+        expect(JSON.stringify([...drive_files.get(email)!.values()][0])).toBe(saved)
+        expect(await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(guest_key.key)
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator(".desk_messages_log")).toContainText("Separate anonymous history")
+    } finally { await context.close() }
 })

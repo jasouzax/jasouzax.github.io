@@ -1,12 +1,13 @@
 /*
- * Server-backed Google sign-in. The browser stores no ID/access tokens or trusted profile claims.
- * Full-page authorization redirects preserve this tab's local encryption keys and avoid popup isolation conflicts.
+ * Server-backed Google identity. Provider tokens never enter browser persistent storage.
+ * Short-lived Drive access lives in memory; guest keys remain local until saved to private Drive app data.
  */
 export type Auth_State = { user: { email: string, name: string, role: "owner" | "client" } | null, csrf: string, google_enabled: boolean }
 let current: Auth_State | null = null
 let pending: Promise<Auth_State> | null = null
 
-export function get_auth(): Promise<Auth_State> {
+export function get_auth(refresh = false): Promise<Auth_State> {
+    if (refresh) pending = null
     return pending ??= fetch("/api/v1/auth/session", { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(10000) }).then(async response => {
         if (!response.ok) throw new Error("Sign-in service is unavailable")
         current = await response.json() as Auth_State
@@ -57,9 +58,9 @@ export function init_sign(): void {
             if (button.dataset.sign === "out") await sign_out()
             else if (button.dataset.sign === "delete") {
                 if (auth.user && button.dataset.confirm && window.confirm(button.dataset.confirm)) await delete_account()
-            } else if (button.dataset.sign === "google" && !auth.user) {
+            } else if ((button.dataset.sign === "google" && !auth.user) || (button.dataset.sign === "drive" && auth.user)) {
                 if (!auth.google_enabled) throw new Error("Google sign-in is not configured on this site")
-                location.assign("/api/v1/auth/google/start")
+                location.assign("/api/v1/auth/google/start" + (button.dataset.sign === "drive" ? "?drive=1" : ""))
             }
         }).catch(error => {
             const status = document.createElement("p")

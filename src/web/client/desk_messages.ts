@@ -1,384 +1,225 @@
-/*
- * Work messaging window: invitation import, owner room management, encrypted text and catch-up polling.
- * Invitation secrets live in URL fragments, then in this tab's session storage; never in desk/VFS state.
- * Unacknowledged sends retain the same encrypted envelope/id for safe explicit retries.
- */
+/* Direct encrypted chat: browser guests, private Drive keys and owner-only client navigation. */
 import type { desk_window } from "./desk.ts"
-import { text, refresh_tab } from "./desk.ts"
+import { text, refresh_tab, state, new_window, focus_window, toggle_maximize } from "./desk.ts"
+import { open_source } from "./desk_view.ts"
 import { sync_navigation } from "./desk_navigation.ts"
-import { encrypt_message, decrypt_message, encode_key, decode_key, type Work_Envelope } from "../../work_crypto.ts"
-import { get_auth, sign_out, type Auth_State } from "./sign.ts"
+import { encrypt_message, decrypt_message, unwrap_room_key, type Work_Envelope } from "../../work_crypto.ts"
+import { work_context, work_api, prepare_conversation, type Work_Context, type Work_Room } from "./work_session.ts"
+import type { Client_Key } from "./work_drive.ts"
 
-type Invitation = { room: string, token: string, key: string }
 type Message = { seq: number, id: string, author: "owner" | "client", envelope: Work_Envelope, created_at: number }
-type Room = { id: string, email: string, revoked?: number }
 type Pending = { id: string, envelope: Work_Envelope, text: string }
-const base = "/api/v1/work/rooms"
-const invitations = new Map<string, Invitation>()
 const pending = new Map<string, Pending>()
 const drafts = new Map<string, string>()
-const provisioning = new Map<string, Invitation>()
-let owner_token = ""
 const label = (key: string) => text(`work_${key}`)
-
+const base = "/api/v1/work/rooms"
+let identity = ""
+let panel_timer: ReturnType<typeof setTimeout> | undefined
+let panel_revision = 0
+const error_text = (error: unknown) => error instanceof Error ? error.message : label("unavailable")
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, value = "", name = ""): HTMLElementTagNameMap[K] {
-    const node = document.createElement(tag)
-    node.textContent = value
+    const node = document.createElement(tag); node.textContent = value
     if (name) node.className = name
     return node
 }
-
 function button(value: string, action: () => void): HTMLButtonElement {
-    const node = element("button", value)
-    node.type = "button"
-    node.addEventListener("click", action)
-    return node
+    const node = element("button", value); node.type = "button"; node.addEventListener("click", action); return node
 }
-
-function field(form: HTMLElement, name: string, type = "text"): HTMLInputElement {
-    const row = element("label", name)
-    const input = element("input")
-    input.type = type; input.required = true; input.autocomplete = "off"
-    row.append(input); form.append(row)
-    return input
+function account_controls(toolbar: HTMLElement, context: Work_Context): void {
+    if (!context.auth.user) {
+        if (context.auth.google_enabled) { const login = element("button", label("google_signin")); login.dataset.sign = "google"; toolbar.append(login) }
+        return
+    }
+    const out = element("button", text("sign_out_google")); out.dataset.sign = "out"
+    const remove = element("button", text("delete_account")); remove.dataset.sign = "delete"; remove.dataset.confirm = text("delete_account_confirm")
+    toolbar.append(out, remove)
 }
-
-function remember(invitation: Invitation): void {
-    invitations.set(invitation.room, invitation)
-    try { sessionStorage.setItem(`jazu_work_${invitation.room}`, JSON.stringify(invitation)); sessionStorage.setItem("jazu_work_active", invitation.room) } catch {}
+async function rooms(context: Work_Context): Promise<Work_Room[]> {
+    const result: Work_Room[] = []
+    let next: string | null = null
+    do {
+        const data = await work_api(base + (next ? `?before=${encodeURIComponent(next)}` : ""), context.csrf)
+        result.push(...data.rooms); next = data.next
+    } while (next)
+    return result
 }
-
-function recalled(room: string): Invitation | null {
-    if (invitations.has(room)) return invitations.get(room)!
-    try {
-        const data = sessionStorage.getItem(`jazu_work_${room}`)
-        return data ? validate_invitation(JSON.parse(data)) : null
-    } catch { return null }
+function clients_panel(context: Work_Context): void {
+    const desk = state.desk
+    if (!desk?.hasAttribute("data-server")) return
+    const aside = desk.querySelector<HTMLElement>(".desk_side")
+    const tabs = aside?.querySelector(".desk_side_tabs_ul")
+    if (!aside || !tabs || aside.querySelector("[data-work-clients]")) return
+    const revision = ++panel_revision
+    const side_toggle = document.querySelector<HTMLDetailsElement>("#head_menu")
+    if (side_toggle) side_toggle.open = true
+    const tab = element("li")
+    const details = element("details", "", "desk_side_tabs_drop"); details.name = "desk_side_tab"; details.dataset.path = "im:clients"
+    details.append(element("summary", label("clients"))); tab.append(details); tabs.append(tab)
+    const page = element("div", "", "desk_side_page"); page.dataset.workClients = ""; page.dataset.path = "im:clients"; page.style.display = "block"; page.hidden = true
+    const status = element("p"); status.setAttribute("role", "status")
+    const list = element("ul"); const guests = element("details"); guests.append(element("summary", label("guests")))
+    const guest_list = element("ul"), guest_row = element("li"); guests.append(guest_list); guest_row.append(guests); list.append(guest_row); page.append(status, list); aside.append(page)
+    const sync = () => { for (const entry of aside.querySelectorAll<HTMLElement>(".desk_side_page")) entry.hidden = entry === page ? !details.open : details.open }
+    details.addEventListener("toggle", sync)
+    for (const other of aside.querySelectorAll<HTMLDetailsElement>(".desk_side_tabs_drop")) if (other !== details) other.addEventListener("toggle", sync)
+    const open = (room: Work_Room) => {
+        const uri = `im:${room.email}`
+        const focus = (item: desk_window) => { if (state.maximized && state.maximized !== item) toggle_maximize(item); else focus_window(item) }
+        const existing = state.windows.find(item => item.path === uri)
+        if (existing) { focus(existing); return }
+        const item = new_window(); if (item) { focus(item); void open_source(item, uri) }
+    }
+    let signature = ""
+    const refresh = async () => {
+        if (!desk.isConnected || revision !== panel_revision) return
+        try {
+            const all = await rooms(context)
+            if (!desk.isConnected || revision !== panel_revision) return
+            const updated = JSON.stringify(all.map(room => [room.id, room.email, room.revoked]))
+            if (updated !== signature) {
+                signature = updated
+                guest_list.replaceChildren(); for (const entry of [...list.children]) if (entry !== guest_row) entry.remove()
+                for (const room of all) {
+                    const row = element("li"); row.append(button(room.email, () => open(room)))
+                    if (room.email.startsWith("guest/")) guest_list.append(row); else list.append(row)
+                }
+            }
+            status.textContent = all.length ? "" : label("no_clients")
+        } catch (error) { if (revision === panel_revision) status.textContent = error_text(error) }
+        if (desk.isConnected && revision === panel_revision) panel_timer = setTimeout(() => void refresh(), 15000)
+    }
+    details.open = true; sync(); void refresh()
 }
-
-function validate_invitation(value: Invitation): Invitation {
-    if (!value || typeof value.room !== "string" || !/^[a-f0-9-]{36}$/i.test(value.room) || typeof value.token !== "string" || (value.token !== "" && !/^[A-Za-z0-9_-]{32,256}$/.test(value.token)) || typeof value.key !== "string" || decode_key(value.key).length !== 32) throw new Error(label("invalid_invitation"))
-    return { room: value.room, token: value.token, key: value.key }
-}
-
-function import_invitation(value: string): Invitation {
-    const url = new URL(value, location.origin)
-    const fragment = new URLSearchParams(url.hash.slice(1))
-    const invitation = validate_invitation({ room: fragment.get("room")!, token: fragment.get("token")!, key: fragment.get("key")! })
-    remember(invitation)
-    return invitation
-}
-
-function invitation_link(invitation: Invitation): string {
-    return `${location.origin}/work#${new URLSearchParams(invitation).toString()}`
+function remove_panel(): void {
+    panel_revision++; clearTimeout(panel_timer)
+    const aside = state.desk?.querySelector(".desk_side")
+    aside?.querySelector('[data-path="im:clients"]')?.closest("li")?.remove()
+    aside?.querySelector("[data-work-clients]")?.remove()
+    for (const page of aside?.querySelectorAll<HTMLElement>(".desk_side_page") ?? []) page.hidden = false
 }
 
 export function message_body(item: desk_window, signal: AbortSignal): HTMLElement {
-    const root = element("section", "", "desk_messages")
-    root.setAttribute("aria-label", label("messages"))
-    if (!item.el.closest(".desk[data-server]")) {
-        root.append(element("p", label("work_only")))
-        return root
-    }
-    let current: AbortController | null = null
+    const root = element("section", "", "desk_messages"); root.setAttribute("aria-label", label("messages"))
+    if (!item.el.closest(".desk[data-server]")) { root.append(element("p", label("work_only"))); return root }
+    let current: AbortController | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
-    let generation = 0
-    let auth: Auth_State = { user: null, csrf: "", google_enabled: false }
+    let generation = 0    let unsent = ""
     const stop = () => { generation++; current?.abort(); clearTimeout(timer) }
     signal.addEventListener("abort", stop, { once: true })
-
-    const api = async (path: string, token: string, body?: unknown, abort = signal): Promise<any> => {
-        const headers: Record<string, string> = { "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }
-        if (token) headers.authorization = `Bearer ${token}`
-        const response = await fetch(path, { method: body === undefined ? "GET" : "POST", credentials: "same-origin", cache: "no-store", signal: AbortSignal.any([abort, AbortSignal.timeout(15000)]), headers, body: body === undefined ? undefined : JSON.stringify(body) })
-        const data = await response.json()
-        if (!response.ok) throw new Error(data.error?.message ?? label("unavailable"))
-        return data
-    }
-    const address = (email: string) => {
-        item.path = `im:${email}`; item.name = email
-        refresh_tab(item); sync_navigation(item)
-    }
-    const logout = () => {
-        stop(); owner_token = ""; invitations.clear(); pending.clear(); drafts.clear(); provisioning.clear()
-        try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
-        entry()
-        void sign_out().catch(error => { root.append(element("p", error_text(error))) })
-    }
-    const error_text = (error: unknown) => error instanceof Error ? error.message : label("unavailable")
-    const account_controls = (toolbar: HTMLElement) => {
-        if (!auth.user) { toolbar.append(button(label("lock"), logout)); return }
-        const out = element("button", text("sign_out_google")); out.type = "button"
-        out.dataset.sign = "out"; out.title = text("sign_out_google_title")
-        const remove = element("button", text("delete_account")); remove.type = "button"
-        remove.dataset.sign = "delete"; remove.dataset.confirm = text("delete_account_confirm")
-        toolbar.append(out, remove)
-    }
-
-    const conversation = async (invitation: Invitation, token: string, owner: boolean): Promise<void> => {
+    const initialize = async () => {
         stop()
-        try { sessionStorage.setItem("jazu_work_role", owner ? "owner" : "client") } catch {}
+        const revision = generation
         current = new AbortController()
         const abort = AbortSignal.any([signal, current.signal])
-        const revision = generation
-        const status = element("p", label("connecting"), "desk_messages_status")
-        status.setAttribute("role", "status")
-        root.replaceChildren(status)
-        try {
-            const info = await api(`${base}/${invitation.room}`, token, undefined, abort)
+        const toolbar = element("div", "", "desk_messages_toolbar")
+        const heading = element("strong", "jason@jasouza.com"); toolbar.append(heading)
+        const notice = element("p", label("encrypted"), "desk_messages_notice")
+        const warning = element("p"); warning.setAttribute("role", "alert"); warning.hidden = true
+        const status = element("p", label("connecting"), "desk_messages_status"); status.setAttribute("role", "status")
+        const empty = element("p", label("empty"), "desk_messages_empty")
+        const log = element("ol", "", "desk_messages_log"); log.setAttribute("role", "log"); log.setAttribute("aria-label", label("messages")); log.setAttribute("aria-live", "polite")
+        const composer = element("form", "", "desk_messages_composer")
+        const input = element("textarea"); input.rows = 3; input.maxLength = 8000; input.placeholder = label("write"); input.setAttribute("aria-label", label("write"))        input.value = unsent
+        const send = element("button", label("send")); send.type = "submit"
+        composer.append(input, send, element("small", label("send_hint")))
+        root.replaceChildren(toolbar, notice, warning, empty, log, status, composer)
+        let context: Work_Context | undefined
+        let key: Client_Key | undefined
+        let owner = false
+        let cursor = 0
+        let polling = false
+        let delay = 5000
+        const seen = new Set<number>()
+        const requested = item.path.slice(3)
+        const address = (value: string) => { item.path = `im:${value}`; item.name = value; refresh_tab(item); sync_navigation(item); heading.textContent = value }
+        const append = async (message: Message) => {
+            if (!key || seen.has(message.seq) || abort.aborted) return
+            const row = element("li", "", `desk_message desk_message_${message.author}${message.author === (owner ? "owner" : "client") ? " desk_message_self" : ""}`)
+            const meta = element("small", `${message.author === (owner ? "owner" : "client") ? label("you") : heading.textContent} · ${new Date(message.created_at).toLocaleString()}`)
+            const body = element("p")
+            try { body.textContent = await decrypt_message(key.key, message.envelope, { room: key.room, id: message.id, author: message.author }) }
+            catch { body.textContent = label("decrypt_failed"); row.classList.add("desk_message_error") }
             if (abort.aborted) return
-            if ((info.role === "owner") !== owner) throw new Error(label("unavailable"))
-            address(owner ? info.room.email : info.owner_email)
-            const toolbar = element("div", "", "desk_messages_toolbar")
-            const heading = element("strong", owner ? info.room.email : info.owner_email)
-            toolbar.append(heading)
-            account_controls(toolbar)
-            if (owner || auth.user) toolbar.append(button(label("conversations"), () => void owner_rooms()))
-            if (!owner && auth.user && !info.room.google_bound) toolbar.append(button(label("link_google"), () => {
-                void api(`${base}/${invitation.room}/bind`, token, {}, abort).then(() => conversation(invitation, "", false)).catch(error => { status.textContent = error_text(error) })
-            }))
-            if (!auth.user && auth.google_enabled) {
-                const login = button(label("google_signin"), () => location.assign("/api/v1/auth/google/start"))
-                toolbar.append(login)
-            }
-            const note = element("p", label("encrypted"), "desk_messages_notice")
-            const log = element("ol", "", "desk_messages_log")
-            log.setAttribute("role", "log"); log.setAttribute("aria-label", label("messages")); log.setAttribute("aria-live", "polite")
-            const empty = element("p", label("empty"), "desk_messages_empty")
-            const composer = element("form", "", "desk_messages_composer")
-            const input = element("textarea")
-            input.setAttribute("aria-label", label("write")); input.placeholder = label("write"); input.rows = 3; input.maxLength = 8000
-            input.value = drafts.get(invitation.room) ?? pending.get(invitation.room)?.text ?? ""
-            const send = element("button", label(pending.has(invitation.room) ? "retry" : "send"))
-            send.type = "submit"
-            const hint = element("small", label("send_hint"))
-            composer.append(input, send, hint)
-            if (info.room.revoked) { input.disabled = true; send.disabled = true; note.textContent = label("closed") }
-            root.replaceChildren(toolbar, note, empty, log, status, composer)
-            if (owner) {
-                const tools = element("details", "", "desk_messages_tools")
-                tools.append(element("summary", label(invitation.token ? "invitation" : "shared_key")))
-                const backup = element("textarea")
-                backup.readOnly = true; backup.rows = 3; backup.value = invitation.token ? invitation_link(invitation) : invitation.key
-                backup.setAttribute("aria-label", label("invitation"))
-                tools.append(element("p", label("backup")), backup, button(label("revoke"), () => {
-                    void api(`${base}/${invitation.room}/revoke`, token, {}, abort).then(() => { input.disabled = true; send.disabled = true; note.textContent = label("closed") }).catch(error => { status.textContent = error_text(error) })
-                }))
-                root.append(tools)
-            }
-            let cursor = 0
-            let delay = 5000
-            let polling = false
-            const seen = new Set<number>()
-            const append = async (message: Message) => {
-                if (seen.has(message.seq) || abort.aborted) return
-                const row = element("li", "", `desk_message desk_message_${message.author}${message.author === (owner ? "owner" : "client") ? " desk_message_self" : ""}`)
-                const meta = element("small", `${message.author === (owner ? "owner" : "client") ? label("you") : owner ? info.room.email : info.owner_email} · ${new Date(message.created_at).toLocaleString()}`)
-                const body = element("p")
-                try { body.textContent = await decrypt_message(invitation.key, message.envelope, { room: invitation.room, id: message.id, author: message.author }) }
-                catch { body.textContent = label("decrypt_failed"); row.classList.add("desk_message_error") }
-                if (abort.aborted) return
-                const near_bottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100
-                row.append(meta, body); log.append(row); seen.add(message.seq); empty.hidden = true
-                if (near_bottom) log.scrollTop = log.scrollHeight
-            }
-            const poll = async () => {
-                if (polling || abort.aborted) return
-                polling = true; clearTimeout(timer)
-                try {
-                    let more = true
-                    while (more && !abort.aborted) {
-                        const data = await api(`${base}/${invitation.room}/messages?after=${cursor}`, token, undefined, abort)
-                        for (const message of data.messages as Message[]) { await append(message); cursor = Math.max(cursor, message.seq) }
-                        more = data.more
-                    }
-                    if (!abort.aborted) { status.textContent = label(pending.has(invitation.room) ? "not_sent" : "connected"); delay = 5000 }
-                } catch (error) {
-                    if (!abort.aborted) { status.textContent = `${label("reconnecting")} ${error_text(error)}`; delay = Math.min(delay * 2, 30000) }
-                } finally {
-                    polling = false
-                    if (!abort.aborted && revision === generation) timer = setTimeout(() => void poll(), delay)
+            const near_bottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100
+            row.append(meta, body); log.append(row); seen.add(message.seq); empty.hidden = true
+            if (near_bottom) log.scrollTop = log.scrollHeight
+        }
+        const poll = async () => {
+            if (!context || !key || polling || abort.aborted) return
+            polling = true; clearTimeout(timer)
+            try {
+                let more = true
+                while (more && !abort.aborted) {
+                    const data = await work_api(`${base}/${key.room}/messages?after=${cursor}`, context.csrf, undefined, abort)
+                    for (const message of data.messages as Message[]) { await append(message); cursor = Math.max(cursor, message.seq) }
+                    more = data.more
                 }
-            }
-            window.addEventListener("online", () => void poll(), { signal: abort })
-            document.addEventListener("visibilitychange", () => { if (!document.hidden) void poll() }, { signal: abort })
-            input.addEventListener("input", () => drafts.set(invitation.room, input.value))
-            input.addEventListener("keydown", event => {
-                if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !send.disabled) { event.preventDefault(); composer.requestSubmit() }
-            })
-            composer.addEventListener("submit", event => {
-                event.preventDefault()
-                if (send.disabled || (!input.value.trim() && !pending.has(invitation.room))) return
-                send.disabled = true; input.readOnly = true
-                void (async () => {
-                    try {
-                        let message = pending.get(invitation.room)
-                        if (!message) {
-                            const id = crypto.randomUUID()
-                            message = { id, text: input.value, envelope: await encrypt_message(invitation.key, input.value, { room: invitation.room, id, author: owner ? "owner" : "client" }) }
-                            pending.set(invitation.room, message)
-                        }
-                        await api(`${base}/${invitation.room}/messages`, token, { id: message.id, envelope: message.envelope }, abort)
-                        pending.delete(invitation.room); drafts.delete(invitation.room)
-                        if (abort.aborted) return
-                        input.value = ""; send.textContent = label("send"); status.textContent = label("sent")
-                        await poll()
-                    } catch (error) {
-                        if (!abort.aborted) { status.textContent = `${label("not_sent")} ${error_text(error)}`; send.textContent = label("retry") }
-                    } finally {
-                        if (!abort.aborted) { send.disabled = false; input.readOnly = pending.has(invitation.room); input.focus() }
-                    }
-                })()
-            })
-            if (pending.has(invitation.room)) input.readOnly = true
-            void poll()
-        } catch (error) {
-            if (!abort.aborted) {
-                root.replaceChildren(element("p", error_text(error)), button(label("back"), entry))
-                if (!auth.user && auth.google_enabled) root.append(button(label("google_signin"), () => location.assign("/api/v1/auth/google/start")))
-            }
+                if (!abort.aborted) { status.textContent = label(pending.has(key.room) ? "not_sent" : "connected"); delay = 5000 }
+            } catch (error) { if (!abort.aborted) { status.textContent = `${label("reconnecting")} ${error_text(error)}`; delay = Math.min(delay * 2, 30000) } }
+            finally { polling = false; if (!abort.aborted && revision === generation) timer = setTimeout(() => void poll(), delay) }
         }
-    }
-
-    const owner_rooms = async (): Promise<void> => {
-        stop()
-        const revision = generation
-        const status = element("p", label("connecting"))
-        root.replaceChildren(status)
-        try {
-            const data = await api(base, owner_token)
-            if (signal.aborted || revision !== generation) return
-            const heading = element("div", "", "desk_messages_toolbar")
-            heading.append(element("strong", label("conversations")))
-            account_controls(heading)
-            const list = element("ul", "", "desk_messages_rooms")
-            const owner = Boolean(owner_token) || auth.user?.role === "owner"
-            for (const room of data.rooms as Room[]) {
-                const row = element("li")
-                row.append(button(room.email + (room.revoked ? ` (${label("closed")})` : ""), () => {
-                    const saved = recalled(room.id)
-                    if (saved) { void conversation(saved, owner_token, owner); return }
-                    const form = element("form")
-                    const key = field(form, label("shared_key"), "password")
-                    const submit = element("button", label("open")); submit.type = "submit"
-                    form.append(submit)
-                    form.addEventListener("submit", event => {
-                        event.preventDefault()
-                        try {
-                            let invitation: Invitation
-                            if (key.value.includes("#")) invitation = import_invitation(key.value)
-                            else { if (decode_key(key.value).length !== 32) throw new Error(label("invalid_invitation")); invitation = { room: room.id, token: "", key: key.value } }
-                            if (invitation.room !== room.id) throw new Error(label("invalid_invitation"))
-                            remember(invitation)
-                            void conversation(invitation, owner_token, owner)
-                        } catch (error) { status.textContent = error_text(error) }
-                    })
-                    row.replaceChildren(element("strong", room.email), form); key.focus()
-                }))
-                list.append(row)
-            }
-            const form = element("form", "", "desk_messages_create")
-            const email = field(form, label("client_email"), "email")
-            const create = element("button", label("create")); create.type = "submit"
-            form.append(create)
-            form.addEventListener("submit", event => {
-                event.preventDefault(); create.disabled = true
-                // Generate before provisioning so a failed crypto context cannot create a keyless room.
-                void (async () => {
-                    const client_email = email.value.trim().toLowerCase()
-                    let invitation = provisioning.get(client_email)
-                    if (!invitation) {
-                        invitation = { room: crypto.randomUUID(), token: encode_key(crypto.getRandomValues(new Uint8Array(32))), key: encode_key(crypto.getRandomValues(new Uint8Array(32))) }
-                        provisioning.set(client_email, invitation)
-                    }
-                    // Save the key before the request: a lost provisioning acknowledgement must not lose access.
-                    remember(invitation)
-                    try { sessionStorage.setItem("jazu_work_role", "owner") } catch {}
-                    await api(base, owner_token, { email: client_email, id: invitation.room, token: invitation.token })
-                    provisioning.delete(client_email)
-                    if (!signal.aborted && revision === generation) await conversation(invitation, owner_token, true)
-                })().catch(error => { status.textContent = error_text(error); create.disabled = false })
-            })
-            status.textContent = label(owner ? "owner_help" : "client_help")
-            root.replaceChildren(heading, status, list)
-            if (owner) root.append(form)
-            else {
-                const restore = element("form")
-                const link = field(restore, label("invitation"), "password")
-                const open = element("button", label("open")); open.type = "submit"; restore.append(open)
-                restore.addEventListener("submit", event => {
-                    event.preventDefault()
-                    try { const invitation = import_invitation(link.value); void conversation(invitation, invitation.token, false) }
-                    catch (error) { status.textContent = error_text(error) }
-                })
-                root.append(restore)
-            }
-        } catch (error) {
-            if (!signal.aborted && revision === generation) root.replaceChildren(element("p", error_text(error)), button(label("back"), entry))
-        }
-    }
-
-    const entry = (): void => {
-        stop()
-        const intro = element("p", label("welcome"))
-        const status = element("p")
-        status.setAttribute("role", "status")
-        const form = element("form")
-        const invitation = field(form, label("invitation"), "password")
-        const open = element("button", label("open")); open.type = "submit"; form.append(open)
-        form.addEventListener("submit", event => {
+        input.addEventListener("input", () => { unsent = input.value; if (key) drafts.set(key.room, input.value) })
+        input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !send.disabled) { event.preventDefault(); composer.requestSubmit() } })
+        composer.addEventListener("submit", event => {
             event.preventDefault()
-            try { const data = import_invitation(invitation.value); void conversation(data, data.token, false) }
-            catch (error) { status.textContent = error_text(error) }
+            if (send.disabled || !input.value.trim()) return
+            send.disabled = true; input.readOnly = true
+            void (async () => {
+                try {
+                    if (!context || context.error || (!owner && !context.owner_key)) context = await work_context(true)
+                    if (abort.aborted) return
+                    if (!owner) key = await prepare_conversation(context)
+                    if (!key || !context) throw new Error(label("choose_client"))
+                    let message = pending.get(key.room)
+                    if (!message) {
+                        const id = crypto.randomUUID()
+                        message = { id, text: input.value, envelope: await encrypt_message(key.key, input.value, { room: key.room, id, author: owner ? "owner" : "client" }) }
+                        pending.set(key.room, message)
+                    }
+                    await work_api(`${base}/${key.room}/messages`, context.csrf, { id: message.id, envelope: message.envelope }, abort)
+                    pending.delete(key.room); drafts.delete(key.room)
+                    if (abort.aborted) return
+                    input.value = unsent = ""; send.textContent = label("send"); status.textContent = label("sent"); await poll()
+                } catch (error) { context = undefined; if (!abort.aborted) { status.textContent = `${label("not_sent")} ${error_text(error)}`; send.textContent = label("retry") } }
+                finally { if (!abort.aborted) { send.disabled = false; input.readOnly = Boolean(key && pending.has(key.room)); input.focus() } }
+            })()
         })
-        const owner = element("details")
-        owner.append(element("summary", label("owner_access")))
-        const login = element("form")
-        const token = field(login, label("owner_token"), "password")
-        const connect = element("button", label("connect")); connect.type = "submit"; login.append(connect)
-        login.addEventListener("submit", event => { event.preventDefault(); owner_token = token.value.trim(); token.value = ""; void owner_rooms() })
-        owner.append(login)
-        root.replaceChildren(element("h2", label("messages")), intro, form, status, owner)
-        if (auth.google_enabled) root.prepend(button(label("google_signin"), () => location.assign("/api/v1/auth/google/start")))
-        const url = new URL(location.href)
-        if (url.searchParams.has("auth_error")) {
-            status.textContent = label("google_failed") + " (" + url.searchParams.get("auth_error") + ")"
-            // Keep this non-secret code in the URL so a desk/auth refresh cannot erase the failure.
-        }
-    }
-
-    if (!globalThis.isSecureContext || !crypto.subtle) { root.append(element("p", label("secure_context"))); return root }
-    const initialize = async () => {
-        const revision = generation
+        window.addEventListener("online", () => void poll(), { signal: abort })
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) void poll() }, { signal: abort })
         try {
-            const next = await get_auth()
-            if (auth.user && !next.user) { owner_token = ""; invitations.clear(); pending.clear(); drafts.clear(); provisioning.clear() }
-            auth = next
-        } catch { /* Invitations and emergency owner access still work without Google. */ }
-        if (signal.aborted || revision !== generation) return
-        try {
-            if (location.hash.startsWith("#room=")) {
-                const value = location.href
-                history.replaceState(history.state, "", location.pathname + location.search)
-                const invitation = import_invitation(value)
-                void conversation(invitation, auth.user?.role === "owner" ? "" : invitation.token, auth.user?.role === "owner")
-            } else if (owner_token || auth.user?.role === "owner") void owner_rooms()
-            else {
-                let active = ""
-                try { active = sessionStorage.getItem("jazu_work_active") ?? "" } catch {}
-                const invitation = recalled(active)
-                let role = "client"
-                try { role = sessionStorage.getItem("jazu_work_role") ?? "client" } catch {}
-                if (invitation && role !== "owner") void conversation(invitation, invitation.token, false)
-                else if (auth.user) void owner_rooms()
-                else entry()
+            context = await work_context()
+            if (abort.aborted || revision !== generation) return
+            const next_identity = context.auth.user?.email ?? "guest"
+            if (identity && identity !== next_identity) { drafts.clear(); pending.clear(); input.value = unsent = ""; remove_panel() }
+            identity = next_identity
+            owner = context.auth.user?.role === "owner"
+            account_controls(toolbar, context)
+            if (context.error && context.auth.user) {
+                const reconnect = element("button", label("drive_connect")); reconnect.dataset.sign = "drive"; toolbar.append(reconnect)
             }
-        } catch { entry() }
+            if (owner) {
+                clients_panel(context)
+                if (context.error) throw new Error(context.error)
+                const room = (await rooms(context)).find(room => room.email === requested)
+                if (!room) { composer.hidden = true; empty.textContent = label("choose_client"); status.textContent = ""; return }
+                if (!room.owner_wrap || !context.vault?.value?.owner || room.owner_key_id !== context.owner_key?.key_id) throw new Error("The owner's private key does not match this conversation")
+                key = { room: room.id, key: await unwrap_room_key(room.owner_wrap, context.vault.value.owner.private_jwk, room.id), owner_wrap: room.owner_wrap, key_id: room.owner_key_id }
+                address(room.email)
+                if (room.revoked) { input.disabled = true; send.disabled = true; notice.textContent = label("closed") }
+            } else { address(context.owner_email); key = context.key }
+            if (context.warning) { warning.hidden = false; warning.textContent = context.warning }
+            const auth_error = new URL(location.href).searchParams.get("auth_error")
+            if (auth_error) { warning.hidden = false; warning.textContent = label("google_failed") + ` (${auth_error})` }
+            if (context.error) { status.textContent = context.error; return }
+            status.textContent = context.owner_key ? label("connected") : label("owner_not_ready")
+            if (key) {
+                input.value = drafts.get(key.room) ?? pending.get(key.room)?.text ?? unsent
+                if (pending.has(key.room)) { input.readOnly = true; send.textContent = label("retry") }
+                if (owner || context.room || context.guest_room) void poll()
+            }
+        } catch (error) { if (!abort.aborted) status.textContent = error_text(error) }
     }
-    document.addEventListener("jazu:auth", () => { stop(); void initialize() }, { signal })
-    window.addEventListener("hashchange", () => {
-        if (location.hash.startsWith("#room=")) { stop(); void initialize() }
-    }, { signal })
+    document.addEventListener("jazu:auth", () => { void initialize() }, { signal })
     void initialize()
     return root
 }

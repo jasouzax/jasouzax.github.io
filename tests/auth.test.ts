@@ -23,8 +23,8 @@ async function token(claims: Record<string, unknown> = {}): Promise<string> {
 
 function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
-    const env: Work_Env = { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: "secret-never-shown-to-browser", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", WORK_OWNER_TOKEN: "a".repeat(43), DB: { prepare(sql) {
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    const env: Work_Env = { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: "secret-never-shown-to-browser", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = {
             bind(...args) { values = args; return statement },
@@ -49,13 +49,13 @@ function fixture() {
         const url = new URL(response.headers.get("location")!)
         assert.equal(url.origin, "https://accounts.google.com")
         assert.equal(url.searchParams.get("redirect_uri"), origin + "/api/v1/auth/google/callback")
-        assert.equal(url.searchParams.get("scope"), "openid email profile")
+        assert.equal(url.searchParams.get("scope"), "openid email profile https://www.googleapis.com/auth/drive.appdata")
         assert.equal(url.searchParams.has("client_secret"), false)
         assert.equal(url.searchParams.get("code_challenge_method"), "S256")
         assert.match(response.headers.get("set-cookie")!, /HttpOnly; Secure; SameSite=Lax/)
         return { url, cookie: cookie_part(response, "__Host-jazu_oauth") }
     }
-    const login = async (email: string, subject: string) => {
+    const login = async (email: string, subject: string, grant: Record<string, unknown> = {}) => {
         const flow = await start()
         const id_token = await token({ email, sub: subject, nonce: flow.url.searchParams.get("nonce") })
         const callback = request(`/api/v1/auth/google/callback?state=${flow.url.searchParams.get("state")}&code=one-use-code`, flow.cookie)
@@ -66,7 +66,7 @@ function fixture() {
             assert.equal(body.get("redirect_uri"), origin + "/api/v1/auth/google/callback")
             const challenge = encode_key(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body.get("code_verifier")!))))
             assert.equal(challenge, flow.url.searchParams.get("code_challenge"))
-            return Response.json({ id_token })
+            return Response.json({ id_token, ...grant })
         } })
         assert.equal(response.headers.get("location"), "/work")
         assert.equal(secure_response(response).headers.getSetCookie().length, 2)
@@ -125,31 +125,29 @@ test("admin identity is pinned; OAuth project ownership alone gives no admin rol
     } finally { f.db.close() }
 })
 
-test("Google clients must possess an invitation to link a room, then its bearer token alone no longer works", async () => {
+test("Drive credentials are sealed per session, require CSRF and refresh without exposing tokens in profiles", async () => {
     const f = fixture()
     try {
-        const admin = await f.login("jason@jasouza.com", "owner")
-        const client = await f.login("client@example.com", "client")
-        const other = await f.login("other@example.com", "other")
-        const created = await work_route(f.request("/api/v1/work/rooms", admin.cookie, { email: "client@example.com" }, { "x-jazu-csrf": admin.session.csrf }), f.env)
-        assert.equal(created.status, 201)
-        const room = await created.json() as any
-        const path = `/api/v1/work/rooms/${room.room.id}`
-        assert.equal((await work_route(f.request(path, client.cookie), f.env)).status, 404)
-        assert.equal((await work_route(f.request(path + "/bind", other.cookie, {}, { authorization: `Bearer ${room.token}`, "x-jazu-csrf": other.session.csrf }), f.env)).status, 403)
-        assert.equal((await work_route(f.request(path + "/bind", client.cookie, {}, { authorization: `Bearer ${room.token}`, "x-jazu-csrf": client.session.csrf }), f.env)).status, 200)
-        assert.equal((await work_route(f.request(path, "", undefined, { authorization: `Bearer ${room.token}` }), f.env)).status, 404)
-        assert.equal((await work_route(f.request(path, client.cookie), f.env)).status, 200)
-        assert.equal((await work_route(f.request(path, other.cookie), f.env)).status, 404)
-        const list = await (await work_route(f.request("/api/v1/work/rooms", client.cookie), f.env)).json() as any
-        assert.equal(list.rooms.length, 1)
-        const other_list = await (await work_route(f.request("/api/v1/work/rooms", other.cookie), f.env)).json() as any
-        assert.equal(other_list.rooms.length, 0)
-        f.db.prepare("UPDATE auth_sessions SET last_seen = 0").run()
-        assert.equal((await (await auth_route(f.request("/api/v1/auth/session", client.cookie), f.env)).json() as any).user, null)
+        const grant = { access_token: "synthetic-access", refresh_token: "synthetic-refresh", expires_in: 1, scope: "openid email profile https://www.googleapis.com/auth/drive.appdata" }
+        const client = await f.login("client@example.com", "drive-client", grant)
+        const stored = f.db.prepare("SELECT sealed FROM auth_google_grants").get() as any
+        assert.ok(stored)
+        assert.equal(stored.sealed.includes(grant.access_token), false)
+        assert.equal(stored.sealed.includes(grant.refresh_token), false)
+        assert.equal(JSON.stringify(client.session).includes("access_token"), false)
+        assert.equal((await auth_route(f.request("/api/v1/auth/drive", client.cookie, {}), f.env)).status, 403)
+        const response = await auth_route(f.request("/api/v1/auth/drive", client.cookie, {}, { "x-jazu-csrf": client.session.csrf }), f.env, { fetch: async (input, init) => {
+            assert.equal(String(input), "https://oauth2.googleapis.com/token")
+            assert.equal(init!.redirect, "manual")
+            assert.equal(new URLSearchParams(String(init!.body)).get("refresh_token"), grant.refresh_token)
+            return Response.json({ access_token: "refreshed-access", expires_in: 3600 })
+        } })
+        assert.deepEqual(await response.json(), { access_token: "refreshed-access" })
+        assert.equal(response.headers.get("cache-control"), "no-store")
+        await auth_route(f.request("/api/v1/auth/logout", client.cookie, {}, { "x-jazu-csrf": client.session.csrf }), f.env)
+        assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_google_grants").get() as any).n, 0)
     } finally { f.db.close() }
 })
-
 
 test("account deletion requires CSRF and explicit intent, revokes all devices and anonymizes only its linked rooms", async () => {
     const f = fixture()

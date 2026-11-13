@@ -65,7 +65,6 @@ resource "cloudflare_workers_script" "router" {
     { name = "PERSONAL_ORIGIN", type = "plain_text", text = var.personal_origin },
     { name = "ASSETS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.assets.name },
     { name = "DB", type = "d1", id = cloudflare_d1_database.work.id },
-    { name = "WORK_OWNER_TOKEN", type = "secret_text", text = var.work_owner_token },
     { name = "WORK_OWNER_EMAIL", type = "plain_text", text = var.work_owner_email },
     { name = "GOOGLE_CLIENT_ID", type = "plain_text", text = var.google_client_id },
     { name = "GOOGLE_CLIENT_SECRET", type = "secret_text", text = var.google_client_secret },

@@ -154,7 +154,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     if (path === "/api" || path.startsWith("/api/")) {
         if (path.startsWith("/api/v1/auth/")) return auth_route(request, env)
         if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
-        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && ((env.WORK_OWNER_TOKEN?.length ?? 0) >= 32 || (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)) ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
+        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
         if (path === "/api/v1/work" || path.startsWith("/api/v1/work/")) return work_route(request, env)
         const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
         if (read && projects.includes(read[2]) && request.method === "GET") {

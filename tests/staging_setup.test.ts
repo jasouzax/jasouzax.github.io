@@ -13,7 +13,7 @@ test("staging setup maps existing private environment names and preserves explic
     assert.equal(env.TF_VAR_access_client_id, "explicit-client-test")
     assert.equal(env.TF_VAR_access_client_secret, "secret-test")
     assert.equal(env.TF_VAR_worker_bundle, "/cache/worker.js")
-    assert.equal(env.TF_VAR_work_owner_token, "work-test-secret")
+    assert.equal(env.TF_VAR_work_owner_token, undefined, "manual owner access tokens are retired")
     assert.equal(env.TF_VAR_work_owner_email, "owner@example.com")
     assert.equal(env.TF_VAR_staging_pages_project, undefined, "production variable names must not override staging defaults")
     assert.equal(staging_environment({ HMAC_SECRET: "legacy-test" }, "/worker.js").TF_VAR_origin_hmac_secret, "legacy-test")
