@@ -2,7 +2,7 @@
 import { get_auth, type Auth_State } from "./sign.ts"
 import { generate_owner_key, wrap_room_key, encode_key, decode_key } from "../../work_crypto.ts"
 import { open_drive, clear_drive, type Client_Key, type Drive_Vault } from "./work_drive.ts"
-export type Work_Room = { id: string, email: string, guest_id: number | null, owner_wrap: Client_Key["owner_wrap"] | null, owner_key_id: string, revoked: number }
+export type Work_Room = { id: string, email: string, name?: string, picture?: string, guest_id: number | null, owner_wrap: Client_Key["owner_wrap"] | null, owner_key_id: string, revoked: number }
 export type Work_Context = { auth: Auth_State, csrf: string, owner_email: string, owner_key: { key_id: string, public_jwk: JsonWebKey } | null, room: Work_Room | null, guest_room: Work_Room | null, key?: Client_Key, vault?: Drive_Vault, warning?: string, error?: string }
 const guest_storage = "jazu_work_guest_v2"
 const conflict = "Your Google account already has a conversation key. Guest messages were not transferred. Your guest conversation remains separate."

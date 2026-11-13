@@ -43,6 +43,10 @@ Google OAuth access/refresh credentials are encrypted in D1 with a key derived f
 
 ### Owner Clients panel
 
+The conversation layout uses a compact service-connection bar and Google sign-in state, centered encryption notice, timestamps above theme-colored incoming/outgoing bubbles, and a bottom composer with an account avatar and accessible Send icon. The avatar opens account actions. The connection indicator describes the messaging service, not the owner's presence. Shared geometry lives in `content/theme/work.scss`; theme paint uses inherited tokens with a Memory variant.
+
+Client and guest entries use the same `article.desk_side_item` / `details.desk_side_item_box` / summary/name/icon/subtree structure as Files, without list elements in the Clients page. Google photo URLs are accepted only from verified identity claims or matching-subject Google userinfo responses, stored in migration 0005's `auth_profiles`, and removed with the website account. Existing sessions backfill their own photo without requiring a new scope or sign-in. Images use a narrow Google-host allowlist, no referrer, and a guest fallback when absent or unavailable.
+
 Only the pinned admin sees the additional **Clients** side-panel page. **Guests** is the first expandable group, with anonymous conversations addressed as `im:guest/{number}`. Registered clients appear by verified Google email and open `im:{email}` windows. Clicking a client opens/focuses a conversation window, leaving other conversations available. The list refreshes and paginates through all conversations with messages; opening the website without sending does not create a visible client entry. All list/read/send permissions are checked server-side, independently of panel visibility. Guest cookies cannot list or access another guest's room, and owner bearer authentication is retired.
 
 ### Delivery, sessions and deletion
@@ -53,7 +57,7 @@ Account deletion requires native confirmation and a CSRF/intent-protected transa
 
 ### Code, tests and staging setup
 
-Code: `src/work_crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0004. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
+Code: `src/work_crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0005. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
 
 Tests use real SQLite, AES-GCM/ECDH, RSA verification and workerd. Browser tests exercise a local Worker/D1, real browser crypto, synthetic Google sessions and mocked Drive storage: guest/owner chat, browser reload, Drive recovery on a new device, first-time account linking, existing-key warning, no cross-guest access, account menu/deletion, and safe retries. Real Google consent/Drive access requires the user's configured Cloud project and account interaction; mocked tests do not claim to have performed that consent.
 

@@ -2,7 +2,7 @@
  * Server-backed Google identity. Provider tokens never enter browser persistent storage.
  * Short-lived Drive access lives in memory; guest keys remain local until saved to private Drive app data.
  */
-export type Auth_State = { user: { email: string, name: string, role: "owner" | "client" } | null, csrf: string, google_enabled: boolean }
+export type Auth_State = { user: { email: string, name: string, picture?: string, role: "owner" | "client" } | null, csrf: string, google_enabled: boolean }
 let current: Auth_State | null = null
 let pending: Promise<Auth_State> | null = null
 
@@ -48,7 +48,14 @@ async function delete_account(): Promise<void> {
 export function init_sign(): void {
     // Retire the former unverified, browser-only profile cache.
     try { localStorage.removeItem("jazu_user"); sessionStorage.removeItem("jazu_nonce") } catch {}
-    void get_auth().then(() => { paint(); document.dispatchEvent(new Event("jazu:auth")) }).catch(() => {})
+    void get_auth().then(auth => {
+        paint(); document.dispatchEvent(new Event("jazu:auth"))
+        if (auth.user && !auth.user.picture) void fetch("/api/v1/auth/profile", { method: "POST", credentials: "same-origin", headers: { "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }, signal: AbortSignal.timeout(7000) }).then(async response => {
+            if (!response.ok) return
+            const profile = await response.json() as { picture?: string }
+            if (current?.user && current.csrf === auth.csrf && profile.picture) { current.user.picture = profile.picture; document.dispatchEvent(new Event("jazu:profile")) }
+        }).catch(() => {})
+    }).catch(() => {})
     document.addEventListener("click", event => {
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-sign]")
         if (!button) return

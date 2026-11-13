@@ -6,6 +6,7 @@
 import { api_error } from "./security.ts"
 import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
+import { google_picture } from "../work_profile.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -20,7 +21,7 @@ export type Work_Env = {
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
 }
-type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null }
+type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null, name?: string, picture?: string, account_email?: string }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } })
@@ -66,7 +67,7 @@ async function public_key(value: unknown): Promise<JsonWebKey> {
     return clean
 }
 function room_info(room: Room) {
-    return { id: room.id, email: room.google_subject ? room.email : `guest/${room.guest_id}`, guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
+    return { id: room.id, email: room.google_subject ? room.account_email || room.email : `guest/${room.guest_id}`, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
 }
 
 export async function work_route(request: Request, env: Work_Env): Promise<Response> {
@@ -133,7 +134,7 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
             const before = url.searchParams.get("before") ?? `${Date.now() + 1}.ffffffff-ffff-ffff-ffff-ffffffffffff`
             if (!/^\d{1,15}\.[0-9a-f-]{36}$/i.test(before)) return api_error("bad_cursor", "Invalid conversation cursor", 400)
             const [time, id] = before.split(".")
-            const { results } = await env.DB.prepare("SELECT * FROM work_rooms WHERE (created_at < ? OR (created_at = ? AND id < ?)) AND owner_wrap IS NOT NULL AND EXISTS (SELECT 1 FROM work_messages WHERE room_id = work_rooms.id) ORDER BY created_at DESC, id DESC LIMIT ?").bind(Number(time), Number(time), id, limit).all<Room>()
+            const { results } = await env.DB.prepare("SELECT work_rooms.*, (SELECT name FROM auth_users WHERE subject = work_rooms.google_subject) AS name, (SELECT email FROM auth_users WHERE subject = work_rooms.google_subject) AS account_email, (SELECT picture FROM auth_profiles WHERE subject = work_rooms.google_subject) AS picture FROM work_rooms WHERE (created_at < ? OR (created_at = ? AND id < ?)) AND owner_wrap IS NOT NULL AND EXISTS (SELECT 1 FROM work_messages WHERE room_id = work_rooms.id) ORDER BY created_at DESC, id DESC LIMIT ?").bind(Number(time), Number(time), id, limit).all<Room>()
             const last = results[results.length - 1]
             return reply({ rooms: results.map(room_info), next: results.length === limit ? `${last.created_at}.${last.id}` : null })
         }

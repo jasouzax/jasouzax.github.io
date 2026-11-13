@@ -13,6 +13,7 @@ Plain TypeScript bundled by esbuild into IIFE scripts (classic scripts, not modu
 | Expertise | `expertise.ts` | Scroll-snap slider ↔ URL fragment state (CSS `:target` is the state machine) |
 | Themes | `theme_switch.ts` | Lazy theme load, fade, rollback |
 | Accounts | `sign.ts`, `connect_folder.ts`, `home_directory.ts`, `memory_fs.ts` | Google sign-in popup, local folder mount, OPFS home, memory-only handles |
+| Work messaging | `desk_messages.ts`, `work_session.ts`, `../work_profile.ts` | Encrypted conversations, Files-style client entities, account avatars and shared Google profile-image URL validation (also used by the Worker) |
 | Desk windows | `desk.ts`, `desk_view.ts`, `desk_folder*.ts`, `desk_media.ts`, `desk_markdown.ts`, `desk_previews.ts`, `desk_syntax.ts`, `desk_mime.ts`, `desk_navigation.ts`, `desk_selection.ts`, `desk_files_util.ts`, `desk_paths.ts`, `desk_plugins.ts`, `desk_flow.ts`, `desk_flow_rules.ts` | See [desk.md](desk.md) |
 | Filesystem | `desk_fs.ts`, `desk_fs_permissions.ts`, `desk_vfs.ts` | The file tree and its POSIX-like view for processes |
 | Processes | `kernel.ts`, `proc_types.ts`, `desk_proc.ts`, `desk_shell.ts`, `desk_users.ts`, `wasm_*.ts` | Kernel, shell, WASM workers |

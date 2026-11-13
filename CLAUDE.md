@@ -104,6 +104,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Work presentation:** shared chat geometry belongs in `content/theme/work.scss` (unnamed layout), with theme-specific paint in the named themes. Clients must use `.desk_side_item` entities, not generic lists. Profile images come from verified Google claims or the authenticated matching-subject userinfo backfill, with migration 0005 and a Google-image-host allowlist. Avatar account menus replace the old full-width chat account buttons.
+
 - **Opening client windows:** `new_window()` already focuses its result; `activate()` then minimizes it. Use `focus_window()` for client selection (hand off maximization when needed). Open `#head_menu` when revealing Clients so its controls are not covered by the chat window. Browser screenshots after reload must wait for `#main-content` to leave `inert`, otherwise the captured screen can still be the loading skeleton.
 
 - **Guest identity after linking:** `/work/session` must issue a fresh guest cookie after Google sign-out when the previous guest room is bound or closed. Reusing that cookie would prevent a new anonymous room because guest IDs are unique per room. Both SQLite and browser regressions cover linking, signing out, then sending as a new guest.

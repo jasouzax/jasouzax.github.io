@@ -28,7 +28,7 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
     }))
     try {
         const db = await runtime.getD1Database("DB")
-        for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql"]) {
+        for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql"]) {
             // D1 exec accepts one SQL statement per line.
             await db.exec(readFileSync(`migrations/${file}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
         }
@@ -50,6 +50,6 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
         assert.equal(callback.headers.get("location"), "/work")
         const cookie = callback.headers.getSetCookie().find(value => value.startsWith("__Host-jazu_session="))!.split(";")[0]
         const session = await runtime.dispatchFetch("https://staging.example.com/api/v1/auth/session", { headers: { cookie } })
-        assert.deepEqual((await session.json() as any).user, { email: "jason@jasouza.com", name: "Owner", role: "owner" })
+        assert.deepEqual((await session.json() as any).user, { email: "jason@jasouza.com", name: "Owner", picture: "", role: "owner" })
     } finally { await runtime.dispose() }
 })

@@ -34,7 +34,7 @@ test("signed-in menu replaces sign-in, cancellation preserves the account, confi
     execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "wrangler.local.jsonc", "--persist-to", ".cache/work-browser-guest-state", "--command", sql], { windowsHide: true, stdio: "pipe" })
     await page.context().addCookies([{ name: "__Host-jazu_session", value: token, url: "https://localhost:8787/", secure: true, httpOnly: true, sameSite: "Lax" }])
     await page.goto("/work")
-    await expect(page.locator('.desk_messages [data-sign="delete"]')).toBeVisible()
+    await expect(page.locator('.desk_messages_account > summary')).toBeVisible()
     await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
     await page.locator("#head_account > summary").click()
     const account = page.locator("#head_account")

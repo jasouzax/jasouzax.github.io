@@ -46,11 +46,13 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         const info = await guest.evaluate(async () => (await fetch("/api/v1/work/session", { method: "POST", headers: { "x-jazu-work": "1" } })).json())
         const address = `guest/${info.guest_room.guest_id}`
         await expect(guest.locator(".desk_wbox_head_path")).toHaveValue("im:jason@jasouza.com")
-        await page.locator("[data-work-clients] details > summary").click()
+        await page.locator("[data-work-guests] > summary").click()
         const entry = page.getByRole("button", { name: address, exact: true })
         await expect(entry).toBeVisible({ timeout: 25000 }); await entry.click()
         const chat = page.locator(".desk_messages").filter({ has: page.locator(".desk_messages_toolbar strong", { hasText: address }) })
         await expect(chat.locator(".desk_messages_log")).toContainText(message)
+        await expect(page.locator("[data-work-clients] ul, [data-work-clients] li")).toHaveCount(0)
+        await expect(page.locator("[data-work-clients] .desk_client_entity")).toHaveCount(1)
         await expect(page.locator(`.desk_wbox_head_path`).last()).toHaveValue(`im:${address}`)
         let dropped = false
         await page.route("**/api/v1/work/rooms/*/messages", async route => {
@@ -62,6 +64,10 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         await expect(chat.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
         await chat.getByRole("button", { name: "Retry send", exact: true }).click()
         await expect(guest.locator(".desk_messages_log .desk_message")).toHaveCount(2, { timeout: 15000 })
+        await expect(chat.locator(".desk_message_meta time")).toHaveCount(2)
+        await expect(chat.locator(".desk_message_body time")).toHaveCount(0)
+        await expect(chat.locator(".desk_messages_account img")).toBeVisible()
+        await expect(chat.locator(".desk_messages_identity")).toHaveText("Signed in with Google")
         await guest.reload()
         await ready(guest)
         await expect(guest.locator(".desk_messages_log")).toContainText("Reply from Jason")
@@ -72,10 +78,15 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         expect(stored).not.toContain("Guest hello"); expect(stored).not.toContain(key.key)
         await guest.screenshot({ path: ".cache/work-guest-mobile.png", fullPage: true })
         await page.screenshot({ path: ".cache/work-clients-desktop.png", fullPage: true })
+        await page.locator("#theme_name_memory").evaluate((input: HTMLInputElement) => { input.checked = true; input.dispatchEvent(new Event("change", { bubbles: true })) })
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "memory")
+        await ready(page)
+        await expect(chat.getByRole("textbox", { name: "Write a message…" })).toBeVisible()
+        await page.screenshot({ path: ".cache/work-clients-memory.png", fullPage: true })
         const stranger = await browser.newContext()
         try {
             const other = await stranger.newPage(); await other.goto("http://localhost:8787/work")
-            await expect(other.locator(".desk_messages_status")).toContainText("Connected")
+            await expect(other.locator(".desk_messages_connection")).toContainText("Online")
             expect(await other.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
         } finally { await stranger.close() }
     } finally { await context.close() }
@@ -94,6 +105,7 @@ test("first Google sign-in saves the guest key, links history and restores it on
         expect(await client.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
         await expect(page.getByRole("button", { name: email, exact: true })).toBeVisible({ timeout: 25000 })
         await page.getByRole("button", { name: email, exact: true }).click()
+        await expect(page.locator("[data-work-clients] .desk_client_entity img")).toBeVisible()
         await expect(page.locator(".desk_wbox_head_path").last()).toHaveValue(`im:${email}`)
         const device = await browser.newContext()
         try {
@@ -104,8 +116,9 @@ test("first Google sign-in saves the guest key, links history and restores it on
             await send(restored, "Another device")
             await expect(client.locator(".desk_messages_log")).toContainText("Another device", { timeout: 15000 })
         } finally { await device.close() }
+        await client.locator('.desk_messages_account > summary').click()
         await client.locator('.desk_messages [data-sign="out"]').click()
-        await expect(client.locator('.desk_messages [data-sign="google"]')).toBeVisible()
+        await expect(client.locator('.desk_messages_toolbar [data-sign="google"]')).toBeVisible()
         await send(client, "New guest after linking and signing out")
         await expect(client.locator(".desk_messages_log")).not.toContainText("Message before Google")
     } finally { await context.close() }
@@ -134,8 +147,9 @@ test("an existing Google key warns without transferring or overwriting a later g
         await account(context, email); await client.goto("http://localhost:8787/work"); await send(client, "Account history")
         const saved = JSON.stringify([...drive_files.get(email)!.values()][0])
         await writer(client).fill("Unsent account draft")
+        await client.locator('.desk_messages_account > summary').click()
         await client.locator('.desk_messages [data-sign="out"]').click()
-        await expect(client.locator('.desk_messages [data-sign="google"]')).toBeVisible()
+        await expect(client.locator('.desk_messages_toolbar [data-sign="google"]')).toBeVisible()
         await expect(writer(client)).toHaveValue("")
         await send(client, "Separate anonymous history")
         const guest_key = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
@@ -145,6 +159,7 @@ test("an existing Google key warns without transferring or overwriting a later g
         await expect(client.locator(".desk_messages_log")).not.toContainText("Separate anonymous history")
         expect(JSON.stringify([...drive_files.get(email)!.values()][0])).toBe(saved)
         expect(await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(guest_key.key)
+        await client.locator('.desk_messages_account > summary').click()
         await client.locator('.desk_messages [data-sign="out"]').click()
         await expect(client.locator(".desk_messages_log")).toContainText("Separate anonymous history")
     } finally { await context.close() }

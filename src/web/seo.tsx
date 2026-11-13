@@ -348,7 +348,7 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         // Any page can enter the desktop through the SPA. xterm generates
         // dimension/theme style elements when a terminal is opened there.
         "style-src-elem 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self'",
         "media-src 'self' blob:",
         "connect-src 'self' https://*.googleapis.com https://accounts.google.com",

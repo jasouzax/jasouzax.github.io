@@ -3230,3 +3230,8 @@
 .desk_pdf_controls button { padding: .2em .4em; }
 .desk_pdf_viewport { flex: 1; min-height: 0; overflow: auto; padding: 1em; background: #555; }
 .desk_pdf_viewport canvas { display: block; margin: auto; background: white; }
+
+// Conversation paint follows the Memory window surfaces while sharing chat geometry.
+.desk_message_body { border-radius: .25em .25em .25em 0; box-shadow: 1px 1px 0 color-mix(in srgb, currentColor 20%, transparent); }
+.desk_message_self .desk_message_body { border-radius: .25em .25em 0 .25em; }
+.desk_messages_composer textarea { border-radius: .2em; }

@@ -242,7 +242,14 @@
       "work_no_clients": "No one has messaged you yet.",
       "work_choose_client": "Choose a client or guest from the Clients panel to open their conversation.",
       "work_owner_not_ready": "The owner is setting up encrypted messaging. You can write a message here and try sending again shortly.",
-      "work_drive_connect": "Reconnect Google Drive"
+      "work_drive_connect": "Reconnect Google Drive",
+      "work_online": "Online",
+      "work_offline": "Offline",
+      "work_connection_hint": "Connection to the messaging service; this is not the owner’s presence status.",
+      "work_signin_save": "Sign in to save session",
+      "work_google_signed_in": "Signed in with Google",
+      "work_your_account": "Your account",
+      "work_guest": "Guest"
     },
     "ja": {
       "sign_out_google": "Googleからログアウト",
@@ -512,7 +519,14 @@
       "work_no_clients": "メッセージはまだありません。",
       "work_choose_client": "クライアント一覧から会話を選択してください。",
       "work_owner_not_ready": "暗号化メッセージを準備中です。しばらくしてから送信してください。",
-      "work_drive_connect": "Google Driveに再接続"
+      "work_drive_connect": "Google Driveに再接続",
+      "work_online": "接続中",
+      "work_offline": "オフライン",
+      "work_connection_hint": "メッセージサービスへの接続状態です。相手の在席状態ではありません。",
+      "work_signin_save": "ログインして会話を保存",
+      "work_google_signed_in": "Googleでログイン済み",
+      "work_your_account": "アカウント",
+      "work_guest": "ゲスト"
     }
   },
   "default_language": "en",

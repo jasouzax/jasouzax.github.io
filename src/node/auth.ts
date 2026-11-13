@@ -8,13 +8,14 @@ import type { Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { encode_key } from "../work_crypto.ts"
 import { google_access, save_google_grant } from "./google_grant.ts"
+import { google_picture } from "../work_profile.ts"
 
 const session_cookie = "__Host-jazu_session"
 const flow_cookie = "__Host-jazu_oauth"
 const month = 30 * 86400000
 const callback_path = "/api/v1/auth/google/callback"
 const google_keys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"))
-type Identity = { subject: string, email: string, name: string }
+type Identity = { subject: string, email: string, name: string, picture?: string }
 export type Auth_Session = Identity & { role: "owner" | "client", csrf: string }
 export type Auth_Dependencies = { fetch?: typeof fetch, keys?: JWTVerifyGetKey }
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
@@ -36,10 +37,10 @@ export async function read_session(request: Request, env: Work_Env): Promise<Aut
     const token = read_cookie(request, session_cookie)
     if (!token || !env.DB) return null
     const hash = await auth_hash(token)
-    const row = await env.DB.prepare("SELECT u.subject, u.email, u.name, s.last_seen, o.subject AS owner_subject FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(hash, Date.now() - month).first<Identity & { last_seen: number, owner_subject: string | null }>()
+    const row = await env.DB.prepare("SELECT u.subject, u.email, u.name, p.picture, s.last_seen, o.subject AS owner_subject FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_profiles p ON p.subject = u.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(hash, Date.now() - month).first<Identity & { last_seen: number, owner_subject: string | null }>()
     if (!row) return null
     if (row.last_seen < Date.now() - 300000) await env.DB.prepare("UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?").bind(Date.now(), hash).run()
-    return { subject: row.subject, email: row.email, name: row.name, role: row.owner_subject ? "owner" : "client", csrf: await auth_hash(`csrf\n${token}`) }
+    return { subject: row.subject, email: row.email, name: row.name, picture: google_picture(row.picture), role: row.owner_subject ? "owner" : "client", csrf: await auth_hash(`csrf\n${token}`) }
 }
 
 export function valid_csrf(request: Request, session: Auth_Session): boolean {
@@ -53,7 +54,7 @@ function redirect_work(error?: string): Response {
 export async function verify_google_token(token: string, client: string, nonce: string, keys: JWTVerifyGetKey = google_keys): Promise<Identity> {
     const { payload } = await jwtVerify(token, keys, { algorithms: ["RS256"], issuer: ["https://accounts.google.com", "accounts.google.com"], audience: client, requiredClaims: ["exp", "iat", "sub", "email", "email_verified", "nonce"], maxTokenAge: "10 minutes", clockTolerance: 30 })
     if (payload.nonce !== nonce || payload.email_verified !== true || typeof payload.sub !== "string" || !payload.sub || payload.sub.length > 255 || typeof payload.email !== "string" || payload.email.length > 254 || !payload.email.includes("@") || (payload.azp !== undefined && payload.azp !== client)) throw new Error("Invalid Google identity")
-    return { subject: payload.sub, email: payload.email.toLowerCase(), name: typeof payload.name === "string" ? payload.name.slice(0, 200) : payload.email }
+    return { subject: payload.sub, email: payload.email.toLowerCase(), name: typeof payload.name === "string" ? payload.name.slice(0, 200) : payload.email, picture: google_picture(payload.picture) }
 }
 
 export async function auth_route(request: Request, env: Work_Env, dependencies: Auth_Dependencies = {}): Promise<Response> {
@@ -61,7 +62,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (!env.DB) return api_error("auth_unconfigured", "Sign-in is not configured", 503)
     if (url.pathname === "/api/v1/auth/session" && request.method === "GET") {
         const session = await read_session(request, env)
-        const response = reply({ user: session ? { email: session.email, name: session.name, role: session.role } : null, csrf: session?.csrf ?? "", google_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_ADMIN_EMAIL) })
+        const response = reply({ user: session ? { email: session.email, name: session.name, picture: session.picture, role: session.role } : null, csrf: session?.csrf ?? "", google_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_ADMIN_EMAIL) })
         const token = read_cookie(request, session_cookie)
         if (session && token) response.headers.set("set-cookie", cookie(session_cookie, token, month / 1000))
         return response
@@ -84,6 +85,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
             env.DB.prepare("DELETE FROM work_key_files WHERE subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_profiles WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_sessions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_users WHERE subject = ?").bind(session.subject),
@@ -97,6 +99,20 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before opening your key storage", 403)
         try { return reply({ access_token: await google_access(env, read_cookie(request, session_cookie), dependencies.fetch) }) }
         catch { return api_error("drive_consent_required", "Sign in again and allow private app data storage in Google Drive", 403) }
+    }
+    if (url.pathname === "/api/v1/auth/profile" && request.method === "POST") {
+        const session = await read_session(request, env)
+        if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before loading your profile image", 403)
+        if (session.picture) return reply({ picture: session.picture })
+        try {
+            const access = await google_access(env, read_cookie(request, session_cookie), dependencies.fetch)
+            const response = await (dependencies.fetch ?? fetch)("https://openidconnect.googleapis.com/v1/userinfo", { redirect: "manual", signal: AbortSignal.timeout(5000), headers: { authorization: `Bearer ${access}` } })
+            if (!response.ok) return reply({ picture: "" })
+            const profile = await response.json() as { sub?: string, picture?: string }
+            const picture = profile.sub === session.subject ? google_picture(profile.picture) : ""
+            if (picture) await env.DB.prepare("INSERT OR REPLACE INTO auth_profiles (subject, picture) VALUES (?, ?)").bind(session.subject, picture).run()
+            return reply({ picture })
+        } catch { return reply({ picture: "" }) }
     }
     if (request.method !== "GET") return api_error("method_not_allowed", "Use GET", 405)
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_ADMIN_EMAIL) return api_error("auth_unconfigured", "Google sign-in is not configured", 503)
@@ -137,6 +153,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     } catch { return redirect_work("identity_verification") }
     const now = Date.now()
     await env.DB.prepare("INSERT INTO auth_users (subject, email, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(subject) DO UPDATE SET email = excluded.email, name = excluded.name").bind(identity.subject, identity.email, identity.name, now).run()
+    if (identity.picture) await env.DB.prepare("INSERT OR REPLACE INTO auth_profiles (subject, picture) VALUES (?, ?)").bind(identity.subject, identity.picture).run()
     if (identity.email === env.GOOGLE_ADMIN_EMAIL.toLowerCase()) await env.DB.prepare("INSERT OR IGNORE INTO auth_owner (id, subject) VALUES (1, ?)").bind(identity.subject).run()
     const token = random()
     await env.DB.prepare("INSERT INTO auth_sessions (token_hash, subject, created_at, last_seen) VALUES (?, ?, ?, ?)").bind(await auth_hash(token), identity.subject, now, now).run()

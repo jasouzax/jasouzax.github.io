@@ -23,7 +23,7 @@ async function token(claims: Record<string, unknown> = {}): Promise<string> {
 
 function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
     const env: Work_Env = { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: "secret-never-shown-to-browser", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = {
@@ -55,9 +55,9 @@ function fixture() {
         assert.match(response.headers.get("set-cookie")!, /HttpOnly; Secure; SameSite=Lax/)
         return { url, cookie: cookie_part(response, "__Host-jazu_oauth") }
     }
-    const login = async (email: string, subject: string, grant: Record<string, unknown> = {}) => {
+    const login = async (email: string, subject: string, grant: Record<string, unknown> = {}, picture = "") => {
         const flow = await start()
-        const id_token = await token({ email, sub: subject, nonce: flow.url.searchParams.get("nonce") })
+        const id_token = await token({ email, sub: subject, picture, nonce: flow.url.searchParams.get("nonce") })
         const callback = request(`/api/v1/auth/google/callback?state=${flow.url.searchParams.get("state")}&code=one-use-code`, flow.cookie)
         const response = await auth_route(callback, env, { keys: resolver, fetch: async (input, init) => {
             assert.equal(String(input), "https://oauth2.googleapis.com/token")
@@ -146,6 +146,28 @@ test("Drive credentials are sealed per session, require CSRF and refresh without
         assert.equal(response.headers.get("cache-control"), "no-store")
         await auth_route(f.request("/api/v1/auth/logout", client.cookie, {}, { "x-jazu-csrf": client.session.csrf }), f.env)
         assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_google_grants").get() as any).n, 0)
+    } finally { f.db.close() }
+})
+
+test("profile images use verified claims or matching Google userinfo and never accept another subject", async () => {
+    const f = fixture()
+    try {
+        const picture = "https://lh3.googleusercontent.com/a/verified-photo"
+        const claimed = await f.login("picture@example.com", "photo-claim", {}, picture)
+        assert.equal(claimed.session.user.picture, picture)
+        const grant = { access_token: "synthetic-profile-access", expires_in: 3600, scope: "openid profile https://www.googleapis.com/auth/drive.appdata" }
+        const older = await f.login("older@example.com", "older-subject", grant)
+        assert.equal((await auth_route(f.request("/api/v1/auth/profile", older.cookie, {}), f.env)).status, 403)
+        const request = f.request("/api/v1/auth/profile", older.cookie, {}, { "x-jazu-csrf": older.session.csrf })
+        const mismatch = await auth_route(request, f.env, { fetch: async () => Response.json({ sub: "someone-else", picture }) })
+        assert.deepEqual(await mismatch.json(), { picture: "" })
+        const matched = await auth_route(request, f.env, { fetch: async (input, init) => {
+            assert.equal(String(input), "https://openidconnect.googleapis.com/v1/userinfo")
+            assert.equal(init!.redirect, "manual")
+            return Response.json({ sub: "older-subject", picture })
+        } })
+        assert.deepEqual(await matched.json(), { picture })
+        assert.equal((await (await auth_route(f.request("/api/v1/auth/session", older.cookie), f.env)).json() as any).user.picture, picture)
     } finally { f.db.close() }
 })
 
