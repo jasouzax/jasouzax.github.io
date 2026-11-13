@@ -1,4 +1,5 @@
 /* Lazy, browser-independent PDF viewer. PDF.js renders local bytes; no document is uploaded or allowed to execute actions. */
+import { text } from "./desk.ts"
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist"
 
 type Pdf_Assets = { base: string, module: string, worker: string }
@@ -19,7 +20,7 @@ export function pdf_viewer(file: Blob, name: string, signal: AbortSignal): HTMLE
     box.className = "desk_preview desk_pdf"
     controls.className = "desk_pdf_controls"; viewport.className = "desk_pdf_viewport"
     const status = document.createElement("span"), canvas = document.createElement("canvas"), download = document.createElement("a")
-    status.setAttribute("role", "status"); status.textContent = "Loading PDFÃ¢â‚¬Â¦"
+    status.setAttribute("role", "status"); status.textContent = text("pdf_loading")
     canvas.setAttribute("role", "img")
     const button = (label: string, click: () => void) => {
         const node = document.createElement("button"); node.type = "button"; node.textContent = label
@@ -27,12 +28,12 @@ export function pdf_viewer(file: Blob, name: string, signal: AbortSignal): HTMLE
     }
     let pdf_document: PDFDocumentProxy | null = null, loading: PDFDocumentLoadingTask | null = null, running: RenderTask | null = null
     let page = 1, zoom = 1, revision = 0, chain = Promise.resolve()
-    const previous = button("Previous page", () => { if (page > 1) { page--; draw() } })
-    const next = button("Next page", () => { if (pdf_document && page < pdf_document.numPages) { page++; draw() } })
-    button("Zoom out", () => { zoom = Math.max(.25, zoom / 1.25); draw() })
-    button("Zoom in", () => { zoom = Math.min(4, zoom * 1.25); draw() })
+    const previous = button(text("pdf_previous"), () => { if (page > 1) { page--; draw() } })
+    const next = button(text("pdf_next"), () => { if (pdf_document && page < pdf_document.numPages) { page++; draw() } })
+    button(text("pdf_zoom_out"), () => { zoom = Math.max(.25, zoom / 1.25); draw() })
+    button(text("pdf_zoom_in"), () => { zoom = Math.min(4, zoom * 1.25); draw() })
     const url = URL.createObjectURL(new Blob([file], { type: "application/pdf" }))
-    download.href = url; download.download = name; download.textContent = "Download PDF"
+    download.href = url; download.download = name; download.textContent = text("pdf_download")
     controls.append(status); viewport.append(canvas); box.append(controls, viewport, download)
     previous.disabled = next.disabled = true
     function draw(): void {
@@ -57,13 +58,13 @@ export function pdf_viewer(file: Blob, name: string, signal: AbortSignal): HTMLE
             status.textContent = `${page} / ${pdf_document.numPages}`
             previous.disabled = page === 1; next.disabled = page === pdf_document.numPages
         }).catch(error => {
-            if (!signal.aborted && current === revision) status.textContent = `PDF viewer: ${String(error)}`
+            if (!signal.aborted && current === revision) status.textContent = `${text("pdf_failed")} ${String(error)}`
         })
     }
     const observer = new ResizeObserver(() => draw())
     observer.observe(viewport)
     signal.addEventListener("abort", () => {
-        observer.disconnect(); running?.cancel(); void loading?.destroy(); URL.revokeObjectURL(url)
+        observer.disconnect(); running?.cancel(); void loading?.destroy().catch(() => {}); URL.revokeObjectURL(url)
     }, { once: true })
     void load_pdf().then(async ({ pdf, assets }) => {
         if (signal.aborted) return
@@ -72,6 +73,6 @@ export function pdf_viewer(file: Blob, name: string, signal: AbortSignal): HTMLE
         if (signal.aborted) { await loading.destroy(); return }
         pdf_document = await loading.promise
         if (!signal.aborted) draw()
-    }).catch(error => { if (!signal.aborted) status.textContent = `PDF viewer: ${String(error)}` })
+    }).catch(error => { if (!signal.aborted) status.textContent = `${text("pdf_failed")} ${String(error)}` })
     return box
 }

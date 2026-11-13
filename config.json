@@ -196,7 +196,18 @@
       "colon": ":",
       "sitemap_info": "Every page on this site.",
       "not_found": "Page not found",
-      "not_found_info": "The page you asked for does not exist, or it moved."
+      "not_found_info": "The page you asked for does not exist, or it moved.",
+      "pdf_loading": "Loading PDF...",
+      "pdf_download": "Download PDF",
+      "pdf_previous": "Previous page",
+      "pdf_next": "Next page",
+      "pdf_zoom_out": "Zoom out",
+      "pdf_zoom_in": "Zoom in",
+      "pdf_failed": "PDF viewer:",
+      "convert_pdf_loading": "Converting image to PDF...",
+      "convert_pdf_noedit": "PDF editing is unsupported. Choose View to read the PDF.",
+      "conversion_failed": "Conversion failed:",
+      "conversion_unavailable": "No conversion from {from} to {to}"
     },
     "ja": {
       "skip_main": "メインコンテンツへ移動",
@@ -422,7 +433,18 @@
       "rireki_photo_4": "1.縦 36~40mm",
       "rireki_photo_5": "　横 24~30mm",
       "rireki_photo_6": "2.本人単身胸か",
-      "rireki_photo_7": "3.裏面のりづけ"
+      "rireki_photo_7": "3.裏面のりづけ",
+      "pdf_loading": "PDFを読み込み中…",
+      "pdf_download": "PDFをダウンロード",
+      "pdf_previous": "前のページ",
+      "pdf_next": "次のページ",
+      "pdf_zoom_out": "縮小",
+      "pdf_zoom_in": "拡大",
+      "pdf_failed": "PDFビューア：",
+      "convert_pdf_loading": "画像をPDFに変換中…",
+      "convert_pdf_noedit": "PDFの編集には対応していません。表示モードでPDFを閲覧できます。",
+      "conversion_failed": "変換に失敗しました：",
+      "conversion_unavailable": "{from} から {to} への変換には対応していません"
     }
   },
   "default_language": "en",

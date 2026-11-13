@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Locator } from "@playwright/test"
+import { test, expect, type Page, type Locator } from "./desk_fixture.ts"
 
 const pane = (page: Page, index = 0) => page.locator(".desk_wbox").nth(index)
 const tile = (window: Locator, path: string) => window.locator(`.desk_folder_tile[data-path="${path}"]`)

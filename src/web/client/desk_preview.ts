@@ -1,5 +1,5 @@
 /* Sandboxed HTML, lazy PDF viewing and image-to-PDF conversion. Conversion runs the existing img2pdf WASM process against owned temporary files. */
-import type { desk_window } from "./desk.ts"
+import { text, type desk_window } from "./desk.ts"
 import { render_window } from "./desk_view.ts"
 import { latest_bytes, subscribe_edits } from "./desk_flow.ts"
 import { pdf_viewer } from "./desk_pdf.ts"
@@ -34,17 +34,17 @@ const conversions = new WeakMap<desk_window, Conversion>()
 export function image_pdf_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const box = preview(), status = document.createElement("p")
     status.className = "desk_preview_status"; status.setAttribute("role", "status")
-    status.textContent = "Converting image to PDFÃ¢â‚¬Â¦"
+    status.textContent = text("convert_pdf_loading")
     box.append(status)
     const parent = item.parent!, file = parent.file!, bytes = latest_bytes(parent)
+    signal.addEventListener("abort", subscribe_edits(parent, () => render_window(item)), { once: true })
     const cached = outputs.get(item)
     if (cached && cached.file === file && cached.bytes === bytes) {
         item.file = cached.output
         if (item.mode !== "edit") return pdf_body(item, signal)
-        status.textContent = "PDF editing is unsupported. Choose View to read the PDF."
+        status.textContent = text("convert_pdf_noedit")
         return box
     }
-    signal.addEventListener("abort", subscribe_edits(parent, () => render_window(item)), { once: true })
     // An aborted render never reuses an aborted worker, even for the same source.
     const existing = conversions.get(item)
     const result = existing && existing.file === file && existing.bytes === bytes ? existing.result
@@ -60,7 +60,7 @@ export function image_pdf_body(item: desk_window, signal: AbortSignal): HTMLElem
         outputs.set(item, { file, bytes, output })
         item.el.dataset.converted = "img2pdf"
         render_window(item)
-    }).catch(error => { if (!signal.aborted) status.textContent = `Conversion failed: ${String(error)}` })
+    }).catch(error => { if (!signal.aborted) status.textContent = `${text("conversion_failed")} ${String(error)}` })
     return box
 }
 

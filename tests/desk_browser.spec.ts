@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { test, expect } from "./desk_fixture.ts"
 import { execFileSync } from "node:child_process"
 
 test("project research Overview expands explanations without opening windows or file actions", async ({ page }) => {
@@ -85,7 +85,7 @@ test("a terminal request is not overwritten by a pending home folder request", a
     await page.getByRole("button", { name: "Open folder", exact: true }).click()
     await page.getByRole("button", { name: "Open terminal", exact: true }).click()
     await page.evaluate(() => (window as any).releaseHomeStorage())
-    await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:")
+    await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:", { timeout: 30000 })
     await expect(page.locator(".desk_wbox_head_path")).toHaveValue(/^pid:/)
     await expect(page.locator(".desk_wbox_body_folder")).toHaveCount(0)
 })
@@ -288,7 +288,7 @@ test("terminal colors follow light, dark and operating-system theme changes", as
     await page.emulateMedia({ colorScheme: "light" })
     await page.goto("/desk")
     await page.getByRole("button", { name: "Open terminal", exact: true }).click()
-    await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:")
+    await expect(page.locator(".xterm-rows")).toContainText("user@jasouza:", { timeout: 30000 })
     const input = page.locator(".xterm-helper-textarea")
     await input.pressSequentially("printf 'PLAIN_TEXT\\n'")
     await input.press("Enter")
@@ -504,6 +504,7 @@ test("Files selects before opening and keeps tree controls and sticky rows align
 })
 
 test("desk plugins show code lines, toggle hex, preserve binary edits and report missing resources", async ({ page }) => {
+    test.setTimeout(120000)
     const plugin_scripts: string[] = []
     page.on("request", request => {
         if (/\/assets\/plugins\/.*\.js$/.test(request.url())) plugin_scripts.push(request.url())

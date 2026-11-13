@@ -273,7 +273,7 @@ function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
     const receive = (next: Uint8Array): void => {
         item.dirty = is_dirty(item)
         sync_save(item)
-        if (!ready || signal.aborted) return
+        if (!ready || signal.aborted || bytes === next) return
         const selection = [area.selectionStart, area.selectionEnd] as const
         const scroll = [box.scrollTop, box.scrollLeft]
         bytes = new Uint8Array(next)
@@ -415,7 +415,7 @@ function fallback_body(item: desk_window): HTMLElement {
         const note = document.createElement("div")
         note.className = "desk_wbox_body_none"
         note.setAttribute("role", "status")
-        note.textContent = `No conversion from ${item.parent!.mime} to ${item.mime}`
+        note.textContent = text("conversion_unavailable").replace("{from}", item.parent!.mime).replace("{to}", item.mime)
         return note
     }
     if (item.error) {

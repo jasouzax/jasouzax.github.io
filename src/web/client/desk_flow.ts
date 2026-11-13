@@ -64,7 +64,7 @@ export function accept_save(item: desk_window, file: Blob, bytes: Uint8Array | n
     const root = document_of(item)
     root.file = file
     if (latest_bytes(root) === bytes) dirty.delete(root)
-    if (bytes) for (const listener of listeners.get(root) ?? []) listener(latest_bytes(root)!)
+    if (bytes) for (const listener of [...(listeners.get(root) ?? [])]) listener(latest_bytes(root)!)
 }
 
 // A closing window leaves its parent, and its children stop being children. With `redraw` they are drawn again as ordinary windows
@@ -93,7 +93,7 @@ export function announce_edit(item: desk_window, bytes: Uint8Array): void {
     const root = document_of(item)
     newest.set(root, bytes)
     dirty.add(root)
-    for (const listener of listeners.get(root) ?? []) listener(bytes)
+    for (const listener of [...(listeners.get(root) ?? [])]) listener(bytes)
 }
 
 export function latest_bytes(item: desk_window): Uint8Array | null {
