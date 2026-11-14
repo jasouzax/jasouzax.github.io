@@ -1,12 +1,13 @@
 /*
  * Encrypted Work API backed by D1, independent of the personal server.
  * Automatic guest cookies or verified Google sessions authenticate participants.
- * Only cookie hashes, public keys, wrapped conversation keys and ciphertext are stored.
+ * D1 stores cookie hashes, public/wrapped keys, ciphertext and separately sealed client recovery keys.
  */
 import { api_error } from "./security.ts"
 import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 import { google_picture } from "../work_profile.ts"
+import { unstored_route } from "./work_unstored.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -20,6 +21,7 @@ export type Work_Env = {
     GOOGLE_CLIENT_ID?: string
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
+    WORK_FALLBACK_KEY?: string
 }
 type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null, name?: string, picture?: string, account_email?: string }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
@@ -70,7 +72,7 @@ function room_info(room: Room) {
     return { id: room.id, email: room.google_subject ? room.account_email || room.email : `guest/${room.guest_id}`, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
 }
 
-export async function work_route(request: Request, env: Work_Env): Promise<Response> {
+export async function work_route(request: Request, env: Work_Env, dependencies: { fetch?: typeof fetch } = {}): Promise<Response> {
     if (!env.DB || !env.GOOGLE_CLIENT_ID) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
     const url = new URL(request.url)
     if (request.headers.has("authorization")) return api_error("forbidden", "Use your browser session", 403)
@@ -104,6 +106,11 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
     }
     if (!session && !guest_row) return api_error("unauthorized", "Refresh the messaging window", 401)
     if (request.method === "POST" && (session ? !valid_csrf(request, session) : request.headers.get("x-jazu-csrf") !== await auth_hash(`guest-csrf\n${guest}`))) return api_error("forbidden", "Refresh the messaging window", 403)
+    if (url.pathname === "/api/v1/work/unstored-key" && request.method === "POST") {
+        let data: Record<string, unknown>
+        try { data = await read_json(request) } catch { return api_error("invalid_request", "Invalid recovery storage request", 400) }
+        return unstored_route(request, env, session, guest_row?.id, data, dependencies.fetch)
+    }
     if (url.pathname === "/api/v1/work/key-file") {
         if (!session) return api_error("forbidden", "Sign in to use private Google Drive storage", 403)
         if (request.method === "POST") {
@@ -148,7 +155,7 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
             const serialized = JSON.stringify({ v: 1, public_jwk: await public_key(wrap.public_jwk), iv: wrap.iv, ciphertext: wrap.ciphertext })
             const existing = session ? await env.DB.prepare("SELECT * FROM work_rooms WHERE google_subject = ? AND revoked = 0 AND owner_wrap IS NOT NULL").bind(session.subject).first<Room>() : await env.DB.prepare("SELECT * FROM work_rooms WHERE guest_id = ?").bind(guest_row!.id).first<Room>()
             if (existing) return existing.id === data.id && existing.owner_wrap === serialized ? reply({ room: room_info(existing) }) : api_error("conversation_exists", "A conversation already exists; restore its key", 409)
-            await env.DB.prepare("INSERT OR IGNORE INTO work_rooms (id, email, token_hash, created_at, google_subject, guest_id, owner_wrap, owner_key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(data.id, session?.email ?? `guest/${guest_row!.id}`, `disabled:${data.id}`, Date.now(), session?.subject ?? null, session ? null : guest_row!.id, serialized, owner_key.key_id).run()
+            await env.DB.prepare("INSERT OR IGNORE INTO work_rooms (id, email, token_hash, created_at, google_subject, guest_id, owner_wrap, owner_key_id) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM unstored_keys WHERE subject = ? AND room_id != ?)").bind(data.id, session?.email ?? `guest/${guest_row!.id}`, `disabled:${data.id}`, Date.now(), session?.subject ?? null, session ? null : guest_row!.id, serialized, owner_key.key_id, session?.subject ?? "", data.id).run()
             const room = await env.DB.prepare("SELECT * FROM work_rooms WHERE id = ?").bind(data.id).first<Room>()
             const permitted = room && (session ? room.google_subject === session.subject : !room.google_subject && room.guest_id === guest_row!.id)
             return permitted && room.owner_wrap === serialized ? reply({ room: room_info(room) }, 201) : api_error("conversation_exists", "A conversation already exists; refresh the window", 409)
@@ -161,7 +168,7 @@ export async function work_route(request: Request, env: Work_Env): Promise<Respo
     if (!room || (!owner && !client_access)) return api_error("not_found", "Conversation is unavailable", 404)
     if (match[2] === "/bind" && request.method === "POST") {
         if (!session || owner || !guest_row || room.guest_id !== guest_row.id || room.revoked) return api_error("forbidden", "Use the guest's browser to connect this conversation", 403)
-        const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ?, email = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE google_subject = ? AND id != ? AND revoked = 0 AND owner_wrap IS NOT NULL) RETURNING id").bind(session.subject, session.email, room.id, session.subject, session.subject, room.id).first()
+        const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ?, email = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE google_subject = ? AND id != ? AND revoked = 0 AND owner_wrap IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM unstored_keys WHERE subject = ? AND room_id != ?) RETURNING id").bind(session.subject, session.email, room.id, session.subject, session.subject, room.id, session.subject, room.id).first()
         return linked ? reply({ linked: true }) : api_error("conversation_exists", "Your Google account already has a conversation. Guest messages were not transferred.", 409)
     }
     if (!match[2] && request.method === "GET") return reply({ room: room_info(room), role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })

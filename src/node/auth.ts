@@ -32,6 +32,7 @@ function read_cookie(request: Request, name: string): string {
     const value = values[0].slice(name.length + 1)
     return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : ""
 }
+export const session_token = (request: Request) => read_cookie(request, session_cookie)
 
 export async function read_session(request: Request, env: Work_Env): Promise<Auth_Session | null> {
     const token = read_cookie(request, session_cookie)
@@ -85,6 +86,8 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
             env.DB.prepare("DELETE FROM work_key_files WHERE subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM unstored_keys WHERE subject = ?").bind(session.subject),
+            env.DB.prepare("DELETE FROM work_key_promotions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_profiles WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_sessions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),

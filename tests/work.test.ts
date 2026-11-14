@@ -4,20 +4,21 @@ import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
 import { work_route, type Work_Env, type Work_Statement } from "../src/node/work.ts"
-import { auth_hash } from "../src/node/auth.ts"
+import { auth_hash, auth_route } from "../src/node/auth.ts"
+import { save_google_grant } from "../src/node/google_grant.ts"
 import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../src/work_crypto.ts"
 const origin = "https://example.com", base = "/api/v1/work/rooms"
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 type Identity = { cookie: string, csrf: string }
 async function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
-    const env: Work_Env = { GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", DB: { prepare(sql) {
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    const env: Work_Env = { WORK_FALLBACK_KEY: random(), GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = { bind(...args) { values = args; return statement }, async first<T>() { return db.prepare(sql).get(...values) as T ?? null }, async all<T>() { return { results: db.prepare(sql).all(...values) as T[] } }, async run() { return db.prepare(sql).run(...values) } }
         return statement
-    } } }
-    const api = (path: string, who?: Identity, body?: unknown, headers?: Record<string, string>) => work_route(new Request(origin + path, { method: body === undefined ? "GET" : "POST", headers: { origin, cookie: who?.cookie ?? "", "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who?.csrf ?? "", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) }), env)
+    }, async batch(statements) { db.exec("BEGIN"); try { for (const statement of statements) await statement.run(); db.exec("COMMIT") } catch (error) { db.exec("ROLLBACK"); throw error } } } }
+    const api = (path: string, who?: Identity, body?: unknown, headers?: Record<string, string>, upstream?: typeof fetch) => work_route(new Request(origin + path, { method: body === undefined ? "GET" : "POST", headers: { origin, cookie: who?.cookie ?? "", "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who?.csrf ?? "", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) }), env, { fetch: upstream })
     const client = async (email: string, subject = email): Promise<Identity> => {
         const token = random()
         db.prepare("INSERT OR IGNORE INTO auth_users VALUES (?, ?, 'Test', ?)").run(subject, email, Date.now())
@@ -44,6 +45,71 @@ async function fixture() {
     }
     return { db, env, api, client, owner, pair, key_id, guest, room }
 }
+
+test("client fallback keys are immutable, sealed outside D1 and isolated from guests, owners and other accounts", async () => {
+    const f = await fixture(), path = "/api/v1/work/unstored-key"
+    try {
+        const client = await f.client("recovery@example.com"), stranger = await f.client("stranger@example.com"), guest = await f.guest()
+        const make = async () => { const room = crypto.randomUUID(), key = random(); return { room, key, key_id: f.key_id, owner_wrap: await wrap_room_key(key, f.pair.public_jwk, room) } }
+        const first = await make(), other = await make()
+        for (const who of [guest, f.owner]) assert.equal((await f.api(path, who, { action: "save", client: first })).status, 403)
+        assert.equal((await f.api(path, client, { action: "save", client: first }, { "x-jazu-csrf": "wrong" })).status, 403)
+        const results = await Promise.all([first, other].map(client_key => f.api(path, client, { action: "save", client: client_key })))
+        const stored = (await results[0].json() as any).client
+        assert.deepEqual((await results[1].json() as any).client, stored, "concurrent devices restore the first immutable backup")
+        const competitor = stored.room === first.room ? other : first
+        assert.equal((await f.api(base, client, { id: competitor.room, owner_wrap: competitor.owner_wrap, key_id: competitor.key_id })).status, 409, "a competing Drive key cannot claim a different room after fallback reservation")
+        assert.equal((await f.api(base, client, { id: stored.room, owner_wrap: stored.owner_wrap, key_id: stored.key_id })).status, 201)
+        const row = f.db.prepare("SELECT * FROM unstored_keys").get() as any
+        assert.equal(row.email, "recovery@example.com"); assert.equal(row.room_id, stored.room)
+        assert.equal(row.sealed.includes(stored.key), false)
+        assert.deepEqual((await (await f.api(path, client, { action: "load" })).json() as any).client, stored)
+        assert.equal((await (await f.api(path, stranger, { action: "load" })).json() as any).client, null)
+        const secret = f.env.WORK_FALLBACK_KEY; f.env.WORK_FALLBACK_KEY = random()
+        assert.equal((await f.api(path, client, { action: "load" })).status, 503)
+        assert.equal((await f.api(path, client, { action: "save", client: other })).status, 503)
+        f.env.WORK_FALLBACK_KEY = secret
+        f.db.prepare("INSERT INTO unstored_keys VALUES (?, ?, ?, ?, ?)").run("stranger@example.com", "stranger@example.com", crypto.randomUUID(), row.sealed, Date.now())
+        assert.equal((await f.api(path, stranger, { action: "load" })).status, 503, "AAD prevents copying a backup to another identity or room")
+        const deletion = await auth_route(new Request(origin + "/api/v1/auth/account/delete", { method: "POST", headers: { origin, cookie: client.cookie, "x-jazu-work": "1", "x-jazu-csrf": client.csrf, "x-jazu-confirm-delete": "account" } }), f.env)
+        assert.equal(deletion.status, 200)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM unstored_keys WHERE subject = 'recovery@example.com'").get()!.n, 0)
+    } finally { f.db.close() }
+})
+
+test("Drive handoff independently verifies the uploaded key, retains failures and deletes the backup without allowing resurrection", async () => {
+    const f = await fixture(), path = "/api/v1/work/unstored-key"
+    try {
+        const client = await f.client("handoff@example.com"), room = await f.room(client)
+        const value = { room: room.id, key: room.key, key_id: f.key_id, owner_wrap: room.body.owner_wrap }
+        assert.equal((await f.api(path, client, { action: "save", client: value })).status, 200)
+        await f.api("/api/v1/work/key-file", client, { file_id: "reserved-drive-file" })
+        const action = { action: "drive" }
+        assert.equal((await f.api(path, client, action)).status, 503, "no Drive credentials keeps the backup")
+        await save_google_grant(f.env, client.cookie.split("=")[1], { access_token: "test-drive-access", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.appdata" })
+        let mode = "different"
+        const upstream: typeof fetch = async (url, init) => {
+            assert.equal(String(url), "https://www.googleapis.com/drive/v3/files/reserved-drive-file?alt=media")
+            assert.equal(init?.redirect, "manual"); assert.equal((init?.headers as any).authorization, "Bearer test-drive-access")
+            if (mode === "redirect") return new Response(null, { status: 307, headers: { location: "https://untrusted.example/" } })
+            return Response.json({ v: 2, client: mode === "different" ? { ...value, key: random() } : value })
+        }
+        assert.equal((await f.api(path, client, action, {}, upstream)).status, 409)
+        mode = "redirect"; assert.equal((await f.api(path, client, action, {}, upstream)).status, 409)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM unstored_keys").get()!.n, 1)
+        mode = "matching"
+        f.db.exec("CREATE TRIGGER fail_backup_delete BEFORE DELETE ON unstored_keys BEGIN SELECT RAISE(ABORT, 'synthetic delete failure'); END;")
+        assert.equal((await f.api(path, client, action, {}, upstream)).status, 503)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM work_key_promotions").get()!.n, 0, "failed deletion rolls back its completion marker")
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM unstored_keys").get()!.n, 1)
+        f.db.exec("DROP TRIGGER fail_backup_delete")
+        assert.equal((await f.api(path, client, action, {}, upstream)).status, 200)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM unstored_keys").get()!.n, 0)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM work_key_promotions").get()!.n, 1)
+        assert.equal((await f.api(path, client, { action: "save", client: value })).status, 409, "a stale tab cannot recreate the deleted backup")
+        assert.equal((await f.api(path, client, action, {}, upstream)).status, 200, "lost deletion acknowledgements are safe to retry")
+    } finally { f.db.close() }
+})
 
 test("shared keys roundtrip and owner wrapping authenticates both room and private key", async () => {
     const pair = await generate_owner_key(), key = random(), room = crypto.randomUUID()

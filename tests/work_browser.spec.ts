@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
-import { account, reset, drive_files } from "./work_browser_helpers.ts"
+import { account, reset, drive_files, denied_drive, failed_uploads, sql } from "./work_browser_helpers.ts"
 test.beforeEach(() => reset())
 const writer = (page: Page) => page.getByRole("textbox", { name: "Write a message…", exact: true })
 async function ready(page: Page): Promise<void> { await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 }) }
@@ -112,6 +112,65 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
             await expect(other.locator(".desk_messages_connection")).toContainText("Online")
             expect(await other.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
         } finally { await stranger.close() }
+    } finally { await context.close() }
+})
+
+test("clients without Drive consent retain guest history and recover the encrypted fallback on another device", async ({ page, browser }) => {
+    await owner(page)
+    const direct = await browser.newContext(), direct_email = "direct-no-drive@example.com"
+    try {
+        denied_drive.add(direct_email); await account(direct, direct_email)
+        const signed_in = await direct.newPage(); await signed_in.goto("/work")
+        await send(signed_in, "My first message without Drive or a guest key")
+        await expect(signed_in.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true })).toBeVisible()
+        await signed_in.reload(); await ready(signed_in)
+        await expect(signed_in.locator(".desk_messages_log")).toContainText("My first message without Drive or a guest key")
+    } finally { await direct.close() }
+    const context = await browser.newContext(), client = await context.newPage(), email = "no-drive@example.com"
+    try {
+        await client.goto("/work"); await send(client, "Guest before declining Drive")
+        const original = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        denied_drive.add(email); await account(context, email); await client.reload(); await ready(client)
+        await expect(client.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true })).toBeVisible()
+        await expect(client.locator(".desk_messages_notice")).toContainText("server-recoverable")
+        await expect(client.locator(".desk_messages_log")).toContainText("Guest before declining Drive")
+        await send(client, "Signed in without Drive")
+        expect(await client.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
+        expect(drive_files.get(email)!.size).toBe(0)
+        const next = await browser.newContext()
+        try {
+            await account(next, email); const recovered = await next.newPage(); await recovered.goto("/work"); await ready(recovered)
+            await expect(recovered.locator(".desk_messages_log")).toContainText("Signed in without Drive")
+            const backup = await recovered.evaluate(async () => { const auth = await (await fetch("/api/v1/auth/session")).json(); return (await fetch("/api/v1/work/unstored-key", { method: "POST", headers: { "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }, body: JSON.stringify({ action: "load" }) })).json() })
+            expect(backup.client.key).toBe(original.key)
+            // Browser tests mock Google's APIs. The server-side verifier/deletion is exercised separately with real SQL/Web Crypto.
+            await next.route("**/api/v1/work/unstored-key", async route => {
+                const body = route.request().postDataJSON()
+                if (body.action !== "drive") { await route.continue(); return }
+                const saved = [...drive_files.get(email)!.values()][0].client
+                expect(saved.key).toBe(original.key); expect(saved.room).toBe(original.room)
+                sql(`INSERT INTO work_key_promotions SELECT subject, room_id, 'browser-verification' FROM unstored_keys WHERE email = '${email}'; DELETE FROM unstored_keys WHERE email = '${email}';`)
+                await route.fulfill({ json: { removed: true } })
+            })
+            denied_drive.delete(email); await recovered.reload(); await ready(recovered)
+            await expect(recovered.locator(".desk_messages_identity")).toHaveText("Signed in with Google")
+            await expect(recovered.locator(".desk_messages_log")).toContainText("Signed in without Drive")
+            expect([...drive_files.get(email)!.values()][0].client.key).toBe(original.key)
+        } finally { await next.close() }
+    } finally { await context.close() }
+})
+
+test("Drive upload failures use fallback storage and a consent button opens the existing Google consent flow", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), client = await context.newPage(), email = "failed-upload@example.com"
+    try {
+        failed_uploads.add(email); await account(context, email); await client.goto("/work"); await send(client, "Recover after failed upload")
+        await expect(client.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true })).toBeVisible()
+        await client.reload(); await ready(client)
+        await expect(client.locator(".desk_messages_log")).toContainText("Recover after failed upload")
+        await client.route("**/api/v1/auth/google/start?drive=1", route => route.fulfill({ contentType: "text/html", body: "Google Drive consent requested" }))
+        await client.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true }).click()
+        await expect(client).toHaveURL(/\/api\/v1\/auth\/google\/start\?drive=1$/)
     } finally { await context.close() }
 })
 

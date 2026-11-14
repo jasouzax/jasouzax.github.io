@@ -137,7 +137,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
     if (!item.el.closest(".desk[data-server]")) { root.append(element("p", label("work_only"))); return root }
     let current: AbortController | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
-    let generation = 0    let unsent = ""
+    let generation = 0
+    let unsent = ""
     const stop = () => { generation++; current?.abort(); clearTimeout(timer) }
     signal.addEventListener("abort", stop, { once: true })
     const initialize = async () => {
@@ -178,6 +179,16 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         const seen = new Set<number>()
         const requested = item.path.slice(3)
         const address = (value: string) => { item.path = `im:${value}`; item.name = value; refresh_tab(item); sync_navigation(item); heading.textContent = value; root.setAttribute("aria-label", `${label("messages")}: ${value}`) }
+        const storage_status = (context: Work_Context) => {
+            identity_status.replaceChildren()
+            notice.textContent = label(context.storage === "fallback" ? "fallback_notice" : "encrypted")
+            if (context.auth.user && context.storage === "fallback") {
+                const consent = element("button", label("drive_for_e2e")); consent.dataset.sign = "drive"; identity_status.append(consent)
+            } else if (context.auth.user) identity_status.textContent = label("google_signed_in")
+            else if (context.auth.google_enabled) {
+                const save = element("button", label("signin_save")); save.dataset.sign = "google"; save.setAttribute("aria-label", label("google_signin")); identity_status.append(save)
+            }
+        }
         const append = async (message: Message) => {
             if (!key || seen.has(message.seq) || abort.aborted) return
             const row = element("li", "", `desk_message desk_message_${message.author}${message.author === (owner ? "owner" : "client") ? " desk_message_self" : ""}`)
@@ -218,6 +229,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
                     if (!context || context.error || (!owner && !context.owner_key)) context = await work_context(true)
                     if (abort.aborted) return
                     if (!owner) key = await prepare_conversation(context)
+                    storage_status(context)
                     if (!key || !context) throw new Error(label("choose_client"))
                     let message = pending.get(key.room)
                     if (!message) {
@@ -249,10 +261,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             const update_avatar = () => { account_head.replaceChildren(avatar(context?.auth.user?.picture)) }
             update_avatar()
             document.addEventListener("jazu:profile", () => { void get_auth().then(auth => { if (context && !abort.aborted) { context.auth = auth; update_avatar() } }) }, { signal: abort })
-            if (context.auth.user) identity_status.textContent = label("google_signed_in")
-            else if (context.auth.google_enabled) {
-                const save = element("button", label("signin_save")); save.dataset.sign = "google"; save.setAttribute("aria-label", label("google_signin")); identity_status.append(save)
-            }
+            storage_status(context)
             if (context.error && context.auth.user) {
                 const reconnect = element("button", label("drive_connect")); reconnect.dataset.sign = "drive"; toolbar.append(reconnect)
             }

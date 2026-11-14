@@ -1,4 +1,4 @@
-/* Drive calls go directly from this browser to Google. Keys never transit our Worker. */
+/* Normal Drive keys travel directly to Google; client fallback recovery uses the Worker. */
 import { decode_key, type Owner_Wrap } from "../../work_crypto.ts"
 export type Client_Key = { room: string, key: string, owner_wrap: Owner_Wrap, key_id: string }
 export type Key_Vault = { v: 2, owner?: { private_jwk: JsonWebKey, public_jwk: JsonWebKey }, client?: Client_Key }
@@ -61,7 +61,7 @@ export class Drive_Vault {
         const response = await this.request("upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", headers: { "content-type": `multipart/related; boundary=${boundary}` }, body })
         if (response.status === 404) throw new Error("Google Drive could not create the private key file")
         if (response.status === 409) await this.read()
-        else this.value = value
+        else await this.read()
         if (!this.value) throw new Error("The private key file is not available yet; retry shortly")
         return this.value
     }

@@ -1,6 +1,6 @@
 /*
  * Server-backed Google identity. Provider tokens never enter browser persistent storage.
- * Short-lived Drive access lives in memory; guest keys remain local until saved to private Drive app data.
+ * Short-lived Drive access lives in memory; guest keys remain local until Google sign-in saves them to Drive or encrypted client recovery storage.
  */
 export type Auth_State = { user: { email: string, name: string, picture?: string, role: "owner" | "client" } | null, csrf: string, google_enabled: boolean }
 let current: Auth_State | null = null
