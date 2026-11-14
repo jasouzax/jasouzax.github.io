@@ -105,6 +105,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 ## Notes & tips (read, and extend)
 
 - **Work presentation:** shared chat geometry belongs in `content/theme/work.scss` (unnamed layout), with theme-specific paint in the named themes. Clients must use `.desk_side_item` entities, not generic lists. Profile images come from verified Google claims or the authenticated matching-subject userinfo backfill, with migration 0005 and a Google-image-host allowlist. Avatar account menus replace the old full-width chat account buttons.
+  Chat windows must override the file viewer's `.desk_wbox` overflow on `[data-plugin="messages"]`; only `.desk_messages_log` displays a scrollbar. Keep the textarea's scrollbar hidden even when a long draft reaches its height cap.
 
 - **Opening client windows:** `new_window()` already focuses its result; `activate()` then minimizes it. Use `focus_window()` for client selection (hand off maximization when needed). Open `#head_menu` when revealing Clients so its controls are not covered by the chat window. Browser screenshots after reload must wait for `#main-content` to leave `inert`, otherwise the captured screen can still be the loading skeleton.
 

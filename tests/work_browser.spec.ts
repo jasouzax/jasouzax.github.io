@@ -33,6 +33,29 @@ test("a signed-out visitor gets a composer with no invitation or token, and call
     await expect(page.locator('.desk_messages [role="alert"]')).toContainText("token_exchange")
 })
 
+test("only message history displays a scrollbar in both themes and viewport sizes", async ({ page }) => {
+    await page.goto("/work"); await ready(page)
+    await expect(writer(page)).toBeVisible()
+    for (const theme of ["default", "memory"]) {
+        await page.locator(`#theme_name_${theme}`).evaluate((input: HTMLInputElement) => { input.checked = true; input.dispatchEvent(new Event("change", { bubbles: true })) })
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme); await ready(page)
+        for (const viewport of [{ width: 1100, height: 790 }, { width: 390, height: 844 }]) {
+            await page.setViewportSize(viewport)
+            await writer(page).fill(Array.from({ length: 20 }, (_, i) => `Draft line ${i}`).join("\n"))
+            await writer(page).press("End")
+            const layout = await page.locator(".desk_messages").evaluate(root => {
+                const log = root.querySelector<HTMLElement>(".desk_messages_log")!
+                log.replaceChildren(...Array.from({ length: 30 }, () => { const row = document.createElement("li"); row.className = "desk_message"; row.textContent = "History message"; return row }))
+                const window = root.closest<HTMLElement>(".desk_wbox")!, input = root.querySelector<HTMLTextAreaElement>("textarea")!, composer = root.querySelector<HTMLElement>("form")!
+                log.scrollTop = 100
+                return { outerOverflow: getComputedStyle(window).overflowY, inputOverflow: getComputedStyle(input).overflowY, inputScrollbar: getComputedStyle(input).scrollbarWidth, logOverflow: getComputedStyle(log).overflowY, logScrolls: log.scrollTop > 0, composerFits: composer.getBoundingClientRect().bottom <= window.getBoundingClientRect().bottom + 1 }
+            })
+            expect(layout).toEqual({ outerOverflow: "hidden", inputOverflow: "hidden", inputScrollbar: "none", logOverflow: "auto", logScrolls: true, composerFits: true })
+            await expect(writer(page)).toHaveValue(/Draft line 19$/)
+        }
+    }
+})
+
 test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
     await owner(page)
     expect([...drive_files.get("jason@jasouza.com")!.values()][0].owner.private_jwk.d).toBeTruthy()

@@ -1,4 +1,6 @@
 // Shared conversation geometry and inherited theme colors, including non-Default themes.
+.desk_wbox[data-plugin="messages"] { overflow: hidden; min-height: 0; }
+.desk_wbox[data-plugin="messages"] > .desk_wbox_head { flex-shrink: 0; }
 .desk_messages { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .desk_messages :is(button, textarea) { font: inherit; color: inherit; }
 .desk_messages :is(button, summary) { cursor: pointer; }
@@ -27,7 +29,8 @@
 .desk_messages_status:not(:empty) { padding: .5em 1em; font-size: .8em; }
 .desk_messages_status:empty { display: none; }
 .desk_messages_composer { display: flex; align-items: flex-end; gap: .6em; flex: 0 0 auto; padding: .65em .8em; border-top: 1px solid var(--line, currentColor); }
-.desk_messages_composer textarea { display: block; flex: 1; box-sizing: border-box; width: 0; min-width: 0; min-height: 2.5em; max-height: 8em; padding: .6em .8em; resize: none; border: 1px solid var(--line, currentColor); border-radius: .65em; background: color-mix(in srgb, var(--panel, Canvas) 35%, transparent); line-height: 1.3; }
+.desk_messages_composer textarea { display: block; flex: 1; box-sizing: border-box; width: 0; min-width: 0; min-height: 2.5em; max-height: 8em; padding: .6em .8em; resize: none; overflow: hidden; scrollbar-width: none; border: 1px solid var(--line, currentColor); border-radius: .65em; background: color-mix(in srgb, var(--panel, Canvas) 35%, transparent); line-height: 1.3; }
+.desk_messages_composer textarea::-webkit-scrollbar { display: none; }
 .desk_messages_send { display: grid; place-items: center; flex: 0 0 2.5em; width: 2.5em; height: 2.5em; padding: .45em; border: 0; border-radius: .5em; background: transparent; color: var(--accent, currentColor); }
 .desk_messages_send:hover { background: color-mix(in srgb, var(--accent, currentColor) 12%, transparent); }
 .desk_messages_send svg { display: block; width: 100%; height: 100%; fill: currentColor; }
