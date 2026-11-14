@@ -57,6 +57,15 @@ test("only message history displays a scrollbar in both themes and viewport size
 })
 
 test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
+    let dropped = false, send_request = ""
+    await page.routeWebSocket("**/api/v1/realtime", socket => {
+        const server = socket.connectToServer()
+        socket.onMessage(message => { try { const frame = JSON.parse(String(message)); if (frame.type === "send" && !dropped) send_request = frame.request_id } catch {}; server.send(message) })
+        server.onMessage(message => {
+            try { const frame = JSON.parse(String(message)); if (!dropped && send_request && frame.type === "ack" && frame.request_id === send_request) { dropped = true; socket.close({ code: 1011, reason: "Synthetic lost acknowledgement" }); server.close(); return } } catch {}
+            socket.send(message)
+        })
+    })
     await owner(page)
     expect([...drive_files.get("jason@jasouza.com")!.values()][0].owner.private_jwk.d).toBeTruthy()
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -77,11 +86,6 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         await expect(page.locator("[data-work-clients] ul, [data-work-clients] li")).toHaveCount(0)
         await expect(page.locator("[data-work-clients] .desk_client_entity")).toHaveCount(1)
         await expect(page.locator(`.desk_wbox_head_path`).last()).toHaveValue(`im:${address}`)
-        let dropped = false
-        await page.route("**/api/v1/work/rooms/*/messages", async route => {
-            if (route.request().method() === "POST" && !dropped) { dropped = true; await route.fetch(); await route.abort("failed"); return }
-            await route.continue()
-        })
         await chat.getByRole("textbox", { name: "Write a message…" }).fill("Reply from Jason")
         await chat.getByRole("button", { name: "Send", exact: true }).click()
         await expect(chat.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
@@ -206,13 +210,15 @@ test("first Google sign-in saves the guest key, links history and restores it on
     } finally { await context.close() }
 })
 
-test("two guest tabs create one conversation without overwriting the browser key", async ({ page, browser }) => {
+test("guest tabs replace the active socket and recover the same conversation when focused", async ({ page, browser }) => {
     await owner(page)
     const context = await browser.newContext()
     try {
         const first = await context.newPage(), second = await context.newPage()
-        await Promise.all([first.goto("http://localhost:8787/work"), second.goto("http://localhost:8787/work")])
-        await Promise.all([send(first, "First tab"), send(second, "Second tab")])
+        await first.goto("http://localhost:8787/work"); await send(first, "First tab")
+        await second.goto("http://localhost:8787/work"); await send(second, "Second tab")
+        await expect(first.locator(".desk_messages_connection")).toHaveText("Connected in another tab")
+        await first.bringToFront(); await first.evaluate(() => window.dispatchEvent(new Event("focus")))
         await expect(first.locator(".desk_messages_log")).toContainText("Second tab", { timeout: 15000 })
         await expect(second.locator(".desk_messages_log")).toContainText("First tab", { timeout: 15000 })
         const saved = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))

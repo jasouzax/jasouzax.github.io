@@ -11,6 +11,11 @@ export async function work_peers(env: Work_Env, conversation: string) {
     return { room, owner: `a:${owner.subject}`, client: room.google_subject ? `a:${room.google_subject}` : `g:${room.guest_id}` }
 }
 export async function work_access(env: Work_Env, actor: Realtime_Actor, conversation: string, origin: string) {
+    if (conversation === "owner" && actor.session?.role !== "owner") {
+        const owner = await env.DB!.prepare("SELECT subject FROM auth_owner WHERE id = 1").first<{ subject: string }>()
+        if (!owner) throw new Error("The owner has not connected yet")
+        return { target: `a:${owner.subject}` }
+    }
     if (!/^[a-f0-9-]{36}$/i.test(conversation)) throw new Error("Invalid conversation")
     const response = await work_route(new Request(`${origin}/api/v1/work/rooms/${conversation}`), env, { actor })
     if (!response.ok) throw new Error("Conversation unavailable")
@@ -24,6 +29,12 @@ export async function work_outbox(env: Work_Env, conversation: string, id: strin
 export async function wake_delivery(env: Work_Env, source: string, dispatch?: () => Promise<void>): Promise<void> {
     if (!env.REALTIME) return
     try { if (dispatch) await dispatch(); else await realtime_call(env, source, "drain", {}) } catch { /* The source object's alarm retries its durable outbox. */ }
+}
+export async function work_changed(env: Work_Env, conversation: string, subject: string): Promise<void> {
+    if (!env.REALTIME) return
+    const peers = await work_peers(env, conversation), source = `a:${subject}`
+    await env.DB!.prepare("INSERT INTO realtime_outbox (id, source, target, payload, created_at) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), source, peers.owner, JSON.stringify({ type: "conversation-updated", channel: "work", conversation, source }), Date.now()).run()
+    await wake_delivery(env, source)
 }
 export async function work_notification(env: Work_Env, principal: string, data: any) {
     const peers = await work_peers(env, data.conversation)

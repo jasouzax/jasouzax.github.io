@@ -240,6 +240,9 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
                 <span class="sign_text">{t(ctx, "delete_account")}</span>
             </button>
         </li>
+        <li class="list_drop_li" data-auth="user" hidden="true">
+            <button type="button" data-notifications="true" data-notification-title={t(ctx, "notification_title")} data-notification-dismiss={t(ctx, "notification_dismiss")} data-notification-enabled={t(ctx, "notification_enabled")} data-notification-denied={t(ctx, "notification_denied")}>{t(ctx, "notification_enable")}</button>
+        </li>
         <li class="list_drop_separator" role="separator" />
         <li class="list_drop_li needs_js">
             <button type="button" data-connect-folder="" data-unsupported={t(ctx, "folder_connect_unsupported")}

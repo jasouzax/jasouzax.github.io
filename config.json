@@ -251,7 +251,16 @@
       "work_your_account": "Your account",
       "work_guest": "Guest",
       "work_drive_for_e2e": "Provide Drive access for E2E encryption",
-      "work_fallback_notice": "Messages are encrypted. A server-recoverable key backup is active until Google Drive storage is verified."
+      "work_fallback_notice": "Messages are encrypted. A server-recoverable key backup is active until Google Drive storage is verified.",
+      "notification_title": "New encrypted message",
+      "notification_dismiss": "Dismiss notification",
+      "notification_enabled": "Notifications enabled",
+      "notification_denied": "Notifications blocked",
+      "notification_enable": "Enable message notifications",
+      "work_last_online": "Last online {time}",
+      "work_presence_hint": "The other participant’s live connection. Online does not guarantee they have read the message.",
+      "work_live_connected": "Live connection ready",
+      "work_other_tab": "Connected in another tab"
     },
     "ja": {
       "sign_out_google": "Googleからログアウト",
@@ -530,7 +539,16 @@
       "work_your_account": "アカウント",
       "work_guest": "ゲスト",
       "work_drive_for_e2e": "E2E暗号化のためDriveへのアクセスを許可",
-      "work_fallback_notice": "メッセージは暗号化されています。Google Driveへの保存が確認されるまで、サーバーで復元可能な鍵のバックアップを使用します。"
+      "work_fallback_notice": "メッセージは暗号化されています。Google Driveへの保存が確認されるまで、サーバーで復元可能な鍵のバックアップを使用します。",
+      "notification_title": "新しい暗号化メッセージ",
+      "notification_dismiss": "通知を閉じる",
+      "notification_enabled": "通知は有効です",
+      "notification_denied": "通知はブロックされています",
+      "notification_enable": "メッセージ通知を有効にする",
+      "work_last_online": "最終接続 {time}",
+      "work_presence_hint": "相手の接続状態です。接続中でも既読とは限りません。",
+      "work_live_connected": "リアルタイム接続中",
+      "work_other_tab": "別のタブで接続中"
     }
   },
   "default_language": "en",

@@ -3,7 +3,7 @@ import { read_session, auth_hash, session_token, type Auth_Session } from "./aut
 import { guest_token, work_route, type Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { realtime_call } from "./realtime_bus.ts"
-import { work_access, work_notification } from "./realtime_work.ts"
+import { work_access, work_notification, work_peers } from "./realtime_work.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): Attachment }
 type Attachment = { principal: string, credential: string, origin: string, connected: number, activity: number, watches: Record<string, { channel: string, conversation: string, target: string, cursor: number }> }
@@ -126,7 +126,7 @@ export class Realtime_Hub {
     }
     private async sync(ws: Socket, key: string): Promise<void> {
         let watch = ws.deserializeAttachment().watches[key]
-        if (!watch) return
+        if (!watch || watch.conversation === "owner") return
         for (let page = 0; page < 10; page++) {
             const { results } = await this.env.DB!.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND seq > ? ORDER BY seq LIMIT 100").bind(watch.conversation, watch.cursor).all<any>()
             const current = ws.deserializeAttachment(), latest = current.watches[key]
@@ -163,6 +163,11 @@ export class Realtime_Hub {
             return new Response(null, { status: delivered ? 204 : 404 })
         }
         if (action === "/event" && data.channel === "work") {
+            if (data.type === "conversation-updated") {
+                const peers = await work_peers(this.env, data.conversation)
+                if (this.principal === peers.owner) for (const ws of this.live()) ws.send(encode({ type: "conversation-updated", channel: "work", conversation: data.conversation, address: peers.room.email }))
+                return json({ ok: true })
+            }
             const notification = await work_notification(this.env, this.principal, data)
             if (!notification) return json({ ignored: true })
             for (const ws of this.live()) {
@@ -198,7 +203,7 @@ export class Realtime_Hub {
                 if (!Number.isSafeInteger(data.after) || data.after < 0) throw new Error("Invalid cursor")
                 const peers = await work_access(this.env, actor, data.conversation, attachment.origin)
                 if (!attachment.watches[key] && Object.keys(attachment.watches).length >= 32) throw new Error("Too many conversations")
-                attachment.watches[key] = { channel: "work", conversation: data.conversation, target: peers.target, cursor: data.after }; ws.serializeAttachment(attachment)
+                attachment.watches[key] = { channel: "work", conversation: data.conversation, target: peers.target, cursor: Math.min(attachment.watches[key]?.cursor ?? data.after, data.after) }; ws.serializeAttachment(attachment)
                 const response = await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: "work", conversation: data.conversation })
                 if (!response.ok) throw new Error("Presence subscription unavailable")
                 ack({ presence: await response.json() }); await this.sync(ws, key); return

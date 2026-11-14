@@ -8,7 +8,7 @@ import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 import { google_picture } from "../work_profile.ts"
 import { unstored_route } from "./work_unstored.ts"
-import { work_outbox, wake_delivery, type Realtime_Actor } from "./realtime_work.ts"
+import { work_outbox, wake_delivery, work_changed, type Realtime_Actor } from "./realtime_work.ts"
 import type { Realtime_Namespace } from "./realtime_bus.ts"
 
 export type Work_Statement = {
@@ -173,6 +173,7 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
     if (match[2] === "/bind" && request.method === "POST") {
         if (!session || owner || !guest_row || room.guest_id !== guest_row.id || room.revoked) return api_error("forbidden", "Use the guest's browser to connect this conversation", 403)
         const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ?, email = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE google_subject = ? AND id != ? AND revoked = 0 AND owner_wrap IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM unstored_keys WHERE subject = ? AND room_id != ?) RETURNING id").bind(session.subject, session.email, room.id, session.subject, session.subject, room.id, session.subject, room.id).first()
+        if (linked) await work_changed(env, room.id, session.subject)
         return linked ? reply({ linked: true }) : api_error("conversation_exists", "Your Google account already has a conversation. Guest messages were not transferred.", 409)
     }
     if (!match[2] && request.method === "GET") return reply({ room: room_info(room), role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })

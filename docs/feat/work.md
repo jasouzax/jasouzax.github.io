@@ -32,6 +32,8 @@ Prototype 1 introduces the server transport/presence and local/runtime infrastru
 
 Prototype 2 adds the Work adapter, authorized conversation/presence subscriptions, ciphertext sends over the socket, cursor-ordered delivery and a D1 outbox inserted atomically with messages. Delivery failures leave outbox rows for the source object's alarm to retry. D1 commit precedes acknowledgements and receiver events; retries use the existing immutable message UUID. The same publication path bridges HTTP sends from older clients. A recipient outside the chat receives a generic encrypted-message notification event without decrypting content server-side.
 
+Prototype 3 connects signed-in accounts across all pages and guest views only on Work, replaces recurring chat/Clients HTTP polling with live events, renders peer presence with a client-side relative-time clock, and adds theme-aware in-page notices plus opt-in desktop notifications while the website is open. Chat opens clear their earlier notice. Guest tabs replace the previous socket and recover the same browser key/history when focus returns. Linking a guest publishes a separate conversation-update event for the owner panel. Initial and reconnect catch-up still use HTTP; this is not periodic polling. Browser closure requires future Web Push support, and Online does not guarantee the person has read or noticed a message.
+
 ## Encrypted messaging implementation
 
 `/work` opens directly to a text composer and Send button in a `message/cpim` window at `im:jason@jasouza.com`, including for signed-out visitors. There are no invitations, owner access tokens or credentials to copy. The MIME identifies the viewer; transport uses encrypted JSON rather than interoperable CPIM/SIP.
