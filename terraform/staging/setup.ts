@@ -22,6 +22,7 @@ export function staging_environment(source: NodeJS.ProcessEnv, bundle: string): 
         access_client_id: ["ACCESS_CLIENT_ID"], access_client_secret: ["ACCESS_CLIENT_SECRET"],
         personal_origin: ["PERSONAL_ORIGIN"],
         work_owner_email: ["WORK_OWNER_EMAIL"],
+        work_fallback_key: ["WORK_FALLBACK_KEY"],
         google_client_id: ["GOOGLE_CLIENT_ID"], google_client_secret: ["GOOGLE_CLIENT_SECRET"], google_admin_email: ["GOOGLE_ADMIN_EMAIL"],
     }
     for (const [name, alternatives] of Object.entries(aliases)) {

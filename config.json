@@ -249,7 +249,9 @@
       "work_signin_save": "Sign in to save session",
       "work_google_signed_in": "Signed in with Google",
       "work_your_account": "Your account",
-      "work_guest": "Guest"
+      "work_guest": "Guest",
+      "work_drive_for_e2e": "Provide Drive access for E2E encryption",
+      "work_fallback_notice": "Messages are encrypted. A server-recoverable key backup is active until Google Drive storage is verified."
     },
     "ja": {
       "sign_out_google": "Googleからログアウト",
@@ -526,7 +528,9 @@
       "work_signin_save": "ログインして会話を保存",
       "work_google_signed_in": "Googleでログイン済み",
       "work_your_account": "アカウント",
-      "work_guest": "ゲスト"
+      "work_guest": "ゲスト",
+      "work_drive_for_e2e": "E2E暗号化のためDriveへのアクセスを許可",
+      "work_fallback_notice": "メッセージは暗号化されています。Google Driveへの保存が確認されるまで、サーバーで復元可能な鍵のバックアップを使用します。"
     }
   },
   "default_language": "en",

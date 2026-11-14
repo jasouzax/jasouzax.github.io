@@ -69,6 +69,7 @@ resource "cloudflare_workers_script" "router" {
     { name = "GOOGLE_CLIENT_ID", type = "plain_text", text = var.google_client_id },
     { name = "GOOGLE_CLIENT_SECRET", type = "secret_text", text = var.google_client_secret },
     { name = "GOOGLE_ADMIN_EMAIL", type = "plain_text", text = var.google_admin_email },
+    { name = "WORK_FALLBACK_KEY", type = "secret_text", text = var.work_fallback_key },
     { name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret },
     { name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id },
     { name = "ACCESS_CLIENT_SECRET", type = "secret_text", text = var.access_client_secret },

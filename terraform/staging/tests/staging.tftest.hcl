@@ -12,6 +12,7 @@ variables {
   origin_hmac_secret    = "test-hmac-secret-with-more-than-32-characters"
   access_client_id      = "test-client-id"
   access_client_secret  = "test-client-secret"
+  work_fallback_key     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
   project_clone_origins = "{\"demo\":\"https://github.com/team/demo.git\"}"
 }
 
@@ -51,7 +52,7 @@ run "staging_resources_and_routing" {
     error_message = "The Worker needs the XML-derived public clone origins for provider-first reads."
   }
   assert {
-    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET"])
+    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY"])
     error_message = "Provision personal-origin and Work secrets with the Worker."
   }
   assert {

@@ -23,7 +23,7 @@ async function token(claims: Record<string, unknown> = {}): Promise<string> {
 
 function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
     const env: Work_Env = { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: "secret-never-shown-to-browser", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = {

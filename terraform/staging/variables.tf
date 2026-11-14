@@ -52,6 +52,15 @@ variable "project_clone_origins" {
   description = "Public HTTPS Git read origins derived from the project's XML repo attributes."
 }
 
+variable "work_fallback_key" {
+  type      = string
+  sensitive = true
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_-]{43}$", var.work_fallback_key))
+    error_message = "Provide a persistent random 32-byte base64url WORK_FALLBACK_KEY, separate from D1."
+  }
+}
+
 variable "google_client_id" {
   type    = string
   default = ""
