@@ -260,7 +260,8 @@
       "work_last_online": "Last online {time}",
       "work_presence_hint": "The other participant’s live connection. Online does not guarantee they have read the message.",
       "work_live_connected": "Live connection ready",
-      "work_other_tab": "Connected in another tab"
+      "work_other_tab": "Connected in another tab",
+      "work_last_online_recent": "Last online just now"
     },
     "ja": {
       "sign_out_google": "Googleからログアウト",
@@ -548,7 +549,8 @@
       "work_last_online": "最終接続 {time}",
       "work_presence_hint": "相手の接続状態です。接続中でも既読とは限りません。",
       "work_live_connected": "リアルタイム接続中",
-      "work_other_tab": "別のタブで接続中"
+      "work_other_tab": "別のタブで接続中",
+      "work_last_online_recent": "最終接続：たった今"
     }
   },
   "default_language": "en",

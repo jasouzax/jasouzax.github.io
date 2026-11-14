@@ -1,9 +1,9 @@
 /* Hibernating account/guest sockets, private event routing and heartbeat-derived presence. */
 import { read_session, auth_hash, session_token, type Auth_Session } from "./auth.ts"
-import { guest_token, work_route, type Work_Env } from "./work.ts"
+import { guest_token, type Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { realtime_call } from "./realtime_bus.ts"
-import { work_access, work_notification, work_peers } from "./realtime_work.ts"
+import { realtime_channels } from "./realtime_channels.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): Attachment }
 type Attachment = { principal: string, credential: string, origin: string, connected: number, activity: number, watches: Record<string, { channel: string, conversation: string, target: string, cursor: number }> }
@@ -45,7 +45,7 @@ export class Realtime_Hub {
         return this.principal
     }
     private live(): Socket[] { return this.ctx.getWebSockets().filter(ws => ws.readyState === 1) }
-    private last(ws: Socket): number { const a = ws.deserializeAttachment(); return Math.max(a.connected, a.activity, this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0) }
+    private last(ws: Socket): number { const a = ws.deserializeAttachment(); return Math.max(a?.connected ?? 0, a?.activity ?? 0, this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0) }
     private async actor(a: Attachment): Promise<{ session: Auth_Session | null, guest_id: number | null, csrf: string } | null> {
         const csrf = "internal-socket"
         if (a.principal.startsWith("g:")) {
@@ -57,30 +57,36 @@ export class Realtime_Hub {
         if (user.last_seen < Date.now() - 300000) await this.env.DB!.prepare("UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?").bind(Date.now(), a.credential).run()
         return { session: { ...user, role: user.owner_subject ? "owner" : "client", csrf }, guest_id: null, csrf }
     }
-    private async presence(online: boolean, last = Date.now()): Promise<void> {
+    private async presence(online: boolean, last = Date.now(), force = false): Promise<void> {
         const previous = await this.env.DB!.prepare("SELECT last_online FROM last_signed_in WHERE principal = ?").bind(this.principal).first<{ last_online: number | null }>()
-        if (!previous && !online) return
-        if (previous && (online ? previous.last_online === null : previous.last_online !== null)) return
-        await this.env.DB!.prepare("INSERT INTO last_signed_in (principal, last_online) VALUES (?, ?) ON CONFLICT(principal) DO UPDATE SET last_online = excluded.last_online").bind(this.principal, online ? null : last).run()
-        const watchers = await this.ctx.storage.get<Record<string, { principal: string, channel: string, conversation: string }>>("watchers") ?? {}
+        if (!previous && !online && !force) return
+        if (!force && previous && (online ? previous.last_online === null : previous.last_online !== null)) return
+        if (previous || online) await this.env.DB!.prepare("INSERT INTO last_signed_in (principal, last_online) VALUES (?, ?) ON CONFLICT(principal) DO UPDATE SET last_online = excluded.last_online").bind(this.principal, online ? null : last).run()
+        const watchers = await this.ctx.storage.get<Record<string, { principal: string, channel: string, conversation: string, revision: string }>>("watchers") ?? {}, stale: string[] = []
         for (const [id, watcher] of Object.entries(watchers)) {
             try {
                 const result = await realtime_call(this.env, watcher.principal, "presence-event", { ...watcher, peer: this.principal, online, last_online: online ? null : last })
-                if (result.status === 404) delete watchers[id]
+                if (result.status === 404) stale.push(id)
             } catch { /* A reconnect obtains an authoritative presence snapshot. */ }
         }
-        await this.ctx.storage.put("watchers", watchers)
+        if (stale.length) {
+            const current = await this.ctx.storage.get<typeof watchers>("watchers") ?? {}
+            for (const id of stale) if (current[id]?.revision === watchers[id].revision) delete current[id]
+            await this.ctx.storage.put("watchers", current)
+        }
     }
-    private async sweep(): Promise<void> {
-        let last = 0
+    private async sweep(disconnected_at = 0): Promise<void> {
+        let last = disconnected_at || await this.ctx.storage.get<number>("last_activity") || 0
         for (const ws of this.live()) {
             last = Math.max(last, this.last(ws))
-            if (Date.now() - this.last(ws) > heartbeat_timeout || !await this.actor(ws.deserializeAttachment())) ws.close(4000, "Connection expired")
+            if (Date.now() - this.last(ws) >= heartbeat_timeout) ws.close(4000, "Connection expired")
+            else if (!await this.actor(ws.deserializeAttachment())) ws.close(4003, "Signed out")
         }
+        if (last) await this.ctx.storage.put("last_activity", last)
         const live = this.live()
         if (!live.length) await this.presence(false, last || Date.now())
         else await this.presence(true)
-        if (live.length) await this.ctx.storage.setAlarm(Date.now() + heartbeat_timeout)
+        if (live.length) await this.ctx.storage.setAlarm(Math.max(Date.now() + 1000, Math.min(...live.map(ws => this.last(ws) + heartbeat_timeout))))
         else if (await this.pending()) await this.ctx.storage.setAlarm(Date.now() + 10000)
         else await this.ctx.storage.deleteAlarm()
     }
@@ -101,7 +107,7 @@ export class Realtime_Hub {
         const data = await request.json() as any
         if (action === "/revoke") {
             for (const ws of this.live()) if (!data.credential || ws.deserializeAttachment().credential === data.credential) ws.close(4003, "Signed out")
-            await this.sweep(); return json({ ok: true })
+            await this.sweep(Date.now()); if (!this.live().length) await this.presence(false, Date.now(), true); return json({ ok: true })
         }
         if (action === "/presence") {
             await this.sweep()
@@ -126,14 +132,14 @@ export class Realtime_Hub {
     }
     private async sync(ws: Socket, key: string): Promise<void> {
         let watch = ws.deserializeAttachment().watches[key]
-        if (!watch || watch.conversation === "owner") return
+        if (!watch) return
         for (let page = 0; page < 10; page++) {
-            const { results } = await this.env.DB!.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND seq > ? ORDER BY seq LIMIT 100").bind(watch.conversation, watch.cursor).all<any>()
+            const results = await realtime_channels.get(watch.channel)!.history(this.env, watch.conversation, watch.cursor)
             const current = ws.deserializeAttachment(), latest = current.watches[key]
             if (!latest || ws.readyState !== 1) return
             const messages = results.filter(row => row.seq > latest.cursor)
             if (messages.length) {
-                ws.send(encode({ type: "messages", channel: watch.channel, conversation: watch.conversation, messages: messages.map(row => ({ ...row, envelope: JSON.parse(row.envelope) })) }))
+                ws.send(encode({ type: "messages", channel: watch.channel, conversation: watch.conversation, messages }))
                 latest.cursor = Math.max(latest.cursor, messages[messages.length - 1].seq); ws.serializeAttachment(current)
             }
             watch = latest
@@ -147,8 +153,8 @@ export class Realtime_Hub {
             const watchers = await this.ctx.storage.get<Record<string, any>>("watchers") ?? {}, key = `${data.principal}:${data.channel}:${data.conversation}`
             if (action === "/unsubscribe") delete watchers[key]
             else {
-                if (!watchers[key] && Object.keys(watchers).length >= 4096) return new Response("Too many subscriptions", { status: 429 })
-                watchers[key] = { principal: data.principal, channel: data.channel, conversation: data.conversation }
+                if (!watchers[key] && Object.keys(watchers).length >= 512) return new Response("Too many subscriptions", { status: 429 })
+                watchers[key] = { principal: data.principal, channel: data.channel, conversation: data.conversation, revision: crypto.randomUUID() }
             }
             await this.ctx.storage.put("watchers", watchers); await this.sweep()
             const row = await this.env.DB!.prepare("SELECT last_online FROM last_signed_in WHERE principal = ?").bind(this.principal).first<{ last_online: number | null }>()
@@ -162,18 +168,19 @@ export class Realtime_Hub {
             }
             return new Response(null, { status: delivered ? 204 : 404 })
         }
-        if (action === "/event" && data.channel === "work") {
+        if (action === "/event" && realtime_channels.has(data.channel)) {
+            const channel = realtime_channels.get(data.channel)!
             if (data.type === "conversation-updated") {
-                const peers = await work_peers(this.env, data.conversation)
-                if (this.principal === peers.owner) for (const ws of this.live()) ws.send(encode({ type: "conversation-updated", channel: "work", conversation: data.conversation, address: peers.room.email }))
+                const changed = await channel.changed(this.env, this.principal, data)
+                if (changed) for (const ws of this.live()) ws.send(encode(changed))
                 return json({ ok: true })
             }
-            const notification = await work_notification(this.env, this.principal, data)
+            const notification = await channel.notification(this.env, this.principal, data)
             if (!notification) return json({ ignored: true })
             for (const ws of this.live()) {
                 if (!await this.actor(ws.deserializeAttachment())) { ws.close(4003, "Signed out"); continue }
                 ws.send(encode(notification))
-                if (ws.deserializeAttachment().watches[`work:${data.conversation}`]) await this.sync(ws, `work:${data.conversation}`)
+                if (ws.deserializeAttachment().watches[`${data.channel}:${data.conversation}`]) await this.sync(ws, `${data.channel}:${data.conversation}`)
             }
             return json({ ok: true })
         }
@@ -194,39 +201,38 @@ export class Realtime_Hub {
     }
     protected async command(ws: Socket, data: any, attachment: Attachment): Promise<void> {
         const ack = (result?: unknown, error?: string) => ws.send(encode({ type: "ack", request_id: data.request_id, result, error }))
-        if (typeof data.request_id !== "string" || data.request_id.length > 64 || data.channel !== "work") { ack(undefined, "Unknown channel"); return }
+        if (typeof data.request_id !== "string" || data.request_id.length > 64 || !realtime_channels.has(data.channel)) { ack(undefined, "Unknown channel"); return }
         const actor = await this.actor(attachment)
         if (!actor) { ws.close(4003, "Signed out"); return }
         try {
-            const key = `work:${data.conversation}`
+            const channel = realtime_channels.get(data.channel)!, key = `${data.channel}:${data.conversation}`
             if (data.type === "watch") {
                 if (!Number.isSafeInteger(data.after) || data.after < 0) throw new Error("Invalid cursor")
-                const peers = await work_access(this.env, actor, data.conversation, attachment.origin)
+                const peers = await channel.authorize(this.env, actor, data.conversation, attachment.origin)
                 if (!attachment.watches[key] && Object.keys(attachment.watches).length >= 32) throw new Error("Too many conversations")
-                attachment.watches[key] = { channel: "work", conversation: data.conversation, target: peers.target, cursor: Math.min(attachment.watches[key]?.cursor ?? data.after, data.after) }; ws.serializeAttachment(attachment)
-                const response = await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: "work", conversation: data.conversation })
+                attachment.watches[key] = { channel: data.channel, conversation: data.conversation, target: peers.target, cursor: Math.min(attachment.watches[key]?.cursor ?? data.after, data.after) }; ws.serializeAttachment(attachment)
+                const response = await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation })
                 if (!response.ok) throw new Error("Presence subscription unavailable")
                 ack({ presence: await response.json() }); await this.sync(ws, key); return
             }
             if (data.type === "unwatch") {
                 const watch = attachment.watches[key]; delete attachment.watches[key]; ws.serializeAttachment(attachment)
-                if (watch && !this.live().some(other => other.deserializeAttachment().watches[key])) await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: "work", conversation: data.conversation })
+                if (watch && !this.live().some(other => other.deserializeAttachment().watches[key])) await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation })
                 ack({ ok: true }); return
             }
             if (data.type === "send") {
-                await work_access(this.env, actor, data.conversation, attachment.origin)
-                const response = await work_route(new Request(`${attachment.origin}/api/v1/work/rooms/${data.conversation}/messages`, { method: "POST", headers: { origin: attachment.origin, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": actor.csrf }, body: JSON.stringify({ id: data.id, envelope: data.envelope }) }), this.env, { actor, dispatch: () => this.drain() })
-                const result = await response.json() as any
-                ack(response.ok ? result : undefined, response.ok ? undefined : result.error?.message ?? "Message was not saved"); return
+                await channel.authorize(this.env, actor, data.conversation, attachment.origin)
+                const result = await channel.send(this.env, actor, attachment.origin, data, () => this.drain())
+                ack(result.value, result.error); return
             }
             ack(undefined, "Unknown command")
         } catch (error) { ack(undefined, error instanceof Error ? error.message : "Live request failed") }
     }
-    async webSocketClose(ws: Socket): Promise<void> {
+    async webSocketClose(ws: Socket, _code?: number, _reason?: string, wasClean = true): Promise<void> {
         await this.identity()
         const attachment = ws.deserializeAttachment()
         for (const [key, watch] of Object.entries(attachment?.watches ?? {})) if (!this.live().some(other => other.deserializeAttachment().watches[key])) try { await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: watch.channel, conversation: watch.conversation }) } catch {}
-        await this.sweep()
+        await this.sweep(wasClean ? Date.now() : this.last(ws))
     }
     async webSocketError(ws: Socket): Promise<void> { ws.close(1011, "Connection error"); await this.identity(); await this.sweep() }
     async alarm(): Promise<void> { await this.identity(); await this.sweep(); await this.drain() }

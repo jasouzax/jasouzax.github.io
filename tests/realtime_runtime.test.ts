@@ -102,3 +102,19 @@ test("WebSocket messages commit ciphertext before fanout, recover cursors, isola
         a.ws.close(); c.ws.close(); resumed.ws.close()
     } finally { await f.runtime.dispose() }
 })
+
+test("account deletion revokes every device and removes private presence/queued delivery state", async () => {
+    const f = await fixture()
+    try {
+        const first = await f.session("deleted"), second = await f.session("deleted")
+        const a = (await f.connect(first.cookie)).webSocket!; a.accept(); await message(a)
+        const b = (await f.connect(second.cookie)).webSocket!; b.accept(); await message(b)
+        const closed_a = new Promise<number>(resolve => a.addEventListener("close", (event: any) => { a.close(); resolve(event.code) }, { once: true }))
+        const closed_b = new Promise<number>(resolve => b.addEventListener("close", (event: any) => { b.close(); resolve(event.code) }, { once: true }))
+        const response = await f.runtime.dispatchFetch("https://example.com/api/v1/auth/account/delete", { method: "POST", headers: { origin: "https://example.com", cookie: first.cookie, "x-jazu-work": "1", "x-jazu-csrf": first.csrf, "x-jazu-confirm-delete": "account" } })
+        assert.equal(response.status, 200)
+        assert.deepEqual(await Promise.all([closed_a, closed_b]), [4003, 4003])
+        assert.equal(await f.db.prepare("SELECT * FROM last_signed_in WHERE principal = 'a:deleted'").first(), null)
+        assert.equal((await f.connect(second.cookie)).status, 401)
+    } finally { await f.runtime.dispose() }
+})

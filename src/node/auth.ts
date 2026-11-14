@@ -90,6 +90,10 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
             env.DB.prepare("DELETE FROM work_key_files WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM unstored_keys WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM work_key_promotions WHERE subject = ?").bind(session.subject),
+            ...(env.REALTIME ? [
+                env.DB.prepare("DELETE FROM realtime_outbox WHERE source = ? OR target = ?").bind(`a:${session.subject}`, `a:${session.subject}`),
+                env.DB.prepare("DELETE FROM last_signed_in WHERE principal = ?").bind(`a:${session.subject}`),
+            ] : []),
             env.DB.prepare("DELETE FROM auth_profiles WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_sessions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),

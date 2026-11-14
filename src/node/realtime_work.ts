@@ -2,6 +2,7 @@
 import { work_route, type Work_Env, type Work_Message } from "./work.ts"
 import type { Auth_Session } from "./auth.ts"
 import { realtime_call } from "./realtime_bus.ts"
+import type { Realtime_Channel } from "./realtime_channels.ts"
 export type Realtime_Actor = { session: Auth_Session | null, guest_id: number | null, csrf: string }
 type Room = { id: string, google_subject: string | null, guest_id: number | null, email: string, revoked: number }
 export async function work_peers(env: Work_Env, conversation: string) {
@@ -33,6 +34,7 @@ export async function wake_delivery(env: Work_Env, source: string, dispatch?: ()
 export async function work_changed(env: Work_Env, conversation: string, subject: string): Promise<void> {
     if (!env.REALTIME) return
     const peers = await work_peers(env, conversation), source = `a:${subject}`
+    if (peers.room.guest_id) try { await realtime_call(env, `g:${peers.room.guest_id}`, "revoke", {}) } catch {}
     await env.DB!.prepare("INSERT INTO realtime_outbox (id, source, target, payload, created_at) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), source, peers.owner, JSON.stringify({ type: "conversation-updated", channel: "work", conversation, source }), Date.now()).run()
     await wake_delivery(env, source)
 }
@@ -44,4 +46,22 @@ export async function work_notification(env: Work_Env, principal: string, data: 
     const client = peers.room.google_subject ? await env.DB!.prepare("SELECT name, email FROM auth_users WHERE subject = ?").bind(peers.room.google_subject).first<{ name: string, email: string }>() : null
     const address = principal === peers.owner ? client?.email ?? `guest/${peers.room.guest_id}` : env.WORK_OWNER_EMAIL ?? "jason@jasouza.com"
     return { type: "notification", channel: "work", conversation: data.conversation, id: message.id, seq: message.seq, created_at: message.created_at, self: data.source === principal, address, sender: message.author === "owner" ? env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" : client?.name ?? `Guest ${peers.room.guest_id}` }
+}
+export const work_channel: Realtime_Channel = {
+    authorize: work_access,
+    notification: work_notification,
+    async history(env, conversation, after) {
+        if (conversation === "owner") return []
+        const { results } = await env.DB!.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND seq > ? ORDER BY seq LIMIT 100").bind(conversation, after).all<Work_Message>()
+        return results.map(row => ({ ...row, envelope: JSON.parse(row.envelope) }))
+    },
+    async send(env, actor, origin, data, dispatch) {
+        const response = await work_route(new Request(`${origin}/api/v1/work/rooms/${data.conversation}/messages`, { method: "POST", headers: { origin, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": actor.csrf }, body: JSON.stringify({ id: data.id, envelope: data.envelope }) }), env, { actor, dispatch })
+        const result = await response.json() as any
+        return response.ok ? { value: result } : { error: result.error?.message ?? "Message was not saved" }
+    },
+    async changed(env, principal, data) {
+        const peers = await work_peers(env, data.conversation)
+        return principal === peers.owner ? { type: "conversation-updated", channel: "work", conversation: data.conversation, address: peers.room.email } : null
+    },
 }

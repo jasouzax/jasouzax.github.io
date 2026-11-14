@@ -5,14 +5,18 @@
 export type Auth_State = { user: { email: string, name: string, picture?: string, role: "owner" | "client" } | null, csrf: string, google_enabled: boolean }
 let current: Auth_State | null = null
 let pending: Promise<Auth_State> | null = null
+let revision = 0
 
 export function get_auth(refresh = false): Promise<Auth_State> {
-    if (refresh) pending = null
+    if (refresh) { pending = null; revision++ }
+    const request_revision = revision
     return pending ??= fetch("/api/v1/auth/session", { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(10000) }).then(async response => {
         if (!response.ok) throw new Error("Sign-in service is unavailable")
-        current = await response.json() as Auth_State
+        const value = await response.json() as Auth_State
+        if (request_revision !== revision) return get_auth()
+        current = value
         return current
-    }).catch(error => { pending = null; throw error })
+    }).catch(error => { if (request_revision === revision) pending = null; throw error })
 }
 
 function paint(): void {
@@ -21,6 +25,7 @@ function paint(): void {
 }
 
 function clear_identity(google_enabled: boolean): void {
+    revision++
     current = { user: null, csrf: "", google_enabled }
     pending = Promise.resolve(current)
     try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
@@ -77,4 +82,5 @@ export function init_sign(): void {
         }).finally(() => { button.disabled = false })
     })
     document.addEventListener("jazu:page", paint)
+    document.addEventListener("jazu:auth", paint)
 }

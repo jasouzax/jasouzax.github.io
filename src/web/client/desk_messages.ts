@@ -9,6 +9,7 @@ import type { Client_Key } from "./work_drive.ts"
 import { google_picture } from "../../work_profile.ts"
 import { get_auth } from "./sign.ts"
 import { acquire_guest, realtime_connected, realtime_replaced, realtime_ready, realtime_request, watch_conversation } from "./realtime.ts"
+import { relative_presence } from "./realtime_time.ts"
 
 type Message = { seq: number, id: string, author: "owner" | "client", envelope: Work_Envelope, created_at: number }
 type Pending = { id: string, envelope: Work_Envelope, text: string }
@@ -170,9 +171,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             else if (!peer) connection.textContent = label("live_connected")
             else if (peer.online) connection.textContent = label("online")
             else if (peer.last_online) {
-                const minutes = Math.max(1, Math.floor((Date.now() - peer.last_online) / 60000))
-                const time = new Intl.RelativeTimeFormat(document.documentElement.lang || "en", { numeric: "always" }).format(-minutes, "minute")
-                connection.textContent = label("last_online").replace("{time}", time)
+                const time = relative_presence(peer.last_online, document.documentElement.lang)
+                connection.textContent = time ? label("last_online").replace("{time}", time) : label("last_online_recent")
             } else connection.textContent = label("offline")
         }
         const tick_presence = () => { render_presence(); timer = setTimeout(tick_presence, 30000) }

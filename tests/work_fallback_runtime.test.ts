@@ -22,7 +22,7 @@ test("edge fallback survives a new session and is removed only after verified pr
     } }))
     try {
         const db = await runtime.getD1Database("DB")
-        for (const name of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql"]) await db.exec(readFileSync(`migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
+        for (const name of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql"]) await db.exec(readFileSync(`migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
         const now = Date.now(), hash = await auth_hash(token), csrf = await auth_hash(`csrf\n${token}`)
         await db.prepare("INSERT INTO auth_users VALUES ('client-subject','client@example.com','Client',?)").bind(now).run()
         await db.prepare("INSERT INTO auth_sessions VALUES (?,'client-subject',?,?)").bind(hash, now, now).run()

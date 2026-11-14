@@ -210,6 +210,44 @@ test("first Google sign-in saves the guest key, links history and restores it on
     } finally { await context.close() }
 })
 
+test("a signed-in owner receives notifications outside Work and sees live disconnect/reconnect without message polling", async ({ page, browser }) => {
+    await page.addInitScript(() => {
+        ;(window as any).notification_requests = 0
+        Object.defineProperty(window, "Notification", { configurable: true, value: class {
+            static permission = "default"
+            static async requestPermission() { (window as any).notification_requests++; this.permission = "granted"; return "granted" }
+            onclick: (() => void) | null = null
+            close() {}
+        } })
+    })
+    await owner(page); await page.goto("/"); await ready(page)
+    await page.locator("#head_account > summary").click()
+    const enable = page.getByRole("button", { name: "Enable message notifications", exact: true })
+    await expect(enable).toBeVisible(); expect(await page.evaluate(() => (window as any).notification_requests)).toBe(0)
+    await enable.click(); await expect(page.getByRole("button", { name: "Notifications enabled", exact: true })).toBeVisible()
+    await page.locator("#head_account > summary").click()
+    const context = await browser.newContext()
+    try {
+        let guest = await context.newPage(); await guest.goto("/work"); await send(guest, "A message while you browse the portfolio")
+        await expect(guest.locator(".desk_messages_connection")).toHaveText("Online")
+        const notice = page.locator(".realtime_notification a")
+        await expect(notice).toContainText("New encrypted message")
+        await notice.click(); await ready(page)
+        await expect(page.locator(".desk_messages_log")).toContainText("A message while you browse the portfolio")
+        await expect(page.locator(".desk_messages_connection")).toHaveText("Online")
+        let reads = 0
+        page.on("request", request => { if (request.method() === "GET" && /\/rooms\/[^/]+\/messages/.test(request.url())) reads++ })
+        await page.waitForTimeout(1000); const baseline = reads
+        await page.waitForTimeout(6500); expect(reads).toBe(baseline)
+        await guest.close()
+        await expect(page.locator(".desk_messages_connection")).toContainText("Last online", { timeout: 15000 })
+        guest = await context.newPage(); await guest.goto("/work"); await ready(guest)
+        await expect(page.locator(".desk_messages_connection")).toHaveText("Online", { timeout: 15000 })
+        await send(guest, "Back online")
+        await expect(page.locator(".desk_messages_log")).toContainText("Back online")
+    } finally { await context.close() }
+})
+
 test("guest tabs replace the active socket and recover the same conversation when focused", async ({ page, browser }) => {
     await owner(page)
     const context = await browser.newContext()

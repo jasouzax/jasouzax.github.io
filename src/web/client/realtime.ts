@@ -1,5 +1,6 @@
 /* Site-wide, channel-neutral live transport. Guests acquire it only while a Work view is mounted. */
 import { get_auth } from "./sign.ts"
+let account = ""
 let socket: WebSocket | null = null, identity = "", guest_views = 0, generation = 0, attempt = 0, connected = false, replaced = false
 let reconnect: ReturnType<typeof setTimeout> | undefined, heartbeat: ReturnType<typeof setInterval> | undefined, pong_at = 0
 const requests = new Map<string, { resolve(value: any): void, reject(error: Error): void, timer: ReturnType<typeof setTimeout> }>()
@@ -16,6 +17,7 @@ function stop(): void {
 }
 async function refresh(): Promise<void> {
     const auth = await get_auth(), next = auth.user ? `account:${auth.user.email}` : guest_views ? "guest" : ""
+    account = auth.user?.email ?? ""
     if (identity !== next) { stop(); identity = next; attempt = 0; replaced = false }
     if (identity && !socket && !replaced) connect()
 }
@@ -29,7 +31,7 @@ function connect(): void {
         let data: any; try { data = JSON.parse(event.data) } catch { return }
         if (data.type === "ready") {
             attempt = 0; pong_at = Date.now(); clearInterval(heartbeat)
-            heartbeat = setInterval(() => { if (Date.now() - pong_at > 90000) ws.close(4000, "Heartbeat expired"); else if (ws.readyState === WebSocket.OPEN) ws.send("ping") }, 30000)
+            heartbeat = setInterval(() => { if (Date.now() - pong_at >= 90000) ws.close(4000, "Heartbeat expired"); else if (ws.readyState === WebSocket.OPEN) ws.send("ping") }, 30000)
             state(true); return
         }
         if (data.type === "ack") {
@@ -101,12 +103,14 @@ function notify(data: any): void {
     }
 }
 export function init_realtime(): void {
-    document.addEventListener("jazu:auth", () => { void refresh().catch(() => {}) })
+    const auth_channel = "BroadcastChannel" in window ? new BroadcastChannel("jazu-auth-changed") : null
+    document.addEventListener("jazu:auth", () => { void refresh().then(() => auth_channel?.postMessage(account)).catch(() => {}) })
+    if (auth_channel) auth_channel.onmessage = event => { if (typeof event.data === "string" && event.data !== account) void get_auth(true).then(() => document.dispatchEvent(new Event("jazu:auth"))).catch(() => {}) }
     window.addEventListener("online", () => { attempt = 0; if (!socket) void refresh().catch(() => {}) })
     const resume = () => {
         if (!document.hidden && identity) {
             if (replaced) { replaced = false; attempt = 0; document.dispatchEvent(new Event("jazu:guest-resume")); return }
-            if (socket && Date.now() - pong_at > 90000) { stop(); attempt = 0 }
+            if (socket && Date.now() - pong_at >= 90000) { stop(); attempt = 0 }
             if (!socket) connect()
         }
     }
@@ -118,6 +122,16 @@ export function init_realtime(): void {
     })
     window.addEventListener("pagehide", () => stop())
     window.addEventListener("pageshow", () => { void refresh().catch(() => {}) })
+    const paint_notifications = () => {
+        const button = document.querySelector<HTMLButtonElement>("[data-notifications]")
+        if (!button) return
+        if (!("Notification" in window)) { button.hidden = true; return }
+        if (Notification.permission === "granted") button.textContent = button.dataset.notificationEnabled ?? "Notifications enabled"
+        else if (Notification.permission === "denied") button.textContent = button.dataset.notificationDenied ?? "Notifications blocked"
+    }
+    document.addEventListener("jazu:page", paint_notifications)
+    document.addEventListener("jazu:auth", paint_notifications)
+    paint_notifications()
     document.addEventListener("click", event => {
         const button = (event.target as Element).closest<HTMLButtonElement>("[data-notifications]")
         if (!button || !("Notification" in window)) return
