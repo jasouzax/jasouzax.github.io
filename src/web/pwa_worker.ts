@@ -18,8 +18,11 @@ worker.addEventListener("install", (event: Lifetime) => event.waitUntil((async (
         await Promise.all(Array.from({ length: 4 }, async () => {
             while (index < __PWA__.entries.length) {
                 const entry = __PWA__.entries[index++]
-                const response = await fetch(entry.url, { credentials: "omit", cache: "reload", redirect: "error" })
-                if (!response.ok || response.type === "opaque" || response.headers.has("set-cookie")) throw new Error(`Offline download failed: ${entry.url}`)
+                // Pages serves "/x/index.html" from "/x/" (308), so request the canonical URL and cache it under the allowlisted name.
+                const source = entry.url.endsWith("/index.html") ? entry.url.slice(0, -"index.html".length) : entry.url
+                const response = await fetch(source, { credentials: "omit", cache: "reload", redirect: "follow" })
+                // Same-origin redirects are tolerated because the revision hash below proves the bytes; anything else is rejected.
+                if (!response.ok || response.type === "opaque" || response.headers.has("set-cookie") || new URL(response.url).origin !== worker.location.origin) throw new Error(`Offline download failed: ${entry.url}`)
                 // Never combine a cached old page with assets from a newer deployment.
                 const bytes = await response.arrayBuffer()
                 const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(byte => byte.toString(16).padStart(2, "0")).join("")

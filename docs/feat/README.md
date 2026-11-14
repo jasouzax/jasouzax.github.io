@@ -194,7 +194,8 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [ ] Extend guest/Google authorization to remaining workspace APIs and add owner audit (4.5)
   - [ ] Remaining chat features: soft deletion, file upload policy, owner audit and mail debounce (4.6)
   - [ ] Per-client durable chat and database API adapters
-  - [ ] Browser-closed Web Push and additional user-to-user messaging channels
+  - [ ] Browser-closed Web Push with on-device decrypted previews: implemented, tests and real-device checks pending (see `pwa.md`)
+  - [ ] Additional user-to-user messaging channels
   - [ ] Work client: sessions, messages, pins, receipts, dashboards and state versioning (3.9)
 
 ## Desktop environment

@@ -150,6 +150,8 @@ dist/ .cache/ .wrangler/   generated, ignored
 - `ci_jazu.ts` is meant as the template for other projects' pipelines; its steps are data (`jazu_steps`). CI/CD children get a scrubbed env on purpose; test doubles must signal through files, not env vars.
 - `content/projects.xml` has a placeholder `<project id="jazu">` (needed so the Worker's `PUBLIC_PROJECTS` includes it and `/projects/jazu` exists). It was added without a build; run `npm run check` and rewrite the text.
 
+- **PWA/Web Push:** `src/pwa.ts` emits `service-worker.js` + `offline.json` from the finished output map (allowlist = public files only). Pages serves `/x/index.html` as `/x/` via 308, so the worker installs from canonical URLs and verifies SHA-256 revisions (never `redirect: "error"`). Push payloads carry routing metadata only; the device fetches ciphertext from `/api/v1/push/message` and decrypts with a non-extractable key kept in IndexedDB (`notification_store.ts`). Never regenerate `VAPID_*` while subscriptions exist (`npm run push:keys` refuses). The PWA feature was finished without `node_modules`: run `npm run types && npm test && npm run test:pwa:browser` first. Details: `docs/feat/pwa.md`.
+
 ## Docs maintenance (do this as you work)
 
 - Changed behaviour → update the matching `docs/**` page. Added attribute → `docs/content/{tag}.md`. New module → `docs/src/*.md` file map.
