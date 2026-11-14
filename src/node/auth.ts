@@ -9,6 +9,7 @@ import { api_error } from "./security.ts"
 import { encode_key } from "../work_crypto.ts"
 import { google_access, save_google_grant } from "./google_grant.ts"
 import { google_picture } from "../work_profile.ts"
+import { realtime_revoke } from "./realtime_bus.ts"
 
 const session_cookie = "__Host-jazu_session"
 const flow_cookie = "__Host-jazu_oauth"
@@ -73,6 +74,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Invalid sign-out request", 403)
         await env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
         await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
+        await realtime_revoke(env, session.subject, await auth_hash(session_token(request)))
         const response = reply({ signed_out: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response
@@ -93,6 +95,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
             env.DB.prepare("DELETE FROM auth_owner WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_users WHERE subject = ?").bind(session.subject),
         ])
+        await realtime_revoke(env, session.subject)
         const response = reply({ deleted: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response

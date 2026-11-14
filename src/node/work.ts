@@ -8,6 +8,7 @@ import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 import { google_picture } from "../work_profile.ts"
 import { unstored_route } from "./work_unstored.ts"
+import type { Realtime_Namespace } from "./realtime_bus.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -22,6 +23,7 @@ export type Work_Env = {
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
     WORK_FALLBACK_KEY?: string
+    REALTIME?: Realtime_Namespace
 }
 type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null, name?: string, picture?: string, account_email?: string }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
@@ -56,7 +58,7 @@ function valid_envelope(value: unknown): value is Work_Envelope {
 
 type Owner_Key = { key_id: string, public_jwk: string }
 const guest_cookie = "__Host-jazu_guest"
-function guest_token(request: Request): string {
+export function guest_token(request: Request): string {
     const values = (request.headers.get("cookie") ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(guest_cookie + "="))
     const value = values.length === 1 ? values[0].slice(guest_cookie.length + 1) : ""
     return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : ""

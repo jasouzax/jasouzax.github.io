@@ -24,6 +24,12 @@
 
 ## Contract
 
+### Realtime prototypes
+
+The staging realtime transport uses hibernating Durable Objects keyed by authenticated account or existing guest cookie. Account sockets may connect across the site; guest sockets are limited to one per session and the Work page. Same-origin upgrades, connection/command limits, hashed credentials, session revocation and a 30-second automatic ping / roughly 90-second expiry protect the transport. Presence aggregates all live account sockets and uses migration 0007's `last_signed_in`; its nullable timestamp is a projection reconciled against the Durable Object's heartbeat state. Unknown identities have no fabricated last-online time. Channel and conversation IDs keep the transport independent from Work-specific authorization. Initial history and reconnect catch-up remain durable D1 reads.
+
+Prototype 1 introduces the server transport/presence and local/runtime infrastructure. Chat delivery, subscriptions and site-wide notification integration follow in separate staging commits.
+
 ## Encrypted messaging implementation
 
 `/work` opens directly to a text composer and Send button in a `message/cpim` window at `im:jason@jasouza.com`, including for signed-out visitors. There are no invitations, owner access tokens or credentials to copy. The MIME identifies the viewer; transport uses encrypted JSON rather than interoperable CPIM/SIP.
