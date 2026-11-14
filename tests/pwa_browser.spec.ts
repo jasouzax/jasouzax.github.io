@@ -1,0 +1,27 @@
+import { test, expect } from "@playwright/test"
+test("downloads public snapshots and both themes, then navigates unvisited pages offline without caching private APIs or toolchains", async ({ page, context }) => {
+    await page.goto("/")
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), { timeout: 150000 })
+    const snapshot = await page.evaluate(async () => {
+        const names = await caches.keys(), cache = await caches.open(names.find(name => name.startsWith("jazu-public-"))!)
+        const urls = (await cache.keys()).map(request => new URL(request.url).pathname)
+        return { names, urls }
+    })
+    expect(snapshot.urls).toContain("/ja/index.html")
+    expect(snapshot.urls).toContain("/privacy/index.html")
+    expect(snapshot.urls.some(url => url.startsWith("/assets/themes/default/"))).toBe(true)
+    expect(snapshot.urls.some(url => url.startsWith("/assets/themes/memory/"))).toBe(true)
+    expect(snapshot.urls.some(url => url.startsWith("/api/") || url.startsWith("/assets/wasm/"))).toBe(false)
+    await context.setOffline(true)
+    await page.goto("/privacy/")
+    await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
+    await expect(page.locator("#pwa_offline")).toContainText("Offline")
+    await page.goto("/ja/")
+    await expect(page.locator("html")).toHaveAttribute("lang", "ja")
+    await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
+    await page.evaluate(() => { localStorage.setItem("jazu_theme", "memory") })
+    await page.reload()
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "memory", { timeout: 30000 })
+    expect(await page.evaluate(async () => { try { await fetch("/api/v1/auth/session"); return false } catch { return true } })).toBe(true)
+    await page.screenshot({ path: ".cache/pwa-offline-memory.png", fullPage: true })
+})

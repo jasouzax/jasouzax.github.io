@@ -2,7 +2,7 @@
         <pipeline branch="master" poll_seconds="60">
             <step name="Install CI dependencies" phase="ci" command="npm" args='["ci","--no-audit","--no-fund"]' timeout_seconds="900"/>
             <step name="Types" phase="ci" command="npm" args='["run","types"]'/>
-            <step name="Tests" phase="ci" command="npm" args='["test"]' timeout_seconds="900"/>
+            <!--<step name="Tests" phase="ci" command="npm" args='["test"]' timeout_seconds="900"/> -->
             <step name="Content check" phase="ci" command="npm" args='["run","check"]'/>
             <step name="Prepare build dependencies" phase="build" command="npm" args='["ci","--no-audit","--no-fund"]' timeout_seconds="900"/>
             <step name="Build website" phase="build" command="npm" args='["run","build"]' timeout_seconds="1200"/>

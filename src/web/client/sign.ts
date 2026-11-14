@@ -30,6 +30,7 @@ function clear_identity(google_enabled: boolean): void {
     pending = Promise.resolve(current)
     try { for (const key of Object.keys(sessionStorage)) if (key.startsWith("jazu_work_")) sessionStorage.removeItem(key) } catch {}
     paint()
+    document.dispatchEvent(new Event("jazu:signed-out"))
     document.dispatchEvent(new Event("jazu:auth"))
 }
 

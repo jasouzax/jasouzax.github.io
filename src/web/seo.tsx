@@ -388,6 +388,8 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "/assets/plugins.json",
         "  Cache-Control: no-cache",
         ...text("/manifest.json", "application/manifest+json; charset=utf-8", 3600),
+        ...text("/service-worker.js", "text/javascript; charset=utf-8", 0),
+        ...text("/offline.json", "application/json; charset=utf-8", 0),
         ...text("/robots.txt", "text/plain; charset=utf-8", 3600),
         ...text("/sitemap.xml", "application/xml; charset=utf-8", 3600),
         ...text("/llms.txt", "text/plain; charset=utf-8", 3600),

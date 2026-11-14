@@ -5,6 +5,7 @@ import { init_expertise } from "./expertise.ts"
 import { init_search } from "./search.ts"
 import { init_sign } from "./sign.ts"
 import { init_realtime } from "./realtime.ts"
+import { init_pwa } from "./pwa.ts"
 import { init_connect_folder } from "./connect_folder.ts"
 import { init_pager } from "./pager.ts"
 import { bind_desk } from "./desk.ts"
@@ -55,6 +56,7 @@ init_expertise()
 init_search()
 init_sign()
 init_realtime()
+init_pwa()
 init_connect_folder()
 init_pager()
 bind_desk()

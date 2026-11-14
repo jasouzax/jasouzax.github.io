@@ -31,6 +31,8 @@
     "tf:validate": "terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate",
     "cloud:dev": "wrangler dev --config wrangler.local.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config wrangler.local.jsonc",
+    "push:keys": "node --import tsx src/node/push_keys.ts",
+    "test:pwa:browser": "playwright test --config tests/pwa_browser.config.ts",
     "node": "node --env-file=.env src/main.ts node",
     "extension:install": "node extension/host/install.ts",
     "extension:uninstall": "node extension/host/install.ts --uninstall"
@@ -39,6 +41,7 @@
     "node": ">=22.18"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
     "@resvg/resvg-js": "^2.6.2",
     "@wasmer/sdk": "^0.19.1",
     "@xterm/addon-fit": "^0.10.0",

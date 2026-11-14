@@ -47,7 +47,7 @@ export async function work_notification(env: Work_Env, principal: string, data: 
     if (!message) return null
     const client = peers.room.google_subject ? await env.DB!.prepare("SELECT name, email FROM auth_users WHERE subject = ?").bind(peers.room.google_subject).first<{ name: string, email: string }>() : null
     const address = principal === peers.owner ? client?.email ?? `guest/${peers.room.guest_id}` : env.WORK_OWNER_EMAIL ?? "jason@jasouza.com"
-    return { type: "notification", channel: "work", conversation: data.conversation, id: message.id, seq: message.seq, created_at: message.created_at, self: data.source === principal, address, href: `/work/?chat=${encodeURIComponent(address)}`, sender: message.author === "owner" ? env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" : client?.name ?? `Guest ${peers.room.guest_id}` }
+    return { type: "notification", channel: "work", conversation: data.conversation, id: message.id, seq: message.seq, created_at: message.created_at, self: data.source === principal, address, href: `/work/?chat=${encodeURIComponent(address)}`, sender: message.author === "owner" ? env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" : client?.email ?? `Guest ${peers.room.guest_id}` }
 }
 export const work_channel: Realtime_Channel = {
     authorize: work_access,

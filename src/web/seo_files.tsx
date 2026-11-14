@@ -45,7 +45,8 @@ export function manifest_json(model: site_model, theme_colors: [string, string],
         background_color: seo.background_color || colors.background,
         categories: seo.manifest.categories.length ? seo.manifest.categories : undefined,
         icons,
-        shortcuts: shortcuts.length ? shortcuts : undefined
+        shortcuts: shortcuts.length ? shortcuts : undefined,
+        jazu: { pwa: model.config.pwa }
     }
     return JSON.stringify(manifest, null, 4) + "\n"
 }

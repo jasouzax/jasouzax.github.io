@@ -13,7 +13,7 @@ export function sql(command: string): void {
 }
 export function reset(): void {
     testcase++
-    sql("DELETE FROM realtime_outbox; DELETE FROM realtime_limits; DELETE FROM last_signed_in; DELETE FROM unstored_keys; DELETE FROM work_key_promotions; DELETE FROM work_messages; DELETE FROM work_rooms; DELETE FROM work_owner_keys; DELETE FROM work_key_files; DELETE FROM auth_google_grants; DELETE FROM auth_sessions; DELETE FROM auth_owner; DELETE FROM auth_profiles; DELETE FROM auth_users; DELETE FROM work_guests;")
+    sql("DELETE FROM push_receipts; DELETE FROM push_subscriptions; DELETE FROM realtime_outbox; DELETE FROM realtime_limits; DELETE FROM last_signed_in; DELETE FROM unstored_keys; DELETE FROM work_key_promotions; DELETE FROM work_messages; DELETE FROM work_rooms; DELETE FROM work_owner_keys; DELETE FROM work_key_files; DELETE FROM auth_google_grants; DELETE FROM auth_sessions; DELETE FROM auth_owner; DELETE FROM auth_profiles; DELETE FROM auth_users; DELETE FROM work_guests;")
     drive_files.clear()
     denied_drive.clear(); failed_uploads.clear()
 }

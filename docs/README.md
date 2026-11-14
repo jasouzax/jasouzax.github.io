@@ -88,6 +88,7 @@ These figures were recorded by the previous author and **were not re-run** when 
 ## Known limitations (summary)
 
 - Work has Google sign-in, hashed cookie sessions, account-linked invitations and shared-key encrypted text chat; UUID merging, receipts and dashboards remain planned. See [setup and limitations](feat/work.md#encrypted-messaging-implementation). Unfinished APIs still return `501`.
+- The PWA (offline public snapshot, installable manifest, decrypted native notifications, Web Push) is implemented but unverified; see [feat/pwa.md](feat/pwa.md).
 - The personal node supports signed Git reads, authenticated HTTPS pushes, a static Pages/R2 Git mirror and XML-defined project synchronization/CI/CD (generic runtime tested locally; production activation pending). Dashboards and agents remain unimplemented.
 - Terraform has not been validated against a real account; state is local.
 - Plugins: no WASM manifest verification before execution beyond build-time hashes; conversion graph not implemented.

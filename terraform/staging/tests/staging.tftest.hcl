@@ -61,7 +61,7 @@ run "staging_resources_and_routing" {
     error_message = "The Worker needs the XML-derived public clone origins for provider-first reads."
   }
   assert {
-    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY"])
+    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY", "VAPID_PRIVATE_KEY"])
     error_message = "Provision personal-origin and Work secrets with the Worker."
   }
   assert {

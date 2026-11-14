@@ -231,7 +231,7 @@ test("a signed-in owner receives notifications outside Work and sees live discon
         let guest = await context.newPage(); await guest.goto("/work"); await send(guest, "A message while you browse the portfolio")
         await expect(guest.locator(".desk_messages_connection")).toHaveText("Online")
         const notice = page.locator(".realtime_notification a")
-        await expect(notice).toContainText("New encrypted message")
+        await expect(notice.locator(".realtime_notification_sender")).toContainText("Guest"); await expect(notice.locator(".realtime_notification_preview")).toHaveText("A message while you browse the portfolio")
         await page.screenshot({ path: ".cache/realtime-notification.png", fullPage: true })
         await notice.click(); await ready(page)
         await expect(page.locator(".desk_messages_log")).toContainText("A message while you browse the portfolio")
