@@ -1,8 +1,9 @@
 /* Hibernating account/guest sockets, private event routing and heartbeat-derived presence. */
 import { read_session, auth_hash, session_token, type Auth_Session } from "./auth.ts"
-import { guest_token, type Work_Env } from "./work.ts"
+import { guest_token, work_route, type Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { realtime_call } from "./realtime_bus.ts"
+import { work_access, work_notification } from "./realtime_work.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): Attachment }
 type Attachment = { principal: string, credential: string, origin: string, connected: number, activity: number, watches: Record<string, { channel: string, conversation: string, target: string, cursor: number }> }
@@ -64,7 +65,7 @@ export class Realtime_Hub {
         const watchers = await this.ctx.storage.get<Record<string, { principal: string, channel: string, conversation: string }>>("watchers") ?? {}
         for (const [id, watcher] of Object.entries(watchers)) {
             try {
-                const result = await realtime_call(this.env, watcher.principal, "presence-event", { ...watcher, online, last_online: online ? null : last })
+                const result = await realtime_call(this.env, watcher.principal, "presence-event", { ...watcher, peer: this.principal, online, last_online: online ? null : last })
                 if (result.status === 404) delete watchers[id]
             } catch { /* A reconnect obtains an authoritative presence snapshot. */ }
         }
@@ -80,6 +81,7 @@ export class Realtime_Hub {
         if (!live.length) await this.presence(false, last || Date.now())
         else await this.presence(true)
         if (live.length) await this.ctx.storage.setAlarm(Date.now() + heartbeat_timeout)
+        else if (await this.pending()) await this.ctx.storage.setAlarm(Date.now() + 10000)
         else await this.ctx.storage.deleteAlarm()
     }
     async fetch(request: Request): Promise<Response> {
@@ -108,7 +110,70 @@ export class Realtime_Hub {
         }
         return this.internal(action, data)
     }
-    protected async internal(_action: string, _data: any): Promise<Response> { return new Response("Unknown action", { status: 404 }) }
+    private async pending(): Promise<boolean> {
+        return Boolean(await this.env.DB!.prepare("SELECT 1 FROM realtime_outbox WHERE source = ? LIMIT 1").bind(this.principal).first())
+    }
+    private async drain(): Promise<void> {
+        const { results } = await this.env.DB!.prepare("SELECT id, target, payload FROM realtime_outbox WHERE source = ? ORDER BY created_at, id LIMIT 100").bind(this.principal).all<{ id: string, target: string, payload: string }>()
+        for (const row of results) {
+            try {
+                const data = JSON.parse(row.payload)
+                const response = row.target === this.principal ? await this.internal("/event", data) : await realtime_call(this.env, row.target, "event", data)
+                if (response.ok) await this.env.DB!.prepare("DELETE FROM realtime_outbox WHERE id = ?").bind(row.id).run()
+            } catch { /* Keep the atomic D1 outbox record for the next alarm/reconnect. */ }
+        }
+        if (await this.pending()) await this.ctx.storage.setAlarm(Date.now() + 10000)
+    }
+    private async sync(ws: Socket, key: string): Promise<void> {
+        let watch = ws.deserializeAttachment().watches[key]
+        if (!watch) return
+        for (let page = 0; page < 10; page++) {
+            const { results } = await this.env.DB!.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND seq > ? ORDER BY seq LIMIT 100").bind(watch.conversation, watch.cursor).all<any>()
+            const current = ws.deserializeAttachment(), latest = current.watches[key]
+            if (!latest || ws.readyState !== 1) return
+            const messages = results.filter(row => row.seq > latest.cursor)
+            if (messages.length) {
+                ws.send(encode({ type: "messages", channel: watch.channel, conversation: watch.conversation, messages: messages.map(row => ({ ...row, envelope: JSON.parse(row.envelope) })) }))
+                latest.cursor = Math.max(latest.cursor, messages[messages.length - 1].seq); ws.serializeAttachment(current)
+            }
+            watch = latest
+            if (results.length < 100) return
+        }
+        ws.send(encode({ type: "catchup", channel: watch.channel, conversation: watch.conversation }))
+    }
+    protected async internal(action: string, data: any): Promise<Response> {
+        if (action === "/drain") { await this.drain(); return json({ ok: true }) }
+        if (action === "/subscribe" || action === "/unsubscribe") {
+            const watchers = await this.ctx.storage.get<Record<string, any>>("watchers") ?? {}, key = `${data.principal}:${data.channel}:${data.conversation}`
+            if (action === "/unsubscribe") delete watchers[key]
+            else {
+                if (!watchers[key] && Object.keys(watchers).length >= 4096) return new Response("Too many subscriptions", { status: 429 })
+                watchers[key] = { principal: data.principal, channel: data.channel, conversation: data.conversation }
+            }
+            await this.ctx.storage.put("watchers", watchers); await this.sweep()
+            const row = await this.env.DB!.prepare("SELECT last_online FROM last_signed_in WHERE principal = ?").bind(this.principal).first<{ last_online: number | null }>()
+            return json({ online: row?.last_online === null, last_online: row?.last_online ?? null })
+        }
+        if (action === "/presence-event") {
+            let delivered = false
+            for (const ws of this.live()) {
+                const watch = ws.deserializeAttachment().watches[`${data.channel}:${data.conversation}`]
+                if (watch?.target === data.peer) { ws.send(encode({ type: "presence", channel: data.channel, conversation: data.conversation, online: data.online, last_online: data.last_online })); delivered = true }
+            }
+            return new Response(null, { status: delivered ? 204 : 404 })
+        }
+        if (action === "/event" && data.channel === "work") {
+            const notification = await work_notification(this.env, this.principal, data)
+            if (!notification) return json({ ignored: true })
+            for (const ws of this.live()) {
+                if (!await this.actor(ws.deserializeAttachment())) { ws.close(4003, "Signed out"); continue }
+                ws.send(encode(notification))
+                if (ws.deserializeAttachment().watches[`work:${data.conversation}`]) await this.sync(ws, `work:${data.conversation}`)
+            }
+            return json({ ok: true })
+        }
+        return new Response("Unknown action", { status: 404 })
+    }
     async webSocketMessage(ws: Socket, message: string | ArrayBuffer): Promise<void> {
         await this.identity()
         if (typeof message !== "string" || new TextEncoder().encode(message).length > 12000) { ws.close(1009, "Message too large"); return }
@@ -122,8 +187,42 @@ export class Realtime_Hub {
         try { await this.command(ws, JSON.parse(message), attachment) }
         catch { ws.send(encode({ type: "error", error: "Invalid live message" })) }
     }
-    protected async command(ws: Socket, data: any, _attachment: Attachment): Promise<void> { ws.send(encode({ type: "ack", request_id: data.request_id, error: "Unknown command" })) }
-    async webSocketClose(_ws: Socket): Promise<void> { await this.identity(); await this.sweep() }
+    protected async command(ws: Socket, data: any, attachment: Attachment): Promise<void> {
+        const ack = (result?: unknown, error?: string) => ws.send(encode({ type: "ack", request_id: data.request_id, result, error }))
+        if (typeof data.request_id !== "string" || data.request_id.length > 64 || data.channel !== "work") { ack(undefined, "Unknown channel"); return }
+        const actor = await this.actor(attachment)
+        if (!actor) { ws.close(4003, "Signed out"); return }
+        try {
+            const key = `work:${data.conversation}`
+            if (data.type === "watch") {
+                if (!Number.isSafeInteger(data.after) || data.after < 0) throw new Error("Invalid cursor")
+                const peers = await work_access(this.env, actor, data.conversation, attachment.origin)
+                if (!attachment.watches[key] && Object.keys(attachment.watches).length >= 32) throw new Error("Too many conversations")
+                attachment.watches[key] = { channel: "work", conversation: data.conversation, target: peers.target, cursor: data.after }; ws.serializeAttachment(attachment)
+                const response = await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: "work", conversation: data.conversation })
+                if (!response.ok) throw new Error("Presence subscription unavailable")
+                ack({ presence: await response.json() }); await this.sync(ws, key); return
+            }
+            if (data.type === "unwatch") {
+                const watch = attachment.watches[key]; delete attachment.watches[key]; ws.serializeAttachment(attachment)
+                if (watch && !this.live().some(other => other.deserializeAttachment().watches[key])) await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: "work", conversation: data.conversation })
+                ack({ ok: true }); return
+            }
+            if (data.type === "send") {
+                await work_access(this.env, actor, data.conversation, attachment.origin)
+                const response = await work_route(new Request(`${attachment.origin}/api/v1/work/rooms/${data.conversation}/messages`, { method: "POST", headers: { origin: attachment.origin, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": actor.csrf }, body: JSON.stringify({ id: data.id, envelope: data.envelope }) }), this.env, { actor, dispatch: () => this.drain() })
+                const result = await response.json() as any
+                ack(response.ok ? result : undefined, response.ok ? undefined : result.error?.message ?? "Message was not saved"); return
+            }
+            ack(undefined, "Unknown command")
+        } catch (error) { ack(undefined, error instanceof Error ? error.message : "Live request failed") }
+    }
+    async webSocketClose(ws: Socket): Promise<void> {
+        await this.identity()
+        const attachment = ws.deserializeAttachment()
+        for (const [key, watch] of Object.entries(attachment?.watches ?? {})) if (!this.live().some(other => other.deserializeAttachment().watches[key])) try { await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: watch.channel, conversation: watch.conversation }) } catch {}
+        await this.sweep()
+    }
     async webSocketError(ws: Socket): Promise<void> { ws.close(1011, "Connection error"); await this.identity(); await this.sweep() }
-    async alarm(): Promise<void> { await this.identity(); await this.sweep() }
+    async alarm(): Promise<void> { await this.identity(); await this.sweep(); await this.drain() }
 }

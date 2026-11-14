@@ -5,9 +5,22 @@ import { readFileSync, readdirSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 import { auth_hash } from "../src/node/auth.ts"
-import { encode_key } from "../src/work_crypto.ts"
+import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../src/work_crypto.ts"
 
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
+function stream(ws: any) {
+    const queued: any[] = [], pending: { predicate: (value: any) => boolean, done: (value: any) => void }[] = []
+    ws.addEventListener("message", (event: any) => {
+        const value = event.data === "pong" ? "pong" : JSON.parse(event.data), index = pending.findIndex(item => item.predicate(value))
+        if (index < 0) queued.push(value); else pending.splice(index, 1)[0].done(value)
+    })
+    const wait = (predicate: (value: any) => boolean): Promise<any> => {
+        const index = queued.findIndex(predicate)
+        if (index >= 0) return Promise.resolve(queued.splice(index, 1)[0])
+        return new Promise((resolve, reject) => { const entry = { predicate, done: (value: any) => { clearTimeout(timer); resolve(value) } }; const timer = setTimeout(() => { pending.splice(pending.indexOf(entry), 1); reject(new Error("Expected live event was not received")) }, 15000); pending.push(entry) })
+    }
+    return { wait, async command(data: object) { const request_id = crypto.randomUUID(), response = wait(value => value.type === "ack" && value.request_id === request_id); ws.send(JSON.stringify({ ...data, request_id, channel: "work" })); return response } }
+}
 function message(ws: any): Promise<any> {
     return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error("WebSocket response timed out")), 10000); ws.addEventListener("message", (event: any) => { clearTimeout(timer); resolve(event.data === "pong" ? "pong" : JSON.parse(event.data)) }, { once: true }) })
 }
@@ -49,5 +62,43 @@ test("hibernating sockets authenticate, aggregate tabs, auto-pong, enforce guest
         const replacement = (await f.connect(`__Host-jazu_guest=${guest}`)).webSocket!; replacement.accept(); await message(replacement)
         assert.equal(await closed, 4001)
         replacement.close(1000, "Bye")
+    } finally { await f.runtime.dispose() }
+})
+
+test("WebSocket messages commit ciphertext before fanout, recover cursors, isolate users and push presence changes", async () => {
+    const f = await fixture()
+    try {
+        const owner = await f.session("owner"), client = await f.session("client"), stranger = await f.session("stranger")
+        await f.db.prepare("INSERT INTO auth_owner VALUES (1,'owner')").run()
+        const api = (path: string, who: typeof owner, body: unknown) => f.runtime.dispatchFetch(`https://example.com${path}`, { method: "POST", headers: { origin: "https://example.com", cookie: who.cookie, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who.csrf }, body: JSON.stringify(body) })
+        const pair = await generate_owner_key(), published = await (await api("/api/v1/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
+        const conversation = crypto.randomUUID(), key = random()
+        assert.equal((await api("/api/v1/work/rooms", client, { id: conversation, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, conversation) })).status, 201)
+        const connect = async (who: typeof owner) => { const ws = (await f.connect(who.cookie)).webSocket!; ws.accept(); const events = stream(ws); await events.wait(value => value.type === "ready"); return { ws, ...events } }
+        const a = await connect(owner), b = await connect(client), c = await connect(stranger)
+        assert.equal((await a.command({ type: "watch", conversation, after: 0 })).result.presence.online, true)
+        assert.equal((await b.command({ type: "watch", conversation, after: 0 })).result.presence.online, true)
+        assert.match((await c.command({ type: "watch", conversation, after: 0 })).error, /unavailable/i)
+        const id = crypto.randomUUID(), envelope = await encrypt_message(key, "Durable socket message", { room: conversation, id, author: "client" })
+        assert.ok((await c.command({ type: "send", conversation, id, envelope })).error)
+        const sent = await b.command({ type: "send", conversation, id, envelope })
+        assert.equal(sent.error, undefined)
+        const saved = await f.db.prepare("SELECT seq, envelope FROM work_messages WHERE room_id = ? AND id = ?").bind(conversation, id).first<any>()
+        assert.equal(saved.envelope.includes("Durable socket message"), false)
+        const received = await a.wait(value => value.type === "messages" && value.messages.some((message: any) => message.id === id))
+        assert.equal(received.messages[0].seq, saved.seq)
+        assert.equal(await decrypt_message(key, received.messages[0].envelope, { room: conversation, id, author: "client" }), "Durable socket message")
+        assert.equal((await a.wait(value => value.type === "notification" && value.id === id)).self, false)
+        assert.equal((await b.command({ type: "send", conversation, id, envelope })).result.message.seq, saved.seq)
+        assert.equal((await f.db.prepare("SELECT count(*) AS n FROM work_messages").first<any>()).n, 1)
+        assert.equal((await f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").first<any>()).n, 0)
+        b.ws.close(1000, "Bye")
+        const offline = await a.wait(value => value.type === "presence" && !value.online)
+        assert.equal(typeof offline.last_online, "number")
+        const resumed = await connect(client)
+        await a.wait(value => value.type === "presence" && value.online)
+        await resumed.command({ type: "watch", conversation, after: 0 })
+        assert.equal((await resumed.wait(value => value.type === "messages")).messages[0].id, id)
+        a.ws.close(); c.ws.close(); resumed.ws.close()
     } finally { await f.runtime.dispose() }
 })

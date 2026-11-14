@@ -30,6 +30,8 @@ The staging realtime transport uses hibernating Durable Objects keyed by authent
 
 Prototype 1 introduces the server transport/presence and local/runtime infrastructure. Chat delivery, subscriptions and site-wide notification integration follow in separate staging commits.
 
+Prototype 2 adds the Work adapter, authorized conversation/presence subscriptions, ciphertext sends over the socket, cursor-ordered delivery and a D1 outbox inserted atomically with messages. Delivery failures leave outbox rows for the source object's alarm to retry. D1 commit precedes acknowledgements and receiver events; retries use the existing immutable message UUID. The same publication path bridges HTTP sends from older clients. A recipient outside the chat receives a generic encrypted-message notification event without decrypting content server-side.
+
 ## Encrypted messaging implementation
 
 `/work` opens directly to a text composer and Send button in a `message/cpim` window at `im:jason@jasouza.com`, including for signed-out visitors. There are no invitations, owner access tokens or credentials to copy. The MIME identifies the viewer; transport uses encrypted JSON rather than interoperable CPIM/SIP.
