@@ -118,3 +118,28 @@ test("account deletion revokes every device and removes private presence/queued 
         assert.equal((await f.connect(second.cookie)).status, 401)
     } finally { await f.runtime.dispose() }
 })
+
+test("concurrent conversations on one socket retain every subscription", async () => {
+    const f = await fixture()
+    try {
+        const owner = await f.session("owner"), first = await f.session("first"), second = await f.session("second")
+        await f.db.prepare("INSERT INTO auth_owner VALUES (1,'owner')").run()
+        const api = (path: string, who: typeof owner, body: unknown) => f.runtime.dispatchFetch(`https://example.com${path}`, { method: "POST", headers: { origin: "https://example.com", cookie: who.cookie, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who.csrf }, body: JSON.stringify(body) })
+        const pair = await generate_owner_key(), published = await (await api("/api/v1/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
+        const rooms = await Promise.all([first, second].map(async who => {
+            const id = crypto.randomUUID(), key = random()
+            await api("/api/v1/work/rooms", who, { id, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, id) })
+            const ws = (await f.connect(who.cookie)).webSocket!; ws.accept(); const events = stream(ws); await events.wait(value => value.type === "ready")
+            return { id, key, ws, events }
+        }))
+        const ws = (await f.connect(owner.cookie)).webSocket!; ws.accept(); const events = stream(ws); await events.wait(value => value.type === "ready")
+        await Promise.all(rooms.map(room => events.command({ type: "watch", conversation: room.id, after: 0 })))
+        await Promise.all(rooms.map(async room => {
+            const id = crypto.randomUUID(), envelope = await encrypt_message(room.key, "Concurrent channel delivery", { room: room.id, id, author: "client" })
+            const response = await room.events.command({ type: "send", conversation: room.id, id, envelope })
+            assert.equal(response.error, undefined)
+            await events.wait(value => value.type === "messages" && value.conversation === room.id)
+        }))
+        ws.close(); for (const room of rooms) room.ws.close()
+    } finally { await f.runtime.dispose() }
+})

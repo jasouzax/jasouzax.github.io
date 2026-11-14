@@ -119,7 +119,7 @@ test("a delivery outage retains the committed message and outbox; an alarm retri
     try {
         const client = await f.client("delivery@example.com"), room = await f.room(client), source = "a:delivery@example.com", memory = new Map<string, any>()
         let available = false, alarm = 0
-        const ctx: any = { getWebSockets: () => [], setWebSocketAutoResponse() {}, storage: { async get(key: string) { return memory.get(key) }, async put(key: string, value: unknown) { memory.set(key, value) }, async setAlarm(time: number) { alarm = time }, async deleteAlarm() { alarm = 0 } } }
+        const ctx: any = { getWebSockets: () => [], setWebSocketAutoResponse() {}, storage: { async get(key: string) { return memory.get(key) }, async put(key: string | Record<string, unknown>, value?: unknown) { if (typeof key === "string") memory.set(key, value); else for (const [name, entry] of Object.entries(key)) memory.set(name, entry) }, async delete(key: string) { memory.delete(key) }, async setAlarm(time: number) { alarm = time }, async deleteAlarm() { alarm = 0 } } }
         const hub = new Realtime_Hub(ctx, f.env)
         f.env.REALTIME = { idFromName: name => name, get: id => ({ async fetch(request) { if (id === source) return hub.fetch(request); if (!available) throw new Error("Synthetic recipient outage"); return Response.json({ ok: true }) } }) }
         const id = crypto.randomUUID(), envelope = await encrypt_message(room.key, "Committed despite delivery failure", { room: room.id, id, author: "client" })

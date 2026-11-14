@@ -19,7 +19,7 @@ test("alarms expire dead sockets, preserve another device, survive reconstructio
     const fake = (auto: number) => ({ readyState: 1, auto, code: 0, attachment: { principal: "a:u", credential: "credential", connected: now - 120000, activity: now - 120000, watches: {} }, deserializeAttachment() { return this.attachment }, serializeAttachment(value: any) { this.attachment = value }, close(code: number) { this.code = code; this.readyState = 3 } })
     const dead = fake(now - 100000), live = fake(now - 1000), sockets = [dead, live], memory = new Map<string, any>([["principal", "a:u"]])
     let alarm = 0
-    const ctx: any = { getWebSockets: () => sockets, getWebSocketAutoResponseTimestamp: (ws: any) => new Date(ws.auto), setWebSocketAutoResponse() {}, storage: { async get(key: string) { return memory.get(key) }, async put(key: string, value: unknown) { memory.set(key, value) }, async setAlarm(time: number) { alarm = time }, async deleteAlarm() { alarm = 0 } } }
+    const ctx: any = { getWebSockets: () => sockets, getWebSocketAutoResponseTimestamp: (ws: any) => new Date(ws.auto), setWebSocketAutoResponse() {}, storage: { async get(key: string) { return memory.get(key) }, async put(key: string | Record<string, unknown>, value?: unknown) { if (typeof key === "string") memory.set(key, value); else for (const [name, entry] of Object.entries(key)) memory.set(name, entry) }, async delete(key: string) { memory.delete(key) }, async setAlarm(time: number) { alarm = time }, async deleteAlarm() { alarm = 0 } } }
     try {
         await new Realtime_Hub(ctx, env).alarm()
         assert.equal(dead.code, 4000); assert.equal(live.readyState, 1)
@@ -34,5 +34,37 @@ test("alarms expire dead sockets, preserve another device, survive reconstructio
         assert.equal(alarm, 0)
         const revoked = fake(Date.now()); sockets.push(revoked); db.prepare("DELETE FROM auth_sessions").run()
         await new Realtime_Hub(ctx, env).alarm(); assert.equal(revoked.code, 4003)
+        // A delayed offline fanout must not overwrite a newer online state.
+        db.prepare("INSERT INTO auth_sessions VALUES ('credential','u',?,?)").run(now, now)
+        const active = fake(Date.now()); sockets.push(active)
+        const hub = new Realtime_Hub(ctx, env); await hub.alarm()
+        const conversation = crypto.randomUUID(), frames: any[] = [], observer_memory = new Map<string, any>([["principal", "a:observer"]])
+        const observer: any = { ...fake(Date.now()), send(value: string) { frames.push(JSON.parse(value)) } }
+        observer.attachment.watches = { [`work:${conversation}`]: { channel: "work", conversation, target: "a:u", cursor: 0 } }
+        const observer_ctx: any = { ...ctx, getWebSockets: () => [observer], storage: { ...ctx.storage, async get(key: string) { return observer_memory.get(key) }, async put(key: string, value: unknown) { observer_memory.set(key, value) } } }
+        const receiver = new Realtime_Hub(observer_ctx, env)
+        memory.set("watchers", { observer: { principal: "a:observer", channel: "work", conversation, revision: "one" } })
+        let unblock!: () => void, started!: () => void, failed = false
+        const blocked = new Promise<void>(resolve => { unblock = resolve }), waiting = new Promise<void>(resolve => { started = resolve })
+        env.REALTIME = { idFromName: name => name, get: () => ({ async fetch(request) {
+            const value = await request.clone().json() as any
+            if (failed) throw new Error("Synthetic presence delivery failure")
+            if (!value.online) { started(); await blocked }
+            return receiver.fetch(request)
+        } }) }
+        Date.now = () => now + 200001
+        const offline = hub.alarm(); await waiting
+        sockets.push(fake(Date.now())); await hub.alarm()
+        unblock(); await offline
+        assert.equal(frames.at(-1).online, true)
+        assert.ok(frames.at(-1).version > 0)
+        assert.equal(db.prepare("SELECT last_online FROM last_signed_in").get()!.last_online, null)
+        assert.ok(alarm > Date.now(), "a late offline handler must not cancel a live connection's alarm")
+        failed = true; Date.now = () => now + 300002; await hub.alarm()
+        assert.ok(memory.has("presence_delivery"), "failed presence fanout is retained durably")
+        failed = false; await hub.alarm()
+        assert.equal(frames.at(-1).online, false)
+        assert.equal(memory.has("presence_delivery"), false)
+        assert.equal(alarm, 0)
     } finally { Date.now = real_now; db.close(); (globalThis as any).WebSocketRequestResponsePair = original }
 })

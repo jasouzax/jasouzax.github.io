@@ -163,7 +163,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         const heading = element("strong", "jason@jasouza.com", "visually_hidden")
         const identity_status = element("span", "", "desk_messages_identity")
         toolbar.append(connection, heading, identity_status)
-        let peer: { online: boolean, last_online: number | null } | undefined
+        let peer: { online: boolean, last_online: number | null, version?: number, peer_id?: string } | undefined
+        const accept_presence = (value: NonNullable<typeof peer>) => { if (!peer || value.peer_id !== peer.peer_id || (value.version ?? 0) >= (peer.version ?? 0)) peer = value }
         const render_presence = () => {
             connection.title = peer ? label("presence_hint") : label("connection_hint")
             connection.dataset.online = String(Boolean(peer?.online && realtime_connected()))
@@ -256,13 +257,13 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             const conversation = key?.room ?? "owner"
             if (watched !== conversation || !watch_abort) { watch_abort?.abort(); watch_abort = new AbortController(); watch_signal = AbortSignal.any([abort, watch_abort.signal]); watched = conversation }
             const subscription = await watch_conversation("work", conversation, cursor, watch_signal!)
-            if (!abort.aborted) { peer = subscription.presence; render_presence() }
+            if (!abort.aborted) { accept_presence(subscription.presence); render_presence() }
         }
         document.addEventListener("jazu:realtime-state", () => { render_presence(); if (realtime_connected()) void watch_live().catch(error => { if (!abort.aborted) status.textContent = error_text(error) }) }, { signal: abort })
         document.addEventListener("jazu:realtime", event => {
             const data = (event as CustomEvent).detail
             if (data.channel !== "work" || abort.aborted) return
-            if (data.type === "presence" && data.conversation === watched) { peer = data; render_presence() }
+            if (data.type === "presence" && data.conversation === watched) { accept_presence(data); render_presence() }
             if (data.conversation !== key?.room) return
             if (data.type === "messages") void apply_messages(data.messages)
             if (data.type === "catchup") void catch_up()

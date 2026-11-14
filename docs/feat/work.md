@@ -38,6 +38,8 @@ Prototype 4 isolates channel authorization/history/send/notification adapters in
 
 Prototype 5 publishes metadata changes for account deletion as well as Google linking, closes an already-open composer immediately, retains a usable anonymized address for a closed client, rejects retired bound/revoked guest identities, and binds outbox entries to the actual committed author/ciphertext. Notification destinations and deduplication keys are channel-scoped rather than hardcoded to Work in the browser transport.
 
+Prototype 6 reproduces and fixes concurrent subscriptions on a shared socket: commands run in a bounded per-socket queue, while delivery can continue independently. Presence projections are serialized, versioned snapshots prevent reordered events from restoring stale states, and failed presence fanout remains in Durable Object storage for alarm retries. Alarm scheduling rechecks current sockets after asynchronous work, preventing an older disconnect from cancelling a newer connection's expiry alarm. Writes to a closed socket are handled without disrupting other devices.
+
 ## Encrypted messaging implementation
 
 `/work` opens directly to a text composer and Send button in a `message/cpim` window at `im:jason@jasouza.com`, including for signed-out visitors. There are no invitations, owner access tokens or credentials to copy. The MIME identifies the viewer; transport uses encrypted JSON rather than interoperable CPIM/SIP.
