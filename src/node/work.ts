@@ -8,6 +8,8 @@ import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 import { google_picture } from "../work_profile.ts"
 import { unstored_route } from "./work_unstored.ts"
+import { work_outbox, wake_delivery, work_changed, type Realtime_Actor } from "./realtime_work.ts"
+import type { Realtime_Namespace } from "./realtime_bus.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -22,6 +24,7 @@ export type Work_Env = {
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
     WORK_FALLBACK_KEY?: string
+    REALTIME?: Realtime_Namespace
 }
 type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null, name?: string, picture?: string, account_email?: string }
 export type Work_Message = { seq: number, id: string, author: "owner" | "client", envelope: string, created_at: number }
@@ -56,7 +59,7 @@ function valid_envelope(value: unknown): value is Work_Envelope {
 
 type Owner_Key = { key_id: string, public_jwk: string }
 const guest_cookie = "__Host-jazu_guest"
-function guest_token(request: Request): string {
+export function guest_token(request: Request): string {
     const values = (request.headers.get("cookie") ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(guest_cookie + "="))
     const value = values.length === 1 ? values[0].slice(guest_cookie.length + 1) : ""
     return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : ""
@@ -69,19 +72,20 @@ async function public_key(value: unknown): Promise<JsonWebKey> {
     return clean
 }
 function room_info(room: Room) {
-    return { id: room.id, email: room.google_subject ? room.account_email || room.email : `guest/${room.guest_id}`, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
+    return { id: room.id, email: room.google_subject ? room.account_email || room.email : room.guest_id !== null && room.guest_id !== undefined ? `guest/${room.guest_id}` : room.email, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
 }
 
-export async function work_route(request: Request, env: Work_Env, dependencies: { fetch?: typeof fetch } = {}): Promise<Response> {
+export async function work_route(request: Request, env: Work_Env, dependencies: { fetch?: typeof fetch, actor?: Realtime_Actor, dispatch?: () => Promise<void> } = {}): Promise<Response> {
     if (!env.DB || !env.GOOGLE_CLIENT_ID) return api_error("work_unconfigured", "Messaging is not configured yet", 503)
     const url = new URL(request.url)
     if (request.headers.has("authorization")) return api_error("forbidden", "Use your browser session", 403)
     if (request.headers.has("origin") && request.headers.get("origin") !== url.origin) return api_error("forbidden", "Use the workspace on this origin", 403)
     if (!["GET", "POST"].includes(request.method)) return api_error("method_not_allowed", "Use GET or POST", 405)
     if (request.method === "POST" && (request.headers.get("origin") !== url.origin || request.headers.get("x-jazu-work") !== "1")) return api_error("forbidden", "Use the workspace on this origin", 403)
-    const session = await read_session(request, env)
+    const session = dependencies.actor ? dependencies.actor.session : await read_session(request, env)
     let guest = guest_token(request)
     let guest_row = guest ? await env.DB.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ?").bind(await auth_hash(guest), Date.now() - 365 * 86400000).first<{ id: number }>() : null
+    if (dependencies.actor) guest_row = dependencies.actor.guest_id ? { id: dependencies.actor.guest_id } : null
     const owner = session?.role === "owner"
     const owner_key = await env.DB.prepare("SELECT key_id, public_jwk FROM work_owner_keys WHERE id = 1").first<Owner_Key>()
     const base = "/api/v1/work/rooms"
@@ -105,7 +109,7 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
         return response
     }
     if (!session && !guest_row) return api_error("unauthorized", "Refresh the messaging window", 401)
-    if (request.method === "POST" && (session ? !valid_csrf(request, session) : request.headers.get("x-jazu-csrf") !== await auth_hash(`guest-csrf\n${guest}`))) return api_error("forbidden", "Refresh the messaging window", 403)
+    if (request.method === "POST" && (session ? !valid_csrf(request, session) : request.headers.get("x-jazu-csrf") !== (dependencies.actor?.csrf ?? await auth_hash(`guest-csrf\n${guest}`)))) return api_error("forbidden", "Refresh the messaging window", 403)
     if (url.pathname === "/api/v1/work/unstored-key" && request.method === "POST") {
         let data: Record<string, unknown>
         try { data = await read_json(request) } catch { return api_error("invalid_request", "Invalid recovery storage request", 400) }
@@ -169,6 +173,7 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
     if (match[2] === "/bind" && request.method === "POST") {
         if (!session || owner || !guest_row || room.guest_id !== guest_row.id || room.revoked) return api_error("forbidden", "Use the guest's browser to connect this conversation", 403)
         const linked = await env.DB.prepare("UPDATE work_rooms SET google_subject = ?, email = ? WHERE id = ? AND (google_subject IS NULL OR google_subject = ?) AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE google_subject = ? AND id != ? AND revoked = 0 AND owner_wrap IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM unstored_keys WHERE subject = ? AND room_id != ?) RETURNING id").bind(session.subject, session.email, room.id, session.subject, session.subject, room.id, session.subject, room.id).first()
+        if (linked) await work_changed(env, room.id, session.subject)
         return linked ? reply({ linked: true }) : api_error("conversation_exists", "Your Google account already has a conversation. Guest messages were not transferred.", 409)
     }
     if (!match[2] && request.method === "GET") return reply({ room: room_info(room), role: owner ? "owner" : "client", owner_email: env.WORK_OWNER_EMAIL ?? "jason@jasouza.com" })
@@ -185,14 +190,24 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
         if (typeof data.id !== "string" || !uuid.test(data.id) || !valid_envelope(data.envelope) || Object.keys(data).sort().join(",") !== "envelope,id") return api_error("invalid_message", "Expected an encrypted message envelope", 400)
         const author = owner ? "owner" : "client"
         const envelope = JSON.stringify(data.envelope)
+        const source = session ? `a:${session.subject}` : `g:${guest_row!.id}`
         const prior = await env.DB.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND id = ?").bind(room.id, data.id).first<Work_Message>()
-        if (prior) return prior.author === author && prior.envelope === envelope ? reply({ message: { ...prior, envelope: JSON.parse(prior.envelope) } }) : api_error("id_conflict", "This message id is already in use", 409)
+        if (prior) {
+            if (prior.author !== author || prior.envelope !== envelope) return api_error("id_conflict", "This message id is already in use", 409)
+            await wake_delivery(env, source, dependencies.dispatch)
+            return reply({ message: { ...prior, envelope: JSON.parse(prior.envelope) } })
+        }
         const now = Date.now()
         // The insertion enforces the burst limit in the same statement, including concurrent sends.
-        await env.DB.prepare("INSERT INTO work_messages (room_id, id, author, envelope, created_at) SELECT ?, ?, ?, ?, ? WHERE (SELECT count(*) FROM work_messages WHERE room_id = ? AND author = ? AND created_at > ?) < 30 ON CONFLICT(room_id, id) DO NOTHING").bind(room.id, data.id, author, envelope, now, room.id, author, now - 60000).run()
+        const insert = env.DB.prepare("INSERT INTO work_messages (room_id, id, author, envelope, created_at) SELECT ?, ?, ?, ?, ? WHERE (SELECT count(*) FROM work_messages WHERE room_id = ? AND author = ? AND created_at > ?) < 30 ON CONFLICT(room_id, id) DO NOTHING").bind(room.id, data.id, author, envelope, now, room.id, author, now - 60000)
+        if (env.REALTIME) {
+            if (!env.DB.batch) return api_error("unavailable", "Durable messaging is unavailable", 503)
+            await env.DB.batch([insert, ...await work_outbox(env, room.id, data.id, source, author, envelope)])
+        } else await insert.run()
         const row = await env.DB.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND id = ?").bind(room.id, data.id).first<Work_Message>()
         if (!row) return api_error("rate_limited", "Please wait a minute before sending more messages", 429)
         if (row.author !== author || row.envelope !== envelope) return api_error("id_conflict", "This message id is already in use", 409)
+        await wake_delivery(env, source, dependencies.dispatch)
         return reply({ message: { ...row, envelope: JSON.parse(row.envelope) } }, 201)
     } catch { return api_error("invalid_request", "Expected a valid encrypted message", 400) }
 }

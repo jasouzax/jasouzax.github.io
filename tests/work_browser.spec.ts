@@ -57,6 +57,15 @@ test("only message history displays a scrollbar in both themes and viewport size
 })
 
 test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
+    let dropped = false, send_request = ""
+    await page.routeWebSocket("**/api/v1/realtime", socket => {
+        const server = socket.connectToServer()
+        socket.onMessage(message => { try { const frame = JSON.parse(String(message)); if (frame.type === "send" && !dropped) send_request = frame.request_id } catch {}; server.send(message) })
+        server.onMessage(message => {
+            try { const frame = JSON.parse(String(message)); if (!dropped && send_request && frame.type === "ack" && frame.request_id === send_request) { dropped = true; socket.close({ code: 1011, reason: "Synthetic lost acknowledgement" }); server.close(); return } } catch {}
+            socket.send(message)
+        })
+    })
     await owner(page)
     expect([...drive_files.get("jason@jasouza.com")!.values()][0].owner.private_jwk.d).toBeTruthy()
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -77,11 +86,6 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         await expect(page.locator("[data-work-clients] ul, [data-work-clients] li")).toHaveCount(0)
         await expect(page.locator("[data-work-clients] .desk_client_entity")).toHaveCount(1)
         await expect(page.locator(`.desk_wbox_head_path`).last()).toHaveValue(`im:${address}`)
-        let dropped = false
-        await page.route("**/api/v1/work/rooms/*/messages", async route => {
-            if (route.request().method() === "POST" && !dropped) { dropped = true; await route.fetch(); await route.abort("failed"); return }
-            await route.continue()
-        })
         await chat.getByRole("textbox", { name: "Write a message…" }).fill("Reply from Jason")
         await chat.getByRole("button", { name: "Send", exact: true }).click()
         await expect(chat.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
@@ -206,13 +210,73 @@ test("first Google sign-in saves the guest key, links history and restores it on
     } finally { await context.close() }
 })
 
-test("two guest tabs create one conversation without overwriting the browser key", async ({ page, browser }) => {
+test("a signed-in owner receives notifications outside Work and sees live disconnect/reconnect without message polling", async ({ page, browser }) => {
+    await page.addInitScript(() => {
+        ;(window as any).notification_requests = 0
+        Object.defineProperty(window, "Notification", { configurable: true, value: class {
+            static permission = "default"
+            static async requestPermission() { (window as any).notification_requests++; this.permission = "granted"; return "granted" }
+            onclick: (() => void) | null = null
+            close() {}
+        } })
+    })
+    await owner(page); await page.goto("/"); await ready(page)
+    await page.locator("#head_account > summary").click()
+    const enable = page.getByRole("button", { name: "Enable message notifications", exact: true })
+    await expect(enable).toBeVisible(); expect(await page.evaluate(() => (window as any).notification_requests)).toBe(0)
+    await enable.click(); await expect(page.getByRole("button", { name: "Notifications enabled", exact: true })).toBeVisible()
+    await page.locator("#head_account > summary").click()
+    const context = await browser.newContext()
+    try {
+        let guest = await context.newPage(); await guest.goto("/work"); await send(guest, "A message while you browse the portfolio")
+        await expect(guest.locator(".desk_messages_connection")).toHaveText("Online")
+        const notice = page.locator(".realtime_notification a")
+        await expect(notice).toContainText("New encrypted message")
+        await page.screenshot({ path: ".cache/realtime-notification.png", fullPage: true })
+        await notice.click(); await ready(page)
+        await expect(page.locator(".desk_messages_log")).toContainText("A message while you browse the portfolio")
+        await expect(page.locator(".desk_messages_connection")).toHaveText("Online")
+        let reads = 0
+        page.on("request", request => { if (request.method() === "GET" && /\/rooms\/[^/]+\/messages/.test(request.url())) reads++ })
+        await page.waitForTimeout(1000); const baseline = reads
+        await page.waitForTimeout(6500); expect(reads).toBe(baseline)
+        await guest.close()
+        await expect(page.locator(".desk_messages_connection")).toContainText("Last online", { timeout: 15000 })
+        guest = await context.newPage(); await guest.goto("/work"); await ready(guest)
+        await expect(page.locator(".desk_messages_connection")).toHaveText("Online", { timeout: 15000 })
+        await send(guest, "Back online")
+        await expect(page.locator(".desk_messages_log")).toContainText("Back online")
+    } finally { await context.close() }
+})
+
+test("client deletion immediately refreshes the owner's entity and closes the open composer", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), email = "deleted-client@example.com"
+    try {
+        await account(context, email); const client = await context.newPage(); await client.goto("/work"); await send(client, "Shared history stays encrypted")
+        await expect(page.getByRole("button", { name: email, exact: true })).toBeVisible({ timeout: 15000 })
+        await page.getByRole("button", { name: email, exact: true }).click()
+        const chat = page.locator(".desk_messages").last()
+        await expect(chat.locator(".desk_messages_log")).toContainText("Shared history stays encrypted")
+        await client.locator(".desk_messages_account > summary").click()
+        client.once("dialog", async dialog => { await dialog.accept() })
+        await client.locator('.desk_messages [data-sign="delete"]').click()
+        await expect(chat.getByRole("textbox", { name: "Write a message…" })).toBeDisabled({ timeout: 15000 })
+        await expect(chat.locator(".desk_messages_notice")).toContainText("closed")
+        await expect(page.getByRole("button", { name: email, exact: true })).toHaveCount(0)
+        await expect(chat.locator(".desk_messages_log")).toContainText("Shared history stays encrypted")
+    } finally { await context.close() }
+})
+
+test("guest tabs replace the active socket and recover the same conversation when focused", async ({ page, browser }) => {
     await owner(page)
     const context = await browser.newContext()
     try {
         const first = await context.newPage(), second = await context.newPage()
-        await Promise.all([first.goto("http://localhost:8787/work"), second.goto("http://localhost:8787/work")])
-        await Promise.all([send(first, "First tab"), send(second, "Second tab")])
+        await first.goto("http://localhost:8787/work"); await send(first, "First tab")
+        await second.goto("http://localhost:8787/work"); await send(second, "Second tab")
+        await expect(first.locator(".desk_messages_connection")).toHaveText("Connected in another tab")
+        await first.bringToFront(); await first.evaluate(() => window.dispatchEvent(new Event("focus")))
         await expect(first.locator(".desk_messages_log")).toContainText("Second tab", { timeout: 15000 })
         await expect(second.locator(".desk_messages_log")).toContainText("First tab", { timeout: 15000 })
         const saved = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))

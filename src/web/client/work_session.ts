@@ -20,6 +20,7 @@ function guest_key(): Client_Key | undefined {
     } catch {}
 }
 export function reset_work(): void { cached = null; clear_drive() }
+if (typeof document !== "undefined") document.addEventListener("jazu:auth", reset_work)
 export async function work_context(retry = false): Promise<Work_Context> {
     const auth = await get_auth(retry)
     const identity = `${auth.user?.role ?? "guest"}:${auth.user?.email ?? ""}`

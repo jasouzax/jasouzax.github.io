@@ -1,0 +1,5 @@
+// Site-wide notification surfaces inherit the selected theme.
+.realtime_notifications { position: fixed; right: 1em; top: 4em; z-index: 1000; display: grid; gap: .5em; max-width: min(26em, calc(100vw - 2em)); pointer-events: none; }
+.realtime_notification { display: flex; align-items: center; gap: .75em; padding: .8em 1em; border: 1px solid var(--line, currentColor); border-radius: .5em; background: var(--panel, Canvas); color: var(--text, CanvasText); box-shadow: 0 .25em 1em #0003; pointer-events: auto; }
+.realtime_notification a { overflow-wrap: anywhere; }
+.realtime_notification button { flex: 0 0 auto; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }

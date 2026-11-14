@@ -4,6 +4,8 @@ import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
 import { work_route, type Work_Env, type Work_Statement } from "../src/node/work.ts"
+import { work_outbox } from "../src/node/realtime_work.ts"
+import { Realtime_Hub } from "../src/node/realtime.ts"
 import { auth_hash, auth_route } from "../src/node/auth.ts"
 import { save_google_grant } from "../src/node/google_grant.ts"
 import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../src/work_crypto.ts"
@@ -12,7 +14,7 @@ const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 type Identity = { cookie: string, csrf: string }
 async function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
     const env: Work_Env = { WORK_FALLBACK_KEY: random(), GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = { bind(...args) { values = args; return statement }, async first<T>() { return db.prepare(sql).get(...values) as T ?? null }, async all<T>() { return { results: db.prepare(sql).all(...values) as T[] } }, async run() { return db.prepare(sql).run(...values) } }
@@ -109,6 +111,32 @@ test("Drive handoff independently verifies the uploaded key, retains failures an
         assert.equal((await f.api(path, client, { action: "save", client: value })).status, 409, "a stale tab cannot recreate the deleted backup")
         assert.equal((await f.api(path, client, action, {}, upstream)).status, 200, "lost deletion acknowledgements are safe to retry")
     } finally { f.db.close() }
+})
+
+test("a delivery outage retains the committed message and outbox; an alarm retries without duplicate messages", async () => {
+    const f = await fixture(), original = (globalThis as any).WebSocketRequestResponsePair
+    ;(globalThis as any).WebSocketRequestResponsePair = class {}
+    try {
+        const client = await f.client("delivery@example.com"), room = await f.room(client), source = "a:delivery@example.com", memory = new Map<string, any>()
+        let available = false, alarm = 0
+        const ctx: any = { getWebSockets: () => [], setWebSocketAutoResponse() {}, storage: { async get(key: string) { return memory.get(key) }, async put(key: string | Record<string, unknown>, value?: unknown) { if (typeof key === "string") memory.set(key, value); else for (const [name, entry] of Object.entries(key)) memory.set(name, entry) }, async delete(key: string) { memory.delete(key) }, async setAlarm(time: number) { alarm = time }, async deleteAlarm() { alarm = 0 } } }
+        const hub = new Realtime_Hub(ctx, f.env)
+        f.env.REALTIME = { idFromName: name => name, get: id => ({ async fetch(request) { if (id === source) return hub.fetch(request); if (!available) throw new Error("Synthetic recipient outage"); return Response.json({ ok: true }) } }) }
+        const id = crypto.randomUUID(), envelope = await encrypt_message(room.key, "Committed despite delivery failure", { room: room.id, id, author: "client" })
+        const path = `${base}/${room.id}/messages`
+        assert.equal((await f.api(path, client, { id, envelope })).status, 201)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM work_messages").get()!.n, 1)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").get()!.n, 1)
+        assert.ok(alarm > Date.now())
+        assert.equal((await f.api(path, client, { id, envelope })).status, 200)
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM work_messages").get()!.n, 1)
+        available = true; await hub.alarm()
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").get()!.n, 0)
+        await hub.alarm(); assert.equal(alarm, 0)
+        const wrong = await encrypt_message(room.key, "Conflicting owner attempt", { room: room.id, id, author: "owner" })
+        for (const statement of await work_outbox(f.env, room.id, id, "a:owner", "owner", JSON.stringify(wrong))) await statement.run()
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").get()!.n, 0, "a raced losing author/ciphertext cannot create notification metadata")
+    } finally { f.db.close(); (globalThis as any).WebSocketRequestResponsePair = original }
 })
 
 test("shared keys roundtrip and owner wrapping authenticates both room and private key", async () => {

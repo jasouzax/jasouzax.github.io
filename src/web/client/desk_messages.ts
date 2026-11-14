@@ -8,6 +8,8 @@ import { work_context, work_api, prepare_conversation, type Work_Context, type W
 import type { Client_Key } from "./work_drive.ts"
 import { google_picture } from "../../work_profile.ts"
 import { get_auth } from "./sign.ts"
+import { acquire_guest, realtime_connected, realtime_replaced, realtime_ready, realtime_request, watch_conversation } from "./realtime.ts"
+import { relative_presence } from "./realtime_time.ts"
 
 type Message = { seq: number, id: string, author: "owner" | "client", envelope: Work_Envelope, created_at: number }
 type Pending = { id: string, envelope: Work_Envelope, text: string }
@@ -18,6 +20,7 @@ const base = "/api/v1/work/rooms"
 let identity = ""
 let panel_timer: ReturnType<typeof setTimeout> | undefined
 let panel_revision = 0
+let panel_abort: AbortController | undefined
 const error_text = (error: unknown) => error instanceof Error ? error.message : label("unavailable")
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, value = "", name = ""): HTMLElementTagNameMap[K] {
     const node = document.createElement(tag); node.textContent = value
@@ -68,6 +71,8 @@ function clients_panel(context: Work_Context): void {
     const aside = desk.querySelector<HTMLElement>(".desk_side")
     const tabs = aside?.querySelector(".desk_side_tabs_ul")
     if (!aside || !tabs || aside.querySelector("[data-work-clients]")) return
+    panel_abort?.abort(); panel_abort = new AbortController()
+    const panel_signal = panel_abort.signal
     const revision = ++panel_revision
     const side_toggle = document.querySelector<HTMLDetailsElement>("#head_menu")
     if (side_toggle) side_toggle.open = true
@@ -120,12 +125,19 @@ function clients_panel(context: Work_Context): void {
             }
             status.textContent = all.length ? "" : label("no_clients")
         } catch (error) { if (revision === panel_revision) status.textContent = error_text(error) }
-        if (desk.isConnected && revision === panel_revision) panel_timer = setTimeout(() => void refresh(), 15000)
+
     }
+    const refresh_live = () => {
+        if (!desk.isConnected) { panel_abort?.abort(); return }
+        clearTimeout(panel_timer); panel_timer = setTimeout(() => void refresh(), 50)
+    }
+    document.addEventListener("jazu:realtime", event => { if (["notification", "conversation-updated"].includes((event as CustomEvent).detail.type)) refresh_live() }, { signal: panel_signal })
+    document.addEventListener("jazu:realtime-state", refresh_live, { signal: panel_signal })
+    document.addEventListener("jazu:page", refresh_live, { signal: panel_signal })
     details.open = true; sync(); void refresh()
 }
 function remove_panel(): void {
-    panel_revision++; clearTimeout(panel_timer)
+    panel_revision++; clearTimeout(panel_timer); panel_abort?.abort()
     const aside = state.desk?.querySelector(".desk_side")
     aside?.querySelector('[data-path="im:clients"]')?.closest("li")?.remove()
     aside?.querySelector("[data-work-clients]")?.remove()
@@ -151,7 +163,21 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         const heading = element("strong", "jason@jasouza.com", "visually_hidden")
         const identity_status = element("span", "", "desk_messages_identity")
         toolbar.append(connection, heading, identity_status)
-        const online = (value: boolean) => { connection.textContent = label(value ? "online" : "offline"); connection.dataset.online = String(value) }
+        let peer: { online: boolean, last_online: number | null, version?: number, peer_id?: string } | undefined
+        const accept_presence = (value: NonNullable<typeof peer>) => { if (!peer || value.peer_id !== peer.peer_id || (value.version ?? 0) >= (peer.version ?? 0)) peer = value }
+        const render_presence = () => {
+            connection.title = peer ? label("presence_hint") : label("connection_hint")
+            connection.dataset.online = String(Boolean(peer?.online && realtime_connected()))
+            if (!realtime_connected()) connection.textContent = label(realtime_replaced() ? "other_tab" : "reconnecting")
+            else if (!peer) connection.textContent = label("live_connected")
+            else if (peer.online) connection.textContent = label("online")
+            else if (peer.last_online) {
+                const time = relative_presence(peer.last_online, document.documentElement.lang)
+                connection.textContent = time ? label("last_online").replace("{time}", time) : label("last_online_recent")
+            } else connection.textContent = label("offline")
+        }
+        const tick_presence = () => { render_presence(); timer = setTimeout(tick_presence, 30000) }
+        tick_presence()
         const notice = element("p", label("encrypted"), "desk_messages_notice")
         const warning = element("p"); warning.setAttribute("role", "alert"); warning.hidden = true
         const status = element("p", "", "desk_messages_status"); status.setAttribute("role", "status")
@@ -174,10 +200,12 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
         let key: Client_Key | undefined
         let owner = false
         let cursor = 0
-        let polling = false
-        let delay = 5000
+        let fetching = false, initialized = false
+        let watched = "", watch_abort: AbortController | undefined, watch_signal: AbortSignal | undefined
+        abort.addEventListener("abort", () => watch_abort?.abort(), { once: true })
+        let updates: Promise<void> = Promise.resolve()
         const seen = new Set<number>()
-        const requested = item.path.slice(3)
+        let requested = item.path.slice(3)
         const address = (value: string) => { item.path = `im:${value}`; item.name = value; refresh_tab(item); sync_navigation(item); heading.textContent = value; root.setAttribute("aria-label", `${label("messages")}: ${value}`) }
         const storage_status = (context: Work_Context) => {
             identity_status.replaceChildren()
@@ -201,23 +229,53 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             catch { body.textContent = label("decrypt_failed"); row.classList.add("desk_message_error") }
             if (abort.aborted) return
             const near_bottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100
-            row.append(meta, body); log.append(row); seen.add(message.seq); empty.hidden = true
+            row.dataset.seq = String(message.seq)
+            row.append(meta, body); log.insertBefore(row, [...log.children].find(child => Number((child as HTMLElement).dataset.seq) > message.seq) ?? null); seen.add(message.seq); empty.hidden = true
             if (near_bottom) log.scrollTop = log.scrollHeight
         }
-        const poll = async () => {
-            if (!context || !key || polling || abort.aborted) return
-            polling = true; clearTimeout(timer)
+        const apply_messages = (messages: Message[], advance = true) => {
+            updates = updates.then(async () => { for (const message of messages) { await append(message); if (advance) cursor = Math.max(cursor, message.seq) } }).catch(() => {})
+            return updates
+        }
+        const catch_up = async () => {
+            if (!context || !key || fetching || abort.aborted) return
+            fetching = true
             try {
                 let more = true
                 while (more && !abort.aborted) {
                     const data = await work_api(`${base}/${key.room}/messages?after=${cursor}`, context.csrf, undefined, abort)
-                    for (const message of data.messages as Message[]) { await append(message); cursor = Math.max(cursor, message.seq) }
-                    more = data.more
+                    await apply_messages(data.messages); more = data.more
                 }
-                if (!abort.aborted) { online(true); status.textContent = pending.has(key.room) ? label("not_sent") : ""; delay = 5000 }
-            } catch (error) { if (!abort.aborted) { online(false); status.textContent = `${label("reconnecting")} ${error_text(error)}`; delay = Math.min(delay * 2, 30000) } }
-            finally { polling = false; if (!abort.aborted && revision === generation) timer = setTimeout(() => void poll(), delay) }
+                if (!abort.aborted) status.textContent = pending.has(key.room) ? label("not_sent") : ""
+            } catch (error) { if (!abort.aborted) status.textContent = `${label("reconnecting")} ${error_text(error)}` }
+            finally { fetching = false }
         }
+        const watch_live = async () => {
+            if (!initialized || !context || context.error || abort.aborted || (owner && !key)) return
+            await realtime_ready(abort)
+            if (key) await catch_up()
+            const conversation = key?.room ?? "owner"
+            if (watched !== conversation || !watch_abort) { watch_abort?.abort(); watch_abort = new AbortController(); watch_signal = AbortSignal.any([abort, watch_abort.signal]); watched = conversation }
+            const subscription = await watch_conversation("work", conversation, cursor, watch_signal!)
+            if (!abort.aborted) { accept_presence(subscription.presence); render_presence() }
+        }
+        document.addEventListener("jazu:realtime-state", () => { render_presence(); if (realtime_connected()) void watch_live().catch(error => { if (!abort.aborted) status.textContent = error_text(error) }) }, { signal: abort })
+        document.addEventListener("jazu:realtime", event => {
+            const data = (event as CustomEvent).detail
+            if (data.channel !== "work" || abort.aborted) return
+            if (data.type === "presence" && data.conversation === watched) { accept_presence(data); render_presence() }
+            if (data.conversation !== key?.room) return
+            if (data.type === "messages") void apply_messages(data.messages)
+            if (data.type === "catchup") void catch_up()
+            if (["notification", "conversation-updated"].includes(data.type) && owner && data.address) {
+                address(data.address)
+                if (data.revoked) { input.disabled = true; send.disabled = true; notice.textContent = label("closed") }
+                if (data.type === "conversation-updated") void watch_live().catch(() => {})
+            }
+        }, { signal: abort })
+        document.addEventListener("jazu:incoming-message", event => {
+            if ((event as CustomEvent).detail.conversation === key?.room && !document.hidden && root.getClientRects().length) event.preventDefault()
+        }, { signal: abort })
         input.addEventListener("input", () => { unsent = input.value; resize_input(); if (key) drafts.set(key.room, input.value) })
         input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !send.disabled) { event.preventDefault(); composer.requestSubmit() } })
         composer.addEventListener("submit", event => {
@@ -237,17 +295,17 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
                         message = { id, text: input.value, envelope: await encrypt_message(key.key, input.value, { room: key.room, id, author: owner ? "owner" : "client" }) }
                         pending.set(key.room, message)
                     }
-                    await work_api(`${base}/${key.room}/messages`, context.csrf, { id: message.id, envelope: message.envelope }, abort)
+                    if (watched !== key.room) await watch_live(); else await realtime_ready(abort)
+                    const result = await realtime_request({ type: "send", channel: "work", conversation: key.room, id: message.id, envelope: message.envelope }, abort)
+                    await apply_messages([result.message], false)
                     pending.delete(key.room); drafts.delete(key.room)
                     if (abort.aborted) return
-                    input.value = unsent = ""; resize_input(); send_label(); status.textContent = ""; await poll()
+                    input.value = unsent = ""; resize_input(); send_label(); status.textContent = ""
                 } catch (error) { context = undefined; if (!abort.aborted) { status.textContent = `${label("not_sent")} ${error_text(error)}`; send_label(true) } }
                 finally { if (!abort.aborted) { send.disabled = false; input.readOnly = Boolean(key && pending.has(key.room)); input.focus() } }
             })()
         })
-        window.addEventListener("online", () => { online(true); void poll() }, { signal: abort })
-        window.addEventListener("offline", () => online(false), { signal: abort })
-        document.addEventListener("visibilitychange", () => { if (!document.hidden) void poll() }, { signal: abort })
+        window.addEventListener("offline", render_presence, { signal: abort })
         try {
             context = await work_context()
             if (abort.aborted || revision !== generation) return
@@ -255,7 +313,8 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             if (identity && identity !== next_identity) { drafts.clear(); pending.clear(); input.value = unsent = ""; remove_panel() }
             identity = next_identity
             owner = context.auth.user?.role === "owner"
-            online(navigator.onLine)
+            if (!context.auth.user) acquire_guest(abort)
+            render_presence()
             account_menu.append(element("p", context.auth.user?.email ?? label("guest"), "desk_messages_account_name"))
             account_controls(account_menu, context)
             const update_avatar = () => { account_head.replaceChildren(avatar(context?.auth.user?.picture)) }
@@ -268,6 +327,7 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             if (owner) {
                 clients_panel(context)
                 if (context.error) throw new Error(context.error)
+                if (requested === context.owner_email) requested = new URL(location.href).searchParams.get("chat") ?? requested
                 const room = (await rooms(context)).find(room => room.email === requested)
                 if (!room) { composer.hidden = true; empty.textContent = label("choose_client"); status.textContent = ""; return }
                 if (!room.owner_wrap || !context.vault?.value?.owner || room.owner_key_id !== context.owner_key?.key_id) throw new Error("The owner's private key does not match this conversation")
@@ -283,12 +343,16 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             if (key) {
                 input.value = drafts.get(key.room) ?? pending.get(key.room)?.text ?? unsent
                 if (pending.has(key.room)) { input.readOnly = true; send_label(true) }
-                if (owner || context.room || context.guest_room) void poll()
+
             }
+            if (key) document.dispatchEvent(new CustomEvent("jazu:conversation-open", { detail: { channel: "work", conversation: key.room } }))
+            initialized = true
+            void watch_live().catch(error => { if (!abort.aborted) status.textContent = error_text(error) })
             resize_input()
-        } catch (error) { if (!abort.aborted) { online(false); status.textContent = error_text(error) } }
+        } catch (error) { if (!abort.aborted) { render_presence(); status.textContent = error_text(error) } }
     }
     document.addEventListener("jazu:auth", () => { void initialize() }, { signal })
+    document.addEventListener("jazu:guest-resume", () => { void work_context(true).then(() => initialize()).catch(() => {}) }, { signal })
     void initialize()
     return root
 }

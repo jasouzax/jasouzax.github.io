@@ -333,7 +333,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     fail_on_errors(diag)
     files.set("sitemap.xml", sitemap_xml(model))
     files.set("robots.txt", robots_txt(model))
-    files.set("_headers", headers_file([inline_script_hash(runtime.boot)], [inline_script_hash(inline_css)]))
+    files.set("_headers", headers_file([inline_script_hash(runtime.boot)], [inline_script_hash(inline_css)], model.config.base_url))
     files.set("_redirects", redirects_file())
     const theme_colors = themes[config.default_theme].colors
     const brand = brand_colors(model, theme_colors)

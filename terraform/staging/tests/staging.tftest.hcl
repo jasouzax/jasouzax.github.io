@@ -6,18 +6,27 @@ mock_provider "cloudflare" {
 
 variables {
   work_migrations_enabled = false
-  account_id            = "test-account"
-  zone_id               = "test-zone"
-  worker_bundle         = "tests/fixtures/worker.js"
-  origin_hmac_secret    = "test-hmac-secret-with-more-than-32-characters"
-  access_client_id      = "test-client-id"
-  access_client_secret  = "test-client-secret"
-  work_fallback_key     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  project_clone_origins = "{\"demo\":\"https://github.com/team/demo.git\"}"
+  account_id              = "test-account"
+  zone_id                 = "test-zone"
+  worker_bundle           = "tests/fixtures/worker.js"
+  origin_hmac_secret      = "test-hmac-secret-with-more-than-32-characters"
+  access_client_id        = "test-client-id"
+  access_client_secret    = "test-client-secret"
+  work_fallback_key       = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  project_clone_origins   = "{\"demo\":\"https://github.com/team/demo.git\"}"
 }
 
 run "staging_resources_and_routing" {
   command = apply
+
+  assert {
+    condition     = anytrue([for binding in cloudflare_workers_script.router.bindings : binding.name == "REALTIME" && binding.type == "durable_object_namespace" && binding.class_name == "Realtime_Hub"])
+    error_message = "Bind the staging realtime Durable Object class."
+  }
+  assert {
+    condition     = cloudflare_workers_script.router.migrations.new_tag == "realtime-v1" && contains(cloudflare_workers_script.router.migrations.new_sqlite_classes, "Realtime_Hub")
+    error_message = "Create the realtime class with a stable SQLite migration."
+  }
 
   assert {
     condition     = cloudflare_pages_project.site.name == "jazu-staging" && cloudflare_pages_project.site.production_branch == "staging"

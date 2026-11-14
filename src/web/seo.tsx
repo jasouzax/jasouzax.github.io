@@ -338,8 +338,9 @@ export function robots_txt(model: site_model): string {
     return groups.join("\n\n") + "\n"
 }
 
-export function headers_file(inline_hashes: string[], style_hashes: string[] = []): string {
+export function headers_file(inline_hashes: string[], style_hashes: string[] = [], base_url = ""): string {
     const script_hashes = inline_hashes.map((hash) => `'sha256-${hash}'`).join(" ")
+    const websocket = base_url ? new URL(base_url).origin.replace(/^http/, "ws") : ""
     const csp = [
         "default-src 'self'",
         `script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' ${script_hashes}`.trim(),
@@ -351,7 +352,7 @@ export function headers_file(inline_hashes: string[], style_hashes: string[] = [
         "img-src 'self' data: blob: https://*.googleusercontent.com",
         "font-src 'self'",
         "media-src 'self' blob:",
-        "connect-src 'self' https://*.googleapis.com https://accounts.google.com",
+        `connect-src 'self' ${websocket} https://*.googleapis.com https://accounts.google.com`.replace(/ +/g, " "),
         "frame-src 'self' blob: https://accounts.google.com",
         "frame-ancestors 'none'"
     ].join("; ")

@@ -5,18 +5,20 @@ export const persist = ".cache/work-browser-guest-state"
 export const drive_files = new Map<string, Map<string, any>>()
 export const denied_drive = new Set<string>()
 export const failed_uploads = new Set<string>()
+let testcase = 0
 const accounts = new WeakMap<BrowserContext, string>()
 const installed = new WeakSet<BrowserContext>()
 export function sql(command: string): void {
     execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "wrangler.local.jsonc", "--persist-to", persist, "--command", command], { windowsHide: true, stdio: "pipe" })
 }
 export function reset(): void {
-    sql("DELETE FROM unstored_keys; DELETE FROM work_key_promotions; DELETE FROM work_messages; DELETE FROM work_rooms; DELETE FROM work_owner_keys; DELETE FROM work_key_files; DELETE FROM auth_google_grants; DELETE FROM auth_sessions; DELETE FROM auth_owner; DELETE FROM auth_profiles; DELETE FROM auth_users; DELETE FROM work_guests;")
+    testcase++
+    sql("DELETE FROM realtime_outbox; DELETE FROM realtime_limits; DELETE FROM last_signed_in; DELETE FROM unstored_keys; DELETE FROM work_key_promotions; DELETE FROM work_messages; DELETE FROM work_rooms; DELETE FROM work_owner_keys; DELETE FROM work_key_files; DELETE FROM auth_google_grants; DELETE FROM auth_sessions; DELETE FROM auth_owner; DELETE FROM auth_profiles; DELETE FROM auth_users; DELETE FROM work_guests;")
     drive_files.clear()
     denied_drive.clear(); failed_uploads.clear()
 }
 export async function account(context: BrowserContext, email: string, owner = false): Promise<void> {
-    const token = randomBytes(32).toString("base64url"), subject = "browser-" + createHash("sha256").update(email).digest("hex").slice(0, 24)
+    const token = randomBytes(32).toString("base64url"), subject = "browser-" + createHash("sha256").update(`${email}:${testcase}`).digest("hex").slice(0, 24)
     const hash = createHash("sha256").update(token).digest("hex"), now = Date.now()
     sql(`INSERT OR IGNORE INTO auth_users VALUES ('${subject}', '${email}', 'Browser test', ${now}); INSERT INTO auth_sessions VALUES ('${hash}', '${subject}', ${now}, ${now}); INSERT OR REPLACE INTO auth_profiles VALUES ('${subject}', 'https://lh3.googleusercontent.com/browser-avatar-${owner ? 'owner' : 'client'}'); ${owner ? `INSERT OR IGNORE INTO auth_owner VALUES (1, '${subject}');` : ""}`)
     await context.addCookies([{ name: "__Host-jazu_session", value: token, url: "https://localhost:8787/", secure: true, httpOnly: true, sameSite: "Lax" }])

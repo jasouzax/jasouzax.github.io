@@ -55,8 +55,13 @@ resource "cloudflare_workers_script" "router" {
   content_file       = var.worker_bundle
   content_sha256     = filesha256(var.worker_bundle)
   compatibility_date = var.compatibility_date
+  migrations = {
+    new_tag            = "realtime-v1"
+    new_sqlite_classes = ["Realtime_Hub"]
+  }
 
   bindings = [
+    { name = "REALTIME", type = "durable_object_namespace", class_name = "Realtime_Hub" },
     { name = "DOMAIN", type = "plain_text", text = var.staging_domain },
     { name = "PAGES_ORIGIN", type = "plain_text", text = "https://${cloudflare_pages_project.site.subdomain}" },
     { name = "PUBLIC_PROJECTS", type = "plain_text", text = var.public_projects },

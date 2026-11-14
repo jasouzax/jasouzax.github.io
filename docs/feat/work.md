@@ -13,16 +13,34 @@
 - [x] Static `/work` shell served with `no-referrer`/`no-store`
 - [x] D1 schema and migration for clients, sessions, messages, files, receipts, pins, dashboards, desk state and audit; tests enforce idempotency and cross-tenant pin constraints
 - [x] Unfinished work APIs return `501` and accept no client data
-- [x] Direct encrypted guest/client chat, browser/Drive keys, owner Clients/Guests panel, idempotent sends, catch-up polling and `message/cpim` / `im:` windows
+- [x] Direct encrypted guest/client chat, browser/Drive keys, owner Clients/Guests panel, idempotent sends, cursor catch-up and `message/cpim` / `im:` windows
 - [x] Client-only encrypted `unstored_keys` fallback, cross-device Google recovery and verified Drive handoff with backup deletion (no key rotation)
+- [x] Hibernating WebSockets, multi-device presence, bounded guest connections, site-wide notifications and durable delivery/reconnect recovery
 - [x] Google OIDC code flow, verified identities, pinned admin subject, hashed HttpOnly sessions, CSRF, sign-out and guest-to-Google linking
 - [x] Signed-in sign-out/account deletion controls, confirmation, all-device revocation and atomic profile deletion with closed/anonymized client links
 - [ ] Extend guest/Google authorization to remaining workspace APIs and add owner audit (4.5)
-- [ ] Chat idempotency, reconnect, soft deletion, file upload policy, owner audit and mail debounce (4.6)
+- [ ] Remaining chat features: soft deletion, file upload policy, owner audit and mail debounce (4.6)
 - [ ] Per-client durable chat and database API adapters
+- [ ] Browser-closed Web Push and additional user-to-user messaging channels
 - [ ] Work client: sessions, messages, pins, receipts, dashboards and state versioning (3.9)
 
 ## Contract
+
+### Realtime prototypes
+
+The staging realtime transport uses hibernating Durable Objects keyed by authenticated account or existing guest cookie. Account sockets may connect across the site; guest sockets are limited to one per session and the Work page. Same-origin upgrades, connection/command limits, hashed credentials, session revocation and a 30-second automatic ping / roughly 90-second expiry protect the transport. Presence aggregates all live account sockets and uses migration 0007's `last_signed_in`; its nullable timestamp is a projection reconciled against the Durable Object's heartbeat state. Unknown identities have no fabricated last-online time. Channel and conversation IDs keep the transport independent from Work-specific authorization. Initial history and reconnect catch-up remain durable D1 reads.
+
+Prototype 1 introduces the server transport/presence and local/runtime infrastructure. Chat delivery, subscriptions and site-wide notification integration follow in separate staging commits.
+
+Prototype 2 adds the Work adapter, authorized conversation/presence subscriptions, ciphertext sends over the socket, cursor-ordered delivery and a D1 outbox inserted atomically with messages. Delivery failures leave outbox rows for the source object's alarm to retry. D1 commit precedes acknowledgements and receiver events; retries use the existing immutable message UUID. The same publication path bridges HTTP sends from older clients. A recipient outside the chat receives a generic encrypted-message notification event without decrypting content server-side.
+
+Prototype 3 connects signed-in accounts across all pages and guest views only on Work, replaces recurring chat/Clients HTTP polling with live events, renders peer presence with a client-side relative-time clock, and adds theme-aware in-page notices plus opt-in desktop notifications while the website is open. Chat opens clear their earlier notice. Guest tabs replace the previous socket and recover the same browser key/history when focus returns. Linking a guest publishes a separate conversation-update event for the owner panel. Initial and reconnect catch-up still use HTTP; this is not periodic polling. Browser closure requires future Web Push support, and Online does not guarantee the person has read or noticed a message.
+
+Prototype 4 isolates channel authorization/history/send/notification adapters in `node/realtime_channels.ts`, reconciles heartbeat deadlines using the last automatic ping response, restores state across hibernation and preserves an offline timestamp without drifting it forward. Session revocation closes sockets; account deletion removes its D1 presence and queued delivery metadata. Cross-tab account changes refresh identity, and stale auth requests cannot restore a superseded identity. Tests cover delivery outages, reconnect cursors, guest replacement, site-wide notices and local relative-time updates.
+
+Prototype 5 publishes metadata changes for account deletion as well as Google linking, closes an already-open composer immediately, retains a usable anonymized address for a closed client, rejects retired bound/revoked guest identities, and binds outbox entries to the actual committed author/ciphertext. Notification destinations and deduplication keys are channel-scoped rather than hardcoded to Work in the browser transport.
+
+Prototype 6 reproduces and fixes concurrent subscriptions on a shared socket: commands run in a bounded per-socket queue, while delivery can continue independently. Presence projections are serialized, versioned snapshots prevent reordered events from restoring stale states, and failed presence fanout remains in Durable Object storage for alarm retries. Alarm scheduling rechecks current sockets after asynchronous work, preventing an older disconnect from cancelling a newer connection's expiry alarm. Writes to a closed socket are handled without disrupting other devices.
 
 ## Encrypted messaging implementation
 
@@ -31,6 +49,16 @@
 A visitor gets an automatic HttpOnly, Secure, SameSite=Lax guest cookie. Only its hash is stored in D1. The browser generates a random 256-bit conversation key, saves it in persistent local storage before sending, and encrypts messages with AES-GCM and fresh 96-bit IVs. Authenticated data binds the room, message UUID and server-authenticated author. Clearing browser storage can lose guest history access; the service does not receive guest or normal Drive-only message keys.
 
 The owner signs in once with the configured admin Google account to initialize encryption. The browser creates a P-256 ECDH key pair, saves the private key in that account's hidden Google Drive application data folder, and publishes only the public key. Each client wraps its conversation key to that public key with an ephemeral P-256 key and AES-GCM, bound to the room ID. D1 stores the wrapped key and ciphertext. The owner restores their private key from Drive and unwraps keys locally. An existing public key cannot be silently replaced when its private key is missing. Guests can compose before this initial setup, but sending waits for the owner's public key.
+
+### Live delivery and presence
+
+`GET /api/v1/realtime` upgrades an authenticated, same-origin cookie request to one hibernating Durable Object socket per browser tab. Google accounts connect across the entire website; guest connections are acquired only by mounted Work views. A principal is the stable Google subject or existing guest-cookie identity, never a client-supplied email. Guests may have one active socket (a newer tab replaces the old one); accounts may have eight. Upgrades are limited to 40 per IP/minute, real commands to 60 guest / 120 account per minute, queued commands to 64 and payloads to 12 KB. At most 32 conversations may be watched per socket, with 512 watchers per peer. Existing room send limits remain in force. Heartbeat auto-responses are not counted as commands.
+
+The browser sends the literal `ping` every 30 seconds; Cloudflare's hibernation API returns `pong` without waking application handlers. Durable alarms examine automatic-response timestamps and expire leases at roughly 90 seconds without activity. A dead socket cannot keep an account online when no other live device remains. `last_signed_in.last_online` is NULL while connected; graceful closes store the disconnect time and stale expiry stores the last confirmed activity. The Durable Object reconciles the D1 projection before serving presence snapshots, so clients do not infer presence from NULL alone. No D1 write is made for every ping. Presence snapshots include a monotonic version and opaque peer ID; outdated updates cannot overwrite a newer state. Failed presence fanout is retained in object storage and retried by alarms.
+
+Conversation commands include `channel`, `conversation` and `request_id`. `watch` carries the browser's last durable sequence, `unwatch` releases it, and `send` carries an immutable message UUID and encrypted envelope. The channel registry supplies authorization, history, sends and notification metadata; Work's owner/client policy is confined to its adapter. Message insertion and notification outbox records share one D1 transaction. The server acknowledges only the committed row. Cursor-ordered socket batches and initial/reconnect HTTP catch-up recover missed events without recurring HTTP polling. Per-socket command queues prevent concurrent chat windows from overwriting each other's subscriptions. Old HTTP senders use the same durable publication path.
+
+The UI displays the peer's connection state and locally advances Last online text without network requests. Only authorized conversation peers may subscribe, except the owner's public inbox presence. Site-wide notices contain sender metadata, not decrypted message text. Desktop notifications require the user's permission button; in-page notices do not. A website tab must remain connected: browser-closed notifications require future Web Push. Online indicates a live connection, not a read receipt or a guarantee that someone notices the alert. Google linking/deletion push metadata updates to the Clients entity panel and open windows. Logout revokes the current credential's sockets; account deletion revokes every device and removes its D1 presence/queued message metadata.
 
 ### Google Drive keys and guest sign-in
 
@@ -68,7 +96,7 @@ Account deletion requires native confirmation and a CSRF/intent-protected transa
 
 ### Code, tests and staging setup
 
-Code: `src/work_crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0006. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
+Code: `src/work_crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0007. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
 
 Tests use real SQLite, AES-GCM/ECDH, RSA verification and workerd. Browser tests exercise a local Worker/D1, real browser crypto, synthetic Google sessions and mocked Drive storage: guest/owner chat, browser reload, Drive recovery on a new device, first-time account linking, existing-key warning, no cross-guest access, account menu/deletion, and safe retries. Real Google consent/Drive access requires the user's configured Cloud project and account interaction; mocked tests do not claim to have performed that consent.
 
@@ -90,7 +118,7 @@ Sessions use automatic guest cookies or verified Google sign-in. Guests can mess
 
 **Objective.** The client-side half of `/work` (1.8).
 
-**Solution.** Uses automatic guest or Google sessions, creates the empty work repository as `/home/user/{id}` (remappable anywhere in the virtual filesystem), opens the message composer without sign-in, runs the message window (WebSocket with a polling fallback of 5 s backing off to 30 s, idempotent sends, catch-up after reconnect), embeds and pins components as windows, renders the Quotation and Dashboard tabs from the API, and saves the client's or admin's desk state with optimistic concurrency.
+**Solution.** Uses automatic guest or Google sessions, creates the empty work repository as `/home/user/{id}` (remappable anywhere in the virtual filesystem), opens the message composer without sign-in, runs the message window (hibernating WebSockets, idempotent sends and cursor catch-up after reconnect), embeds and pins components as windows, renders the Quotation and Dashboard tabs from the API, and saves the client's or admin's desk state with optimistic concurrency.
 
 ## 4.5 Authentication and authorization
 
