@@ -1,3 +1,15 @@
 # Privacy
 
-This site stores your theme choice in your browser. The workspace sets one session cookie. Tools run locally and never upload your files.
+This site stores your theme choice in your browser. Tools in `/desk` run locally and do not upload your files.
+
+Messages in `/work` are encrypted in your browser with a key shared with the project owner. Cloudflare D1 stores encrypted messages, wrapped conversation keys, sender roles and timestamps. Registered clients also have a verified Google email and account identifier. The messaging API does not receive plaintext messages or encryption keys.
+
+You can send as a guest without registering. An automatic HttpOnly, Secure, SameSite=Lax cookie identifies your guest conversation; its hash is stored by the service. Your secret conversation key stays in your browser's local storage. The guest cookie lasts up to one year. Clearing cookies or browser storage can lose access to guest history. A daily hash of the visitor's IP address limits automated guest creation; this code does not store the raw IP address.
+
+Google sign-in provides your verified email, name, profile photo URL and account identifier. Profile images load from Google without sending the chat page as a referrer. With your permission, the app saves your secret key in Google Drive's hidden application data folder and restores it on other signed-in devices. It requests access only to its private app data, not your general Drive files. The owner's private encryption key is stored in the owner's app data folder; only its public key is published. Keys travel directly between your browser and Google Drive. Access to your Google account, this app's authorization or the code running in your browser can affect the security of your keys.
+
+If your Google account has no previous conversation key, signing in saves and links this browser's guest conversation. If the account already has a different key, the app warns that guest messages were not transferred, preserves both histories separately, and opens the existing account conversation. Signing out retains any separate guest key in this browser.
+
+Website Google sessions use opaque HttpOnly, Secure, SameSite=Lax cookies and expire after thirty idle days. Google ID tokens are verified and discarded. Google access/refresh credentials are encrypted per website session in D1; short-lived Drive access is supplied to the browser in memory and is not stored in browser persistent storage. Signing out removes the current session and its encrypted credentials. A ten-minute cookie and database record protect the sign-in flow. Unsent drafts stay in memory. Attachments and automatic email notifications are not currently implemented.
+
+Delete Account requires confirmation. It removes your website profile, all device sessions, encrypted Google credentials and private-file mapping, and closes and anonymizes your linked conversations. Shared encrypted history remains available to the owner; other clients are unaffected. Your Google account and the app's private key file in Google Drive are not deleted. You can remove the app's stored data through Google separately.

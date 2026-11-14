@@ -2,7 +2,7 @@
 
 Plain TypeScript bundled by esbuild into IIFE scripts (classic scripts, not modules, so a wrong MIME type on `.js` cannot break them). No framework. Bundles produced by `bundle_runtime()` in `build.ts`: `page` (main), `theme_switch` (lazy), `desk_shell` (lazy shell registration), one `wasm_worker*` per program, and the inline `boot`. Back to [site developer guide](README.md).
 
-> Some file headers still say `client_desk_*.ts`, `jazu.config.ts` or `client_proc_types.ts`: those are generation-11 names. The files are now `desk_*.ts`, `proc_types.ts`, and `google_client_id` comes from the `GOOGLE_CLIENT_ID` environment variable at build time.
+> Some file headers still say `client_desk_*.ts`, `jazu.config.ts` or `client_proc_types.ts`: those are generation-11 names. The files are now `desk_*.ts` and `proc_types.ts`. Google sign-in uses the Worker's configured client/secret and `/api/v1/auth/session`; browser profile data is not trusted as authentication. See [the Work sign-in guide](../feat/work.md#google-sign-in).
 
 ## File map
 
@@ -13,6 +13,7 @@ Plain TypeScript bundled by esbuild into IIFE scripts (classic scripts, not modu
 | Expertise | `expertise.ts` | Scroll-snap slider ↔ URL fragment state (CSS `:target` is the state machine) |
 | Themes | `theme_switch.ts` | Lazy theme load, fade, rollback |
 | Accounts | `sign.ts`, `connect_folder.ts`, `home_directory.ts`, `memory_fs.ts` | Google sign-in popup, local folder mount, OPFS home, memory-only handles |
+| Work messaging | `desk_messages.ts`, `work_session.ts`, `../work_profile.ts` | Encrypted conversations, Files-style client entities, account avatars and shared Google profile-image URL validation (also used by the Worker) |
 | Desk windows | `desk.ts`, `desk_view.ts`, `desk_folder*.ts`, `desk_media.ts`, `desk_markdown.ts`, `desk_previews.ts`, `desk_syntax.ts`, `desk_mime.ts`, `desk_navigation.ts`, `desk_selection.ts`, `desk_files_util.ts`, `desk_paths.ts`, `desk_plugins.ts`, `desk_flow.ts`, `desk_flow_rules.ts` | See [desk.md](desk.md) |
 | Filesystem | `desk_fs.ts`, `desk_fs_permissions.ts`, `desk_vfs.ts` | The file tree and its POSIX-like view for processes |
 | Processes | `kernel.ts`, `proc_types.ts`, `desk_proc.ts`, `desk_shell.ts`, `desk_users.ts`, `wasm_*.ts` | Kernel, shell, WASM workers |

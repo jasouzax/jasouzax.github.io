@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
 import worker, { route, type worker_env } from "../src/node/worker.ts"
-import { sign_origin, verify_origin } from "../src/node/security.ts"
+import { sign_origin, verify_origin, secure_response, is_work_path } from "../src/node/security.ts"
 import { git_read } from "../src/node/personal.ts"
 import { prepare_deploy } from "../src/node/deploy.ts"
 import type { build_result } from "../src/build.ts"
@@ -33,6 +33,14 @@ test("Worker strips private request data from Pages and applies work security he
     assert.equal(forwarded?.url, "https://example.pages.dev/work")
     assert.equal(forwarded?.headers.get("cookie"), null)
     assert.equal(forwarded?.headers.get("authorization"), null)
+    for (const path of ["/work/", "/work/index.html", "/work/index.json"]) {
+        await route(new Request(`https://example.com${path}?uuid=secret`), env, async request => { forwarded = request; return new Response("shell") })
+        assert.equal(forwarded?.url, `https://example.pages.dev${path}`)
+        const private_shell = secure_response(new Response("shell"), is_work_path(path))
+        assert.equal(private_shell.headers.get("cache-control"), "no-store")
+        assert.equal(private_shell.headers.get("referrer-policy"), "no-referrer")
+    }
+    assert.equal(is_work_path("/workshop"), false)
     const secured = await worker.fetch(new Request("https://example.com/api/v1/health"), env)
     assert.equal(secured.headers.get("x-content-type-options"), "nosniff")
 })

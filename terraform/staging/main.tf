@@ -10,6 +10,27 @@ resource "cloudflare_r2_bucket" "assets" {
   name       = var.staging_assets_bucket_name
 }
 
+resource "cloudflare_d1_database" "work" {
+  account_id = var.account_id
+  name       = "jazu-staging-work"
+}
+
+resource "terraform_data" "work_migrations" {
+  count = var.work_migrations_enabled ? 1 : 0
+  triggers_replace = {
+    database   = cloudflare_d1_database.work.id
+    migrations = sha256(join("", [for f in sort(fileset("${path.module}/../../migrations", "*.sql")) : filesha256("${path.module}/../../migrations/${f}")]))
+  }
+  provisioner "local-exec" {
+    command     = "node src/node/d1_migrate.ts"
+    working_dir = "${path.module}/../.."
+    environment = {
+      CLOUDFLARE_ACCOUNT_ID = var.account_id
+      D1_DATABASE_ID        = cloudflare_d1_database.work.id
+    }
+  }
+}
+
 resource "cloudflare_pages_domain" "site" {
   account_id   = var.account_id
   project_name = cloudflare_pages_project.site.name
@@ -43,10 +64,16 @@ resource "cloudflare_workers_script" "router" {
     { name = "PROJECT_CLONE_ORIGINS", type = "plain_text", text = var.project_clone_origins },
     { name = "PERSONAL_ORIGIN", type = "plain_text", text = var.personal_origin },
     { name = "ASSETS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.assets.name },
+    { name = "DB", type = "d1", id = cloudflare_d1_database.work.id },
+    { name = "WORK_OWNER_EMAIL", type = "plain_text", text = var.work_owner_email },
+    { name = "GOOGLE_CLIENT_ID", type = "plain_text", text = var.google_client_id },
+    { name = "GOOGLE_CLIENT_SECRET", type = "secret_text", text = var.google_client_secret },
+    { name = "GOOGLE_ADMIN_EMAIL", type = "plain_text", text = var.google_admin_email },
     { name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret },
     { name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id },
     { name = "ACCESS_CLIENT_SECRET", type = "secret_text", text = var.access_client_secret },
   ]
+  depends_on = [terraform_data.work_migrations]
 }
 
 resource "cloudflare_workers_script_subdomain" "router" {

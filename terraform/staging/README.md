@@ -17,6 +17,10 @@ The setup command also reads public project `repo` declarations into the Worker'
 
 ## Validation without provisioning
 
+Google sign-in reuses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from private `.env`; the latter is a Worker secret. `GOOGLE_ADMIN_EMAIL` defaults to `jason@jasouza.com`, independently of the Google Cloud project owner. Register `https://staging.jasouza.com/api/v1/auth/google/callback` as the Web client's exact redirect URI. Applying this root migrates D1 authentication tables before publishing the updated Worker. See [Google sign-in and account/key behavior](../../docs/feat/work.md#google-sign-in). No provider tokens or client secrets are embedded in Pages.
+
+Encrypted Work messaging provisions the separate `jazu-staging-work` D1 database and applies `migrations/*.sql`. Guests use automatic browser sessions; the pinned Google admin needs no owner access token. Enable Google Drive API and the `drive.appdata` scope in the OAuth project, then sign in once as the admin to save the private key in Drive and publish the public key. `WORK_OWNER_EMAIL` defaults to `jason@jasouza.com`. See [the Work guide](../../docs/feat/work.md#encrypted-messaging-implementation) for setup and key behavior. Mocked Terraform tests disable `work_migrations_enabled`; normal provisioning keeps its default `true`.
+
 ```sh
 node terraform/staging/setup.ts validate
 node terraform/staging/setup.ts test

@@ -18,9 +18,9 @@ This repository is generation 12. Nothing in it is specific to one person: owner
 | **Desk** | A desktop-like workspace in the browser (`/desk`, project and blog desks): tiled windows, file manager, editors, and a real BusyBox shell and C programs compiled to WebAssembly, running over a shared virtual filesystem. A visitor's files never leave their browser. | [desk runtime](docs/src/desk.md) |
 | **Cloud** | Static files on Cloudflare Pages; one Worker routes subdomains, large media (R2) and a versioned JSON API; D1/KV hold data. Everything is provisioned by Terraform. The site keeps working if every owner-run server is offline. | [nodes](docs/src/node.md), [infrastructure](docs/infra.md) |
 | **Personal server** | The owner's own machine, running this same repository, reachable only through Cloudflare Tunnel + Zero Trust: repository hub, XML-defined project CI/CD and synchronization, with AI agents planned. | [personal server](docs/feat/personal_server.md) |
-| **Work portal** | `/work`: a per-client page for messages, files, dashboards and receipts. Static shell today; backend is **not implemented** yet. | [work](docs/feat/work.md) |
+| **Work portal** | `/work`: Google sign-in and direct encrypted text chat for guests and Google clients, with private Drive key storage. Files, dashboards and receipts remain planned. | [work](docs/feat/work.md) |
 
-What works today and what does not is tracked as checkboxes in **[docs/feat/README.md](docs/feat/README.md)**. In short: the public static site, themes, expertise timeline, desk with WASM shell, print layouts, Terraform/Worker routing and the signed read-only Git node work; client authentication, chat, receipts, dashboards and agents are not built. Personal Git pushes and Jazu CI/CD are implemented; see Server Use.
+What works today and what does not is tracked as checkboxes in **[docs/feat/README.md](docs/feat/README.md)**. The public static site, themes, expertise timeline, desk with WASM shell, print layouts, Terraform/Worker routing, Google sign-in, encrypted Work chat and the Git node work; receipts, dashboards and agents remain planned. Personal Git pushes and Jazu CI/CD are implemented; see Server Use. See [messaging setup and key backup](docs/feat/work.md#encrypted-messaging-implementation) before accepting client messages.
 
 ## Documentation map
 
@@ -81,9 +81,9 @@ npm run cloud:dev       # terminal 2: wrangler dev --config wrangler.local.jsonc
 
 Wrangler serves the Worker on <http://localhost:8787> and proxies public HTML to `http://127.0.0.1:8080`. Try:
 
-- <http://localhost:8787/api/v1/health> → `{"status":"ok","generation":12,"services":{"work":"not_implemented"}}`
+- <http://localhost:8787/api/v1/health> → Work reports `not_configured` until its D1 binding and owner secret are configured, then `encrypted_chat`.
 - <http://localhost:8787/work> → the Work shell with `no-referrer`/`no-store`
-- any other `/api/…` → `501` (unfinished APIs accept no data)
+- unfinished `/api/…` → `501` (no data accepted); encrypted messaging uses `/api/v1/work/rooms` after [Work setup](docs/feat/work.md#staging-setup).
 
 Optionally emulate the personal node's Git read API (**not verified in this environment**):
 

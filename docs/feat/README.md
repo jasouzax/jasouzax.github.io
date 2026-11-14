@@ -184,9 +184,12 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 
 - [ ] **[Work portal](work.md)** — open items below
   - [x] Static `/work` shell served with `no-referrer`/`no-store`
+  - [x] Direct encrypted guest/client chat, browser/Drive keys, owner Clients/Guests panel, idempotent sends, catch-up polling and `message/cpim` / `im:` windows
+  - [x] Google OIDC code flow, verified identities, pinned admin subject, hashed HttpOnly sessions, CSRF, sign-out and guest-to-Google linking
+  - [x] Signed-in sign-out/account deletion controls, confirmation, all-device revocation and atomic profile deletion with closed/anonymized client links
   - [x] D1 schema and migration for clients, sessions, messages, files, receipts, pins, dashboards, desk state and audit; tests enforce idempotency and cross-tenant pin constraints
   - [x] Unfinished work APIs return `501` and accept no client data
-  - [ ] Google JWT verification, UUID claim, hashed cookie sessions, tenant filtering, CSRF and rate limits (4.5)
+  - [ ] Extend guest/Google authorization to remaining workspace APIs and add owner audit (4.5)
   - [ ] Chat idempotency, reconnect, soft deletion, file upload policy, owner audit and mail debounce (4.6)
   - [ ] Per-client durable chat and database API adapters
   - [ ] Work client: sessions, messages, pins, receipts, dashboards and state versioning (3.9)

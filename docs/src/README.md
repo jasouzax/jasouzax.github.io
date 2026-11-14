@@ -9,6 +9,7 @@ For people (and AI agents) changing how the website is **built, rendered, run or
 | Browser runtime | [client.md](client.md) | `src/web/client/*.ts` |
 | Desktop (`desk`): kernel, shell, WASM programs | [desk.md](desk.md) | `src/desk/`, `src/web/client/{kernel,wasm_*,desk_*}.ts` |
 | Nodes: Worker, personal server, local server, deploy | [node.md](node.md) | `src/node/` |
+| Google sign-in and encrypted Work chat | [Work contract and setup](../feat/work.md#encrypted-messaging-implementation) | `src/work_crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_messages,sign}.ts` |
 | Helpers: paths, util, dates, icons, mime, fonts, theme CSS | [helper.md](helper.md) | `src/util.ts`, `paths.ts`, `diag.ts`, `dates.ts`, `era.ts`, `icons.ts`, `mime.ts`, `gitignore.ts`, `raster.ts`, `font_build.ts`, `font/`, `theme_css.ts`, `layout_css.ts` |
 | Infrastructure as code | [../infra.md](../infra.md) | `terraform/`, `migrations/`, `wrangler.local.jsonc` |
 | Tests | [tests.md](tests.md) | `tests/` |

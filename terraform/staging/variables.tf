@@ -52,6 +52,33 @@ variable "project_clone_origins" {
   description = "Public HTTPS Git read origins derived from the project's XML repo attributes."
 }
 
+variable "google_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "google_client_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "google_admin_email" {
+  type    = string
+  default = "jason@jasouza.com"
+}
+
+variable "work_migrations_enabled" {
+  type        = bool
+  default     = true
+  description = "Apply D1 migrations before uploading the Worker. Disable only for mocked tests."
+}
+
+variable "work_owner_email" {
+  type    = string
+  default = "jason@jasouza.com"
+}
+
 variable "compatibility_date" {
   type    = string
   default = "2026-11-04"

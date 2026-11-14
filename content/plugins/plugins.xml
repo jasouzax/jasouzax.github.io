@@ -1,3 +1,6 @@
+<plugin id="messages" name="Messages" version="1.0.0">
+    <case view file="false" mime="message/cpim" url="im:*" host="messages" />
+</plugin>
 <plugin id="image_pdf" name="Image to PDF" version="1.0.0" flow="convert">
     <case file mime="image/*" child_mime="application/pdf" host="image_pdf" />
 </plugin>

@@ -1,5 +1,7 @@
-import { api_error, secure_response, sign_origin } from "./security.ts"
+import { api_error, secure_response, sign_origin, is_work_path } from "./security.ts"
 import { public_git_read } from "./git_read_proxy.ts"
+import { work_route, type Work_Env } from "./work.ts"
+import { auth_route } from "./auth.ts"
 
 type object_result = {
     body?: ReadableStream<Uint8Array>
@@ -8,7 +10,7 @@ type object_result = {
     range?: { offset: number, length: number }
     writeHttpMetadata(headers: Headers): void
 }
-export type worker_env = {
+export type worker_env = Work_Env & {
     DOMAIN: string
     PAGES_ORIGIN: string
     PUBLIC_PROJECTS?: string
@@ -150,8 +152,10 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         return new Response(response.body, { status: response.status, statusText: response.statusText, headers: output })
     }
     if (path === "/api" || path.startsWith("/api/")) {
+        if (path.startsWith("/api/v1/auth/")) return auth_route(request, env)
         if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
-        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: "not_implemented" } }, { headers: { "cache-control": "no-store" } })
+        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
+        if (path === "/api/v1/work" || path.startsWith("/api/v1/work/")) return work_route(request, env)
         const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
         if (read && projects.includes(read[2]) && request.method === "GET") {
             if (!env.PERSONAL_ORIGIN || !env.ORIGIN_HMAC_SECRET) return api_error("origin_offline", "Personal node is not configured", 503)
@@ -176,7 +180,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     const pages = new URL(env.PAGES_ORIGIN)
     if (pages.hostname === url.hostname || pages.origin !== env.PAGES_ORIGIN || (pages.protocol !== "https:" && pages.hostname !== "127.0.0.1")) return api_error("bad_origin", "Configure a distinct Pages HTTPS origin", 503)
     // Only public request headers are forwarded to Pages; UUID query secrets never reach it.
-    const target = new URL(url.pathname === "/work" ? "/work" : url.pathname + url.search, pages)
+    const target = new URL(is_work_path(path) ? url.pathname : url.pathname + url.search, pages)
     const headers = new Headers()
     for (const name of ["accept", "accept-encoding", "range", "if-none-match", "if-modified-since"]) if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
     return upstream(new Request(target, { method: request.method, headers, redirect: "manual" }))
@@ -184,7 +188,9 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
 
 export default {
     async fetch(request: Request, env: worker_env): Promise<Response> {
-        try { return secure_response(await route(request, env), new URL(request.url).pathname === "/work") }
-        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503)) }
+        const path = new URL(request.url).pathname
+        const private_response = is_work_path(path) || path.startsWith("/api/v1/auth/")
+        try { return secure_response(await route(request, env), private_response) }
+        catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), private_response) }
     },
 }

@@ -1,0 +1,52 @@
+// Shared conversation geometry and inherited theme colors, including non-Default themes.
+.desk_wbox[data-plugin="messages"] { overflow: hidden; min-height: 0; }
+.desk_wbox[data-plugin="messages"] > .desk_wbox_head { flex-shrink: 0; }
+.desk_messages { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.desk_messages :is(button, textarea) { font: inherit; color: inherit; }
+.desk_messages :is(button, summary) { cursor: pointer; }
+.desk_messages :is(button, textarea, summary):focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
+.desk_messages button:disabled { opacity: .5; cursor: default; }
+.desk_messages :is(p, h2) { margin: 0; }
+.desk_messages_toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75em; flex: 0 0 auto; padding: .35em .8em; border-bottom: 1px solid var(--line, currentColor); font-size: .8em; }
+.desk_messages_connection { white-space: nowrap; }
+.desk_messages_connection::before { content: ''; display: inline-block; width: .45em; height: .45em; margin-right: .5em; border-radius: 50%; background: currentColor; opacity: .45; }
+.desk_messages_connection[data-online="true"]::before { background: var(--accent, currentColor); opacity: 1; }
+.desk_messages_identity { text-align: end; opacity: .8; }
+.desk_messages_identity button { border: 0; padding: 0; min-height: 0; background: none; text-decoration: underline; text-underline-offset: .2em; }
+.desk_messages_notice { flex: 0 0 auto; padding: 1em 1.5em .5em; text-align: center; font-size: .85em; opacity: .75; }
+.desk_messages_empty { padding: 1em; font-size: .9em; opacity: .8; }
+.desk_messages > [role="alert"]:not([hidden]) { padding: .75em 1em; border-bottom: 1px solid var(--line, currentColor); font-size: .85em; }
+.desk_messages_log { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5em; padding: 1em; margin: 0; list-style: none; overscroll-behavior: contain; }
+.desk_message { align-self: flex-start; max-width: min(85%, 40em); min-width: 0; }
+.desk_message_self { align-self: flex-end; }
+.desk_message_meta { margin: 0 .2em .35em; font-size: .75em; }
+.desk_message_meta time { display: flex; flex-wrap: wrap; column-gap: .5em; }
+.desk_message_self .desk_message_meta time { justify-content: flex-end; }
+.desk_message_date { opacity: .6; }
+.desk_message_body { padding: .65em .9em; border: 1px solid var(--line, currentColor); border-radius: .9em .9em .9em .15em; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; background: color-mix(in srgb, var(--panel, Canvas) 45%, transparent); }
+.desk_message_self .desk_message_body { border-color: var(--accent, currentColor); border-radius: .9em .9em .15em .9em; background: color-mix(in srgb, var(--accent, currentColor) 12%, transparent); }
+.desk_message_error .desk_message_body { border-style: dashed; }
+.desk_messages_status:not(:empty) { padding: .5em 1em; font-size: .8em; }
+.desk_messages_status:empty { display: none; }
+.desk_messages_composer { display: flex; align-items: flex-end; gap: .6em; flex: 0 0 auto; padding: .65em .8em; border-top: 1px solid var(--line, currentColor); }
+.desk_messages_composer textarea { display: block; flex: 1; box-sizing: border-box; width: 0; min-width: 0; min-height: 2.5em; max-height: 8em; padding: .6em .8em; resize: none; overflow: hidden; scrollbar-width: none; border: 1px solid var(--line, currentColor); border-radius: .65em; background: color-mix(in srgb, var(--panel, Canvas) 35%, transparent); line-height: 1.3; }
+.desk_messages_composer textarea::-webkit-scrollbar { display: none; }
+.desk_messages_send { display: grid; place-items: center; flex: 0 0 2.5em; width: 2.5em; height: 2.5em; padding: .45em; border: 0; border-radius: .5em; background: transparent; color: var(--accent, currentColor); }
+.desk_messages_send:hover { background: color-mix(in srgb, var(--accent, currentColor) 12%, transparent); }
+.desk_messages_send svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.desk_messages_send[data-retry="true"] { outline: 1px dashed currentColor; }
+.desk_profile_avatar { display: inline-flex; position: relative; flex: 0 0 auto; align-items: center; justify-content: center; width: 2.5em; height: 2.5em; box-sizing: border-box; border: 1px solid var(--line, currentColor); border-radius: 50%; overflow: hidden; vertical-align: middle; }
+.desk_profile_avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.desk_profile_avatar svg { display: block; width: 90%; height: 90%; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.desk_messages_account { position: relative; flex: 0 0 auto; }
+.desk_messages_account > summary { display: block; padding: 0; min-height: 0; border: 0; list-style: none; }
+.desk_messages_account > summary::-webkit-details-marker { display: none; }
+.desk_messages_account_menu { position: absolute; bottom: calc(100% + .75em); left: 0; z-index: 10; min-width: 15em; max-width: min(22em, 75vw); padding: .75em; border: 1px solid var(--line, currentColor); border-radius: .5em; background: var(--panel, Canvas); color: inherit; box-shadow: 0 .3em 1em #0003; }
+.desk_messages_account:not([open]) > .desk_messages_account_menu { display: none; }
+.desk_messages_account_menu > button { display: block; width: 100%; text-align: start; border: 0; background: none; padding: .5em 0; }
+.desk_messages_account_name { overflow-wrap: anywhere; font-size: .85em; opacity: .8; }
+.desk_client_entity .desk_side_item_head { cursor: pointer; }
+.desk_client_entity .desk_side_item_name > button { display: block; max-width: 100%; min-width: 0; min-height: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.desk_client_entity .desk_profile_avatar { width: 1.125em; height: 1.125em; }
+.desk_client_entity .desk_side_item_name > button:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 1px; }
+@media (max-width: 32em) { .desk_messages_toolbar { font-size: .75em; padding-inline: .6em; } .desk_messages_log { padding: .8em; } .desk_messages_composer { padding: .5em; gap: .45em; } .desk_message { max-width: 92%; } }

@@ -1,0 +1,189 @@
+import { test, expect, type Page } from "@playwright/test"
+import { account, reset, drive_files } from "./work_browser_helpers.ts"
+test.beforeEach(() => reset())
+const writer = (page: Page) => page.getByRole("textbox", { name: "Write a message…", exact: true })
+async function ready(page: Page): Promise<void> { await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 }) }
+async function send(page: Page, message: string): Promise<void> {
+    await ready(page); await writer(page).fill(message)
+    await page.getByRole("button", { name: "Send", exact: true }).click()
+    await expect(page.locator(".desk_messages_log")).toContainText(message, { timeout: 20000 })
+}
+async function owner(page: Page): Promise<void> {
+    await account(page.context(), "jason@jasouza.com", true)
+    await page.goto("/work"); await ready(page)
+    await expect(page.getByText("Choose a client or guest from the Clients panel to open their conversation.", { exact: true })).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('[data-path="im:clients"] summary').first()).toHaveText("Clients")
+}
+
+test("a signed-out visitor gets a composer with no invitation or token, and callback errors survive refresh", async ({ page }) => {
+    await page.goto("/work?auth_error=token_exchange")
+    await expect(writer(page)).toBeVisible()
+    await ready(page)
+    await writer(page).fill("Draft before owner setup")
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent("jazu:auth")))
+    await expect(writer(page)).toHaveValue("Draft before owner setup")
+    await expect(page.locator('.desk_messages [role="alert"]')).toContainText("token_exchange")
+    await expect(page.getByText("Invitation link", { exact: true })).toHaveCount(0)
+    await expect(page.getByText("Owner access", { exact: true })).toHaveCount(0)
+    await expect(page.locator("[data-work-clients]")).toHaveCount(0)
+    await page.getByRole("button", { name: "Send", exact: true }).click()
+    await expect(page.locator(".desk_messages_status")).toContainText("owner is setting up")
+    await expect(writer(page)).toHaveValue("Draft before owner setup")
+    await page.reload()
+    await expect(page.locator('.desk_messages [role="alert"]')).toContainText("token_exchange")
+})
+
+test("only message history displays a scrollbar in both themes and viewport sizes", async ({ page }) => {
+    await page.goto("/work"); await ready(page)
+    await expect(writer(page)).toBeVisible()
+    for (const theme of ["default", "memory"]) {
+        await page.locator(`#theme_name_${theme}`).evaluate((input: HTMLInputElement) => { input.checked = true; input.dispatchEvent(new Event("change", { bubbles: true })) })
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme); await ready(page)
+        for (const viewport of [{ width: 1100, height: 790 }, { width: 390, height: 844 }]) {
+            await page.setViewportSize(viewport)
+            await writer(page).fill(Array.from({ length: 20 }, (_, i) => `Draft line ${i}`).join("\n"))
+            await writer(page).press("End")
+            const layout = await page.locator(".desk_messages").evaluate(root => {
+                const log = root.querySelector<HTMLElement>(".desk_messages_log")!
+                log.replaceChildren(...Array.from({ length: 30 }, () => { const row = document.createElement("li"); row.className = "desk_message"; row.textContent = "History message"; return row }))
+                const window = root.closest<HTMLElement>(".desk_wbox")!, input = root.querySelector<HTMLTextAreaElement>("textarea")!, composer = root.querySelector<HTMLElement>("form")!
+                log.scrollTop = 100
+                return { outerOverflow: getComputedStyle(window).overflowY, inputOverflow: getComputedStyle(input).overflowY, inputScrollbar: getComputedStyle(input).scrollbarWidth, logOverflow: getComputedStyle(log).overflowY, logScrolls: log.scrollTop > 0, composerFits: composer.getBoundingClientRect().bottom <= window.getBoundingClientRect().bottom + 1 }
+            })
+            expect(layout).toEqual({ outerOverflow: "hidden", inputOverflow: "hidden", inputScrollbar: "none", logOverflow: "auto", logScrolls: true, composerFits: true })
+            await expect(writer(page)).toHaveValue(/Draft line 19$/)
+        }
+    }
+})
+
+test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
+    await owner(page)
+    expect([...drive_files.get("jason@jasouza.com")!.values()][0].owner.private_jwk.d).toBeTruthy()
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } })
+    const guest = await context.newPage()
+    try {
+        await guest.goto("http://localhost:8787/work")
+        const message = "Guest hello 👋 <script>window.compromised=true</script>"
+        await send(guest, message)
+        const key = await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        const info = await guest.evaluate(async () => (await fetch("/api/v1/work/session", { method: "POST", headers: { "x-jazu-work": "1" } })).json())
+        const address = `guest/${info.guest_room.guest_id}`
+        await expect(guest.locator(".desk_wbox_head_path")).toHaveValue("im:jason@jasouza.com")
+        await page.locator("[data-work-guests] > summary").click()
+        const entry = page.getByRole("button", { name: address, exact: true })
+        await expect(entry).toBeVisible({ timeout: 25000 }); await entry.click()
+        const chat = page.locator(".desk_messages").filter({ has: page.locator(".desk_messages_toolbar strong", { hasText: address }) })
+        await expect(chat.locator(".desk_messages_log")).toContainText(message)
+        await expect(page.locator("[data-work-clients] ul, [data-work-clients] li")).toHaveCount(0)
+        await expect(page.locator("[data-work-clients] .desk_client_entity")).toHaveCount(1)
+        await expect(page.locator(`.desk_wbox_head_path`).last()).toHaveValue(`im:${address}`)
+        let dropped = false
+        await page.route("**/api/v1/work/rooms/*/messages", async route => {
+            if (route.request().method() === "POST" && !dropped) { dropped = true; await route.fetch(); await route.abort("failed"); return }
+            await route.continue()
+        })
+        await chat.getByRole("textbox", { name: "Write a message…" }).fill("Reply from Jason")
+        await chat.getByRole("button", { name: "Send", exact: true }).click()
+        await expect(chat.getByRole("button", { name: "Retry send", exact: true })).toBeEnabled()
+        await chat.getByRole("button", { name: "Retry send", exact: true }).click()
+        await expect(guest.locator(".desk_messages_log .desk_message")).toHaveCount(2, { timeout: 15000 })
+        await expect(chat.locator(".desk_message_meta time")).toHaveCount(2)
+        await expect(chat.locator(".desk_message_body time")).toHaveCount(0)
+        await expect(chat.locator(".desk_messages_account img")).toBeVisible()
+        await expect(chat.locator(".desk_messages_identity")).toHaveText("Signed in with Google")
+        await guest.reload()
+        await ready(guest)
+        await expect(guest.locator(".desk_messages_log")).toContainText("Reply from Jason")
+        expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(key.key)
+        expect(await guest.evaluate(() => (window as any).compromised)).toBeUndefined()
+        expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+        const stored = await guest.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).text(), key.room)
+        expect(stored).not.toContain("Guest hello"); expect(stored).not.toContain(key.key)
+        await guest.screenshot({ path: ".cache/work-guest-mobile.png", fullPage: true })
+        await page.screenshot({ path: ".cache/work-clients-desktop.png", fullPage: true })
+        await page.locator("#theme_name_memory").evaluate((input: HTMLInputElement) => { input.checked = true; input.dispatchEvent(new Event("change", { bubbles: true })) })
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "memory")
+        await ready(page)
+        await expect(chat.getByRole("textbox", { name: "Write a message…" })).toBeVisible()
+        await page.screenshot({ path: ".cache/work-clients-memory.png", fullPage: true })
+        const stranger = await browser.newContext()
+        try {
+            const other = await stranger.newPage(); await other.goto("http://localhost:8787/work")
+            await expect(other.locator(".desk_messages_connection")).toContainText("Online")
+            expect(await other.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
+        } finally { await stranger.close() }
+    } finally { await context.close() }
+})
+
+test("first Google sign-in saves the guest key, links history and restores it on another device", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), client = await context.newPage()
+    const email = "first-client@example.com"
+    try {
+        await client.goto("http://localhost:8787/work"); await send(client, "Message before Google")
+        const guest_key = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)
+        await account(context, email); await client.reload()
+        await expect(client.locator(".desk_messages_log")).toContainText("Message before Google")
+        expect([...drive_files.get(email)!.values()][0].client.key).toBe(guest_key)
+        expect(await client.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
+        await expect(page.getByRole("button", { name: email, exact: true })).toBeVisible({ timeout: 25000 })
+        await page.getByRole("button", { name: email, exact: true }).click()
+        await expect(page.locator("[data-work-clients] .desk_client_entity img")).toBeVisible()
+        await expect(page.locator(".desk_wbox_head_path").last()).toHaveValue(`im:${email}`)
+        const device = await browser.newContext()
+        try {
+            await account(device, email)
+            const restored = await device.newPage(); await restored.goto("http://localhost:8787/work")
+            await expect(restored.locator(".desk_messages_log")).toContainText("Message before Google")
+            expect(await restored.evaluate(() => localStorage.getItem("jazu_work_guest_v2"))).toBeNull()
+            await send(restored, "Another device")
+            await expect(client.locator(".desk_messages_log")).toContainText("Another device", { timeout: 15000 })
+        } finally { await device.close() }
+        await client.locator('.desk_messages_account > summary').click()
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator('.desk_messages_toolbar [data-sign="google"]')).toBeVisible()
+        await send(client, "New guest after linking and signing out")
+        await expect(client.locator(".desk_messages_log")).not.toContainText("Message before Google")
+    } finally { await context.close() }
+})
+
+test("two guest tabs create one conversation without overwriting the browser key", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext()
+    try {
+        const first = await context.newPage(), second = await context.newPage()
+        await Promise.all([first.goto("http://localhost:8787/work"), second.goto("http://localhost:8787/work")])
+        await Promise.all([send(first, "First tab"), send(second, "Second tab")])
+        await expect(first.locator(".desk_messages_log")).toContainText("Second tab", { timeout: 15000 })
+        await expect(second.locator(".desk_messages_log")).toContainText("First tab", { timeout: 15000 })
+        const saved = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        expect(await saved(first)).toEqual(await saved(second))
+        await expect(first.locator(".desk_messages_log .desk_message")).toHaveCount(2)
+    } finally { await context.close() }
+})
+
+test("an existing Google key warns without transferring or overwriting a later guest conversation", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), client = await context.newPage()
+    const email = "returning-client@example.com"
+    try {
+        await account(context, email); await client.goto("http://localhost:8787/work"); await send(client, "Account history")
+        const saved = JSON.stringify([...drive_files.get(email)!.values()][0])
+        await writer(client).fill("Unsent account draft")
+        await client.locator('.desk_messages_account > summary').click()
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator('.desk_messages_toolbar [data-sign="google"]')).toBeVisible()
+        await expect(writer(client)).toHaveValue("")
+        await send(client, "Separate anonymous history")
+        const guest_key = await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
+        await account(context, email); await client.reload()
+        await expect(client.locator('.desk_messages [role="alert"]')).toContainText("Guest messages were not transferred")
+        await expect(client.locator(".desk_messages_log")).toContainText("Account history")
+        await expect(client.locator(".desk_messages_log")).not.toContainText("Separate anonymous history")
+        expect(JSON.stringify([...drive_files.get(email)!.values()][0])).toBe(saved)
+        expect(await client.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(guest_key.key)
+        await client.locator('.desk_messages_account > summary').click()
+        await client.locator('.desk_messages [data-sign="out"]').click()
+        await expect(client.locator(".desk_messages_log")).toContainText("Separate anonymous history")
+    } finally { await context.close() }
+})

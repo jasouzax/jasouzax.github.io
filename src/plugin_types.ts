@@ -47,7 +47,7 @@ export type plugin_case = {
     child_url?: string
 }
 
-export const plugin_hosts = ["text", "hex", "media", "shell", "markdown", "folder", "html", "pdf", "image_pdf", "mirror", "default"] as const
+export const plugin_hosts = ["text", "hex", "media", "shell", "markdown", "folder", "html", "pdf", "image_pdf", "mirror", "messages", "default"] as const
 export type Plugin_Host = typeof plugin_hosts[number]
 export type Flow_Kind = "convert" | "compare" | "mirror"
 export const flow_kinds: readonly Flow_Kind[] = ["convert", "compare", "mirror"]
