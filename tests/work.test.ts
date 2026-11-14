@@ -4,6 +4,7 @@ import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
 import { work_route, type Work_Env, type Work_Statement } from "../src/node/work.ts"
+import { work_outbox } from "../src/node/realtime_work.ts"
 import { Realtime_Hub } from "../src/node/realtime.ts"
 import { auth_hash, auth_route } from "../src/node/auth.ts"
 import { save_google_grant } from "../src/node/google_grant.ts"
@@ -132,6 +133,9 @@ test("a delivery outage retains the committed message and outbox; an alarm retri
         available = true; await hub.alarm()
         assert.equal(f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").get()!.n, 0)
         await hub.alarm(); assert.equal(alarm, 0)
+        const wrong = await encrypt_message(room.key, "Conflicting owner attempt", { room: room.id, id, author: "owner" })
+        for (const statement of await work_outbox(f.env, room.id, id, "a:owner", "owner", JSON.stringify(wrong))) await statement.run()
+        assert.equal(f.db.prepare("SELECT count(*) AS n FROM realtime_outbox").get()!.n, 0, "a raced losing author/ciphertext cannot create notification metadata")
     } finally { f.db.close(); (globalThis as any).WebSocketRequestResponsePair = original }
 })
 

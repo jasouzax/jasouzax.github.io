@@ -36,6 +36,8 @@ Prototype 3 connects signed-in accounts across all pages and guest views only on
 
 Prototype 4 isolates channel authorization/history/send/notification adapters in `node/realtime_channels.ts`, reconciles heartbeat deadlines using the last automatic ping response, restores state across hibernation and preserves an offline timestamp without drifting it forward. Session revocation closes sockets; account deletion removes its D1 presence and queued delivery metadata. Cross-tab account changes refresh identity, and stale auth requests cannot restore a superseded identity. Tests cover delivery outages, reconnect cursors, guest replacement, site-wide notices and local relative-time updates.
 
+Prototype 5 publishes metadata changes for account deletion as well as Google linking, closes an already-open composer immediately, retains a usable anonymized address for a closed client, rejects retired bound/revoked guest identities, and binds outbox entries to the actual committed author/ciphertext. Notification destinations and deduplication keys are channel-scoped rather than hardcoded to Work in the browser transport.
+
 ## Encrypted messaging implementation
 
 `/work` opens directly to a text composer and Send button in a `message/cpim` window at `im:jason@jasouza.com`, including for signed-out visitors. There are no invitations, owner access tokens or credentials to copy. The MIME identifies the viewer; transport uses encrypted JSON rather than interoperable CPIM/SIP.

@@ -19,7 +19,7 @@ export async function realtime_route(request: Request, env: Work_Env): Promise<R
     if (request.headers.get("origin") !== origin || request.headers.has("authorization")) return api_error("forbidden", "Use this site's connection", 403)
     const session = await read_session(request, env)
     const credential = await auth_hash(session ? session_token(request) : guest_token(request))
-    const guest = !session && guest_token(request) ? await env.DB.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ?").bind(credential, Date.now() - 365 * 86400000).first<{ id: number }>() : null
+    const guest = !session && guest_token(request) ? await env.DB.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ? AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE guest_id = work_guests.id AND (google_subject IS NOT NULL OR revoked = 1))").bind(credential, Date.now() - 365 * 86400000).first<{ id: number }>() : null
     if (!session && !guest) return api_error("unauthorized", "Open Work or sign in first", 401)
     const principal = session ? `a:${session.subject}` : `g:${guest!.id}`
     const bucket = Math.floor(Date.now() / 60000)
@@ -49,7 +49,7 @@ export class Realtime_Hub {
     private async actor(a: Attachment): Promise<{ session: Auth_Session | null, guest_id: number | null, csrf: string } | null> {
         const csrf = "internal-socket"
         if (a.principal.startsWith("g:")) {
-            const guest = await this.env.DB!.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ?").bind(a.credential, Date.now() - 365 * 86400000).first<{ id: number }>()
+            const guest = await this.env.DB!.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ? AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE guest_id = work_guests.id AND (google_subject IS NOT NULL OR revoked = 1))").bind(a.credential, Date.now() - 365 * 86400000).first<{ id: number }>()
             return guest && `g:${guest.id}` === a.principal ? { session: null, guest_id: guest.id, csrf } : null
         }
         const user = await this.env.DB!.prepare("SELECT u.subject, u.email, u.name, o.subject AS owner_subject, s.last_seen FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(a.credential, Date.now() - 30 * 86400000).first<{ subject: string, email: string, name: string, owner_subject: string | null, last_seen: number }>()
@@ -210,14 +210,14 @@ export class Realtime_Hub {
                 if (!Number.isSafeInteger(data.after) || data.after < 0) throw new Error("Invalid cursor")
                 const peers = await channel.authorize(this.env, actor, data.conversation, attachment.origin)
                 if (!attachment.watches[key] && Object.keys(attachment.watches).length >= 32) throw new Error("Too many conversations")
-                attachment.watches[key] = { channel: data.channel, conversation: data.conversation, target: peers.target, cursor: Math.min(attachment.watches[key]?.cursor ?? data.after, data.after) }; ws.serializeAttachment(attachment)
-                const response = await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation })
+                attachment.watches[key] = { channel: data.channel, conversation: data.conversation, target: peers.target ?? "", cursor: Math.min(attachment.watches[key]?.cursor ?? data.after, data.after) }; ws.serializeAttachment(attachment)
+                const response = peers.target ? await realtime_call(this.env, peers.target, "subscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation }) : json({ online: false, last_online: null })
                 if (!response.ok) throw new Error("Presence subscription unavailable")
                 ack({ presence: await response.json() }); await this.sync(ws, key); return
             }
             if (data.type === "unwatch") {
                 const watch = attachment.watches[key]; delete attachment.watches[key]; ws.serializeAttachment(attachment)
-                if (watch && !this.live().some(other => other.deserializeAttachment().watches[key])) await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation })
+                if (watch?.target && !this.live().some(other => other.deserializeAttachment().watches[key])) await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: data.channel, conversation: data.conversation })
                 ack({ ok: true }); return
             }
             if (data.type === "send") {
@@ -231,7 +231,7 @@ export class Realtime_Hub {
     async webSocketClose(ws: Socket, _code?: number, _reason?: string, wasClean = true): Promise<void> {
         await this.identity()
         const attachment = ws.deserializeAttachment()
-        for (const [key, watch] of Object.entries(attachment?.watches ?? {})) if (!this.live().some(other => other.deserializeAttachment().watches[key])) try { await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: watch.channel, conversation: watch.conversation }) } catch {}
+        for (const [key, watch] of Object.entries(attachment?.watches ?? {})) if (watch.target && !this.live().some(other => other.deserializeAttachment().watches[key])) try { await realtime_call(this.env, watch.target, "unsubscribe", { principal: this.principal, channel: watch.channel, conversation: watch.conversation }) } catch {}
         await this.sweep(wasClean ? Date.now() : this.last(ws))
     }
     async webSocketError(ws: Socket): Promise<void> { ws.close(1011, "Connection error"); await this.identity(); await this.sweep() }

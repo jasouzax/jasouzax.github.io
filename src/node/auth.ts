@@ -10,6 +10,7 @@ import { encode_key } from "../work_crypto.ts"
 import { google_access, save_google_grant } from "./google_grant.ts"
 import { google_picture } from "../work_profile.ts"
 import { realtime_revoke } from "./realtime_bus.ts"
+import { work_changed } from "./realtime_work.ts"
 
 const session_cookie = "__Host-jazu_session"
 const flow_cookie = "__Host-jazu_oauth"
@@ -83,6 +84,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session) || request.headers.get("x-jazu-confirm-delete") !== "account") return api_error("forbidden", "Confirm account deletion from the signed-in account menu", 403)
         if (!env.DB.batch) return api_error("unavailable", "Account deletion is temporarily unavailable", 503)
+        const linked_rooms = env.REALTIME ? (await env.DB.prepare("SELECT id FROM work_rooms WHERE google_subject = ? AND owner_wrap IS NOT NULL").bind(session.subject).all<{ id: string }>()).results : []
         // Revoke every device and linked conversation while preserving the other participant's encrypted history.
         await env.DB.batch([
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
@@ -100,6 +102,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
             env.DB.prepare("DELETE FROM auth_users WHERE subject = ?").bind(session.subject),
         ])
         await realtime_revoke(env, session.subject)
+        for (const room of linked_rooms) try { await work_changed(env, room.id, session.subject) } catch { /* Metadata is also refreshed on reconnect. */ }
         const response = reply({ deleted: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response

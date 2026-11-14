@@ -84,11 +84,14 @@ export function acquire_guest(signal: AbortSignal): void {
     signal.addEventListener("abort", () => { guest_views--; void refresh().catch(() => {}) }, { once: true })
 }
 function notify(data: any): void {
-    if (typeof data.id !== "string" || seen_notifications.has(data.id)) return
-    seen_notifications.add(data.id); if (seen_notifications.size > 1000) seen_notifications.delete(seen_notifications.values().next().value!)
+    const notification_id = `${data.channel}:${data.conversation}:${data.id}`
+    if (typeof data.id !== "string" || seen_notifications.has(notification_id)) return
+    seen_notifications.add(notification_id); if (seen_notifications.size > 1000) seen_notifications.delete(seen_notifications.values().next().value!)
     if (!document.dispatchEvent(new CustomEvent("jazu:incoming-message", { detail: data, cancelable: true }))) return
     const labels = document.querySelector<HTMLElement>("[data-notifications]")?.dataset
-    const title = labels?.notificationTitle ?? "New message", href = data.channel === "work" ? `/work/?chat=${encodeURIComponent(data.address ?? "")}` : "/work/"
+    const title = labels?.notificationTitle ?? "New message"
+    const target = new URL(typeof data.href === "string" ? data.href : "/", location.origin)
+    const href = target.origin === location.origin && /^https?:$/.test(target.protocol) ? target.pathname + target.search + target.hash : "/"
     let container = document.getElementById("realtime_notifications")
     if (!container) { container = document.createElement("aside"); container.id = "realtime_notifications"; container.className = "realtime_notifications"; container.setAttribute("aria-live", "polite"); document.body.append(container) }
     const card = document.createElement("div"); card.className = "realtime_notification"
@@ -98,7 +101,7 @@ function notify(data: any): void {
     card.append(link, dismiss); container.append(card); while (container.children.length > 5) container.firstElementChild?.remove()
     setTimeout(() => card.remove(), 20000)
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
-        const notification = new Notification(title, { body: String(data.sender ?? ""), tag: `${data.channel}:${data.id}` })
+        const notification = new Notification(title, { body: String(data.sender ?? ""), tag: notification_id })
         notification.onclick = () => { window.focus(); location.assign(href); notification.close() }
     }
 }

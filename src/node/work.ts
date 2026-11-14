@@ -72,7 +72,7 @@ async function public_key(value: unknown): Promise<JsonWebKey> {
     return clean
 }
 function room_info(room: Room) {
-    return { id: room.id, email: room.google_subject ? room.account_email || room.email : `guest/${room.guest_id}`, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
+    return { id: room.id, email: room.google_subject ? room.account_email || room.email : room.guest_id !== null && room.guest_id !== undefined ? `guest/${room.guest_id}` : room.email, name: room.google_subject ? room.name || room.email : "", picture: room.google_subject ? google_picture(room.picture) : "", guest_id: room.guest_id, revoked: room.revoked, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, owner_key_id: room.owner_key_id }
 }
 
 export async function work_route(request: Request, env: Work_Env, dependencies: { fetch?: typeof fetch, actor?: Realtime_Actor, dispatch?: () => Promise<void> } = {}): Promise<Response> {
@@ -192,14 +192,17 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
         const envelope = JSON.stringify(data.envelope)
         const source = session ? `a:${session.subject}` : `g:${guest_row!.id}`
         const prior = await env.DB.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND id = ?").bind(room.id, data.id).first<Work_Message>()
-        if (prior) await wake_delivery(env, source, dependencies.dispatch)
-        if (prior) return prior.author === author && prior.envelope === envelope ? reply({ message: { ...prior, envelope: JSON.parse(prior.envelope) } }) : api_error("id_conflict", "This message id is already in use", 409)
+        if (prior) {
+            if (prior.author !== author || prior.envelope !== envelope) return api_error("id_conflict", "This message id is already in use", 409)
+            await wake_delivery(env, source, dependencies.dispatch)
+            return reply({ message: { ...prior, envelope: JSON.parse(prior.envelope) } })
+        }
         const now = Date.now()
         // The insertion enforces the burst limit in the same statement, including concurrent sends.
         const insert = env.DB.prepare("INSERT INTO work_messages (room_id, id, author, envelope, created_at) SELECT ?, ?, ?, ?, ? WHERE (SELECT count(*) FROM work_messages WHERE room_id = ? AND author = ? AND created_at > ?) < 30 ON CONFLICT(room_id, id) DO NOTHING").bind(room.id, data.id, author, envelope, now, room.id, author, now - 60000)
         if (env.REALTIME) {
             if (!env.DB.batch) return api_error("unavailable", "Durable messaging is unavailable", 503)
-            await env.DB.batch([insert, ...await work_outbox(env, room.id, data.id, source)])
+            await env.DB.batch([insert, ...await work_outbox(env, room.id, data.id, source, author, envelope)])
         } else await insert.run()
         const row = await env.DB.prepare("SELECT seq, id, author, envelope, created_at FROM work_messages WHERE room_id = ? AND id = ?").bind(room.id, data.id).first<Work_Message>()
         if (!row) return api_error("rate_limited", "Please wait a minute before sending more messages", 429)

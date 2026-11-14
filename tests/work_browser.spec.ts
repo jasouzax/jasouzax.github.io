@@ -232,6 +232,7 @@ test("a signed-in owner receives notifications outside Work and sees live discon
         await expect(guest.locator(".desk_messages_connection")).toHaveText("Online")
         const notice = page.locator(".realtime_notification a")
         await expect(notice).toContainText("New encrypted message")
+        await page.screenshot({ path: ".cache/realtime-notification.png", fullPage: true })
         await notice.click(); await ready(page)
         await expect(page.locator(".desk_messages_log")).toContainText("A message while you browse the portfolio")
         await expect(page.locator(".desk_messages_connection")).toHaveText("Online")
@@ -245,6 +246,25 @@ test("a signed-in owner receives notifications outside Work and sees live discon
         await expect(page.locator(".desk_messages_connection")).toHaveText("Online", { timeout: 15000 })
         await send(guest, "Back online")
         await expect(page.locator(".desk_messages_log")).toContainText("Back online")
+    } finally { await context.close() }
+})
+
+test("client deletion immediately refreshes the owner's entity and closes the open composer", async ({ page, browser }) => {
+    await owner(page)
+    const context = await browser.newContext(), email = "deleted-client@example.com"
+    try {
+        await account(context, email); const client = await context.newPage(); await client.goto("/work"); await send(client, "Shared history stays encrypted")
+        await expect(page.getByRole("button", { name: email, exact: true })).toBeVisible({ timeout: 15000 })
+        await page.getByRole("button", { name: email, exact: true }).click()
+        const chat = page.locator(".desk_messages").last()
+        await expect(chat.locator(".desk_messages_log")).toContainText("Shared history stays encrypted")
+        await client.locator(".desk_messages_account > summary").click()
+        client.once("dialog", async dialog => { await dialog.accept() })
+        await client.locator('.desk_messages [data-sign="delete"]').click()
+        await expect(chat.getByRole("textbox", { name: "Write a message…" })).toBeDisabled({ timeout: 15000 })
+        await expect(chat.locator(".desk_messages_notice")).toContainText("closed")
+        await expect(page.getByRole("button", { name: email, exact: true })).toHaveCount(0)
+        await expect(chat.locator(".desk_messages_log")).toContainText("Shared history stays encrypted")
     } finally { await context.close() }
 })
 

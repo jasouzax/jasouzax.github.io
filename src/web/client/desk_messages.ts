@@ -266,7 +266,11 @@ export function message_body(item: desk_window, signal: AbortSignal): HTMLElemen
             if (data.conversation !== key?.room) return
             if (data.type === "messages") void apply_messages(data.messages)
             if (data.type === "catchup") void catch_up()
-            if (["notification", "conversation-updated"].includes(data.type) && owner && data.address) { address(data.address); if (data.type === "conversation-updated") void watch_live().catch(() => {}) }
+            if (["notification", "conversation-updated"].includes(data.type) && owner && data.address) {
+                address(data.address)
+                if (data.revoked) { input.disabled = true; send.disabled = true; notice.textContent = label("closed") }
+                if (data.type === "conversation-updated") void watch_live().catch(() => {})
+            }
         }, { signal: abort })
         document.addEventListener("jazu:incoming-message", event => {
             if ((event as CustomEvent).detail.conversation === key?.room && !document.hidden && root.getClientRects().length) event.preventDefault()
