@@ -28,6 +28,7 @@ import { emit_page_styles } from "./web/page_style.tsx"
 import { output_directory, output_file } from "./paths.ts"
 import { serialize, type serialized_node } from "./web/vnode.tsx"
 import { compile_plugins } from "./plugins.ts"
+import { pwa_files } from "./pwa.ts"
 
 export type build_options = {
     root: string
@@ -308,6 +309,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     const assets: page_assets = { themes, inline_css, runtime_page: runtime.page, runtime_theme_switch: runtime.theme_switch, runtime_desk_shell: runtime.desk_shell, boot_script: runtime.boot, nav_index: nav, page_styles }
     const cache = load_cache(options.root)
     const next_cache: Record<string, string> = {}
+    const skipped_outputs = new Map<string, string | Uint8Array>()
     const shared = shared_hash(model, inline_css + JSON.stringify(manifest) + JSON.stringify(runtime) + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
     let skipped = 0
     for (const page of model.pages) {
@@ -322,6 +324,7 @@ export async function build_site(options: build_options): Promise<build_result> 
         if (cached) {
             skipped++
             for (const name of names) {
+                skipped_outputs.set(name, readFileSync(output_file(options.out, name)))
                 if (cache[`out:${name}`]) next_cache[`out:${name}`] = cache[`out:${name}`]
             }
             continue
@@ -351,6 +354,8 @@ export async function build_site(options: build_options): Promise<build_result> 
     }
     for (const [url, source] of model.resources) files.set(url.slice(1), readFileSync(source))
     if (options.only_check) return { model, diag, written: [], skipped, pages: model.pages.length }
+    const expertise_media = new Set([...expertise_by_lang.values()].flatMap(data => data?.entries.flatMap(entry => [entry.media, entry.poster]) ?? []))
+    await pwa_files(options.root, files, skipped_outputs, config, expertise_media)
     const { written, hashes } = write_files(options.out, files)
     for (const [name, hash] of Object.entries(hashes)) next_cache[`out:${name}`] = hash
     // Prune only files in this output's previous manifest; never guess at owner files.

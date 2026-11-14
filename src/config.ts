@@ -41,6 +41,7 @@ export type site_config = {
     seo: seo_config
     icons: Record<string, string>
     personal_server: string
+    pwa: { enabled: boolean, exclude_expertise_media: boolean, exclude_prefixes: string[], notifications: boolean }
 }
 
 export const default_config: site_config = {
@@ -64,6 +65,7 @@ export const default_config: site_config = {
     deploy: { pages_project: "jazu", worker_name: "jazu_router" },
     icons: {},
     personal_server: "",
+    pwa: { enabled: false, exclude_expertise_media: true, exclude_prefixes: ["/assets/wasm/"], notifications: true },
     seo: {
         description: "",
         keywords: [],
@@ -90,6 +92,7 @@ export async function load_config(root: string): Promise<site_config> {
     const merged: site_config = { ...default_config, ...given,
         resources: { ...default_config.resources, ...given.resources },
         pack: { ...default_config.pack, ...given.pack },
+        pwa: { ...default_config.pwa, ...given.pwa },
         owner: { ...default_config.owner, ...given.owner },
         deploy: { ...default_config.deploy, ...given.deploy },
         render: { ...default_config.render, ...given.render }, seo: merge_seo(given.seo) }
@@ -97,6 +100,7 @@ export async function load_config(root: string): Promise<site_config> {
     if (Object.values(merged.resources).some(value => typeof value !== "string")) throw new Error("resources must contain content-relative file paths")
     if (!Array.isArray(merged.pack.exclude) || merged.pack.exclude.some(value => typeof value !== "string" || !value)) throw new Error("pack.exclude must be an array of project-relative paths")
     merged.base_url = String(merged.base_url).trim().replace(/\/+$/, "")
+    if ([merged.pwa.enabled, merged.pwa.exclude_expertise_media, merged.pwa.notifications].some(value => typeof value !== "boolean") || !Array.isArray(merged.pwa.exclude_prefixes) || merged.pwa.exclude_prefixes.some(value => typeof value !== "string" || !value.startsWith("/") || value.includes("..") || value.includes("?"))) throw new Error("pwa requires boolean settings and absolute exclude_prefixes")
     const origin = new URL(merged.base_url)
     if (origin.origin !== merged.base_url || !["https:", "http:"].includes(origin.protocol)) throw new Error("config.base_url must be an HTTP(S) origin")
     if (!Object.hasOwn(merged.languages, merged.default_language)) throw new Error("default_language must be in languages")

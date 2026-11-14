@@ -2,4 +2,9 @@
 .realtime_notifications { position: fixed; right: 1em; top: 4em; z-index: 1000; display: grid; gap: .5em; max-width: min(26em, calc(100vw - 2em)); pointer-events: none; }
 .realtime_notification { display: flex; align-items: center; gap: .75em; padding: .8em 1em; border: 1px solid var(--line, currentColor); border-radius: .5em; background: var(--panel, Canvas); color: var(--text, CanvasText); box-shadow: 0 .25em 1em #0003; pointer-events: auto; }
 .realtime_notification a { overflow-wrap: anywhere; }
+.realtime_notification a { display: grid; gap: .3em; min-width: 0; }
+.realtime_notification_sender { opacity: .6; font-size: .85em; }
+.realtime_notification_preview { white-space: pre-wrap; max-height: 8em; overflow: hidden; }
+.pwa_offline { position: fixed; bottom: .5em; left: 50%; transform: translateX(-50%); z-index: 1001; margin: 0; padding: .5em 1em; border: 1px solid currentColor; border-radius: .5em; background: var(--panel, Canvas); color: var(--text, CanvasText); width: max-content; max-width: calc(100vw - 2em); font-size: .85em; }
+html[data-offline] .desk { pointer-events: none; opacity: .6; }
 .realtime_notification button { flex: 0 0 auto; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }

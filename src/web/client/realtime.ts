@@ -1,5 +1,6 @@
 /* Site-wide, channel-neutral live transport. Guests acquire it only while a Work view is mounted. */
 import { get_auth } from "./sign.ts"
+import { notification_preview, native_notice, enable_push, init_notification_keys } from "./notifications.ts"
 let account = ""
 let socket: WebSocket | null = null, identity = "", guest_views = 0, generation = 0, attempt = 0, connected = false, replaced = false
 let reconnect: ReturnType<typeof setTimeout> | undefined, heartbeat: ReturnType<typeof setInterval> | undefined, pong_at = 0
@@ -40,7 +41,7 @@ function connect(): void {
             return
         }
         document.dispatchEvent(new CustomEvent("jazu:realtime", { detail: data }))
-        if (data.type === "notification" && !data.self) notify(data)
+        if (data.type === "notification" && !data.self) void notify(data)
     })
     ws.addEventListener("close", event => {
         if (socket !== ws || revision !== generation) return
@@ -83,29 +84,40 @@ export function acquire_guest(signal: AbortSignal): void {
     guest_views++; void refresh().catch(() => {})
     signal.addEventListener("abort", () => { guest_views--; void refresh().catch(() => {}) }, { once: true })
 }
-function notify(data: any): void {
+async function notify(data: any): Promise<void> {
     const notification_id = `${data.channel}:${data.conversation}:${data.id}`
     if (typeof data.id !== "string" || seen_notifications.has(notification_id)) return
     seen_notifications.add(notification_id); if (seen_notifications.size > 1000) seen_notifications.delete(seen_notifications.values().next().value!)
     if (!document.dispatchEvent(new CustomEvent("jazu:incoming-message", { detail: data, cancelable: true }))) return
     const labels = document.querySelector<HTMLElement>("[data-notifications]")?.dataset
     const title = labels?.notificationTitle ?? "New message"
+    const recipient = account
+    let text = title
+    try { text = await notification_preview(data) } catch {}
+    if (recipient !== account) return
+    if (!document.dispatchEvent(new CustomEvent("jazu:incoming-message", { detail: data, cancelable: true }))) return
     const target = new URL(typeof data.href === "string" ? data.href : "/", location.origin)
     const href = target.origin === location.origin && /^https?:$/.test(target.protocol) ? target.pathname + target.search + target.hash : "/"
     let container = document.getElementById("realtime_notifications")
     if (!container) { container = document.createElement("aside"); container.id = "realtime_notifications"; container.className = "realtime_notifications"; container.setAttribute("aria-live", "polite"); document.body.append(container) }
     const card = document.createElement("div"); card.className = "realtime_notification"
-    const link = document.createElement("a"); link.href = href; link.textContent = `${title}: ${String(data.sender ?? "").slice(0, 200)}`
+    const link = document.createElement("a"); link.href = href
+    const sender = document.createElement("span"); sender.className = "realtime_notification_sender"; sender.textContent = String(data.sender ?? "").slice(0, 254)
+    const preview = document.createElement("span"); preview.className = "realtime_notification_preview"; preview.textContent = text
+    link.append(sender, preview)
     const dismiss = document.createElement("button"); dismiss.type = "button"; dismiss.textContent = "×"; dismiss.setAttribute("aria-label", labels?.notificationDismiss ?? "Dismiss notification"); dismiss.addEventListener("click", () => card.remove())
     card.dataset.conversation = data.conversation; card.dataset.channel = data.channel
     card.append(link, dismiss); container.append(card); while (container.children.length > 5) container.firstElementChild?.remove()
     setTimeout(() => card.remove(), 20000)
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
-        const notification = new Notification(title, { body: String(data.sender ?? ""), tag: notification_id })
-        notification.onclick = () => { window.focus(); location.assign(href); notification.close() }
+        await native_notice({ ...data, href }, text)
     }
 }
 export function init_realtime(): void {
+    init_notification_keys()
+    if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", event => {
+        if (event.data?.type === "jazu:push") void notify(event.data.notice)
+    })
     const auth_channel = "BroadcastChannel" in window ? new BroadcastChannel("jazu-auth-changed") : null
     document.addEventListener("jazu:auth", () => { void refresh().then(() => auth_channel?.postMessage(account)).catch(() => {}) })
     if (auth_channel) auth_channel.onmessage = event => { if (typeof event.data === "string" && event.data !== account) void get_auth(true).then(() => document.dispatchEvent(new Event("jazu:auth"))).catch(() => {}) }
@@ -138,7 +150,10 @@ export function init_realtime(): void {
     document.addEventListener("click", event => {
         const button = (event.target as Element).closest<HTMLButtonElement>("[data-notifications]")
         if (!button || !("Notification" in window)) return
-        event.preventDefault(); void Notification.requestPermission().then(permission => { button.textContent = permission === "granted" ? button.dataset.notificationEnabled ?? "Notifications enabled" : button.dataset.notificationDenied ?? "Notifications blocked" })
+        event.preventDefault(); void Notification.requestPermission().then(async permission => {
+            button.textContent = permission === "granted" ? button.dataset.notificationEnabled ?? "Notifications enabled" : button.dataset.notificationDenied ?? "Notifications blocked"
+            if (permission === "granted") try { await enable_push() } catch { button.textContent = button.dataset.notificationRetry ?? "Retry background notifications" }
+        })
     })
     void refresh().catch(() => {})
 }

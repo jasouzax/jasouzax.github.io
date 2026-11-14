@@ -24,6 +24,9 @@ export type Work_Env = {
     GOOGLE_CLIENT_SECRET?: string
     GOOGLE_ADMIN_EMAIL?: string
     WORK_FALLBACK_KEY?: string
+    VAPID_PUBLIC_KEY?: string
+    VAPID_PRIVATE_KEY?: string
+    VAPID_SUBJECT?: string
     REALTIME?: Realtime_Namespace
 }
 type Room = { id: string, email: string, token_hash: string, created_at: number, revoked: number, google_subject?: string | null, guest_id?: number | null, owner_wrap?: string | null, owner_key_id?: string | null, name?: string, picture?: string, account_email?: string }

@@ -73,6 +73,8 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (url.pathname === "/api/v1/auth/logout" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Invalid sign-out request", 403)
+        await env.DB.prepare("DELETE FROM push_receipts WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE session_hash = ?)").bind(await auth_hash(session_token(request))).run()
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE session_hash = ?").bind(await auth_hash(session_token(request))).run()
         await env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
         await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(read_cookie(request, session_cookie))).run()
         await realtime_revoke(env, session.subject, await auth_hash(session_token(request)))
@@ -87,6 +89,8 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         const linked_rooms = env.REALTIME ? (await env.DB.prepare("SELECT id FROM work_rooms WHERE google_subject = ? AND owner_wrap IS NOT NULL").bind(session.subject).all<{ id: string }>()).results : []
         // Revoke every device and linked conversation while preserving the other participant's encrypted history.
         await env.DB.batch([
+            env.DB.prepare("DELETE FROM push_receipts WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE subject = ?)").bind(session.subject),
+            env.DB.prepare("DELETE FROM push_subscriptions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
             env.DB.prepare("DELETE FROM work_key_files WHERE subject = ?").bind(session.subject),

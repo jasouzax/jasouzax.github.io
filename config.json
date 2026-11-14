@@ -261,7 +261,8 @@
       "work_presence_hint": "The other participant’s live connection. Online does not guarantee they have read the message.",
       "work_live_connected": "Live connection ready",
       "work_other_tab": "Connected in another tab",
-      "work_last_online_recent": "Last online just now"
+      "work_last_online_recent": "Last online just now",
+      "pwa_offline": "Offline · Public pages and themes are available. Desk and messaging require a connection."
     },
     "ja": {
       "sign_out_google": "Googleからログアウト",
@@ -550,7 +551,8 @@
       "work_presence_hint": "相手の接続状態です。接続中でも既読とは限りません。",
       "work_live_connected": "リアルタイム接続中",
       "work_other_tab": "別のタブで接続中",
-      "work_last_online_recent": "最終接続：たった今"
+      "work_last_online_recent": "最終接続：たった今",
+      "pwa_offline": "オフライン · 公開ページとテーマを利用できます。デスクとメッセージには接続が必要です。"
     }
   },
   "default_language": "en",
@@ -657,5 +659,13 @@
   "deploy": {
     "pages_project": "jazu",
     "worker_name": "jazu_router"
+  },
+  "pwa": {
+    "enabled": true,
+    "exclude_expertise_media": true,
+    "exclude_prefixes": [
+      "/assets/wasm/"
+    ],
+    "notifications": true
   }
 }

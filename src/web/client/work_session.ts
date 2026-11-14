@@ -153,5 +153,6 @@ async function prepare_locked(context: Work_Context): Promise<Client_Key> {
         context.key = key
     }
     await work_api("/api/v1/work/rooms", context.csrf, { id: key.room, owner_wrap: key.owner_wrap, key_id: key.key_id })
+    document.dispatchEvent(new Event("jazu:work-key"))
     return key
 }

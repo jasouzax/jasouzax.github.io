@@ -4,6 +4,7 @@ import { guest_token, type Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
 import { realtime_call } from "./realtime_bus.ts"
 import { realtime_channels } from "./realtime_channels.ts"
+import { push_deliver } from "./push.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): Attachment }
 type Attachment = { principal: string, credential: string, origin: string, connected: number, activity: number, watches: Record<string, { channel: string, conversation: string, target: string, cursor: number, presence_version?: number }> }
@@ -220,6 +221,7 @@ export class Realtime_Hub {
                 if (!write(ws, notification)) continue
                 if (ws.deserializeAttachment().watches[`${data.channel}:${data.conversation}`]) await this.sync(ws, `${data.channel}:${data.conversation}`)
             }
+            await push_deliver(this.env, this.principal, notification)
             return json({ ok: true })
         }
         return new Response("Unknown action", { status: 404 })
@@ -273,7 +275,13 @@ export class Realtime_Hub {
             }
             if (data.type === "send") {
                 await channel.authorize(this.env, actor, data.conversation, attachment.origin)
-                const result = await channel.send(this.env, actor, attachment.origin, data, () => this.drain())
+                const result = await channel.send(this.env, actor, attachment.origin, data, async () => {
+                    // Acknowledgements depend on D1 commit, never on an external push provider's latency.
+                    await this.ctx.storage.setAlarm(Date.now() + 10000)
+                    const delivery = this.drain()
+                    if (this.ctx.waitUntil) this.ctx.waitUntil(delivery)
+                    else await delivery
+                })
                 ack(result.value, result.error); return
             }
             ack(undefined, "Unknown command")

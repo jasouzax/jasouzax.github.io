@@ -61,6 +61,22 @@ variable "work_fallback_key" {
   }
 }
 
+variable "vapid_public_key" {
+  type    = string
+  default = ""
+}
+
+variable "vapid_private_key" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "vapid_subject" {
+  type    = string
+  default = "mailto:jason@jasouza.com"
+}
+
 variable "google_client_id" {
   type    = string
   default = ""
