@@ -54,7 +54,7 @@ Wrangler/Terraform cannot run inside a Worker and redeploying per endpoint would
 | Durable Object requests, 100 000/day; incoming WebSocket messages count 1 per 20 | Hibernation API; the agent and page heartbeats are answered by `setWebSocketAutoResponse` and never wake the object; the agent sends **nothing** while no owner is connected (logs are kept in its ring buffer and replayed) |
 | Durable Object duration, 13 000 GB-s/day | A hibernated object is not billed; only active streaming (a watched site window) keeps it awake |
 | Worker requests, 100 000/day | Public `/api/server` is cached at the edge for 60 s; one snapshot refresh per minute at most, shared by every visitor |
-| WebSocket message size, 1 MiB | File transfers are chunked at 384 KiB raw; API bodies are capped at 768 KiB |
+| WebSocket message size, 1 MiB | File transfers are chunked at 384 KiB raw; API request and answer bodies are capped at 600 KiB (base64 inside one JSON frame stays under the 900 KiB frame limit) |
 | Feed frames | Agent → object frames are the only costly traffic: capped at 6 fps, JPEG, dropped when the page's socket is backed up, and sent only while someone watches |
 
 Only SQLite-backed Durable Objects exist on the free plan, so the class is declared with `new_sqlite_classes`.

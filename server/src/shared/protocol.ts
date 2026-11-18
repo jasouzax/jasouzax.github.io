@@ -23,7 +23,8 @@ export const heartbeat_ping = "ping"
 export const heartbeat_pong = "pong"
 export const max_frame_bytes = 900 * 1024
 export const fs_chunk_bytes = 384 * 1024
-export const api_body_limit = 768 * 1024
+// Bodies travel as base64 inside one JSON frame: 600 KiB raw is 800 KiB of text, which stays under max_frame_bytes with room for the headers
+export const api_body_limit = 600 * 1024
 export const binary_video = 1
 export const binary_audio = 2
 export const video_header_size = 5

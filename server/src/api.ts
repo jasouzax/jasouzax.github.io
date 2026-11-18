@@ -499,5 +499,7 @@ export async function serve_http(registry: Api_Registry, call: Api_Call): Promis
     const argument = request_argument(call);
     if ('status' in argument && 'headers' in argument && typeof argument.status === 'number') return { ...(argument as Api_Answer), id: call.id };
     const result = await registry.call(call.name, method, call.path, argument, { via: 'http', ip: call.ip, headers: call.headers, query: call.query });
+    // An answer travels in one frame like a request does: a bigger one would be dropped by the hub and leave the caller waiting
+    if (result.body.length > api_body_limit) return { ...json_error(502, 'The answer is too large'), id: call.id };
     return { id: call.id, status: result.status, headers: result.headers, body: result.body.toString('base64') };
 }

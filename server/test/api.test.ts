@@ -56,7 +56,7 @@ test("bodies: JSON and forms become the argument, bad ones are 400, big ones 413
     assert.deepEqual(JSON.parse(text_of((await post("a=1&a=2&b=x", { "content-type": "application/x-www-form-urlencoded" })).body)), { a: ["1", "2"], b: "x" })
     assert.equal((await post("{")).status, 400)
     assert.equal((await post("[1]")).status, 400)
-    assert.equal((await post("x".repeat(768 * 1024 + 1))).status, 413)
+    assert.equal((await post("x".repeat(600 * 1024 + 1))).status, 413)
     assert.equal((await post("   ")).status, 200)
 })
 
@@ -88,4 +88,14 @@ test("scripts call each other's APIs directly, and errors reject with the status
     await assert.rejects(() => client.get("missing"), (error: any) => error.status === 404)
     assert.equal(registry.client("friend").is_running, true)
     assert.equal(registry.client("nobody").is_running, false)
+})
+
+test("an answer too big for one frame becomes a 502 instead of vanishing", async () => {
+    const registry = new Api_Registry()
+    registry.create(owner(), "big").get("", () => "x".repeat(600 * 1024 + 1))
+    const answer = await serve_http(registry, call("big"))
+    assert.equal(answer.status, 502)
+    assert.equal(JSON.parse(text_of(answer.body)).error, "The answer is too large")
+    registry.create(owner(), "ok").get("", () => "x".repeat(1000))
+    assert.equal((await serve_http(registry, call("ok"))).status, 200)
 })
