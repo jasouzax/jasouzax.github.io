@@ -5,6 +5,7 @@
  *   Fs_Error        a failure carrying the errno-like code the page maps onto File System Access errors
  *   confine         turns a requested path into a normalised absolute path inside the configured root
  *   handle_fs       runs one request and returns its result; rejects with Fs_Error
+ *   read_text       reads a small plain file as text (the scripts the runner starts)
  *
  * Limits
  *   Runs as the agent's Unix user: the operating system's permissions are the real access control, the root only narrows it.
@@ -123,6 +124,17 @@ async function run(root: string, request: Fs_Request): Promise<Fs_Result> {
         case "copy": await fs.cp(target, await confine(root, request.to), { recursive: true, errorOnExist: true, force: false }); return { op: "copy" }
         default: throw new Fs_Error("EINVAL", "Unknown operation")
     }
+}
+
+// The whole text of a small file, for the script runner: confined like every other path, and refused when it is not a plain file
+export async function read_text(root: string, requested: unknown, limit = 1024 * 1024): Promise<string> {
+    const target = await confine(root, requested)
+    try {
+        const stats = await fs.stat(target)
+        if (!stats.isFile()) throw new Fs_Error("EISDIR", "Not a file")
+        if (stats.size > limit) throw new Fs_Error("EFBIG", "The file is too large")
+        return await fs.readFile(target, "utf8")
+    } catch (error) { throw to_fs_error(error) }
 }
 
 export async function handle_fs(root: string, request: Fs_Request): Promise<Fs_Result> {

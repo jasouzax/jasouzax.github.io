@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
-import { Fs_Error, confine, handle_fs } from "../src/fs_channel.ts"
+import { Fs_Error, confine, handle_fs, read_text } from "../src/fs_channel.ts"
 import { from_base64, to_base64 } from "../src/shared/codec.ts"
 
 async function sandbox(): Promise<string> {
@@ -65,4 +65,15 @@ test("paths must be absolute and stay inside the root, also through .. and symli
     assert.equal(await confine(root, `${root}/new/deep/file`), `${root}/new/deep/file`)
     assert.equal(await confine("/", "/etc//hosts/"), "/etc/hosts")
     assert.equal(await code_of(confine(root, 5 as unknown as string)), "EINVAL")
+})
+
+test("read_text reads small plain files inside the root only", async () => {
+    const root = await sandbox()
+    await fs.writeFile(path.join(root, "a.auto.js"), "console.log(1)")
+    await fs.mkdir(path.join(root, "dir"))
+    assert.equal(await read_text(root, path.join(root, "a.auto.js")), "console.log(1)")
+    assert.equal(await code_of(read_text(root, path.join(root, "dir"))), "EISDIR")
+    assert.equal(await code_of(read_text(root, path.join(root, "a.auto.js"), 3)), "EFBIG")
+    assert.equal(await code_of(read_text(root, "/etc/hostname")), "EACCES")
+    assert.equal(await code_of(read_text(root, "relative.js")), "EINVAL")
 })
