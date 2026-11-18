@@ -56,12 +56,14 @@ resource "cloudflare_workers_script" "router" {
   content_sha256     = filesha256(var.worker_bundle)
   compatibility_date = var.compatibility_date
   migrations = {
-    new_tag            = "realtime-v1"
-    new_sqlite_classes = ["Realtime_Hub"]
+    old_tag            = "realtime-v1"
+    new_tag            = "server-v1"
+    new_sqlite_classes = ["Server_Hub"]
   }
 
-  bindings = [
+  bindings = concat([
     { name = "REALTIME", type = "durable_object_namespace", class_name = "Realtime_Hub" },
+    { name = "SERVER_HUB", type = "durable_object_namespace", class_name = "Server_Hub" },
     { name = "DOMAIN", type = "plain_text", text = var.staging_domain },
     { name = "PAGES_ORIGIN", type = "plain_text", text = "https://${cloudflare_pages_project.site.subdomain}" },
     { name = "PUBLIC_PROJECTS", type = "plain_text", text = var.public_projects },
@@ -81,7 +83,10 @@ resource "cloudflare_workers_script" "router" {
     { name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret },
     { name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id },
     { name = "ACCESS_CLIENT_SECRET", type = "secret_text", text = var.access_client_secret },
-  ]
+    ],
+    var.server_agent_secret == null ? [] : [{ name = "SERVER_AGENT_SECRET", type = "secret_text", text = var.server_agent_secret }],
+    var.server_owner_emails == null ? [] : [{ name = "SERVER_OWNER_EMAILS", type = "plain_text", text = var.server_owner_emails }],
+  )
   depends_on = [terraform_data.work_migrations]
 }
 

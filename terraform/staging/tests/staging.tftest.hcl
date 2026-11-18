@@ -10,6 +10,7 @@ variables {
   zone_id                 = "test-zone"
   worker_bundle           = "tests/fixtures/worker.js"
   origin_hmac_secret      = "test-hmac-secret-with-more-than-32-characters"
+  server_agent_secret     = "test-server-agent-secret-with-more-than-32-characters"
   access_client_id        = "test-client-id"
   access_client_secret    = "test-client-secret"
   work_fallback_key       = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -20,12 +21,12 @@ run "staging_resources_and_routing" {
   command = apply
 
   assert {
-    condition     = anytrue([for binding in cloudflare_workers_script.router.bindings : binding.name == "REALTIME" && binding.type == "durable_object_namespace" && binding.class_name == "Realtime_Hub"])
-    error_message = "Bind the staging realtime Durable Object class."
+    condition     = anytrue([for binding in cloudflare_workers_script.router.bindings : binding.name == "REALTIME" && binding.type == "durable_object_namespace" && binding.class_name == "Realtime_Hub"]) && anytrue([for binding in cloudflare_workers_script.router.bindings : binding.name == "SERVER_HUB" && binding.type == "durable_object_namespace" && binding.class_name == "Server_Hub"])
+    error_message = "Bind the staging realtime and server Durable Object classes."
   }
   assert {
-    condition     = cloudflare_workers_script.router.migrations.new_tag == "realtime-v1" && contains(cloudflare_workers_script.router.migrations.new_sqlite_classes, "Realtime_Hub")
-    error_message = "Create the realtime class with a stable SQLite migration."
+    condition     = cloudflare_workers_script.router.migrations.old_tag == "realtime-v1" && cloudflare_workers_script.router.migrations.new_tag == "server-v1" && contains(cloudflare_workers_script.router.migrations.new_sqlite_classes, "Server_Hub")
+    error_message = "Add the server hub class in a migration that follows the already applied realtime-v1 tag."
   }
 
   assert {
@@ -61,7 +62,7 @@ run "staging_resources_and_routing" {
     error_message = "The Worker needs the XML-derived public clone origins for provider-first reads."
   }
   assert {
-    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY", "VAPID_PRIVATE_KEY"])
+    condition     = toset([for binding in cloudflare_workers_script.router.bindings : binding.name if binding.type == "secret_text"]) == toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY", "VAPID_PRIVATE_KEY", "SERVER_AGENT_SECRET"])
     error_message = "Provision personal-origin and Work secrets with the Worker."
   }
   assert {

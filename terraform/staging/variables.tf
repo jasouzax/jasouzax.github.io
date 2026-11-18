@@ -135,3 +135,16 @@ variable "access_client_secret" {
     error_message = "Reuse the existing Cloudflare Access service-token secret."
   }
 }
+
+# The Pi agent (`server/`) signs its WebSocket upgrade with this secret; leave null to keep /server offline on staging.
+variable "server_agent_secret" {
+  type      = string
+  default   = null
+  sensitive = true
+}
+
+variable "server_owner_emails" {
+  type        = string
+  default     = null
+  description = "Comma-separated e-mails allowed to open the real Pi desk; null means the Google admin e-mail only."
+}

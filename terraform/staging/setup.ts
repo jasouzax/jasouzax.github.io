@@ -21,6 +21,7 @@ export function staging_environment(source: NodeJS.ProcessEnv, bundle: string): 
         origin_hmac_secret: ["ORIGIN_HMAC_SECRET", "HMAC_SECRET"],
         access_client_id: ["ACCESS_CLIENT_ID"], access_client_secret: ["ACCESS_CLIENT_SECRET"],
         personal_origin: ["PERSONAL_ORIGIN"],
+        server_agent_secret: ["SERVER_AGENT_SECRET"], server_owner_emails: ["SERVER_OWNER_EMAILS"],
         work_owner_email: ["WORK_OWNER_EMAIL"],
         work_fallback_key: ["WORK_FALLBACK_KEY"],
         vapid_public_key: ["VAPID_PUBLIC_KEY"], vapid_private_key: ["VAPID_PRIVATE_KEY"], vapid_subject: ["VAPID_SUBJECT"],
