@@ -1,0 +1,25 @@
+{
+  "name": "jazu-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Pi agent of jasouza.com/server: dials out to the Worker and serves the file system, terminals, scripts and live browser windows",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
+    "start:headless": "npm run build && xvfb-run -a electron . --no-sandbox --disable-gpu",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "ws": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.2",
+    "electron": "^45.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.0"
+  }
+}
