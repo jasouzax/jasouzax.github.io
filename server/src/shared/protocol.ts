@@ -16,6 +16,11 @@
  */
 
 export const protocol_version = 1
+// The `client` the agent signs its upgrade request with (HMAC, see src/node/security.ts sign_origin)
+export const agent_client_id = "server-agent"
+// Text heartbeat: the Durable Object answers it with setWebSocketAutoResponse, so it never wakes the object
+export const heartbeat_ping = "ping"
+export const heartbeat_pong = "pong"
 export const max_frame_bytes = 900 * 1024
 export const fs_chunk_bytes = 384 * 1024
 export const api_body_limit = 768 * 1024
