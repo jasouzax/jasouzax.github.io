@@ -94,6 +94,7 @@ export type Input_Event =
 export type Client_Message =
     | ({ t: "fs", id: number } & Fs_Request)
     | { t: "pty_open", id: number, cols: number, rows: number, cwd?: string }
+    // `data` of pty_input and pty_out is base64 of the raw bytes: a shell may emit or accept any byte sequence
     | { t: "pty_input", id: number, data: string }
     | { t: "pty_resize", id: number, cols: number, rows: number }
     | { t: "pty_close", id: number }
