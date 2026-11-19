@@ -3,6 +3,7 @@
 // pick any other type, or take one that is typed in.
 
 import { state } from "./desk.ts"
+import { find_by_name } from "../../mime.ts"
 
 const magic: { mime: string, bytes: (number | null)[], at?: number }[] = [
     { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
@@ -46,8 +47,7 @@ export function looks_like_text(head: Uint8Array): boolean {
 }
 
 function by_extension(name: string): string {
-    const extension = name.includes(".") ? (name.split(".").pop() ?? "").toLowerCase() : ""
-    return extension ? (state.data?.mimes.find(info => info.extensions.includes(extension))?.mime ?? "") : ""
+    return state.data ? (find_by_name(state.data.mimes, name)?.mime ?? "") : ""
 }
 
 function svg_like(head: Uint8Array): boolean {

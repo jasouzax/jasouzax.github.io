@@ -36,12 +36,27 @@ export const mime_table: mime_info[] = [
     { mime: "application/pdf", icon: "[file_pdf]", label: "PDF", extensions: ["pdf"] },
     { mime: "application/zip", icon: "[file_archive]", label: "ZIP archive", extensions: ["zip"] },
     { mime: "application/x-pid", icon: "[file_script]", label: "Process", extensions: [] },
+    // Automation types of the /server desk: a script that keeps running on the personal server, and a live site feed (docs/feat/server.md)
+    { mime: "application/auto-javascript", icon: "[file_script]", label: "Automation script", extensions: ["auto.js"] },
+    { mime: "application/auto-site", icon: "[file_web]", label: "Automation site", extensions: ["auto.site"] },
     { mime: "application/octet-stream", icon: "[file_binary]", label: "Binary data", extensions: ["bin", "exe", "dat"] },
 ]
 
+// The entry whose extension ends the file name. An extension may hold dots ("auto.js"); the longest match wins, so "run.auto.js" is not plain "js".
+export function find_by_name<T extends { extensions: string[] }>(table: readonly T[], name: string): T | undefined {
+    const lower = name.toLowerCase()
+    let best: T | undefined
+    let best_length = 0
+    for (const info of table) {
+        for (const extension of info.extensions) {
+            if (extension.length > best_length && lower.length > extension.length + 1 && lower.endsWith(`.${extension}`)) { best = info; best_length = extension.length }
+        }
+    }
+    return best
+}
+
 export function mime_from_name(name: string): string {
-    const extension = name.split(".").pop()?.toLowerCase() ?? ""
-    return mime_table.find(info => info.extensions.includes(extension))?.mime ?? ""
+    return find_by_name(mime_table, name)?.mime ?? ""
 }
 
 export function mime_info_of(mime: string): mime_info | undefined {

@@ -3,6 +3,7 @@
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
 
 import type { desk_window } from "./desk.ts"
+import { find_by_name } from "../../mime.ts"
 import { state, text, new_window, focus_window, refresh_tab, working_directory } from "./desk.ts"
 import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
@@ -128,8 +129,7 @@ export function find_node(path: string, from: fs_node | null = tree?.root ?? nul
 
 function icon_of(node: fs_node): string {
     if (node.kind === "dir") return state.data?.folder_icon ?? ""
-    const extension = node.name.includes(".") ? (node.name.split(".").pop() ?? "").toLowerCase() : ""
-    return state.data?.mimes.find(info => info.extensions.includes(extension))?.icon ?? state.data?.file_icon ?? ""
+    return (state.data ? find_by_name(state.data.mimes, node.name)?.icon : undefined) ?? state.data?.file_icon ?? ""
 }
 
 // The row of a new item: its icon and a name field. Enter makes the item (when there is a name), Escape or an empty name drops it.

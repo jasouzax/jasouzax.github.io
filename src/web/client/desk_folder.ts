@@ -1,5 +1,6 @@
 import type { desk_window } from "./desk.ts"
 import { state, text } from "./desk.ts"
+import { find_by_name } from "../../mime.ts"
 import { load_children, redraw, visible_entries, type fs_node, type file_handle } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
 import { open_source } from "./desk_view.ts"
@@ -11,15 +12,13 @@ import { bind_folder_context } from "./desk_folder_context.ts"
 import { bind_folder_drag } from "./desk_folder_drag.ts"
 
 function mime_of(node: fs_node, file: File): string {
-    const ext = node.name.split(".").pop()?.toLowerCase() ?? ""
-    const named = state.data?.mimes.find(info => info.extensions.includes(ext))?.mime
+    const named = state.data ? find_by_name(state.data.mimes, node.name)?.mime : undefined
     return file.type && file.type !== "application/octet-stream" && file.type !== "text/plain" ? file.type : named || file.type || "application/octet-stream"
 }
 
 function icon_of(node: fs_node): string {
     if (node.kind === "dir") return state.data?.folder_icon ?? ""
-    const ext = node.name.split(".").pop()?.toLowerCase() ?? ""
-    return state.data?.mimes.find(info => info.extensions.includes(ext))?.icon ?? state.data?.file_icon ?? ""
+    return (state.data ? find_by_name(state.data.mimes, node.name)?.icon : undefined) ?? state.data?.file_icon ?? ""
 }
 
 type tile_state = {
