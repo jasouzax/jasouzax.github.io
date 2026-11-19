@@ -19,7 +19,9 @@ const gesture_events = ['pointerdown', 'keydown', 'click', 'touchend'] as const
 // has touched the page, so the player starts on the first touch and the server only sends sound after that
 export class Server_audio {
     // The player became able (or unable) to play, or was switched
-    on_change: () => void = () => {}
+    readonly #listeners = new Set<() => void>()
+    on_change(listener: () => void): () => void { this.#listeners.add(listener); return () => { this.#listeners.delete(listener) } }
+    #changed(): void { for (const listener of [...this.#listeners]) listener() }
 
     readonly #listener = () => this.unlock()
     #context: AudioContext | null = null
@@ -50,7 +52,7 @@ export class Server_audio {
         // Pressing the button is the touch the browser wants to see
         if (value) this.unlock()
         else this.reset()
-        this.on_change()
+        this.#changed()
     }
 
     get is_running(): boolean {
@@ -148,7 +150,7 @@ export class Server_audio {
 
     #on_state(): void {
         this.#listen_for_gesture(!this.is_running)
-        this.on_change()
+        this.#changed()
     }
 
     #listen_for_gesture(is_listening: boolean): void {

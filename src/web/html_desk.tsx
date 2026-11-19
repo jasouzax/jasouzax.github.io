@@ -205,6 +205,8 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
             </div>
             <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
         </div>,
+        head_button(ctx, "desk_wbox_head_fullscreen", t(ctx, "window_fullscreen"), "[fullscreen]", false),
+        head_button(ctx, "desk_wbox_head_audio", t(ctx, "window_audio"), "[audio]", false),
         attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
         attrs.flow !== "false" &&
             head_button(ctx, "desk_wbox_head_split", t(ctx, "split_window"), "[split]", false),
@@ -557,6 +559,10 @@ const runtime_keys = [
     "open_new_window",
     "files_toggle_hidden",
     "window_source",
+    "window_fullscreen",
+    "window_exit_fullscreen",
+    "window_audio",
+    "server_sessions_empty",
     "previous",
     "forward",
     "folder_navigation",

@@ -5,6 +5,20 @@ import { local_file_path } from "./desk_paths.ts"
 type history = { entries: string[], index: number }
 const histories = new WeakMap<desk_window, history>()
 const actions = new WeakMap<desk_window, (action: string) => void>()
+export type Live_Navigation = {
+    path: string, can_back: boolean, can_forward: boolean,
+    open: (uri: string) => void, navigate: (action: string) => void,
+}
+const live_navigation = new WeakMap<desk_window, Live_Navigation>()
+export function override_navigation(item: desk_window, navigation: Live_Navigation): () => void {
+    live_navigation.set(item, navigation)
+    sync_navigation(item)
+    return () => {
+        if (live_navigation.get(item) !== navigation) return
+        live_navigation.delete(item)
+        sync_navigation(item)
+    }
+}
 export function navigate_window(item: desk_window, action: "previous" | "refresh" | "forward"): void { actions.get(item)?.(action) }
 export function remap_navigation(item: desk_window, remap: (uri: string) => string): void {
     const history = histories.get(item)
@@ -29,6 +43,7 @@ export function url_parts(uri: string): { scheme: string, parts: { label: string
 }
 
 export function sync_navigation(item: desk_window): void {
+    const live = live_navigation.get(item)
     let history = histories.get(item)
     if (!history) { history = { entries: [], index: -1 }; histories.set(item, history) }
     if (history.entries[history.index] !== item.path) {
@@ -37,14 +52,14 @@ export function sync_navigation(item: desk_window): void {
     const head = item.el.querySelector(".desk_wbox_head")
     const previous = head?.querySelector<HTMLButtonElement>('[data-navigation="previous"]')
     const forward = head?.querySelector<HTMLButtonElement>('[data-navigation="forward"]')
-    if (previous) previous.disabled = history.index <= 0
-    if (forward) forward.disabled = history.index >= history.entries.length - 1
+    if (previous) previous.disabled = live ? !live.can_back : history.index <= 0
+    if (forward) forward.disabled = live ? !live.can_forward : history.index >= history.entries.length - 1
+    const value = live?.path || item.path || item.name
     const input = head?.querySelector<HTMLInputElement>(".desk_wbox_head_path")
-    if (input && document.activeElement !== input) input.value = item.path || item.name
+    if (input && document.activeElement !== input) input.value = value
     const crumbs = head?.querySelector<HTMLElement>(".desk_wbox_head_breadcrumbs")
     if (!crumbs) return
     crumbs.replaceChildren()
-    const value = item.path || item.name
     crumbs.title = value
     const edit = document.createElement("button")
     edit.type = "button"; edit.className = "desk_wbox_head_scheme"; edit.dataset.urlEdit = ""
@@ -65,15 +80,23 @@ export function sync_navigation(item: desk_window): void {
 }
 
 export function bind_navigation(item: desk_window, open: (uri: string) => Promise<void>, refresh: () => void): void {
+    const open_uri = (uri: string) => {
+        const live = live_navigation.get(item)
+        if (live) live.open(uri)
+        else void open(uri)
+    }
+    const value = () => live_navigation.get(item)?.path || item.path || item.name
     const head = item.el.querySelector(".desk_wbox_head")!
     const input = head.querySelector<HTMLInputElement>(".desk_wbox_head_path")!
     input.addEventListener("focus", () => input.select())
     input.addEventListener("keydown", event => {
-        if (event.key === "Escape") { input.value = item.path || item.name; input.blur(); return }
+        if (event.key === "Escape") { input.value = value(); input.blur(); return }
         if (event.key !== "Enter") return
-        event.preventDefault(); const value = input.value; input.blur(); void open(value)
+        event.preventDefault(); const uri = input.value; input.blur(); open_uri(uri)
     })
     const navigate = (action: string) => {
+        const live = live_navigation.get(item)
+        if (live) { live.navigate(action); return }
         if (action === "refresh") { refresh(); return }
         const history = histories.get(item)
         if (!history) return
@@ -85,9 +108,9 @@ export function bind_navigation(item: desk_window, open: (uri: string) => Promis
     actions.set(item, navigate)
     head.addEventListener("click", event => {
         const target = event.target as Element
-        if (target.closest("[data-url-edit]") || (target.closest(".desk_wbox_head_address") && !target.closest("[data-url], input"))) { input.value = item.path || item.name; input.focus(); input.select(); return }
+        if (target.closest("[data-url-edit]") || (target.closest(".desk_wbox_head_address") && !target.closest("[data-url], input"))) { input.value = value(); input.focus(); input.select(); return }
         const crumb = target.closest<HTMLElement>("[data-url]")
-        if (crumb?.dataset.url) { void open(crumb.dataset.url); return }
+        if (crumb?.dataset.url) { open_uri(crumb.dataset.url); return }
         const action = target.closest<HTMLElement>("[data-navigation]")?.dataset.navigation
         if (action) navigate(action)
     })

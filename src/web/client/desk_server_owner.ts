@@ -18,12 +18,14 @@ import { is_server_page } from "./server_text.ts"
 import { Server_Link, default_socket_url } from "./server_link.ts"
 import { remote_directory } from "./server_fs.ts"
 import { Window_Store } from "./server_windows.ts"
+import { mount_sessions } from "./server_sessions.ts"
 
 // The Chromium windows of the Pi (scripts' windows and standalone sites), filled while the owner's link is up
 export const owner_windows = new Window_Store()
 let link: Server_Link | null = null
 let restore: (() => Promise<void>) | null = null
 let starting = false
+let release_sessions: (() => void) | null = null
 const listeners = new Set<(link: Server_Link | null) => void>()
 
 export function owner_link(): Server_Link | null { return link }
@@ -58,6 +60,7 @@ async function start_owner(): Promise<void> {
         await filesystem_initialized()
         const current = new Server_Link({ url: default_socket_url() })
         link = current
+        release_sessions = mount_sessions(current, owner_windows)
         server.live_refresh = () => { current.send({ t: "fastfetch" }) }
         current.on("fastfetch", message => note_snapshot(String(message.text ?? ""), Number(message.taken_at) || Date.now()))
         for (const type of ["windows", "window_added", "window_updated", "window_removed"]) current.on(type, message => owner_windows.apply(message))
@@ -68,6 +71,7 @@ async function start_owner(): Promise<void> {
 }
 
 export async function stop_owner(): Promise<void> {
+    release_sessions?.(); release_sessions = null
     const current = link
     link = null
     server.live_refresh = null

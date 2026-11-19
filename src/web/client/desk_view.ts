@@ -18,6 +18,7 @@ import { no_picks } from "./desk_flow_rules.ts"
 import { message_body } from "./desk_messages.ts"
 import { auto_script_body } from "./server_script.ts"
 import { auto_site_body } from "./server_site.ts"
+import { bind_window_controls } from "./desk_window_controls.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -811,6 +812,7 @@ export function init_view(open_window: () => desk_window | null): void {
     window_hooks.created = item => {
         wire(item, open_window)
         wire_head(item)
+        bind_window_controls(item)
         fill_mime_list(item)
         render_window(item)
     }

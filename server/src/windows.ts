@@ -188,6 +188,8 @@ export class Window_Registry extends EventEmitter {
         // Chromium draws the DevTools into the window that was made for them, and never into one of its own
         contents.setDevToolsWebContents(window.webContents);
         contents.openDevTools({ mode: 'detach' });
+        // A hidden BrowserWindow does not composite frames under Xvfb.
+        if (process.env.JAZU_VIRTUAL_DISPLAY === '1') window.showInactive();
         item.info.devtools = { id: surface.id, ...devtools_start_size };
         this.emit('updated', item.info);
         if (this.#watched === item.id) await this.#sync_screencast();

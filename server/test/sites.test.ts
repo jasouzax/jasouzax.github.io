@@ -66,3 +66,15 @@ test("close_all closes everything", async () => {
     assert.deepEqual(made.map(web => web.closed), [true, true])
     assert.equal(registry.count, 0)
 })
+
+test("standalone popups and their descendants are tracked without a script parent", () => {
+    const { registry, made, tracked } = setup()
+    registry.open("parent", "https://example.com")
+    const child = new Fake_Web("https://example.com/popup")
+    const grandchild = new Fake_Web("https://example.com/child")
+    made[0].emit("popup", child)
+    child.emit("popup", grandchild)
+    assert.deepEqual(tracked.map(item => item.script), [site_script("parent"), "", ""])
+    assert.equal(tracked[1].web, child)
+    assert.equal(tracked[2].web, grandchild)
+})

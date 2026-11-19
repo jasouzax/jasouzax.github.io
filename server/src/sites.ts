@@ -18,6 +18,7 @@ export const site_script_prefix = "site:"
 
 export interface Site_Web {
     url: string
+    on(event: "popup", handler: (web: Site_Web) => void): unknown
     once(event: "close", handler: () => void): unknown
     close(): Promise<unknown>
 }
@@ -53,6 +54,13 @@ export class Site_Registry {
         if (this.#webs.has(key)) return true
         if (this.#webs.size >= (this.#options.max ?? max_sites)) return false
         const web = this.#options.make_web(url)
+        const watch_popups = (parent: Site_Web): void => {
+            parent.on("popup", child => {
+                this.#options.windows.track("", child)
+                watch_popups(child)
+            })
+        }
+        watch_popups(web)
         this.#webs.set(key, web)
         web.once("close", () => { if (this.#webs.get(key) === web) this.#webs.delete(key) })
         this.#options.windows.track(site_script(key), web)

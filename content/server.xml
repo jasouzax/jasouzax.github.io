@@ -24,6 +24,7 @@
                     <entry type="Folder" id="fs_var" name="var" info="Variable data" />
                 </entry>
             </menu>
+            <menu name="Sessions" icon="[window]" path="server:sessions" />
             <window path="server:fastfetch" type="text/plain" mode="view" />
         </desk>
     </page>
@@ -54,6 +55,7 @@
                     <entry type="Folder" id="fs_var" name="var" info="可変データ" />
                 </entry>
             </menu>
+            <menu name="セッション" icon="[window]" path="server:sessions" />
             <window path="server:fastfetch" type="text/plain" mode="view" />
         </desk>
     </page>

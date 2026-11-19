@@ -6,33 +6,33 @@
  *   init_site_sources   registers the sources of this view: http(s):// URLs and server:window:<id> (a window of a running script, or DevTools)
  * Sources
  *   https://...         a standalone site; its key is a hash of the URL, so every desk window of that URL meets the same Chromium window
- *   file *.auto.site    the first http(s) line of the file is the URL (the file is the bookmark; "view" shows it live, "edit" is the text)
+ *   file *.auto.site    the first http(s) line of the file is the URL (the file is the bookmark; "view" shows it live, "edit" is the DevTools feed)
  *   server:window:<id>  a window a script opened (the log view lists them) or the DevTools picture of one
  * Scope
  *   Only with the owner's link. Video arrives as JPEG frames of exactly the page's size, so a position in the picture is a position in the page.
  *   One stream per tab (the agent keeps the newest request): the window you touched last is the one that moves.
- *   Closing the desk window closes the Pi's site window unless another desk window shows it; closing a script's window is up to the script.
+ *   Closing a desk pane keeps its server session available in Sessions.
  * Limits
  *   Frames that arrive while one is still decoding replace each other, so a slow screen shows the newest picture, never a queue.
  */
 import type { desk_window } from "./desk.ts"
-import { new_window, state, text } from "./desk.ts"
-import { open_source, render_window, uri_handlers, process_hooks } from "./desk_view.ts"
+import { state, text } from "./desk.ts"
+import { render_window, uri_handlers, process_hooks } from "./desk_view.ts"
 import { owner_link, owner_windows } from "./desk_server_owner.ts"
 import { Touch_control } from "./server_touch.ts"
 import { server_audio } from "./server_audio.ts"
+import { override_navigation, sync_navigation, type Live_Navigation } from "./desk_navigation.ts"
+import { window_audio_enabled } from "./desk_window_controls.ts"
 import { Click_Counter, copy_shortcut, key_events, modifiers, mouse_button, page_point, wheel_pixels } from "./server_input.ts"
-import { is_site_url, site_key, site_url_of, window_id_of, window_uri } from "./server_windows.ts"
+import { is_site_url, site_key, site_url_of, window_id_of } from "./server_windows.ts"
 import type { Input_Event, Window_Info } from "../../../server/src/shared/protocol.ts"
 
 export const site_mime = "application/auto-site"
 const fit_debounce_ms = 150
 const min_fit_px = 100
+let active_feed: desk_window | null = null
 
 type Source = { kind: "window", id: number } | { kind: "site", key: string, url: string } | { kind: "error", message: string }
-
-// desk windows that show each site key: the Pi's window is closed when the last of them goes
-const site_users = new Map<string, Set<desk_window>>()
 
 async function resolve_source(item: desk_window): Promise<Source> {
     const path = item.path.trim()
@@ -54,14 +54,6 @@ function make<K extends keyof HTMLElementTagNameMap>(tag: K, class_name: string,
     return element
 }
 
-function bar_button(label: string, title: string): HTMLButtonElement {
-    const button = make("button", "server_site_button", label)
-    button.type = "button"
-    button.title = title
-    button.setAttribute("aria-label", title)
-    return button
-}
-
 export function auto_site_body(item: desk_window, signal: AbortSignal, fallback: () => HTMLElement): HTMLElement {
     const link = owner_link()
     if (!link) return fallback()
@@ -79,34 +71,33 @@ export function auto_site_body(item: desk_window, signal: AbortSignal, fallback:
 
 function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnType<typeof owner_link>>, source: Exclude<Source, { kind: "error" }>): HTMLElement[] {
     const store = owner_windows
-    let fit = true
     let watched: number | null = null
     let asked_open = false
-    let want_tools = false
+    let seen_window = false
+    let tools_requested = false
     let last_fit = ""
 
     // ---- the window this view shows: a given id, or the site's window once the Pi has opened it
-    const current_id = (): number | null => source.kind === "window" ? source.id : (store.of_site(source.key)?.id ?? null)
-    const picture = () => { const id = current_id(); return id === null ? undefined : store.picture(id) }
-    const info = (): Window_Info | undefined => picture()?.owner
+    const owner_id = (): number | null => source.kind === "window" ? (store.picture(source.id)?.owner.id ?? source.id) : (store.of_site(source.key)?.id ?? null)
+    const info = (): Window_Info | undefined => { const id = owner_id(); return id === null ? undefined : store.get(id) }
+    const picture = () => {
+        if (item.mode === "edit") { const tools = info()?.devtools; return tools ? store.picture(tools.id) : undefined }
+        const id = source.kind === "window" ? source.id : owner_id()
+        return id === null ? undefined : store.picture(id)
+    }
+    const current_id = (): number | null => picture()?.id ?? null
     const target = () => { const shown = picture(); return shown ? { id: shown.id, width: shown.width, height: shown.height } : null }
-
-    // ---- DOM
-    const back = bar_button("←", text("server_site_back"))
-    const forward = bar_button("→", text("server_site_forward"))
-    const reload = bar_button("⟳", text("server_site_reload"))
-    const address = make("input", "server_site_address")
-    address.type = "text"
-    address.spellcheck = false
-    address.setAttribute("aria-label", text("server_site_address"))
-    const fit_button = bar_button("⤢", text("server_site_fit"))
-    fit_button.setAttribute("aria-pressed", "true")
-    const tools_button = bar_button("</>", text("server_site_devtools"))
     const audio = server_audio()
-    const sound_button = bar_button("♪", text("server_site_sound"))
-    sound_button.hidden = !audio.is_supported
-    const bar = make("div", "server_site_bar")
-    bar.append(back, forward, reload, address, fit_button, sound_button, tools_button)
+    const navigation: Live_Navigation = {
+        path: info()?.url || (source.kind === "site" ? source.url : item.path), can_back: false, can_forward: false,
+        open: value => {
+            const id = owner_id(), uri = value.trim()
+            const url = is_site_url(uri) ? uri : `https://${uri}`
+            if (id !== null && uri && is_site_url(url)) link.send({ t: "window_navigate", id, url })
+        },
+        navigate: action => { const id = owner_id(); if (id !== null) link.send({ t: "window_navigate", id, delta: action === "previous" ? -1 : action === "forward" ? 1 : 0 }) },
+    }
+    const restore_navigation = override_navigation(item, navigation)
 
     const feed = make("div", "server_site_feed")
     const canvas = make("canvas", "server_site_canvas")
@@ -123,30 +114,38 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
 
     // ---- the stream: which picture, how wide
     const watch = (force = false): void => {
-        const id = document.hidden || !feed.isConnected || feed.offsetParent === null ? null : current_id()
+        if (active_feed && active_feed !== item) {
+            if (state.focused !== item) return
+            audio.reset()
+            active_feed = item
+        }
+        // The agent watches the owning page and streams both it and its DevTools.
+        const id = document.hidden || !feed.isConnected || feed.offsetParent === null ? null : owner_id()
+        if (id !== null) active_feed = item
         if (!force && id === watched) return
         // nothing of the old window's sound may linger when another one is watched
         if (id !== watched) audio.reset()
         watched = id
-        link.send({ t: "feed_watch", id, max_width: Math.ceil(feed.clientWidth * (window.devicePixelRatio || 1)) || 1280, audio: id !== null && audio.is_wanted })
+        link.send({ t: "feed_watch", id, max_width: Math.ceil(feed.clientWidth * (window.devicePixelRatio || 1)) || 1280, audio: id !== null && item.mode !== "edit" && window_audio_enabled(item) && audio.is_wanted })
     }
     const draw_state = (): void => {
         const shown = picture()
         if (shown) { delete feed.dataset.state; return }
-        feed.dataset.state = !link.connected || !link.online ? text("server_offline") : source.kind === "window" ? text("server_site_gone") : text("server_site_connecting")
+        feed.dataset.state = !link.connected || !link.online ? text("server_offline") : !seen_window && source.kind === "site" ? text("server_site_connecting") : text("server_site_gone")
         canvas.hidden = true
     }
     const sync = (): void => {
         const window_info = info()
-        // the DevTools picture of a window has no address bar of its own
-        const shown_now = picture()
-        bar.hidden = source.kind === "window" && shown_now !== undefined && shown_now.id !== shown_now.owner.id
-        back.disabled = !(window_info?.can_back)
-        forward.disabled = !(window_info?.can_forward)
-        if (window_info && document.activeElement !== address) address.value = window_info.url
-        tools_button.disabled = !window_info
-        tools_button.classList.toggle("active", Boolean(window_info?.devtools))
-        if (window_info?.devtools && want_tools) { want_tools = false; open_devtools_window(window_info.devtools.id) }
+        if (window_info) { asked_open = true; seen_window = true }
+        navigation.path = window_info?.url || navigation.path
+        navigation.can_back = Boolean(window_info?.can_back)
+        navigation.can_forward = Boolean(window_info?.can_forward)
+        sync_navigation(item)
+        if (item.mode === "edit" && window_info && !window_info.devtools && !tools_requested) {
+            tools_requested = true
+            link.send({ t: "window_devtools", id: window_info.id, open: true })
+        }
+        if (window_info?.devtools) tools_requested = false
         draw_state()
         watch()
         const shown = picture()
@@ -155,23 +154,15 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     }
     const open_site = (): void => {
         if (source.kind !== "site") return
-        const users = site_users.get(source.key) ?? new Set()
-        users.add(item)
-        site_users.set(source.key, users)
         link.send({ t: "site_open", key: source.key, url: source.url })
     }
-    const open_devtools_window = (id: number): void => {
-        const created = new_window()
-        if (created) void open_source(created, window_uri(id))
-    }
-
     // ---- fitting the page to the window
     let fit_timer: number | undefined
     const apply_fit = (): void => {
         const shown = picture()
-        if (!shown || shown.id !== info()?.id) return
+        if (!shown) return
         const width = Math.floor(feed.clientWidth), height = Math.floor(feed.clientHeight)
-        const size = fit && width >= min_fit_px && height >= min_fit_px ? { width, height } : null
+        const size = width >= min_fit_px && height >= min_fit_px ? { width, height } : null
         const signature = size ? `${size.width}x${size.height}` : "default"
         if (signature === last_fit) return
         last_fit = signature
@@ -203,7 +194,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const off_frames = link.on_binary(frame => {
         if (frame.id !== current_id()) return
         if (frame.kind === "video") void paint(frame.payload)
-        else audio.push(frame.timestamp, frame.payload)
+        else if (active_feed === item && window_audio_enabled(item) && item.mode !== "edit") audio.push(frame.timestamp, frame.payload)
     })
 
     // ---- pointer
@@ -280,44 +271,28 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
         void write.catch(() => undefined)
     })
 
-    // ---- the bar
-    back.addEventListener("click", () => { const id = current_id(); if (id !== null) link.send({ t: "window_navigate", id, delta: -1 }) })
-    forward.addEventListener("click", () => { const id = current_id(); if (id !== null) link.send({ t: "window_navigate", id, delta: 1 }) })
-    reload.addEventListener("click", () => { const id = current_id(); if (id !== null) link.send({ t: "window_navigate", id, delta: 0 }) })
-    address.addEventListener("keydown", event => {
-        if (event.key !== "Enter") return
-        event.preventDefault()
-        const id = current_id()
-        const value = address.value.trim()
-        if (id === null || !value) return
-        const url = is_site_url(value) ? value : `https://${value}`
-        if (is_site_url(url)) { link.send({ t: "window_navigate", id, url }); keys.focus({ preventScroll: true }) }
-    })
-    fit_button.addEventListener("click", () => {
-        fit = !fit
-        fit_button.classList.toggle("active", fit)
-        fit_button.setAttribute("aria-pressed", String(fit))
-        last_fit = ""
-        apply_fit()
-    })
-    tools_button.addEventListener("click", () => {
-        const window_info = info()
-        if (!window_info) return
-        if (window_info.devtools) link.send({ t: "window_devtools", id: window_info.id, open: false })
-        else { want_tools = true; link.send({ t: "window_devtools", id: window_info.id, open: true }) }
-    })
-    const draw_sound = (): void => {
-        sound_button.classList.toggle("active", audio.enabled && audio.is_running)
-        sound_button.setAttribute("aria-pressed", String(audio.enabled))
-        // the first touch unlocks the browser's audio: the stream then asks the Pi for sound
-        if (audio.is_wanted !== wanted_sound) { wanted_sound = audio.is_wanted; watch(true) }
-    }
+    // The shared header owns sound; the feed only requests packets while this window wants them.
     let wanted_sound = false
-    sound_button.addEventListener("click", () => { audio.enabled = !audio.enabled })
-    audio.on_change = draw_sound
+    const draw_sound = (): void => {
+        const wanted = window_audio_enabled(item) && audio.is_wanted
+        if (wanted !== wanted_sound) { wanted_sound = wanted; watch(true) }
+    }
+    const change_sound = (): void => {
+        active_feed = item
+        audio.enabled = window_audio_enabled(item)
+        if (!audio.enabled) audio.reset()
+        watch(true)
+    }
+    item.el.addEventListener("jazu:window-audio", change_sound)
+    const off_sound = audio.on_change(draw_sound)
     // the picture you touched last is the one the Pi streams
-    const claim = (): void => watch(true)
-    feed.addEventListener("pointerdown", claim)
+    const claim = (): void => {
+        if (active_feed !== item) audio.reset()
+        active_feed = item
+        if (audio.enabled !== window_audio_enabled(item)) audio.enabled = window_audio_enabled(item)
+        watch(true)
+    }
+    item.el.addEventListener("pointerdown", claim)
     feed.addEventListener("focusin", claim)
     const on_visibility = (): void => watch(true)
     document.addEventListener("visibilitychange", on_visibility)
@@ -326,26 +301,23 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const offs = [store.on_change(sync), link.on_state(sync), off_frames, off_clipboard]
     signal.addEventListener("abort", () => {
         for (const off of offs) off()
-        if (audio.on_change === draw_sound) audio.on_change = () => {}
-        audio.reset()
+        restore_navigation()
+        item.el.removeEventListener("jazu:window-audio", change_sound)
+        item.el.removeEventListener("pointerdown", claim)
+        off_sound()
         observer.disconnect()
         clearTimeout(fit_timer)
         document.removeEventListener("visibilitychange", on_visibility)
-        if (watched !== null) link.send({ t: "feed_watch", id: null, max_width: 1 })
-        if (source.kind === "site") {
-            const key = source.key
-            // a mode switch re-renders the same window; only a window that is gone or shows something else lets go of the site
-            setTimeout(() => {
-                const users = site_users.get(key)
-                if (!users) return
-                if (!state.windows.includes(item) || item.mime !== site_mime) users.delete(item)
-                if (users.size === 0) { site_users.delete(key); owner_link()?.send({ t: "site_close", key }) }
-            }, 0)
+        if (active_feed === item) {
+            active_feed = null
+            audio.reset()
+            if (watched !== null) link.send({ t: "feed_watch", id: null, max_width: 1 })
         }
+
     }, { once: true })
 
     sync()
-    return [bar, feed]
+    return [feed]
 }
 
 // An empty source for the window of an http(s):// address or a script's window: the item becomes a file-less application/auto-site window

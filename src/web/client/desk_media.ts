@@ -1,4 +1,5 @@
 import type { desk_window } from "./desk.ts"
+import { window_audio_enabled } from "./desk_window_controls.ts"
 
 // Inline strokes stay legible even before the site's icon font has loaded.
 const icons: Record<string, string> = {
@@ -47,9 +48,6 @@ export function media_player(item: desk_window, url: string, failed: () => void)
         tools.append(node)
         return node
     }
-    const fullscreen = (): void => {
-        void (document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen()).catch(() => {})
-    }
     const popup = (label: string): HTMLDetailsElement => {
         const details = document.createElement("details")
         details.className = "desk_wbox_body_media_popup"
@@ -77,7 +75,6 @@ export function media_player(item: desk_window, url: string, failed: () => void)
         button("+", () => { zoom = Math.min(8, zoom * 1.25); draw() }).setAttribute("aria-label", "Zoom in")
         button("Fit", () => { zoom = 1; rotation = 0; draw() })
         button("Rotate", () => { rotation = (rotation + 90) % 360; draw() })
-        button("Fullscreen", fullscreen)
         image.addEventListener("error", failed, { once: true })
         box.append(viewport, head, tools)
         return box
@@ -86,6 +83,7 @@ export function media_player(item: desk_window, url: string, failed: () => void)
     media.className = `desk_wbox_body_media_${media.tagName.toLowerCase()}`
     media.src = url
     media.preload = "metadata"
+    media.muted = !window_audio_enabled(item)
     if (media instanceof HTMLVideoElement) media.playsInline = true
     const timeline = document.createElement("div")
     timeline.className = "desk_wbox_body_media_time"
@@ -101,19 +99,15 @@ export function media_player(item: desk_window, url: string, failed: () => void)
         if (media.paused) void media.play().catch(() => {})
         else media.pause()
     })
-    const mute = button("Mute", () => {
-        if (media.volume === 0) { media.volume = 1; media.muted = false }
-        else media.muted = !media.muted
-    })
     const volume = document.createElement("input")
     volume.type = "range"
     volume.min = "0"; volume.max = "1"; volume.step = "0.01"; volume.value = "1"
     volume.setAttribute("aria-label", "Volume")
-    volume.addEventListener("input", () => { media.volume = Number(volume.value); media.muted = false })
+    volume.addEventListener("input", () => { media.volume = Number(volume.value); media.muted = !window_audio_enabled(item) })
     const volume_popup = popup("Mute")
     const volume_panel = document.createElement("div")
     volume_panel.className = "desk_wbox_body_media_popup_panel"
-    volume_panel.append(mute, volume)
+    volume_panel.append(volume)
     volume_popup.append(volume_panel)
     const time = document.createElement("span")
     time.className = "desk_wbox_body_media_tool_time"
@@ -150,22 +144,13 @@ export function media_player(item: desk_window, url: string, failed: () => void)
         if (document.pictureInPictureEnabled) button("Picture in picture", () => {
             void (document.pictureInPictureElement ? document.exitPictureInPicture() : media.requestPictureInPicture()).catch(() => {})
         })
-        const full = button("Fullscreen", fullscreen)
-        full.className = "desk_wbox_body_media_tool_full"
-        box.addEventListener("fullscreenchange", () => {
-            const active = document.fullscreenElement === box
-            button_icon(full, active ? "Exit fullscreen" : "Fullscreen")
-            full.setAttribute("aria-pressed", String(active))
-        })
-        full.setAttribute("aria-pressed", "false")
+
     }
     const clock = (seconds: number): string => Number.isFinite(seconds) ? `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}` : "0:00"
     const update = (): void => {
         button_icon(play, media.paused ? "Play" : "Pause")
-        button_icon(mute, media.muted || media.volume === 0 ? "Unmute" : "Mute")
         button_icon(volume_popup.firstElementChild as HTMLElement, media.muted || media.volume === 0 ? "Unmute" : "Mute")
         volume_popup.firstElementChild!.setAttribute("aria-label", "Volume controls")
-        mute.setAttribute("aria-pressed", String(media.muted))
         seek.disabled = !Number.isFinite(media.duration) || media.duration <= 0
         seek.max = seek.disabled ? "0" : String(media.duration)
         seek.value = String(media.currentTime)

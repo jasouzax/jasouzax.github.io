@@ -6459,30 +6459,6 @@ body::after {
 .server_site { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .server_site_note { margin: auto; padding: 1.5em; color: var(--text-dim); text-align: center; }
 
-.server_site_bar {
-    display: flex;
-    align-items: center;
-    gap: .35em;
-    padding: .3em .5em;
-    background: var(--panel-2);
-}
-
-.server_site_button,
-.server_site_address {
-    font: inherit;
-    color: var(--text);
-    background: var(--tint-1);
-    border: 1px solid var(--line);
-    border-radius: .4em;
-}
-
-.server_site_button { padding: .2em .6em; cursor: pointer; }
-.server_site_button:hover:not(:disabled) { background: var(--tint-2); }
-.server_site_button:disabled { opacity: .4; cursor: default; }
-.server_site_button.active { background: var(--tint-3); }
-.server_site_address { flex: 1 1 auto; min-width: 0; padding: .25em .6em; }
-
-// Live site feed (application/auto-site): the picture of a Chromium window of the Pi, its virtual touch mouse and the hidden keyboard field
 .server_site_feed {
     position: relative;
     flex: 1 1 auto;
@@ -8353,7 +8329,7 @@ body:has(#motion_pause:checked) {
 @media (orientation: portrait) {
     .desk_wbox_head {
         display: grid;
-        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) auto auto auto;
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) repeat(5, auto);
         grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
         align-items: center;
         height: auto;
@@ -8368,9 +8344,11 @@ body:has(#motion_pause:checked) {
             text-align: center;
         }
         > .desk_wbox_head_navigation { grid-area: 1 / 2; }
-        > .desk_wbox_head_save { grid-area: 1 / 5; }
-        > .desk_wbox_head_split { grid-area: 1 / 6; }
-        > .desk_wbox_head_drop { grid-area: 1 / 7; }
+        > .desk_wbox_head_fullscreen { grid-area: 1 / 5; }
+        > .desk_wbox_head_audio { grid-area: 1 / 6; }
+        > .desk_wbox_head_save { grid-area: 1 / 7; }
+        > .desk_wbox_head_split { grid-area: 1 / 8; }
+        > .desk_wbox_head_drop { grid-area: 1 / 9; }
         > .desk_wbox_head_tool,
         > .desk_wbox_head_drop > summary {
             box-sizing: border-box;
@@ -8519,3 +8497,14 @@ body:has(#motion_pause:checked) {
 .desk_pdf_controls button { padding: .2em .4em; }
 .desk_pdf_viewport { flex: 1; min-height: 0; overflow: auto; padding: 1em; background: #555; }
 .desk_pdf_viewport canvas { display: block; margin: auto; background: white; }
+
+.desk_wbox:fullscreen { display: flex; flex-direction: column; background: var(--panel); padding: 0; }
+.desk_wbox:fullscreen > :not(.desk_wbox_head) { flex: 1 1 auto; min-height: 0; }
+.desk_wbox_head_audio[aria-pressed=false] { opacity: .5; }
+.desk_wbox_head_fullscreen[aria-pressed=true] { color: var(--accent); }
+
+.server_session_row { display: flex; gap: .25em; align-items: center; min-width: 0; padding: .25em .5em; }
+.server_session_open { flex: 1; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.server_session_windows { padding-inline-start: 1em; }
+.server_session_script + .server_session_script { border-top: 1px solid var(--edge); }
+.server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }

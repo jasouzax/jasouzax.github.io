@@ -1,0 +1,179 @@
+import type { WebSocketRoute } from "@playwright/test"
+import { test, expect, type Page } from "./desk_fixture.ts"
+import type { Window_Info } from "../server/src/shared/protocol.ts"
+
+async function owner(page: Page) {
+    const messages: any[] = []
+    let socket: WebSocketRoute
+    const windows: Window_Info[] = [
+        { id: 1, script: "/run.auto.js", title: "Script page", url: "https://example.com/start", icon: "", width: 800, height: 600, devtools: null },
+        { id: 2, script: "site:standalone", title: "Standalone page", url: "https://example.com/standalone", icon: "", width: 800, height: 600, devtools: null },
+        { id: 3, script: "", title: "Orphan popup", url: "https://example.com/popup", icon: "", width: 800, height: 600, devtools: null },
+    ]
+    const histories = new Map(windows.map(window => [window.id, { urls: [window.url], index: 0 }]))
+    const files: Record<string, string> = { "/run.auto.js": "console.log('running'); setInterval(() => {}, 1000)", "/bookmark.auto.site": "https://example.com/bookmark" }
+    let jpeg = Buffer.alloc(0)
+    const send = (message: object) => socket.send(JSON.stringify(message))
+    const frame = (id: number) => {
+        if (!jpeg.length) return
+        const bytes = Buffer.alloc(5 + jpeg.length); bytes[0] = 1; bytes.writeUInt32BE(id, 1); jpeg.copy(bytes, 5); socket.send(bytes)
+    }
+    const update = (id: number, url: string, delta?: number) => {
+        const window = windows.find(window => window.id === id)!
+        const history = histories.get(id) ?? { urls: [window.url], index: 0 }
+        histories.set(id, history)
+        if (delta) history.index = Math.max(0, Math.min(history.urls.length - 1, history.index + delta))
+        else if (url !== history.urls[history.index]) { history.urls.splice(history.index + 1); history.urls.push(url); history.index++ }
+        window.url = history.urls[history.index]; window.can_back = history.index > 0; window.can_forward = history.index < history.urls.length - 1
+        send({ t: "window_updated", window })
+    }
+    await page.route("**/api/server", route => route.fulfill({ json: { online: true, owner: true, stale: false, snapshot: { text: "Test Pi", taken_at: Date.now() } } }))
+    await page.routeWebSocket("**/api/server/ws", route => {
+        socket = route
+        route.send(JSON.stringify({ t: "welcome", peer: "test", online: true }))
+        route.onMessage(raw => {
+            if (raw === "ping") return route.send("pong")
+            const message = JSON.parse(String(raw)); messages.push(message)
+            if (message.t === "auto_state") { send({ t: "auto_state", scripts: [{ path: "/run.auto.js", running: true, windows: 1 }] }); send({ t: "windows", windows }) }
+            if (message.t === "auto_logs") send({ t: "auto_logs", path: message.path, entries: [] })
+            if (message.t === "fastfetch") send({ t: "fastfetch", text: "Test Pi", taken_at: Date.now() })
+            if (message.t === "fs") {
+                let result: any = { op: message.op }
+                if (message.op === "list") result.entries = message.path === "/" ? Object.keys(files).map(path => ({ name: path.slice(1), kind: "file", size: files[path].length, mtime: 0 })) : []
+                if (message.op === "stat") {
+                    if (!(message.path in files) && message.path !== "/") return send({ t: "fs_err", id: message.id, code: "ENOENT", message: "Not found" })
+                    result.stat = { kind: message.path in files ? "file" : "dir", size: files[message.path]?.length ?? 0, mtime: 0, mode: 0o755, writable: true }
+                }
+                if (message.op === "read") { const data = files[message.path] ?? ""; result = { op: "read", data: Buffer.from(data).toString("base64"), size: data.length, eof: true } }
+                send({ t: "fs_ok", id: message.id, result })
+            }
+            if (message.t === "site_open") {
+                const window: Window_Info = { ...windows[0], id: 4, script: `site:${message.key}`, title: "Bookmark page", url: message.url, devtools: null }
+                windows.push(window); send({ t: "window_added", window })
+            }
+            if (message.t === "window_navigate") update(message.id, message.url || "", message.delta)
+            if (message.t === "window_devtools") {
+                const window = windows.find(window => window.id === message.id)!
+                window.devtools = message.open ? { id: window.id + 100, width: 800, height: 360 } : null
+                send({ t: "window_updated", window }); setTimeout(() => { if (window.devtools) frame(window.devtools.id) }, 40)
+            }
+            if (message.t === "feed_watch" && message.id !== null) {
+                const window = windows.find(window => window.id === message.id)
+                setTimeout(() => { frame(message.id); if (window?.devtools) frame(window.devtools.id) }, 30)
+            }
+            if (message.t === "window_close") { const index = windows.findIndex(window => window.id === message.id); windows.splice(index, 1); send({ t: "window_removed", id: message.id }) }
+            if (message.t === "auto_stop") send({ t: "auto_status", path: message.path, running: false })
+        })
+    })
+    await page.goto("/server")
+    jpeg = Buffer.from(await page.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8; canvas.getContext("2d")!.fillRect(0, 0, 8, 8); return canvas.toDataURL("image/jpeg").split(",")[1] }), "base64")
+    await expect.poll(() => messages.some(message => message.t === "auto_state")).toBe(true)
+    return { messages, update, send }
+}
+async function sessions(page: Page) {
+    await page.locator("#head_menu > summary").click()
+    await page.locator('.desk_side_tabs_drop[data-path="server:sessions"] > summary').click()
+    return page.locator('.desk_side_page[data-path="server:sessions"]')
+}
+
+test("Sessions groups scripts and opens sites, scripts and orphan windows in view mode", async ({ page }) => {
+    const api = await owner(page), panel = await sessions(page)
+    await expect(panel.locator(".server_session_script")).toHaveCount(1)
+    await expect(panel.locator('.server_session_script [data-session-uri="server:window:1"]')).toHaveText("Script page")
+    await expect(panel.locator(':scope > .server_session_row')).toHaveCount(2)
+    await panel.locator('[data-session-uri="file:///run.auto.js"]').click()
+    const script = page.locator('.desk_wbox').last()
+    await expect(script).toHaveAttribute("data-plugin", "auto_script")
+    await script.locator('[data-mode="edit"]').click()
+    await panel.locator('[data-session-uri="file:///run.auto.js"]').click()
+    await expect(script.locator('[data-mode="view"]')).toBeChecked()
+    await panel.locator('[data-session-uri="server:window:3"]').click()
+    const popup = page.locator('.desk_wbox').last()
+    await expect(popup.locator(".server_site_canvas")).toBeVisible()
+    await expect(popup.locator('[data-mode="view"]')).toBeChecked()
+    await expect(popup.locator(".server_site_bar")).toHaveCount(0)
+    await panel.locator('[data-session-uri="server:window:2"]').click()
+    const standalone = page.locator('.desk_wbox').last()
+    await expect(standalone.locator(".server_site_canvas")).toBeVisible()
+    await page.keyboard.press("Control+Shift+Enter")
+    await expect(panel.locator('[data-session-uri="server:window:2"]')).toBeVisible()
+    expect(api.messages.some(message => message.t === "site_close")).toBe(false)
+    await panel.locator('[data-session-uri="server:window:2"]').click()
+    await panel.locator('.server_session_row').filter({ has: page.locator('[data-session-uri="server:window:2"]') }).locator('.server_session_close').click()
+    await expect(panel.locator('[data-session-uri="server:window:2"]')).toHaveCount(0)
+    await api.send({ t: "auto_status", path: "/run.auto.js", running: false })
+    await expect(panel.locator('.server_session_script')).toHaveCount(0)
+})
+
+test("site headers follow page navigation and Edit shows DevTools in the same pane", async ({ page }) => {
+    const api = await owner(page), panel = await sessions(page)
+    await panel.locator('[data-session-uri="server:window:1"]').click()
+    const pane = page.locator('.desk_wbox').last(), address = pane.locator('.desk_wbox_head_path')
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await expect(address).toHaveValue('https://example.com/start')
+    api.update(1, 'https://example.com/clicked')
+    await expect(address).toHaveValue('https://example.com/clicked')
+    await expect(pane.locator('[data-navigation="previous"]')).toBeEnabled()
+    await pane.locator('[data-navigation="previous"]').click()
+    await expect(address).toHaveValue('https://example.com/start')
+    await pane.locator('[data-navigation="forward"]').click()
+    await expect(address).toHaveValue('https://example.com/clicked')
+    await address.fill('https://example.com/typed'); await address.press('Enter')
+    await expect(address).toHaveValue('https://example.com/typed')
+    await pane.locator('[data-navigation="refresh"]').click()
+    expect(api.messages.filter(message => message.t === 'window_navigate').at(-1).delta).toBe(0)
+    const count = await page.locator('.desk_wbox').count()
+    await pane.locator('[data-mode="edit"]').click()
+    await expect.poll(() => api.messages.some(message => message.t === 'window_devtools' && message.id === 1 && message.open)).toBe(true)
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await expect(pane.locator('.desk_wbox_body_text')).toHaveCount(0)
+    await expect(page.locator('.desk_wbox')).toHaveCount(count)
+    await pane.locator('[data-mode="view"]').click()
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await pane.locator('.desk_wbox_head_audio').click()
+    await expect(pane.locator('.desk_wbox_head_audio')).toHaveAttribute('aria-pressed', 'false')
+    await expect.poll(() => api.messages.filter(message => message.t === 'feed_watch' && message.id === 1).at(-1)?.audio).toBe(false)
+})
+
+test("every window has fullscreen and audio before save, with settings preserved across modes", async ({ page }) => {
+    await page.goto('/desk')
+    const pane = page.locator('.desk_wbox').first(), head = pane.locator('.desk_wbox_head')
+    expect(await head.locator(':scope > button').evaluateAll(buttons => buttons.slice(0, 3).map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_fullscreen', 'desk_wbox_head_audio', 'desk_wbox_head_save'])
+    await pane.locator('.desk_wbox_head_audio').click()
+    await pane.locator('[data-mode="edit"]').click()
+    await expect(pane.locator('.desk_wbox_head_audio')).toHaveAttribute('aria-pressed', 'false')
+    await pane.locator('.desk_wbox_head_fullscreen').click()
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.classList.contains('desk_wbox'))).toBe(true)
+    await pane.locator('.desk_wbox_head_fullscreen').click()
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true)
+    for (const width of [320, 390, 768]) {
+        await page.setViewportSize({ width, height: 1000 })
+        for (const name of ['fullscreen', 'audio', 'save']) await expect(pane.locator(`.desk_wbox_head_${name}`)).toBeVisible()
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    }
+    await page.screenshot({ path: '.cache/desk-browser-results/server-header-portrait.png' })
+})
+
+
+test("an auto-site file switches between its page and DevTools without opening a second session", async ({ page }) => {
+    const api = await owner(page)
+    const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
+    await address.fill('file:///bookmark.auto.site'); await address.press('Enter')
+    await expect(pane).toHaveAttribute('data-plugin', 'auto_site')
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await expect(address).toHaveValue('https://example.com/bookmark')
+    await pane.locator('[data-mode="edit"]').click()
+    await expect.poll(() => api.messages.some(message => message.t === 'window_devtools' && message.id === 4 && message.open)).toBe(true)
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await expect(pane.locator('.desk_wbox_body_text_input')).toHaveCount(0)
+    await pane.locator('[data-mode="view"]').click()
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(1)
+    const panel = await sessions(page)
+    await expect(panel.locator('[data-session-uri="server:window:4"]')).toBeVisible()
+    await panel.locator('.server_session_row').filter({ has: page.locator('[data-session-uri="server:window:4"]') }).locator('.server_session_close').click()
+    await expect(panel.locator('[data-session-uri="server:window:4"]')).toHaveCount(0)
+    await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
+    expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(1)
+    await page.screenshot({ path: '.cache/desk-browser-results/server-site-view.png' })
+})

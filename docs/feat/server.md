@@ -18,7 +18,7 @@
 - [x] `/server` page: shared virtual desk with one fastfetch window; offline state
 - [x] Page link: owner socket, heartbeat, reconnect, request/answer (`server_link.ts`)
 - [x] Owner mode logic: Pi filesystem handles, pty session, window store, site keys, input mapping, log store (unit tests, the real agent channel on a temp directory)
-- [ ] Owner mode in a browser: Pi filesystem as the desk root, Pi terminal, script view (logs, start/stop), site feed view (touch, zoom, sound, fit, DevTools). The DOM glue (`desk_server_owner.ts`, `server_script.ts`, `server_site.ts`, `server_touch.ts`, `server_audio.ts`) has no automated test; no browser in the development sandbox
+- [ ] Owner mode in a browser: Pi filesystem as the desk root, Pi terminal, script view (logs, start/stop), site feed view (touch, zoom, sound, fit, DevTools). Browser coverage now exercises Sessions, script/site opening, shared navigation/history, View/Edit feed switching, fullscreen and audio controls using a mocked owner channel; real signed-in Pi/phone integration remains to verify
 - [ ] Verify on the real Pi, Worker and a phone (not possible in the development sandbox: no Electron, no Cloudflare)
 
 ## Page side (`src/web/client`)
@@ -33,7 +33,7 @@
 | `server_script.ts`, `server_script_model.ts` | `auto_script` host: log, errors-only, clear, Start/Stop, windows of the script |
 | `server_site.ts`, `server_windows.ts`, `server_input.ts`, `server_touch.ts`, `server_audio.ts` | `auto_site` host: live JPEG feed, address bar, fit, DevTools, sound, mouse/keyboard/clipboard, virtual touch mouse and zoom |
 
-Sources that open the feed (owner link only): an `http(s)://` address typed into a window, a `*.auto.site` file whose first non-comment line is an http(s) URL (view = live, edit = the text), and `server:window:<id>` (a window a script opened, or its DevTools). A site's agent key is a hash of its URL, so two desk windows of one URL share one Chromium window; closing the last desk window closes it. One feed streams per tab: the window touched last (the agent keeps the newest `feed_watch`).
+Sources that open the feed (owner link only): an `http(s)://` address typed into a window, a `*.auto.site` file whose first non-comment line is an http(s) URL (view = live page, edit = its DevTools feed), and `server:window:<id>` (a window a script opened, or its DevTools). A site's agent key is a hash of its URL, so two desk windows of one URL share one Chromium window; closing a desk pane keeps its session available in Sessions. One feed streams per tab: the window touched last (the agent keeps the newest `feed_watch`).
 
 Without the owner link an `*.auto.js` view is the plain code, a `*.auto.site` view is its text, and an `http(s)://` source loads as before.
 
@@ -47,7 +47,7 @@ Without the owner link an `*.auto.js` view is the plain code, a `*.auto.site` vi
 |---|---|---|
 | Anyone, agent offline | One window: "server offline" and the last snapshot, dimmed | Durable Object storage |
 | Anyone, agent online | One window with the `fastfetch` text, a shared virtual file system exactly like `/desk` (edits stay in the browser) | Snapshot cache, refreshed at most once a minute |
-| Signed in as an allowed owner (`SERVER_OWNER_EMAILS`, default the Google admin e-mail), agent online | The same desk, but `/` is the Pi's real file system, terminals are real Pi shells, `application/auto-javascript` and `application/auto-site` windows are live | WebSocket through the Durable Object |
+| Signed in as an allowed owner (`SERVER_OWNER_EMAILS`, default the Google admin e-mail), agent online | The same desk, but `/` is the agent's file system, terminals are agent shells, `application/auto-javascript` and `application/auto-site` windows are live | WebSocket through the Durable Object |
 
 Authentication is Jazu's existing session (`__Host-jazu_session`, `read_session`). The check is server-side in the Worker; the Durable Object trusts only requests the Worker marks as owner. Other accounts get the public view (per-account containers are planned, not built).
 
@@ -89,7 +89,7 @@ An Electron app started by hand on the Pi (`cd server && npm start`, or `npm run
 
 ### Page
 
-`desk_server.ts` reads `/api/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector bar, window-size toggle, back/forward/refresh, DevTools and sound.
+`desk_server.ts` reads `/api/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector hints and sound. The existing window head owns back/refresh/forward and the live URL, following Chromium history for link clicks and typed addresses. Every window has Fullscreen and Audio before Save, in every mode; the audio preference stays with the window across mode/type changes. For `application/auto-site`, View shows the page and Edit shows that page's DevTools feed in the same pane. The Sessions side lists running scripts with their windows, standalone sites, and parentless popups; clicking any entry opens it in View. Closing a desk pane leaves its server session running; Sessions can stop scripts or close native windows.
 
 ### Wire protocol (summary)
 
