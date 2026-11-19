@@ -55,6 +55,7 @@ Available hosts:
 | `pdf` | Lazy local PDF.js canvas viewer |
 | `image_pdf` | Image to JPEG normalization, img2pdf WASM, PDF |
 | `mirror` | Ordinary viewer selection over a shared parent document |
+| `auto_script` | Log of an `application/auto-javascript` script with Start/Stop (owner's `/server` desk; the plain code without it) |
 | `default` | Upload area, resource error or unsupported-resource message |
 
 Double-click a sidebar folder, or enter a folder URI such as

@@ -6376,6 +6376,76 @@ body::after {
 }
 
 // a process window (pid:N): the terminal of a shell. History above, the line in progress (the prompt) and the input on the last row.
+// Log view of an automation script (application/auto-javascript, view mode): head with count and actions, the log, Start/Stop below
+.server_script {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    font-size: .9em;
+}
+
+.server_script_head,
+.server_script_foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .35em .75em;
+    background: var(--panel-2);
+}
+
+.server_script_count,
+.server_script_state { color: var(--text-dim); }
+
+.server_script_actions { display: flex; gap: .4em; }
+
+.server_script button {
+    font: inherit;
+    padding: .2em .7em;
+    color: var(--text);
+    background: var(--tint-1);
+    border: 1px solid var(--line);
+    border-radius: .4em;
+    cursor: pointer;
+}
+
+.server_script button:hover:not(:disabled) { background: var(--tint-2); }
+.server_script button:disabled { opacity: .5; cursor: default; }
+.server_script button.active { background: var(--tint-3); }
+
+.server_script_toggle { min-width: 5.5em; font-weight: 600; }
+.server_script[data-running="true"] .server_script_toggle { border-color: var(--danger, #d64545); }
+.server_script[data-running="true"] .server_script_state::before { content: "\25CF  "; color: var(--accent); }
+
+.server_script_logs {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: .25em 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .95em;
+    line-height: 1.45;
+}
+
+.server_script_logs:empty::after {
+    content: attr(data-empty);
+    display: block;
+    padding: 1em .75em;
+    color: var(--text-dim);
+}
+
+.server_script_log { padding: .1em .75em; border-top: 1px solid var(--tint-1); }
+.server_script_log:hover { background: var(--tint-1); }
+.server_script_time { display: block; font-size: .8em; color: var(--text-dim); }
+.server_script_text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.server_script_log_system .server_script_text { color: var(--text-dim); font-style: italic; }
+.server_script_log_error { background: color-mix(in srgb, var(--danger, #d64545) 12%, transparent); }
+.server_script_log_error .server_script_text { color: var(--danger, #d64545); }
+.server_script_log_warn .server_script_text { color: #b7791f; }
+.server_script_log_info .server_script_text,
+.server_script_log_debug .server_script_text { color: var(--accent); }
+
 .desk_wbox_body_term {
     flex: 1 1 auto;
     min-height: 0;

@@ -16,6 +16,7 @@ import { html_body, pdf_body, image_pdf_body } from "./desk_preview.ts"
 import { comparison_lines } from "./desk_compare.ts"
 import { no_picks } from "./desk_flow_rules.ts"
 import { message_body } from "./desk_messages.ts"
+import { auto_script_body } from "./server_script.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -520,12 +521,17 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     }
 }
 
+// the log view of an automation script; without the owner's link it is the plain (read-only) code
+function script_body(item: desk_window, signal: AbortSignal): HTMLElement {
+    return auto_script_body(item, signal, () => text_layout_body(item))
+}
+
 function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_mirror_body"
     const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
-        messages: message_body, state, text, render_window, save_window }
+        messages: message_body, auto_script: script_body, state, text, render_window, save_window }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
         for (const { context, module } of candidates) {
@@ -556,7 +562,7 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, state, text, render_window, save_window }
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
