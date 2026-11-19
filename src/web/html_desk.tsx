@@ -541,6 +541,7 @@ const runtime_keys = [
     "server_script_empty_errors",
     "server_script_running",
     "server_script_stopped",
+    "server_script_new_window",
     "server_site_back",
     "server_site_forward",
     "server_site_reload",

@@ -6418,6 +6418,16 @@ body::after {
 .server_script[data-running="true"] .server_script_toggle { border-color: var(--danger, #d64545); }
 .server_script[data-running="true"] .server_script_state::before { content: "\25CF  "; color: var(--accent); }
 
+.server_script_windows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35em;
+    padding: .35em .75em;
+    border-top: 1px solid var(--line);
+}
+
+.server_script_window { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .server_script_logs {
     flex: 1 1 auto;
     min-height: 0;

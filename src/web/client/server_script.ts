@@ -10,9 +10,11 @@
  *   Only the owner's desk has a link; everybody else sees the code read-only. Start runs the file as saved on the Pi (save edits first).
  */
 import type { desk_window } from "./desk.ts"
-import { text } from "./desk.ts"
+import { new_window, text } from "./desk.ts"
+import { open_source } from "./desk_view.ts"
 import { local_file_path } from "./desk_paths.ts"
-import { owner_link } from "./desk_server_owner.ts"
+import { owner_link, owner_windows } from "./desk_server_owner.ts"
+import { window_uri } from "./server_windows.ts"
 import { Log_Store, count_label, log_stamp, max_log_entries } from "./server_script_model.ts"
 import type { Log_Entry } from "../../../server/src/shared/protocol.ts"
 
@@ -52,7 +54,13 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
     toggle.title = "Ctrl+Enter"
     const foot = make("div", "server_script_foot")
     foot.append(state, toggle)
-    root.append(head, list, foot)
+    // the windows this script opened: each opens as a live feed in its own desk window
+    const strip = make("div", "server_script_windows")
+    const add_window = make("button", "server_script_new_window", "+")
+    add_window.type = "button"
+    add_window.title = add_window.ariaLabel = text("server_script_new_window")
+    add_window.addEventListener("click", () => { link.send({ t: "window_create", script: path }) })
+    root.append(head, list, strip, foot)
 
     const row = (entry: Log_Entry): HTMLElement => {
         const line = make("div", `server_script_log server_script_log_${entry.level}`)
@@ -75,6 +83,18 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
         state.textContent = running ? text("server_script_running") : text("server_script_stopped")
         toggle.textContent = running ? text("server_script_stop") : text("server_script_start")
         toggle.disabled = !link.connected || !link.online
+        draw_windows()
+    }
+    const draw_windows = (): void => {
+        const chips = owner_windows.of_script(path).map(window_info => {
+            const chip = make("button", "server_script_window", window_info.title || window_info.url || `#${window_info.id}`)
+            chip.type = "button"
+            chip.title = window_info.url
+            chip.addEventListener("click", () => { const created = new_window(); if (created) void open_source(created, window_uri(window_info.id)) })
+            return chip
+        })
+        strip.replaceChildren(...chips, add_window)
+        strip.hidden = !running && chips.length === 0
     }
     const append = (entry: Log_Entry): void => {
         store.add(path, entry)
@@ -108,6 +128,7 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
             if (message.path === path) append({ id: -Date.now(), time: Date.now(), level: "error", text: String(message.message ?? "") })
         }),
         link.on_state(draw_state),
+        owner_windows.on_change(draw_windows),
     ]
     signal.addEventListener("abort", () => { for (const off of offs) off() }, { once: true })
 
