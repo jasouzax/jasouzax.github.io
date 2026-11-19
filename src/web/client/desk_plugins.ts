@@ -15,6 +15,7 @@ export type plugin_host = {
     folder: (item: desk_window, signal: AbortSignal) => HTMLElement
     messages: (item: desk_window, signal: AbortSignal) => HTMLElement
     auto_script: (item: desk_window, signal: AbortSignal) => HTMLElement
+    auto_site: (item: desk_window, signal: AbortSignal) => HTMLElement
     state: typeof desk_state
     text: (key: string) => string
     render_window: (item: desk_window) => void
@@ -110,6 +111,7 @@ function render_host(name: NonNullable<plugin_case["host"]>, { item, host, signa
         case "folder": return host.folder(item, signal)
         case "messages": return host.messages(item, signal)
         case "auto_script": return host.auto_script(item, signal)
+        case "auto_site": return host.auto_site(item, signal)
         case "default": return host.fallback(item)
     }
 }

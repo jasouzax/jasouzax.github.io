@@ -16,6 +16,7 @@ import type { desk_window } from "./desk.ts"
 import { state, text } from "./desk.ts"
 import { load_file, open_source, uri_handlers } from "./desk_view.ts"
 import { fetch_public_status } from "./server_link.ts"
+import { init_site_sources } from "./server_site.ts"
 import { mode_of, snapshot_text, type Server_Mode } from "./server_text.ts"
 export { mode_of, snapshot_text, type Server_Mode }
 import type { Public_Status } from "../../../server/src/shared/protocol.ts"
@@ -85,6 +86,7 @@ async function refresh_fastfetch(): Promise<void> {
 }
 
 export function init_server(): void {
+    init_site_sources()
     if (uri_handlers.some(handler => (handler as { server?: boolean }).server)) return
     const handler = async (item: desk_window, uri: string, current: () => boolean = () => true): Promise<boolean> => {
         if (uri.trim() !== fastfetch_uri) return false

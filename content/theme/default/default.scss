@@ -6446,6 +6446,32 @@ body::after {
 .server_script_log_info .server_script_text,
 .server_script_log_debug .server_script_text { color: var(--accent); }
 
+.server_site { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.server_site_note { margin: auto; padding: 1.5em; color: var(--text-dim); text-align: center; }
+
+.server_site_bar {
+    display: flex;
+    align-items: center;
+    gap: .35em;
+    padding: .3em .5em;
+    background: var(--panel-2);
+}
+
+.server_site_button,
+.server_site_address {
+    font: inherit;
+    color: var(--text);
+    background: var(--tint-1);
+    border: 1px solid var(--line);
+    border-radius: .4em;
+}
+
+.server_site_button { padding: .2em .6em; cursor: pointer; }
+.server_site_button:hover:not(:disabled) { background: var(--tint-2); }
+.server_site_button:disabled { opacity: .4; cursor: default; }
+.server_site_button.active { background: var(--tint-3); }
+.server_site_address { flex: 1 1 auto; min-width: 0; padding: .25em .6em; }
+
 // Live site feed (application/auto-site): the picture of a Chromium window of the Pi, its virtual touch mouse and the hidden keyboard field
 .server_site_feed {
     position: relative;

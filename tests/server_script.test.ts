@@ -53,3 +53,10 @@ test("plugins: an automation script is the log view in view mode and the code ed
     assert.equal(await host_of("text/javascript", "view"), "default")
     assert.equal(await host_of("text/plain", "view"), "text")
 })
+
+test("plugins: a site is the live feed in view mode with or without a file, and its file is text in edit mode", async () => {
+    assert.equal(await host_of("application/auto-site", "view", true), "auto_site")
+    assert.equal(await host_of("application/auto-site", "view", false, "https://example.com"), "auto_site")
+    assert.equal(await host_of("application/auto-site", "view", false, "server:window:3"), "auto_site")
+    assert.equal(await host_of("application/auto-site", "edit", true), "text")
+})

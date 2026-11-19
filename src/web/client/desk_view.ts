@@ -17,6 +17,7 @@ import { comparison_lines } from "./desk_compare.ts"
 import { no_picks } from "./desk_flow_rules.ts"
 import { message_body } from "./desk_messages.ts"
 import { auto_script_body } from "./server_script.ts"
+import { auto_site_body } from "./server_site.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -526,12 +527,23 @@ function script_body(item: desk_window, signal: AbortSignal): HTMLElement {
     return auto_script_body(item, signal, () => text_layout_body(item))
 }
 
+// the live feed of a site or of a window of the Pi; a .auto.site file without the owner's link is its text, any other source says why it is empty
+function site_body(item: desk_window, signal: AbortSignal): HTMLElement {
+    return auto_site_body(item, signal, () => {
+        if (item.file) return text_layout_body(item)
+        const note = document.createElement("div")
+        note.className = "server_site_note"
+        note.textContent = text("server_offline")
+        return note
+    })
+}
+
 function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_mirror_body"
     const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
-        messages: message_body, auto_script: script_body, state, text, render_window, save_window }
+        messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
         for (const { context, module } of candidates) {
@@ -562,7 +574,7 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, state, text, render_window, save_window }
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
