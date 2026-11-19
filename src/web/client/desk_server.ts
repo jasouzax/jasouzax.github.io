@@ -20,7 +20,7 @@ import { mode_of, snapshot_text, type Server_Mode } from "./server_text.ts"
 export { mode_of, snapshot_text, type Server_Mode }
 import type { Public_Status } from "../../../server/src/shared/protocol.ts"
 
-export const server: { mode: Server_Mode, status: Public_Status | null, failed: boolean } = { mode: "unknown", status: null, failed: false }
+export const server: { mode: Server_Mode, status: Public_Status | null, failed: boolean, live_refresh: (() => void) | null } = { mode: "unknown", status: null, failed: false, live_refresh: null }
 
 export const fastfetch_uri = "server:fastfetch"
 export const status_ttl_ms = 60_000
@@ -66,8 +66,18 @@ function fastfetch_windows(): desk_window[] {
     return state.windows.filter(item => item.el.isConnected && item.path === fastfetch_uri)
 }
 
+// The owner's live link brings a fresh snapshot: it replaces the public one and the windows show it at once
+export function note_snapshot(snapshot_text_value: string, taken_at: number): void {
+    if (!server.status) return
+    server.status = { ...server.status, snapshot: { text: snapshot_text_value, taken_at } }
+    loaded_at = Date.now()
+    for (const item of fastfetch_windows()) if (!item.dirty) void open_source(item, fastfetch_uri)
+}
+
 async function refresh_fastfetch(): Promise<void> {
     if (document.hidden || fastfetch_windows().length === 0) return
+    // the owner's link asks the Pi itself (the answer arrives as a snapshot); everybody else polls the cached public status
+    if (server.live_refresh) { server.live_refresh(); return }
     const before = server.status?.snapshot?.taken_at
     const status = await load_status(true)
     if (status?.snapshot?.taken_at === before && server.mode !== "offline") return

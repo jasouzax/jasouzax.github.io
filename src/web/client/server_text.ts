@@ -3,6 +3,11 @@
  */
 import type { Public_Status } from "../../../server/src/shared/protocol.ts"
 
+// /server and /ja/server (a language prefix is two letters)
+export function is_server_page(pathname: string): boolean {
+    return /^(?:\/[a-z]{2})?\/server\/?$/.test(pathname)
+}
+
 export type Server_Mode = "unknown" | "offline" | "public" | "owner"
 
 export function mode_of(status: Public_Status): Server_Mode {

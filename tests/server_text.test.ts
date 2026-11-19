@@ -24,3 +24,9 @@ test("a failed request without any earlier status says the status could not be l
     assert.equal(snapshot_text(null, false, label), "")
     assert.equal(format_time(0), "1970-01-01 00:00:00 UTC")
 })
+
+import { is_server_page } from "../src/web/client/server_text.ts"
+test("only /server and its language form count as the server page", () => {
+    for (const path of ["/server", "/server/", "/ja/server"]) assert.equal(is_server_page(path), true, path)
+    for (const path of ["/desk", "/servers", "/server/x", "/jap/server", "/api/server", "/"]) assert.equal(is_server_page(path), false, path)
+})

@@ -63,6 +63,34 @@ let home_node: fs_node | null = null
 let filesystem_ready: Promise<void> = Promise.resolve()
 export function filesystem_initialized(): Promise<void> { return filesystem_ready }
 
+// While the owner's /server desk shows the Pi, the tree's root is the Pi's directory. Nothing of the shared virtual file system is touched: its
+// handle and children are kept and put back by the returned function. The polling of picked folders and the /bin mount skip a remote root.
+let remote_active = false
+export function remote_root_active(): boolean { return remote_active }
+export async function swap_root(handle: dir_handle, writable: boolean): Promise<() => Promise<void>> {
+    await filesystem_ready
+    const root = shared_root
+    if (!root) throw new Error("No desk file system")
+    const saved = { handle: root.handle, writable: root.writable, children: root.children, readable: root.readable, content_readable: root.content_readable, write_allowed: root.write_allowed }
+    remote_active = true
+    root.handle = handle; root.writable = writable; root.children = null
+    root.readable = root.content_readable = root.write_allowed = undefined
+    await load_children(root)
+    if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
+    redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
+    let restored = false
+    return async () => {
+        if (restored) return
+        restored = true
+        remote_active = false
+        Object.assign(root, saved)
+        if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
+        redraw()
+        document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
+    }
+}
+
 export function replace_directory(node: fs_node, handle: dir_handle, writable: boolean): void {
     node.handle = named_directory(node.name, handle); node.writable = writable; node.children = null
     const parent = node.parent?.handle as memory_handle | null
@@ -91,6 +119,7 @@ let clipboard_mode: "copy" | "cut" = "copy"
 export async function mount_executables(names: string[]): Promise<void> {
     await filesystem_initialized()
     executable_names = names
+    if (remote_active) return
     const bin = find_node("/bin")
     if (!bin) return
     const directory = memory_directory("bin")
@@ -1444,7 +1473,7 @@ export function init_fs(desk: HTMLElement): void {
 
 let external_refresh = false
 async function refresh_external(): Promise<void> {
-    if (external_refresh || !shared_root) return
+    if (external_refresh || !shared_root || remote_active) return
     external_refresh = true
     try {
         await filesystem_ready
