@@ -17,7 +17,10 @@ import { load_status, note_snapshot, server } from "./desk_server.ts"
 import { is_server_page } from "./server_text.ts"
 import { Server_Link, default_socket_url } from "./server_link.ts"
 import { remote_directory } from "./server_fs.ts"
+import { Window_Store } from "./server_windows.ts"
 
+// The Chromium windows of the Pi (scripts' windows and standalone sites), filled while the owner's link is up
+export const owner_windows = new Window_Store()
 let link: Server_Link | null = null
 let restore: (() => Promise<void>) | null = null
 let starting = false
@@ -38,10 +41,12 @@ async function on_link_state(current: Server_Link): Promise<void> {
         restore = await swap_root(remote_directory(current, "/") as dir_handle, true).catch(() => null)
         if (current !== link) { await restore?.(); restore = null; return }
         current.send({ t: "fastfetch" })
+        current.send({ t: "auto_state" })
         announce()
         return
     }
-    // the agent came back: list the root again
+    // the agent came back: its windows again, then the root
+    current.send({ t: "auto_state" })
     const root = fs_root()
     if (root && remote_root_active()) { await load_children(root); redraw() }
 }
@@ -55,6 +60,8 @@ async function start_owner(): Promise<void> {
         link = current
         server.live_refresh = () => { current.send({ t: "fastfetch" }) }
         current.on("fastfetch", message => note_snapshot(String(message.text ?? ""), Number(message.taken_at) || Date.now()))
+        for (const type of ["windows", "window_added", "window_updated", "window_removed"]) current.on(type, message => owner_windows.apply(message))
+        current.on("disconnected", () => owner_windows.clear())
         current.on_state(() => { void on_link_state(current) })
         current.open()
     } finally { starting = false }
@@ -65,6 +72,7 @@ export async function stop_owner(): Promise<void> {
     link = null
     server.live_refresh = null
     current?.close()
+    owner_windows.clear()
     const undo = restore
     restore = null
     await undo?.()
