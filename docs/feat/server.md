@@ -10,14 +10,32 @@
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
-- [ ] Wire protocol shared by agent, Durable Object and page (`server/src/shared/protocol.ts`)
-- [ ] Pi agent: Electron app that dials out to the Worker, reconnects with backoff, serves fs, pty, scripts, windows, APIs and fastfetch
-- [ ] Worker: `Server_Hub` Durable Object (hibernating sockets, endpoint map, one-minute public snapshot) and `/api/server/*`
-- [ ] Worker: `jasouza.com/api/{endpoint}` gateway to scripts that publish APIs
-- [ ] MIME types `application/auto-javascript` (`*.auto.js`) and `application/auto-site` (`*.auto.site`) with plugin cases
-- [ ] `/server` page: shared virtual desk with one fastfetch window; offline state
-- [ ] Owner mode: Pi filesystem as the desk root, Pi terminal, script view (logs, start/stop), site feed view
+- [x] Wire protocol shared by agent, Durable Object and page (`server/src/shared/protocol.ts`)
+- [x] Pi agent: Electron app that dials out to the Worker, reconnects with backoff, serves fs, pty, scripts, windows, APIs and fastfetch (logic tested without Electron)
+- [x] Worker: `Server_Hub` Durable Object (hibernating sockets, endpoint map, one-minute public snapshot) and `/api/server/*`
+- [x] Worker: `jasouza.com/api/{endpoint}` gateway to scripts that publish APIs
+- [x] MIME types `application/auto-javascript` (`*.auto.js`) and `application/auto-site` (`*.auto.site`) with plugin cases
+- [x] `/server` page: shared virtual desk with one fastfetch window; offline state
+- [x] Page link: owner socket, heartbeat, reconnect, request/answer (`server_link.ts`)
+- [x] Owner mode logic: Pi filesystem handles, pty session, window store, site keys, input mapping, log store (unit tests, the real agent channel on a temp directory)
+- [ ] Owner mode in a browser: Pi filesystem as the desk root, Pi terminal, script view (logs, start/stop), site feed view (touch, zoom, sound, fit, DevTools). The DOM glue (`desk_server_owner.ts`, `server_script.ts`, `server_site.ts`, `server_touch.ts`, `server_audio.ts`) has no automated test; no browser in the development sandbox
 - [ ] Verify on the real Pi, Worker and a phone (not possible in the development sandbox: no Electron, no Cloudflare)
+
+## Page side (`src/web/client`)
+
+| File | Job |
+|---|---|
+| `desk_server.ts` | `server:fastfetch` source, one-minute refresh, mode from `GET /api/server` (`unknown`/`offline`/`public`/`owner`); `server_text.ts` holds the pure rules |
+| `desk_server_owner.ts` | Owner mode on `/server` only: opens `Server_Link`, swaps the desk root (`swap_root` in `desk_fs.ts`) for the Pi and puts the virtual one back when leaving; `owner_link()`, `owner_windows` |
+| `server_link.ts` | The socket: heartbeat `ping`, backoff 1-30 s, numbered `fs` requests with a 30 s timeout, subscriptions by message type |
+| `server_fs.ts` | The Pi's files as `dir_handle`/`file_handle`; a file opens whole up to 32 MiB; devices and sockets are not listed |
+| `server_terminal.ts`, `server_pty.ts` | `server_sh` kernel program relaying a pty (the terminal hook becomes `server:sh` while the link is up) |
+| `server_script.ts`, `server_script_model.ts` | `auto_script` host: log, errors-only, clear, Start/Stop, windows of the script |
+| `server_site.ts`, `server_windows.ts`, `server_input.ts`, `server_touch.ts`, `server_audio.ts` | `auto_site` host: live JPEG feed, address bar, fit, DevTools, sound, mouse/keyboard/clipboard, virtual touch mouse and zoom |
+
+Sources that open the feed (owner link only): an `http(s)://` address typed into a window, a `*.auto.site` file whose first non-comment line is an http(s) URL (view = live, edit = the text), and `server:window:<id>` (a window a script opened, or its DevTools). A site's agent key is a hash of its URL, so two desk windows of one URL share one Chromium window; closing the last desk window closes it. One feed streams per tab: the window touched last (the agent keeps the newest `feed_watch`).
+
+Without the owner link an `*.auto.js` view is the plain code, a `*.auto.site` view is its text, and an `http(s)://` source loads as before.
 
 ## Contract
 

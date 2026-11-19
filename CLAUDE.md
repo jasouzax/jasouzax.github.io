@@ -84,6 +84,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 | Skeleton/loading | `src/web/skeleton_css.ts`, `src/web/client/loading.ts`, `boot.ts` |
 | Desk window bodies | `content/plugins/plugins.xml` (cases) + `src/web/client/desk_view.ts` hosts |
 | Shell / WASM program | `src/desk/**`, `src/web/client/wasm_*.ts`, `kernel.ts`; docs `src/desk/README.md` |
+| Personal server desk (`/server`, Pi agent) | `server/**`, `src/node/server_*.ts`, `src/web/client/{desk_server,desk_server_owner,server_*}.ts`, `content/server.xml`; docs `docs/feat/server.md`; tests `tests/server_*.test.ts` |
 | Device shell / extension bridge | `extension/**` (+ `src/web/client/desk_host.ts`, `desk_proc.ts`); docs `extension/README.md`, `docs/feat/desk_env.md`; tests `tests/host*.test.ts` |
 | Worker route / API | `src/node/worker.ts` (+ test in `tests/nodes.test.ts`); keep `{error:{code,message}}` shape and fail closed |
 | Infra | `terraform/*.tf`; deploy glue `src/node/deploy.ts` |
