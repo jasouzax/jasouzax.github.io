@@ -6446,6 +6446,114 @@ body::after {
 .server_script_log_info .server_script_text,
 .server_script_log_debug .server_script_text { color: var(--accent); }
 
+// Live site feed (application/auto-site): the picture of a Chromium window of the Pi, its virtual touch mouse and the hidden keyboard field
+.server_site_feed {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--panel);
+}
+
+.server_site_feed[data-state]::after {
+    content: attr(data-state);
+    position: absolute;
+    padding: .4em .9em;
+    border-radius: 99px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+.server_site_canvas {
+    display: block;
+    background: #fff;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--line);
+    cursor: default;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.server_site_touch {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+// where the next tap clicks; it keeps its size however far the picture is zoomed
+.server_site_cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 3;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.server_site_touch[data-touch="off"] .server_site_cursor { display: none; }
+.server_site_cursor svg { position: absolute; left: -3px; top: -2px; display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7)); }
+
+.server_site_ring {
+    position: absolute;
+    left: -17px;
+    top: -17px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.server_site_cursor[data-pressed] .server_site_ring { opacity: 1; transform: scale(.8); }
+.server_site_cursor.tap .server_site_ring { animation: server_site_tap .38s ease-out; }
+
+@keyframes server_site_tap {
+    0% { opacity: .9; transform: scale(.4); }
+    100% { opacity: 0; transform: scale(1.15); }
+}
+
+.server_site_zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 4;
+    padding: .35em .8em;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--accent);
+    font: 600 .85em/1 inherit;
+    touch-action: manipulation;
+}
+
+// invisible but focusable (16px keeps iOS from zooming in on it)
+.server_site_keys {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    resize: none;
+    font-size: 16px;
+    pointer-events: none;
+}
+
 .desk_wbox_body_term {
     flex: 1 1 auto;
     min-height: 0;
