@@ -552,6 +552,7 @@ const runtime_keys = [
     "server_site_connecting",
     "server_site_gone",
     "server_site_invalid",
+    "server_site_sound",
     "open_folder",
     "open_new_window",
     "files_toggle_hidden",

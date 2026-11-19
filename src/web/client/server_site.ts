@@ -20,6 +20,7 @@ import { new_window, state, text } from "./desk.ts"
 import { open_source, render_window, uri_handlers, process_hooks } from "./desk_view.ts"
 import { owner_link, owner_windows } from "./desk_server_owner.ts"
 import { Touch_control } from "./server_touch.ts"
+import { server_audio } from "./server_audio.ts"
 import { Click_Counter, copy_shortcut, key_events, modifiers, mouse_button, page_point, wheel_pixels } from "./server_input.ts"
 import { is_site_url, site_key, site_url_of, window_id_of, window_uri } from "./server_windows.ts"
 import type { Input_Event, Window_Info } from "../../../server/src/shared/protocol.ts"
@@ -101,8 +102,11 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const fit_button = bar_button("⤢", text("server_site_fit"))
     fit_button.setAttribute("aria-pressed", "true")
     const tools_button = bar_button("</>", text("server_site_devtools"))
+    const audio = server_audio()
+    const sound_button = bar_button("♪", text("server_site_sound"))
+    sound_button.hidden = !audio.is_supported
     const bar = make("div", "server_site_bar")
-    bar.append(back, forward, reload, address, fit_button, tools_button)
+    bar.append(back, forward, reload, address, fit_button, sound_button, tools_button)
 
     const feed = make("div", "server_site_feed")
     const canvas = make("canvas", "server_site_canvas")
@@ -121,8 +125,10 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const watch = (force = false): void => {
         const id = document.hidden || !feed.isConnected || feed.offsetParent === null ? null : current_id()
         if (!force && id === watched) return
+        // nothing of the old window's sound may linger when another one is watched
+        if (id !== watched) audio.reset()
         watched = id
-        link.send({ t: "feed_watch", id, max_width: Math.ceil(feed.clientWidth * (window.devicePixelRatio || 1)) || 1280 })
+        link.send({ t: "feed_watch", id, max_width: Math.ceil(feed.clientWidth * (window.devicePixelRatio || 1)) || 1280, audio: id !== null && audio.is_wanted })
     }
     const draw_state = (): void => {
         const shown = picture()
@@ -194,7 +200,11 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
         busy = false
         if (latest) { const next = latest; latest = null; void paint(next) }
     }
-    const off_frames = link.on_binary(frame => { if (frame.kind === "video" && frame.id === current_id()) void paint(frame.payload) })
+    const off_frames = link.on_binary(frame => {
+        if (frame.id !== current_id()) return
+        if (frame.kind === "video") void paint(frame.payload)
+        else audio.push(frame.timestamp, frame.payload)
+    })
 
     // ---- pointer
     let pending_move: { x: number, y: number } | null = null
@@ -296,6 +306,15 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
         if (window_info.devtools) link.send({ t: "window_devtools", id: window_info.id, open: false })
         else { want_tools = true; link.send({ t: "window_devtools", id: window_info.id, open: true }) }
     })
+    const draw_sound = (): void => {
+        sound_button.classList.toggle("active", audio.enabled && audio.is_running)
+        sound_button.setAttribute("aria-pressed", String(audio.enabled))
+        // the first touch unlocks the browser's audio: the stream then asks the Pi for sound
+        if (audio.is_wanted !== wanted_sound) { wanted_sound = audio.is_wanted; watch(true) }
+    }
+    let wanted_sound = false
+    sound_button.addEventListener("click", () => { audio.enabled = !audio.enabled })
+    audio.on_change = draw_sound
     // the picture you touched last is the one the Pi streams
     const claim = (): void => watch(true)
     feed.addEventListener("pointerdown", claim)
@@ -303,9 +322,12 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const on_visibility = (): void => watch(true)
     document.addEventListener("visibilitychange", on_visibility)
 
+    draw_sound()
     const offs = [store.on_change(sync), link.on_state(sync), off_frames, off_clipboard]
     signal.addEventListener("abort", () => {
         for (const off of offs) off()
+        if (audio.on_change === draw_sound) audio.on_change = () => {}
+        audio.reset()
         observer.disconnect()
         clearTimeout(fit_timer)
         document.removeEventListener("visibilitychange", on_visibility)
