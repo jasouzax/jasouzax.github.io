@@ -3,6 +3,9 @@ codebase*.zip
 .cache/
 .wasmer/
 dist/*
+server/dist/
+server/user_data/
+server/workspace/
 .wrangler/
 node_modules/
 .claude/

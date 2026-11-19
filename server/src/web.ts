@@ -830,7 +830,10 @@ export class Web extends EventEmitter {
     // keyboard). Offscreen rendering is not used because it can never be switched to a real window
     #apply_window(browser_window: BrowserWindow, is_visible: boolean): void {
         this.#options.window = is_visible;
-        browser_window.setOpacity(is_visible ? 1 : 0);
+        // Xvfb has no desktop to hide from. Parking outside its screen stops
+        // Chromium's compositor, including the DevTools screencast.
+        const virtual_display = process.platform === 'linux' && process.env.JAZU_VIRTUAL_DISPLAY === '1';
+        browser_window.setOpacity(is_visible || virtual_display ? 1 : 0);
         browser_window.setIgnoreMouseEvents(!is_visible);
         browser_window.setFocusable(is_visible);
         browser_window.setSkipTaskbar(!is_visible);
@@ -839,7 +842,7 @@ export class Web extends EventEmitter {
             browser_window.setPosition(home.x, home.y);
             this.#parked_from = null;
         }
-        if (!is_visible && process.platform === 'linux' && home === null) {
+        if (!is_visible && process.platform === 'linux' && !virtual_display && home === null) {
             const [x, y] = browser_window.getPosition();
             this.#parked_from = { x, y };
             browser_window.setPosition(parked_position, parked_position);

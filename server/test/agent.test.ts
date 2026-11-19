@@ -60,6 +60,13 @@ function setup(options: { viewers?: boolean, buffered?: number, files?: Record<s
     return { agent, sent, hub, binary, state, windows, runner, apis, sites, root, shells, snapshot_calls }
 }
 const settle = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms))
+async function wait_for(check: () => boolean): Promise<void> {
+    const deadline = Date.now() + 5000
+    while (!check()) {
+        assert.ok(Date.now() < deadline, "Timed out waiting for the agent's filesystem reply")
+        await settle(10)
+    }
+}
 
 test("a page's fs request is answered to that page, with the errno code on failure", async () => {
     const { agent, sent, root } = setup()
@@ -67,7 +74,7 @@ test("a page's fs request is answered to that page, with the errno code on failu
     agent.handle({ t: "fs", id: 1, op: "read", path: join(root, "a.txt"), offset: 0, length: 100, peer: "p1" })
     agent.handle({ t: "fs", id: 2, op: "stat", path: join(root, "missing"), peer: "p1" })
     agent.handle({ t: "fs", id: 3, op: "explode" as any, path: root, peer: "p1" })
-    await settle()
+    await wait_for(() => sent.length === 3)
     // Answers may arrive in any order: they are matched by id
     const answer = (id: number) => sent.find(item => item.message.id === id)!.message
     assert.equal(sent.every(item => item.to === "p1"), true)
@@ -81,7 +88,7 @@ test("writes and paths outside the root are confined", async () => {
     const { agent, sent, root } = setup()
     agent.handle({ t: "fs", id: 1, op: "write", path: join(root, "out.txt"), offset: 0, data: to_base64(Buffer.from("x")), truncate: true, peer: "p" })
     agent.handle({ t: "fs", id: 2, op: "read", path: join(root, "../../../etc/passwd"), offset: 0, length: 10, peer: "p" })
-    await settle()
+    await wait_for(() => sent.length === 2)
     assert.equal(readFileSync(join(root, "out.txt"), "utf8"), "x")
     assert.deepEqual([sent.find(item => item.message.id === 2)!.message.code], ["EACCES"])
 })

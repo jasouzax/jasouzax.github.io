@@ -111,3 +111,25 @@ Every text frame is JSON with a `t` field. Owners and the agent never talk direc
 - One agent at a time (`main` object). A second agent replaces the first.
 - Script APIs answer one request at a time per name only as far as the script's handler allows; each call has a 30 s timeout (`504`).
 - Sound needs `AudioDecoder` in the viewing browser.
+
+## Staging Pi deployment — 2026-11-20
+
+The ARM64 Pi at `192.168.1.22` runs the outbound Electron agent in the
+`jazu-server-staging` Docker container, managed from
+`/home/jason/jazu-server-staging/app/server`. Setup and restart commands are in
+[`server/README.md`](../../server/README.md#docker-headless-linux-including-arm64).
+Private settings and persistent workspace/browser data live outside the checkout.
+The existing Git/publishing container remains separate.
+
+All 56 agent tests and the TypeScript build passed on the Pi. A real Electron
+smoke run also verified filesystem read/write and confinement, a Python PTY shell,
+script execution, an HTTP page, live JPEG screencast frames, and Opus audio capture.
+The staging Worker accepted the agent's signed connection and `/api/server`
+reported `online: true`, `stale: false` with a fresh snapshot. This does not verify
+the signed-in owner's browser DOM integration or a phone; those checklist items
+remain open.
+
+Xvfb needs `JAZU_VIRTUAL_DISPLAY=1` (set by the image): parking a window outside
+the virtual screen loads the page but produces no screencast frames. Docker's
+file manager exposes the container's `/`, with persistent files in `/workspace`;
+the host's root filesystem is not mounted.
