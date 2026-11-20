@@ -9,6 +9,7 @@
     <case file mime="text/*" child_file child_view child_mime="text/plain" host="text" />
 </plugin>
 <plugin id="mirror" name="Mirror" version="1.0.0" flow="mirror">
+    <case mime="application/auto-site" child_view child_edit host="auto_site" />
     <case child_view child_edit host="mirror" />
 </plugin>
 <plugin id="shell" name="Shell" version="1.0.0">
