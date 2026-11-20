@@ -8329,7 +8329,7 @@ body:has(#motion_pause:checked) {
 @media (orientation: portrait) {
     .desk_wbox_head {
         display: grid;
-        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) repeat(5, auto);
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) calc(3rem + 2px) repeat(3, auto);
         grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
         align-items: center;
         height: auto;
@@ -8344,12 +8344,12 @@ body:has(#motion_pause:checked) {
             text-align: center;
         }
         > .desk_wbox_head_navigation { grid-area: 1 / 2; }
-        > .desk_wbox_head_fullscreen { grid-area: 1 / 5; }
-        > .desk_wbox_head_audio { grid-area: 1 / 6; }
-        > .desk_wbox_head_save { grid-area: 1 / 7; }
-        > .desk_wbox_head_split { grid-area: 1 / 8; }
-        > .desk_wbox_head_drop { grid-area: 1 / 9; }
+        > .desk_wbox_head_actions { grid-area: 1 / 5; }
+        > .desk_wbox_head_split { grid-area: 1 / 6; }
+        > .desk_wbox_head_fullscreen { grid-area: 1 / 7; }
+        > .desk_wbox_head_drop { grid-area: 1 / 8; }
         > .desk_wbox_head_tool,
+        > .desk_wbox_head_actions > button,
         > .desk_wbox_head_drop > summary {
             box-sizing: border-box;
             width: 1.5rem;
@@ -8513,3 +8513,14 @@ body:has(#motion_pause:checked) {
     }
 }
 .server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }
+
+.desk_wbox_head_actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    > button { border: 0; border-radius: 0; margin: 0; }
+    > button + button { border-left: 1px solid var(--edge); }
+}

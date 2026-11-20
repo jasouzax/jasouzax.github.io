@@ -205,11 +205,13 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
             </div>
             <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
         </div>,
-        head_button(ctx, "desk_wbox_head_fullscreen", t(ctx, "window_fullscreen"), "[fullscreen]", false),
-        head_button(ctx, "desk_wbox_head_audio", t(ctx, "window_audio"), "[audio]", false),
-        attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
+        <div class="desk_wbox_head_actions" role="group" aria-label={t(ctx, "window_actions")}>
+            {head_button(ctx, "desk_wbox_head_audio", t(ctx, "window_audio"), "[audio]", false)}
+            {attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true)}
+        </div>,
         attrs.flow !== "false" &&
             head_button(ctx, "desk_wbox_head_split", t(ctx, "split_window"), "[split]", false),
+        head_button(ctx, "desk_wbox_head_fullscreen", t(ctx, "window_fullscreen"), "[fullscreen]", false),
         tool_list(ctx, "desk_wbox_head_drop", t(ctx, "move_window"), "[move]", moves)
     ]
     return (
@@ -543,6 +545,7 @@ const runtime_keys = [
     "server_script_empty_errors",
     "server_script_running",
     "server_script_stopped",
+    "server_script_restarting",
     "server_script_new_window",
     "server_site_back",
     "server_site_forward",
@@ -562,6 +565,7 @@ const runtime_keys = [
     "window_fullscreen",
     "window_exit_fullscreen",
     "window_audio",
+    "window_actions",
     "server_sessions_empty",
     "previous",
     "forward",

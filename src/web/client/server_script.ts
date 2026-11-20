@@ -31,6 +31,8 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
     if (!link || path === null) return fallback()
     const store = new Log_Store()
     let running = false
+    let autostart = false
+    let restarting = false
     let errors_only = false
 
     const root = make("div", "server_script")
@@ -80,8 +82,8 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
     }
     const draw_state = (): void => {
         root.dataset.running = String(running)
-        state.textContent = running ? text("server_script_running") : text("server_script_stopped")
-        toggle.textContent = running ? text("server_script_stop") : text("server_script_start")
+        state.textContent = restarting ? text("server_script_restarting") : running ? text("server_script_running") : text("server_script_stopped")
+        toggle.textContent = (running || autostart) ? text("server_script_stop") : text("server_script_start")
         toggle.disabled = !link.connected || !link.online
         draw_windows()
     }
@@ -106,7 +108,7 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
         if (at_bottom) list.scrollTop = list.scrollHeight
         refresh_count()
     }
-    const press = (): void => { link.send(running ? { t: "auto_stop", path } : { t: "auto_start", path }) }
+    const press = (): void => { link.send((running || autostart) ? { t: "auto_stop", path } : { t: "auto_start", path }) }
 
     toggle.addEventListener("click", press)
     clear.addEventListener("click", () => { link.send({ t: "auto_clear_logs", path }) })
@@ -122,9 +124,9 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
         link.on("auto_logs", message => { if (message.path === path) { store.set(path, message.entries as Log_Entry[]); redraw_all() } }),
         link.on("auto_log", message => { if (message.path === path) append(message.entry as Log_Entry) }),
         link.on("auto_logs_cleared", message => { if (message.path === path) { store.clear(path); redraw_all() } }),
-        link.on("auto_status", message => { if (message.path === path) { running = Boolean(message.running); draw_state() } }),
-        link.on("auto_deleted", message => { if (message.path === path) { running = false; store.clear(path); redraw_all(); draw_state() } }),
-        link.on("auto_state", message => { running = (message.scripts as { path: string, running: boolean }[]).some(script => script.path === path && script.running); draw_state() }),
+        link.on("auto_status", message => { if (message.path === path) { running = Boolean(message.running); autostart = Boolean(message.autostart); restarting = Boolean(message.restarting); draw_state() } }),
+        link.on("auto_deleted", message => { if (message.path === path) { running = autostart = restarting = false; store.clear(path); redraw_all(); draw_state() } }),
+        link.on("auto_state", message => { const script = (message.scripts as { path: string, running: boolean, autostart?: boolean, restarting?: boolean }[]).find(script => script.path === path); running = Boolean(script?.running); autostart = Boolean(script?.autostart); restarting = Boolean(script?.restarting); draw_state() }),
         link.on("auto_error", message => {
             if (message.path === path) append({ id: -Date.now(), time: Date.now(), level: "error", text: String(message.message ?? "") })
         }),

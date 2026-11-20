@@ -23,3 +23,16 @@ test("sessions keep stopped scripts available to restart and remove only deleted
     store.clear()
     assert.equal(store.list([]).scripts.length, 0)
 })
+
+
+test("sessions retain desired-running and pending-restart state across snapshots", () => {
+    const store = new Session_Store()
+    store.apply({ t: "auto_state", scripts: [{ path: "/a.auto.js", running: false, autostart: true, restarting: true }] })
+    assert.equal(store.list([]).scripts[0].autostart, true)
+    assert.equal(store.list([]).scripts[0].restarting, true)
+    store.apply({ t: "auto_status", path: "/a.auto.js", running: true, autostart: true, restarting: false })
+    assert.equal(store.list([]).scripts[0].running, true)
+    assert.equal(store.list([]).scripts[0].restarting, false)
+    store.apply({ t: "auto_status", path: "/a.auto.js", running: false, autostart: false, restarting: false })
+    assert.equal(store.list([]).scripts[0].autostart, false)
+})

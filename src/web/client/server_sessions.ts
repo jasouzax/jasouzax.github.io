@@ -67,12 +67,13 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
         const sessions = scripts.list(windows.all())
         const nodes: HTMLElement[] = []
         for (const script of sessions.scripts) {
+            const active = script.running || script.autostart
             const { entry, box } = row(script.path.split("/").pop() || script.path, `file://${script.path}`, "application/auto-javascript", [
-                action(script.running ? "stop" : "start", text(script.running ? "server_script_stop" : "server_script_start"), script.running ? "pause" : "view", () => link.send({ t: script.running ? "auto_stop" : "auto_start", path: script.path })),
+                action(active ? "stop" : "start", text(active ? "server_script_stop" : "server_script_start"), active ? "pause" : "view", () => link.send({ t: active ? "auto_stop" : "auto_start", path: script.path })),
                 action("window", text("server_script_new_window"), "window", () => link.send({ t: "window_create", script: script.path })),
                 action("clear", text("server_script_clear"), "refresh", () => link.send({ t: "auto_clear_logs", path: script.path })),
                 action("delete", text("files_delete"), "delete", () => link.send({ t: "auto_delete", path: script.path })),
-            ], text(script.running ? "server_script_running" : "server_script_stopped"), true)
+            ], text(script.restarting ? "server_script_restarting" : script.running ? "server_script_running" : "server_script_stopped"), true)
             entry.classList.add("server_session_script"); entry.dataset.running = String(script.running)
             const children = document.createElement("ul"); children.className = "desk_side_item_sub server_session_windows"
             for (const window of script.windows) { const child = document.createElement("li"); child.append(site(window)); children.append(child) }

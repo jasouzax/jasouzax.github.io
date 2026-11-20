@@ -672,7 +672,7 @@ test("portrait window headers keep controls above a full-width joined URL field"
         await expect(async () => {
             const metrics = await head.evaluate(element => {
                 const rect = (node: Element) => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height } }
-                const names = ["icon", "navigation", "mime", "mode", "fullscreen", "audio", "save", "split", "drop"]
+                const names = ["icon", "navigation", "mime", "mode", "actions", "split", "fullscreen", "drop"]
                 return { url: rect(element.querySelector(".desk_wbox_head_address")!), bounds: rect(element), controls: names.map(name => rect(element.querySelector(`.desk_wbox_head_${name}`)!)) }
             })
             const { url, bounds } = metrics

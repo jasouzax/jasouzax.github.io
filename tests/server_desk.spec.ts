@@ -151,10 +151,11 @@ test("site headers follow page navigation and Edit shows DevTools in the same pa
     await expect.poll(() => api.messages.filter(message => message.t === 'feed_watch' && message.id === 1).at(-1)?.audio).toBe(false)
 })
 
-test("every window has fullscreen and audio before save, with settings preserved across modes", async ({ page }) => {
+test("every window groups volume and save, with fullscreen between split and move", async ({ page }) => {
     await page.goto('/desk')
     const pane = page.locator('.desk_wbox').first(), head = pane.locator('.desk_wbox_head')
-    expect(await head.locator(':scope > button').evaluateAll(buttons => buttons.slice(0, 3).map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_fullscreen', 'desk_wbox_head_audio', 'desk_wbox_head_save'])
+    expect(await head.locator('.desk_wbox_head_actions > button').evaluateAll(buttons => buttons.map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_audio', 'desk_wbox_head_save'])
+    expect(await head.locator(':scope > .desk_wbox_head_split, :scope > .desk_wbox_head_fullscreen, :scope > .desk_wbox_head_drop').evaluateAll(buttons => buttons.map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_split', 'desk_wbox_head_fullscreen', 'desk_wbox_head_drop'])
     await pane.locator('.desk_wbox_head_audio').click()
     await pane.locator('[data-mode="edit"]').click()
     await expect(pane.locator('.desk_wbox_head_audio')).toHaveAttribute('aria-pressed', 'false')
@@ -277,4 +278,24 @@ test("touch clicks use the same native input channel as mouse clicks", async ({ 
         await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
         await expect.poll(() => api.messages.filter(message => message.t === 'window_input' && message.id === 1 && message.input.kind === 'mouse').map(message => message.input.action).slice(-3)).toEqual(['move', 'down', 'up'])
     } finally { await context.close() }
+})
+
+
+test("a script waiting to restart can be stopped from Sessions and its log view", async ({ page }) => {
+    const api = await owner(page), panel = await sessions(page)
+    await panel.locator('[data-session-uri="file:///run.auto.js"]').click()
+    const pane = page.locator('.desk_wbox').last()
+    await expect(pane.locator('.server_script_state')).toHaveText('Running')
+    api.send({ t: "auto_status", path: "/run.auto.js", running: false, autostart: true, restarting: true })
+    await expect(pane.locator('.server_script_state')).toHaveText('Restarting')
+    await expect(pane.locator('.server_script_toggle')).toHaveText('Stop')
+    await pane.locator('.server_script_toggle').click()
+    await expect(pane.locator('.server_script_state')).toHaveText('Stopped')
+    api.send({ t: "auto_status", path: "/run.auto.js", running: false, autostart: true, restarting: true })
+    const session = panel.locator('.server_session_script')
+    await expect(session.locator('[data-session-action="stop"]')).toHaveCount(1)
+    await session.locator('[data-session-action="stop"]').click()
+    expect(api.messages.filter(message => message.t === 'auto_stop')).toHaveLength(2)
+    await expect(session.locator('[data-session-action="start"]')).toHaveCount(1)
+    await expect(session.getByRole('button', { name: 'New Window', exact: true })).toHaveCount(1)
 })
