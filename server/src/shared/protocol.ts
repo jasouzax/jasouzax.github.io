@@ -62,7 +62,7 @@ export type Fs_Code = "ENOENT" | "EEXIST" | "ENOTDIR" | "EISDIR" | "ENOTEMPTY" |
 
 export type Log_Level = "log" | "info" | "debug" | "warn" | "error" | "system"
 export type Log_Entry = { id: number, time: number, level: Log_Level, text: string }
-export type Script_Info = { path: string, running: boolean, windows: number }
+export type Script_Info = { path: string, running: boolean, windows: number, autostart?: boolean, restarting?: boolean }
 
 // ---- windows (the live feed) -----------------------------------------------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ export type Agent_Message =
     | { t: "auto_state", scripts: Script_Info[] }
     | { t: "auto_logs", path: string, entries: Log_Entry[] }
     | { t: "auto_log", path: string, entry: Log_Entry }
-    | { t: "auto_status", path: string, running: boolean }
+    | { t: "auto_status", path: string, running: boolean, autostart?: boolean, restarting?: boolean }
     | { t: "auto_deleted", path: string }
     | { t: "auto_logs_cleared", path: string }
     | { t: "auto_error", path: string, message: string }

@@ -100,3 +100,17 @@ docker run --rm --init --network none --entrypoint npm jazu-server:staging run t
 The regression serves local controls on distinct loopback origins, checks trusted
 checkbox/button events, keyboard/text, drag and scroll, and verifies the DevTools
 feed while the embedded page remains interactive.
+
+## Automation restart behavior
+
+Starting a `*.auto.js` script saves it in `user_data/autostart.json` before it
+executes. On agent startup, saved scripts start again. This file shares the
+persistent `user_data` Docker mount with browser profiles.
+
+A normal completion, Stop, or Delete removes the script from the list. An uncaught
+runtime, syntax, timer, or API-handler error closes that run's windows/APIs and
+restarts from its saved source. An unreadable source also retries. Retry delays
+increase from 1 second to a maximum of 60 seconds; a run lasting at least a minute
+resets that delay. Sessions and the log view show Restarting and offer Stop while
+waiting. Agent shutdown preserves the list, including scripts waiting to retry.
+Scripts resume from the beginning; their JavaScript memory is not restored.

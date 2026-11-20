@@ -10,6 +10,7 @@
     "start:headless": "npm run build && xvfb-run -a electron . --no-sandbox --disable-gpu",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
+    "test:restart": "node test/restart.smoke.cjs",
     "test:interaction": "dbus-run-session -- xvfb-run -a electron test/interaction.smoke.cjs --no-sandbox --disable-gpu"
   },
   "dependencies": {

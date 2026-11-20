@@ -11,6 +11,7 @@
 import { app } from "electron"
 import { config as load_env } from "dotenv"
 import * as path from "path"
+import { Auto_Start } from "./autostart"
 import { Agent } from "./agent"
 import { Api_Registry } from "./api"
 import { parse_config } from "./config"
@@ -36,7 +37,7 @@ async function main(): Promise<void> {
     const log = (line: string) => console.log(`[server] ${line}`)
     const windows = new Window_Registry(root)
     const apis = new Api_Registry()
-    const runner = new Script_Runner({ read_source: script_path => read_text(config.fs_root, script_path), web_class: Web, apis, root })
+    const runner = new Script_Runner({ read_source: script_path => read_text(config.fs_root, script_path), web_class: Web, apis, root, autostart: new Auto_Start(path.join(root, "user_data", "autostart.json")) })
     runner.on("web", (script_path: string, web: Web) => windows.track(script_path, web))
     const sites = new Site_Registry({ make_web: url => new Web(url), windows })
     const link = new Hub_Link({
@@ -52,8 +53,9 @@ async function main(): Promise<void> {
     link.on_message = message => agent.handle(message)
     link.on_open = () => agent.publish_apis()
     link.on_close = () => agent.on_link_closed()
-    app.on("before-quit", () => { link.stop(); pty.close_all(); void runner.stop_all(); void sites.close_all() })
+    app.on("before-quit", () => { link.stop(); pty.close_all(); void runner.shutdown(); void sites.close_all() })
     link.start()
+    await runner.restore()
     log(`agent (protocol ${protocol_version}) for ${config.origin}, file system root ${config.fs_root}`)
 }
 

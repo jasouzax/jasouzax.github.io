@@ -22,6 +22,7 @@ import { format, inspect } from 'util';
 import * as vm from 'vm';
 import type { Log_Entry, Log_Level, Script_Info } from './shared/protocol.ts';
 import type { Web, web_options } from './web.ts';
+import type { Auto_Start } from './autostart.ts';
 import { Api_Registry } from './api.ts';
 import type { Api, Api_Options, Api_Owner } from './api.ts';
 
@@ -40,6 +41,9 @@ export interface Runner_Options {
     root: string;
     // Electron would show an error dialog for an uncaught exception: route them to the logs instead
     catch_stray?: boolean;
+    autostart?: Auto_Start;
+    restart_min_ms?: number;
+    restart_max_ms?: number;
 }
 
 class Run {
@@ -54,6 +58,9 @@ class Run {
     // Stop was pressed (or a newer run replaced this one): from then on it may do nothing visible
     is_stopped = false;
     is_main_done = false;
+    failed = false;
+    callbacks = 0;
+    started_at = Date.now();
 
     constructor(script_path: string) {
         this.script_path = script_path;
@@ -64,6 +71,10 @@ export class Script_Runner extends EventEmitter {
     readonly #options: Runner_Options;
     readonly #require: NodeJS.Require;
     readonly #runs = new Map<string, Run>();
+    readonly #loading = new Map<string, symbol>();
+    readonly #retries = new Map<string, NodeJS.Timeout>();
+    readonly #attempts = new Map<string, number>();
+    #shutting_down = false;
     readonly #logs = new Map<string, Log_Entry[]>();
     // Lets an error that nobody caught be traced back to the run it came from
     readonly #context = new AsyncLocalStorage<Run>();
@@ -90,46 +101,105 @@ export class Script_Runner extends EventEmitter {
 
     // Every script that ran (or has a window) since the agent started
     list(): Script_Info[] {
-        const paths = new Set([...this.#runs.keys(), ...this.#logs.keys()]);
-        return [...paths].sort().map((script_path) => ({ path: script_path, running: this.is_running(script_path), windows: this.#runs.get(script_path)?.webs.size ?? 0 }));
+        const paths = new Set([...this.#runs.keys(), ...this.#logs.keys(), ...(this.#options.autostart?.list() ?? [])]);
+        return [...paths].sort().map((script_path) => ({ path: script_path, running: this.is_running(script_path), windows: this.#runs.get(script_path)?.webs.size ?? 0, ...this.#state(script_path) }));
     }
 
     // ---------- Control ----------
+    #state(script_path: string): { autostart?: boolean, restarting?: boolean } {
+        if (!this.#options.autostart) return {};
+        const autostart = this.#options.autostart.has(script_path);
+        return { autostart, restarting: autostart && !this.is_running(script_path) };
+    }
+
+    #status(script_path: string): void {
+        this.emit('status', script_path, this.is_running(script_path), this.#state(script_path));
+    }
+
+    async restore(): Promise<void> {
+        await Promise.all((this.#options.autostart?.list() ?? []).map(script => this.start(script)));
+    }
+
     async start(script_path: string): Promise<void> {
-        if (!script_path.endsWith(script_suffix) || this.is_running(script_path)) return;
+        if (this.#shutting_down || !script_path.endsWith(script_suffix) || this.is_running(script_path) || this.#loading.has(script_path)) return;
+        this.#options.autostart?.set(script_path, true);
+        this.#cancel_retry(script_path);
+        this.#attempts.delete(script_path);
+        await this.#launch(script_path);
+    }
+
+    async #launch(script_path: string): Promise<void> {
+        if (this.#shutting_down) return;
+        const token = Symbol();
+        this.#loading.set(script_path, token);
         let code: string;
-        try {
-            code = await this.#options.read_source(script_path);
-        } catch (error) {
+        try { code = await this.#options.read_source(script_path); }
+        catch (error) {
+            if (this.#loading.get(script_path) !== token) return;
+            this.#loading.delete(script_path);
             this.#log(script_path, 'error', `Cannot read ${script_path}: ${error instanceof Error ? error.message : error}`);
+            this.#retry(script_path);
+            this.#status(script_path);
             return;
         }
-        // Another start may have won while the file was being read
-        if (this.is_running(script_path)) return;
-        // A new run starts from a clean slate: the windows of the last one go away
+        if (this.#loading.get(script_path) !== token || this.#shutting_down) return;
         const previous = this.#runs.get(script_path);
-        if (previous) void this.#end_run(previous);
+        if (previous) await this.#end_run(previous);
+        if (this.#loading.get(script_path) !== token || this.#shutting_down) return;
+        this.#loading.delete(script_path);
         const run = new Run(script_path);
         this.#runs.set(script_path, run);
         this.#log(script_path, 'system', 'Started');
-        this.emit('status', script_path, true);
+        this.#status(script_path);
         void this.#execute(run, path.basename(script_path), code);
     }
 
+    #cancel_retry(script_path: string): void {
+        clearTimeout(this.#retries.get(script_path));
+        this.#retries.delete(script_path);
+        this.#loading.delete(script_path);
+    }
+
+    #retry(script_path: string): void {
+        if (this.#shutting_down || !this.#options.autostart?.has(script_path)) return;
+        const attempt = this.#attempts.get(script_path) ?? 0;
+        this.#attempts.set(script_path, attempt + 1);
+        const delay = Math.min(this.#options.restart_max_ms ?? 60_000, (this.#options.restart_min_ms ?? 1000) * 2 ** Math.min(attempt, 16));
+        this.#log(script_path, 'system', `Restarting in ${delay} ms`);
+        const timer = setTimeout(() => {
+            this.#retries.delete(script_path);
+            void this.#launch(script_path);
+        }, delay);
+        timer.unref();
+        this.#retries.set(script_path, timer);
+    }
+
     async stop(script_path: string): Promise<void> {
+        this.#options.autostart?.set(script_path, false);
+        this.#cancel_retry(script_path);
+        this.#attempts.delete(script_path);
         const run = this.#runs.get(script_path);
-        if (!run || run.is_over) return;
-        await this.#end_run(run);
-        this.#finish(run);
+        if (run && !run.is_over) { await this.#end_run(run); this.#finish(run); }
+        else this.#status(script_path);
     }
 
     async stop_all(): Promise<void> {
-        await Promise.all([...this.#runs.keys()].map((script_path) => this.stop(script_path)));
+        await Promise.all(this.list().map(script => this.stop(script.path)));
+    }
+
+    // Shutdown is different from Stop: persisted intent survives the process.
+    async shutdown(): Promise<void> {
+        this.#shutting_down = true;
+        for (const script of new Set([...this.#retries.keys(), ...this.#loading.keys()])) this.#cancel_retry(script);
+        await Promise.all([...this.#runs.values()].map(async run => { await this.#end_run(run); this.#finish(run); }));
     }
 
     // Remove the session, including stopped runs and manually opened windows.
     // Its source file is independent of runtime state and stays in Files.
     async remove(script_path: string): Promise<void> {
+        this.#options.autostart?.set(script_path, false);
+        this.#cancel_retry(script_path);
+        this.#attempts.delete(script_path);
         const run = this.#runs.get(script_path);
         if (run) {
             await this.#end_run(run);
@@ -188,11 +258,12 @@ export class Script_Runner extends EventEmitter {
             if (!run.is_stopped) this.#log(run.script_path, level, format(...args));
         };
         const guard = (callback: (...args: any[]) => unknown, args: unknown[]) => {
-            try {
-                Promise.resolve(callback(...args)).catch((error) => this.#report(run, error));
-            } catch (error) {
-                this.#report(run, error);
-            }
+            if (run.is_stopped) return;
+            run.callbacks++;
+            Promise.resolve().then(() => callback(...args)).catch((error) => this.#report(run, error)).finally(() => {
+                run.callbacks--;
+                this.#settle(run);
+            });
         };
         const runner = this;
         const Base = this.#options.web_class;
@@ -310,7 +381,7 @@ export class Script_Runner extends EventEmitter {
     }
 
     #settle(run: Run): void {
-        if (run.is_main_done && run.timers.size === 0 && run.apis.size === 0) this.#finish(run);
+        if (!run.failed && !run.is_stopped && run.is_main_done && run.callbacks === 0 && run.timers.size === 0 && run.apis.size === 0) this.#finish(run);
     }
 
     #finish(run: Run): void {
@@ -318,13 +389,26 @@ export class Script_Runner extends EventEmitter {
         run.is_over = true;
         this.#log(run.script_path, 'system', 'Ended');
         // A newer run may already own the script: only the current one reports the status
-        if (this.#runs.get(run.script_path) === run) this.emit('status', run.script_path, false);
+        if (this.#runs.get(run.script_path) === run) {
+            if (!this.#shutting_down && !run.failed) {
+                try { this.#options.autostart?.set(run.script_path, false); }
+                catch (error) { this.#log(run.script_path, 'error', `Cannot update restart list: ${error}`); }
+            }
+            if (run.failed) {
+                if (Date.now() - run.started_at >= 60_000) this.#attempts.delete(run.script_path);
+                this.#retry(run.script_path);
+            }
+            this.#status(run.script_path);
+        }
     }
 
     // ---------- Errors ----------
     #report(run: Run, error: unknown): void {
         if (run.is_stopped) return;
         this.#log(run.script_path, 'error', this.#describe(error));
+        if (run.failed) return;
+        run.failed = true;
+        void this.#end_run(run).then(() => this.#finish(run));
     }
 
     #on_stray_error(error: unknown): void {
