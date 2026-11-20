@@ -2,7 +2,7 @@ import type { WebSocketRoute } from "@playwright/test"
 import { test, expect, type Page } from "./desk_fixture.ts"
 import type { Window_Info } from "../server/src/shared/protocol.ts"
 
-async function owner(page: Page) {
+async function owner(page: Page, stale_plugins = false) {
     const messages: any[] = []
     let socket: WebSocketRoute
     let script_present = true, script_running = true
@@ -28,6 +28,12 @@ async function owner(page: Page) {
         window.url = history.urls[history.index]; window.can_back = history.index > 0; window.can_forward = history.index < history.urls.length - 1
         send({ t: "window_updated", window })
     }
+    if (stale_plugins) await page.route("**/assets/plugins.json", async route => {
+        const response = await route.fetch()
+        const plugins = (await response.json()).filter((plugin: any) => plugin.id !== "auto_site")
+        for (const plugin of plugins) if (plugin.id === "mirror") plugin.cases = plugin.cases.filter((entry: any) => entry.host !== "auto_site")
+        await route.fulfill({ json: plugins })
+    })
     await page.route("**/api/server", route => route.fulfill({ json: { online: true, owner: true, stale: false, snapshot: { text: "Test Pi", taken_at: Date.now() } } }))
     await page.routeWebSocket("**/api/server/ws", route => {
         socket = route
@@ -241,4 +247,34 @@ test("splitting an auto-site opens its developer tools beside the original page"
     await expect.poll(() => api.messages.some(message => message.t === 'window_input' && message.id === 4)).toBe(true)
     expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(1)
     await page.screenshot({ path: '.cache/desk-browser-results/server-site-split-devtools.png' })
+})
+
+
+test("a file-less site split keeps its live DevTools host with a stale plugin catalog", async ({ page }) => {
+    const api = await owner(page, true), panel = await sessions(page)
+    await panel.locator('[data-session-uri="server:window:1"]').click()
+    const parent = page.locator('.desk_wbox').last()
+    await expect(parent.locator('.server_site_canvas')).toBeVisible()
+    await parent.locator('.desk_wbox_head_split').click()
+    const child = page.locator('.desk_wbox').last()
+    await child.locator('[data-mode="edit"]').click()
+    await expect(child).toHaveAttribute('data-plugin', 'auto_site')
+    await expect(child.locator('.server_site_canvas')).toBeVisible()
+    await expect(child).not.toContainText('No editor for')
+    expect(api.messages.some(message => message.t === 'window_devtools' && message.id === 1 && message.open)).toBe(true)
+    expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(0)
+})
+
+test("touch clicks use the same native input channel as mouse clicks", async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://127.0.0.1:8124', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+    try {
+        const page = await context.newPage(), api = await owner(page), panel = await sessions(page)
+        await panel.locator('[data-session-uri="server:window:1"]').click()
+        await page.locator('#head_menu > summary').click()
+        const canvas = page.locator('.desk_wbox').last().locator('.server_site_canvas')
+        await expect(canvas).toBeVisible()
+        const box = (await canvas.boundingBox())!
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+        await expect.poll(() => api.messages.filter(message => message.t === 'window_input' && message.id === 1 && message.input.kind === 'mouse').map(message => message.input.action).slice(-3)).toEqual(['move', 'down', 'up'])
+    } finally { await context.close() }
 })

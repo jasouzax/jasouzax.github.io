@@ -21,6 +21,7 @@ COPY --from=build --chown=node:node /repo/server/node_modules ./node_modules
 RUN node node_modules/electron/install.js && rm -rf /root/.cache/electron
 COPY --from=build --chown=node:node /repo/server/dist ./dist
 COPY --chown=node:node server/assets ./assets
+COPY --chown=node:node server/test/interaction.smoke.cjs ./test/interaction.smoke.cjs
 RUN mkdir user_data && chown node:node user_data
 USER node
 ENV NODE_ENV=production JAZU_VIRTUAL_DISPLAY=1

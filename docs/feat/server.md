@@ -89,7 +89,7 @@ An Electron app started by hand on the Pi (`cd server && npm start`, or `npm run
 
 ### Page
 
-`desk_server.ts` reads `/api/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector hints and sound. The existing window head owns back/refresh/forward and the live URL, following Chromium history for link clicks and typed addresses. Every window has Fullscreen and Audio before Save, in every mode; the audio preference stays with the window across mode/type changes. For `application/auto-site`, View shows the page and Edit shows that page's DevTools feed in the same pane. The Sessions side uses the standard `.desk_side_item` icon, name, details and toolbar layout for scripts and their windows, standalone sites, and parentless popups. Clicking an entry opens it in View. Script actions are Start/Stop, New Window, Clear Logs and Delete; stopped scripts remain available to restart. Delete removes the runtime session, its windows and logs, while its source file stays in Files. Site entries provide Delete to close the native window. A site split inherits the same native session: selecting Edit in the child streams its DevTools beside the parent page. Closing a desk pane leaves its server session running.
+`desk_server.ts` reads `/api/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector hints and sound. The existing window head owns back/refresh/forward and the live URL, following Chromium history for link clicks and typed addresses. Every window has Fullscreen and Audio before Save, in every mode; the audio preference stays with the window across mode/type changes. For `application/auto-site`, View shows the page and Edit shows that page's DevTools feed in the same pane. This built-in live host also serves file-less split mirrors before plugin lookup, so a stale plugin catalog cannot substitute a file editor. The Sessions side uses the standard `.desk_side_item` icon, name, details and toolbar layout for scripts and their windows, standalone sites, and parentless popups. Clicking an entry opens it in View. Script actions are Start/Stop, New Window, Clear Logs and Delete; stopped scripts remain available to restart. Delete removes the runtime session, its windows and logs, while its source file stays in Files. Site entries provide Delete to close the native window. A site split inherits the same native session: selecting Edit in the child streams its DevTools beside the parent page. Closing a desk pane leaves its server session running.
 
 ### Wire protocol (summary)
 
@@ -133,3 +133,13 @@ Xvfb needs `JAZU_VIRTUAL_DISPLAY=1` (set by the image): parking a window outside
 the virtual screen loads the page but produces no screencast frames. Docker's
 file manager exposes the container's `/`, with persistent files in `/workspace`;
 the host's root filesystem is not mounted.
+
+### Embedded-frame input regression
+
+Mouse and touch-generated pointer events, text, keys, scrolling and dragging use
+Chromium input dispatch, queued per target. The old Electron `sendInputEvent`
+path reached top-level controls but missed out-of-process iframe controls on the
+ARM64 agent. A real Electron regression (`server/test/interaction.smoke.cjs`)
+checks ordinary controls on different loopback origins, including while DevTools
+is open. This enables manual interaction with embedded verification controls;
+it does not solve or skip a verification challenge.

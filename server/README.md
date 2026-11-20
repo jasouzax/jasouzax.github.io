@@ -13,6 +13,7 @@ cp .env.example .env      # set SERVER_AGENT_SECRET (same value as the Worker se
 npm start                 # build + run (needs a display)
 npm run start:headless    # build + run on a headless Pi through xvfb
 npm test                  # unit tests (no Electron needed)
+npm run test:interaction  # Linux/Xvfb: real Electron iframe input + DevTools regression (build first)
 ```
 
 From the repository root, `npm run server` does the same as `npm start` here.
@@ -82,3 +83,20 @@ The container is `jazu-server-staging` and restarts automatically. The existing
 | `src/server/` | Audio capture and clipboard bridge for the live feed |
 | `assets/` | Hidden window used to capture a page's sound |
 | `test/` | `node:test` suites, run with `npm test` |
+
+## Manual input into embedded frames
+
+The streamed browser relays owner input with Chromium's `Input` domain so clicks,
+keyboard input, scrolling and dragging reach cross-process frames as well as the
+main page. Input is queued per browser target to keep presses and releases in
+order. This is a remote-control transport; verification challenges remain manual.
+
+To check a built image without connecting an agent or using external websites:
+
+```bash
+docker run --rm --init --network none --entrypoint npm jazu-server:staging run test:interaction
+```
+
+The regression serves local controls on distinct loopback origins, checks trusted
+checkbox/button events, keyboard/text, drag and scroll, and verifies the DevTools
+feed while the embedded page remains interactive.

@@ -20,6 +20,7 @@ import type { Clipboard_Data, Input_Event, Selector_Candidate, Window_Info } fro
 import type { Web } from './web.ts';
 import { Audio_capture } from './server/audio.ts';
 import { Clipboard_bridge, max_clipboard_chars } from './server/clipboard.ts';
+import { Remote_Input } from './input.ts';
 
 const default_size = { width: 800, height: 600 };
 // What a page may ask for (window_resize): a window smaller or larger than this is of no use to anybody
@@ -28,8 +29,6 @@ const max_size = 4096;
 // The DevTools of a window start out like this, and then take the size of the area the page gives them
 const devtools_start_size = { width: 800, height: 360 };
 
-// Electron names modifier keys differently from the page
-const modifier_names: Record<string, string> = { shift: 'shift', ctrl: 'control', control: 'control', alt: 'alt', meta: 'meta', left_button: 'leftButtonDown' };
 
 // Declared for TypeScript: injected by Web.run's page_prelude at runtime inside the browser context
 declare function resilient_selectors(element: Element): Selector_Candidate[];
@@ -81,6 +80,7 @@ export class Window_Registry extends EventEmitter {
     #audio_id: number | null = null;
     #audio_retry: NodeJS.Timeout | null = null;
     readonly #clipboard = new Clipboard_bridge();
+    readonly #input = new Remote_Input();
 
     constructor(root: string) {
         super();
@@ -341,37 +341,11 @@ export class Window_Registry extends EventEmitter {
         const item = surface ? undefined : this.#entries.get(id);
         const contents = surface ? surface.contents : item?.contents;
         if (!contents || contents.isDestroyed()) return;
-        const modifiers = (input.kind === 'text' ? [] : (input.modifiers ?? [])).flatMap((name) => modifier_names[name] ?? []);
-        if (input.kind === 'text') {
-            contents.insertText(input.text);
-        } else if (input.kind === 'key') {
-            contents.sendInputEvent({ type: input.action === 'down' ? 'keyDown' : 'keyUp', keyCode: input.key, modifiers } as any);
-            // A printable key also has to produce its character, unless a shortcut modifier is held
-            if (input.action === 'down' && input.key.length === 1 && modifiers.every((name) => name === 'shift')) {
-                contents.sendInputEvent({ type: 'char', keyCode: input.key, modifiers } as any);
-            }
-        } else {
-            const x = Math.round(input.x);
-            const y = Math.round(input.y);
-            const button = input.button ?? 'left';
-            switch (input.action) {
-                case 'move':
-                    contents.sendInputEvent({ type: 'mouseMove', x, y, modifiers } as any);
-                    if (item) this.#queue_hover(item, x, y);
-                    break;
-                case 'down':
-                    contents.focus();
-                    contents.sendInputEvent({ type: 'mouseDown', x, y, button, clickCount: input.clicks ?? 1, modifiers } as any);
-                    if (item) this.#queue_hover(item, x, y);
-                    break;
-                case 'up':
-                    contents.sendInputEvent({ type: 'mouseUp', x, y, button, clickCount: input.clicks ?? 1, modifiers } as any);
-                    break;
-                case 'wheel':
-                    contents.sendInputEvent({ type: 'mouseWheel', x, y, deltaX: -(input.dx ?? 0), deltaY: -(input.dy ?? 0), modifiers } as any);
-                    if (item) this.#queue_hover(item, x, y);
-                    break;
-            }
+        try {
+            await this.#input.send(contents, input);
+            if (item && input.kind === 'mouse') this.#queue_hover(item, Math.round(input.x), Math.round(input.y));
+        } catch (error) {
+            if (!contents.isDestroyed()) console.error('[windows] input dispatch failed:', error instanceof Error ? error.message : error);
         }
     }
 

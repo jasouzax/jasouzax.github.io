@@ -575,6 +575,15 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
+    // Site View/Edit are live browser surfaces even for file-less split mirrors.
+    // Do not let a stale plugin catalog send this resource to a file editor.
+    if (!item.error && item.mime === "application/auto-site" && ["view", "edit"].includes(item.mode)
+        && (!flow_kind_of(item) || flow_kind_of(item) === "mirror")) {
+        set_body(item, site_body(item, controller.signal))
+        item.el.dataset.plugin = "auto_site"
+        sync_save(item)
+        return
+    }
     const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
