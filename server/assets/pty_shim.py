@@ -41,7 +41,7 @@ def main():
     if pid == 0:
         set_size(0, rows, cols)
         os.close(3)
-        os.execvp(shell, [shell, "-i"])
+        os.execvp(shell, [shell, *(sys.argv[4:] or ["-i"])])
     set_size(master, rows, cols)
 
     def hang_up(signum, frame):

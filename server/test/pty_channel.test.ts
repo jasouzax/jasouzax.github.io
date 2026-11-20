@@ -1,3 +1,4 @@
+import { join } from "node:path"
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { Pty_Channel, max_sessions } from "../src/pty_channel.ts"
@@ -71,4 +72,13 @@ test("a real shell on a real pty echoes input and reports its exit", { skip: (()
     assert.equal(await done, 3)
     assert.match(output, /jazu-42/)
     void from_base64
+})
+
+
+test("bash loads the terminal rcfile while other account shells retain their own startup", () => {
+    const opened: any[] = []
+    const channel = new Pty_Channel({ shim: "/app/assets/pty_shim.py", send: () => true, buffered: () => 0, backend: "python", shell: "/bin/bash", home: "/tmp", open: (options) => { opened.push(options); return { write() {}, resize() {}, close() {}, pause() {}, resume() {} } } })
+    channel.handle({ t: "pty_open", id: 1, cols: 80, rows: 24, peer: "owner" })
+    assert.deepEqual(opened[0].shell_args, ["--rcfile", join("/app/assets", "terminal.bashrc"), "-i"])
+    assert.equal(opened[0].env.HOME, "/tmp")
 })

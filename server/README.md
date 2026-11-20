@@ -136,3 +136,21 @@ increase from 1 second to a maximum of 60 seconds; a run lasting at least a minu
 resets that delay. Sessions and the log view show Restarting and offer Stop while
 waiting. Agent shutdown preserves the list, including scripts waiting to retry.
 Scripts resume from the beginning; their JavaScript memory is not restored.
+
+## Browser terminal
+
+On `/server`, terminal windows only relay raw input/output to the owner's native
+Pi PTY through the Worker. They do not load the browser WASM shell or its command
+registry, including when the agent is offline. Executables and command-not-found
+errors come from the container's PATH. The public status snapshot is separate.
+
+Compose sets the container hostname to `jasouza`. Bash loads the account's usual
+`~/.bashrc`, then uses a prompt showing the real account, hostname and full current
+path (`jason@jasouza:/home/jason$` initially). Shell files and configuration remain
+in the persistent home. Both stdout and stderr are displayed through the PTY.
+
+Check the built image's actual terminal, without connecting an agent:
+
+```bash
+docker run --rm --init --network none --hostname jasouza --entrypoint node jazu-server:staging test/terminal.smoke.cjs
+```

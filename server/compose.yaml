@@ -5,6 +5,7 @@ services:
       dockerfile: server/Dockerfile
     image: jazu-server:staging
     container_name: jazu-server-staging
+    hostname: jasouza
     restart: unless-stopped
     init: true
     env_file: ["${JAZU_AGENT_ENV_FILE:-./.env}"]

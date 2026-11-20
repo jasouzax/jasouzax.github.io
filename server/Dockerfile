@@ -21,7 +21,7 @@ COPY --from=build --chown=node:node /repo/server/node_modules ./node_modules
 RUN node node_modules/electron/install.js && rm -rf /root/.cache/electron
 COPY --from=build --chown=node:node /repo/server/dist ./dist
 COPY --chown=node:node server/assets ./assets
-COPY --chown=node:node server/test/interaction.smoke.cjs server/test/restart.smoke.cjs ./test/
+COPY --chown=node:node server/test/interaction.smoke.cjs server/test/restart.smoke.cjs server/test/terminal.smoke.cjs ./test/
 RUN mkdir user_data && chown node:node user_data
 # Keep UID/GID 1000 so existing persistent data stays writable.
 RUN groupmod -n jason node \

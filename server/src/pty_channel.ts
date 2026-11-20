@@ -12,6 +12,7 @@
  *   Opens only the account's own shell, in a folder that exists; the page never supplies a command.
  */
 import { existsSync, statSync } from "fs"
+import { basename, dirname, join } from "path"
 import { userInfo } from "os"
 import type { Agent_Message, Client_Message, Relayed, Routed } from "./shared/protocol.ts"
 import { from_base64, to_base64 } from "./shared/codec.ts"
@@ -94,7 +95,8 @@ export class Pty_Channel {
             },
         }
         try {
-            const session = open({ cols: clamp(message.cols, 1, 500, 80), rows: clamp(message.rows, 1, 300, 24), cwd, shell, env, backend: this.#options.backend ?? pick_backend(), shim: this.#options.shim }, events)
+            const shell_args = basename(shell) === "bash" ? ["--rcfile", join(dirname(this.#options.shim), "terminal.bashrc"), "-i"] : undefined
+            const session = open({ shell_args, cols: clamp(message.cols, 1, 500, 80), rows: clamp(message.rows, 1, 300, 24), cwd, shell, env, backend: this.#options.backend ?? pick_backend(), shim: this.#options.shim }, events)
             this.#sessions.set(key, { session, peer, id, paused: false })
         } catch (error) {
             fail(error instanceof Error ? error.message : "could not start a shell")

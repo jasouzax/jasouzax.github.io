@@ -16,7 +16,7 @@ import { accessSync, constants } from "fs"
 import { delimiter, join } from "path"
 
 export type Pty_Backend = "python" | "script"
-export type Pty_Options = { cols: number, rows: number, cwd: string, shell: string, env: NodeJS.ProcessEnv, backend: Pty_Backend, shim: string }
+export type Pty_Options = { cols: number, rows: number, cwd: string, shell: string, shell_args?: string[], env: NodeJS.ProcessEnv, backend: Pty_Backend, shim: string }
 export type Pty_Events = { on_data: (chunk: Buffer) => void, on_exit: (code: number) => void }
 export type Pty_Session = { write: (data: Buffer) => void, resize: (cols: number, rows: number) => void, pause: () => void, resume: () => void, close: () => void }
 
@@ -36,9 +36,9 @@ const quote = (word: string) => `'${word.replaceAll("'", "'\\''")}'`
 
 function launch(options: Pty_Options): ChildProcess {
     const spawn_options = { cwd: options.cwd, env: options.env, stdio: ["pipe", "pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe", "pipe"] }
-    if (options.backend === "python") return spawn("python3", [options.shim, String(options.cols), String(options.rows), options.shell], spawn_options)
+    if (options.backend === "python") return spawn("python3", [options.shim, String(options.cols), String(options.rows), options.shell, ...(options.shell_args ?? ["-i"])], spawn_options)
     // script cannot be resized later; the size is applied once, before the shell takes over
-    return spawn("script", ["-qefc", `stty cols ${options.cols} rows ${options.rows} 2>/dev/null; exec ${quote(options.shell)} -i`, "/dev/null"], spawn_options)
+    return spawn("script", ["-qefc", `stty cols ${options.cols} rows ${options.rows} 2>/dev/null; exec ${[options.shell, ...(options.shell_args ?? ["-i"])].map(quote).join(" ")}`, "/dev/null"], spawn_options)
 }
 
 export function open_pty(options: Pty_Options, events: Pty_Events): Pty_Session {
