@@ -113,6 +113,22 @@ test("auto_state tells a connecting page about scripts and windows", async () =>
     assert.deepEqual(sent[0].message.scripts.map((script: any) => script.path), ["/a.auto.js"])
 })
 
+test("deleting a script session is broadcast and stays deleted in later snapshots", async () => {
+    const { agent, runner, sent } = setup({ files: { "/remove.auto.js": "setInterval(() => {}, 100000)" } })
+    await runner.start("/remove.auto.js")
+    agent.handle({ t: "auto_delete", path: "/remove.auto.js", peer: "p1" })
+    const deadline = Date.now() + 5000
+    while (!sent.some(item => item.message.t === "auto_deleted")) {
+        assert.ok(Date.now() < deadline, "delete acknowledgement did not arrive")
+        await settle(10)
+    }
+    assert.equal(sent.find(item => item.message.t === "auto_deleted")?.message.path, "/remove.auto.js")
+    assert.deepEqual(runner.list(), [])
+    sent.length = 0
+    agent.handle({ t: "auto_state", peer: "p2" })
+    assert.deepEqual(sent.find(item => item.message.t === "auto_state")?.message.scripts, [])
+})
+
 test("script logs and status are broadcast only while a page is connected, and replayed on request", async () => {
     const { agent, sent, state } = setup({ files: { "/a.auto.js": "console.log('hi')", "/b.auto.js": "console.log('later')" } })
     agent.handle({ t: "auto_start", path: "/a.auto.js", peer: "p" })

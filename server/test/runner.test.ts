@@ -104,3 +104,32 @@ test("logs are capped, clearable, and open_window adds a blank window without ru
     assert.equal(runner.open_window("/w.txt"), false)
     assert.deepEqual(runner.list().find(item => item.path === "/w.auto.js"), { path: "/w.auto.js", running: false, windows: 1 })
 })
+
+test("deleting a session stops its APIs and windows and forgets logs without deleting source", async () => {
+    const { runner, apis } = setup({ "/delete.auto.js": "new Web('https://example.com'); new API('session').get('', () => 'ok')" })
+    const deleted: string[] = []
+    runner.on("deleted", path => deleted.push(path))
+    await runner.start("/delete.auto.js")
+    await settle()
+    assert.equal(runner.is_running("/delete.auto.js"), true)
+    await runner.remove("/delete.auto.js")
+    assert.deepEqual(runner.list(), [])
+    assert.deepEqual(runner.logs("/delete.auto.js"), [])
+    assert.deepEqual(apis.list(), [])
+    assert.equal(Fake_Web.opened[0].closed, true)
+    assert.deepEqual(deleted, ["/delete.auto.js"])
+    await settle()
+    assert.deepEqual(runner.list(), [], "late completion cannot resurrect the deleted session")
+    await runner.start("/delete.auto.js")
+    assert.equal(runner.is_running("/delete.auto.js"), true, "source remains available to run again")
+    await runner.stop_all()
+})
+
+test("deleting a stopped session also closes windows opened without running its source", async () => {
+    const { runner } = setup({})
+    runner.open_window("/stopped.auto.js")
+    assert.equal(runner.is_running("/stopped.auto.js"), false)
+    await runner.remove("/stopped.auto.js")
+    assert.equal(Fake_Web.opened[0].closed, true)
+    assert.deepEqual(runner.list(), [])
+})

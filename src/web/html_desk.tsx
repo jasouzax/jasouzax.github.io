@@ -679,7 +679,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete"]
+    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 

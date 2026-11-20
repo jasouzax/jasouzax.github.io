@@ -5,6 +5,7 @@ import type { Window_Info } from "../server/src/shared/protocol.ts"
 async function owner(page: Page) {
     const messages: any[] = []
     let socket: WebSocketRoute
+    let script_present = true, script_running = true
     const windows: Window_Info[] = [
         { id: 1, script: "/run.auto.js", title: "Script page", url: "https://example.com/start", icon: "", width: 800, height: 600, devtools: null },
         { id: 2, script: "site:standalone", title: "Standalone page", url: "https://example.com/standalone", icon: "", width: 800, height: 600, devtools: null },
@@ -34,7 +35,7 @@ async function owner(page: Page) {
         route.onMessage(raw => {
             if (raw === "ping") return route.send("pong")
             const message = JSON.parse(String(raw)); messages.push(message)
-            if (message.t === "auto_state") { send({ t: "auto_state", scripts: [{ path: "/run.auto.js", running: true, windows: 1 }] }); send({ t: "windows", windows }) }
+            if (message.t === "auto_state") { send({ t: "auto_state", scripts: script_present ? [{ path: "/run.auto.js", running: script_running, windows: 1 }] : [] }); send({ t: "windows", windows }) }
             if (message.t === "auto_logs") send({ t: "auto_logs", path: message.path, entries: [] })
             if (message.t === "fastfetch") send({ t: "fastfetch", text: "Test Pi", taken_at: Date.now() })
             if (message.t === "fs") {
@@ -62,7 +63,15 @@ async function owner(page: Page) {
                 setTimeout(() => { frame(message.id); if (window?.devtools) frame(window.devtools.id) }, 30)
             }
             if (message.t === "window_close") { const index = windows.findIndex(window => window.id === message.id); windows.splice(index, 1); send({ t: "window_removed", id: message.id }) }
-            if (message.t === "auto_stop") send({ t: "auto_status", path: message.path, running: false })
+            if (message.t === "auto_stop" || message.t === "auto_start") {
+                script_present = true; script_running = message.t === "auto_start"
+                send({ t: "auto_status", path: message.path, running: script_running })
+            }
+            if (message.t === "auto_delete") {
+                script_present = false; script_running = false
+                for (const window of [...windows]) if (window.script === message.path) { windows.splice(windows.indexOf(window), 1); send({ t: "window_removed", id: window.id }) }
+                send({ t: "auto_deleted", path: message.path })
+            }
         })
     })
     await page.goto("/server")
@@ -80,7 +89,7 @@ test("Sessions groups scripts and opens sites, scripts and orphan windows in vie
     const api = await owner(page), panel = await sessions(page)
     await expect(panel.locator(".server_session_script")).toHaveCount(1)
     await expect(panel.locator('.server_session_script [data-session-uri="server:window:1"]')).toHaveText("Script page")
-    await expect(panel.locator(':scope > .server_session_row')).toHaveCount(2)
+    await expect(panel.locator(':scope > .server_session_site')).toHaveCount(2)
     await panel.locator('[data-session-uri="file:///run.auto.js"]').click()
     const script = page.locator('.desk_wbox').last()
     await expect(script).toHaveAttribute("data-plugin", "auto_script")
@@ -99,10 +108,11 @@ test("Sessions groups scripts and opens sites, scripts and orphan windows in vie
     await expect(panel.locator('[data-session-uri="server:window:2"]')).toBeVisible()
     expect(api.messages.some(message => message.t === "site_close")).toBe(false)
     await panel.locator('[data-session-uri="server:window:2"]').click()
-    await panel.locator('.server_session_row').filter({ has: page.locator('[data-session-uri="server:window:2"]') }).locator('.server_session_close').click()
+    await panel.locator('.server_session_site').filter({ has: page.locator('[data-session-uri="server:window:2"]') }).locator('[data-session-action="delete"]').click()
     await expect(panel.locator('[data-session-uri="server:window:2"]')).toHaveCount(0)
     await api.send({ t: "auto_status", path: "/run.auto.js", running: false })
-    await expect(panel.locator('.server_session_script')).toHaveCount(0)
+    await expect(panel.locator('.server_session_script')).toHaveAttribute('data-running', 'false')
+    await expect(panel.locator('.server_session_script [data-session-action="start"]')).toBeVisible()
 })
 
 test("site headers follow page navigation and Edit shows DevTools in the same pane", async ({ page }) => {
@@ -171,9 +181,41 @@ test("an auto-site file switches between its page and DevTools without opening a
     expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(1)
     const panel = await sessions(page)
     await expect(panel.locator('[data-session-uri="server:window:4"]')).toBeVisible()
-    await panel.locator('.server_session_row').filter({ has: page.locator('[data-session-uri="server:window:4"]') }).locator('.server_session_close').click()
+    await panel.locator('[data-session-uri="server:window:4"]').click()
+    await panel.locator('.server_session_site').filter({ has: page.locator('[data-session-uri="server:window:4"]') }).locator('[data-session-action="delete"]').click()
     await expect(panel.locator('[data-session-uri="server:window:4"]')).toHaveCount(0)
     await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
     expect(api.messages.filter(message => message.t === 'site_open')).toHaveLength(1)
     await page.screenshot({ path: '.cache/desk-browser-results/server-site-view.png' })
+})
+
+
+test("Sessions use standard side items with icons and persistent script actions", async ({ page }) => {
+    const api = await owner(page), panel = await sessions(page)
+    const script = panel.locator('.server_session_script')
+    await expect(script).toHaveClass(/desk_side_item/)
+    await expect(script.locator(':scope > .desk_side_item_box > .desk_side_item_head > .desk_side_item_icon')).not.toBeEmpty()
+    await expect(script.locator(':scope > .desk_side_item_box > .desk_side_item_tool')).toBeVisible()
+    await script.locator('[data-session-action="stop"]').click()
+    await expect(script).toHaveAttribute('data-running', 'false')
+    await script.locator('[data-session-action="start"]').click()
+    await expect(script).toHaveAttribute('data-running', 'true')
+    expect(api.messages.some(message => message.t === 'auto_start' && message.path === '/run.auto.js')).toBe(true)
+    await script.locator('[data-session-action="clear"]').click()
+    expect(api.messages.some(message => message.t === 'auto_clear_logs' && message.path === '/run.auto.js')).toBe(true)
+    const standalone = panel.locator('.server_session_site').filter({ has: page.locator('[data-session-uri="server:window:2"]') })
+    await standalone.locator('[data-session-uri]').click()
+    await expect(standalone).toHaveClass(/desk_side_item/)
+    await expect(standalone.locator('.desk_side_item_icon')).not.toBeEmpty()
+    await expect(standalone.locator('.desk_side_item_tool button')).toHaveCount(1)
+    await expect(standalone.locator('[data-session-action="delete"]')).toHaveAccessibleName('Delete')
+    await script.locator(':scope > .desk_side_item_box > .desk_side_item_tool [data-session-action="delete"]').click()
+    await expect(script).toHaveCount(0)
+    expect(api.messages.some(message => message.t === 'auto_delete' && message.path === '/run.auto.js')).toBe(true)
+    // A snapshot after deletion must not bring the forgotten session back.
+    await page.locator('.desk_wbox').first().locator('.desk_wbox_head_path').fill('file:///run.auto.js')
+    await page.locator('.desk_wbox').first().locator('.desk_wbox_head_path').press('Enter')
+    await expect(page.locator('.desk_wbox').first()).toHaveAttribute('data-plugin', 'auto_script')
+    await expect(script).toHaveCount(0)
+    await page.screenshot({ path: '.cache/desk-browser-results/server-sessions-side-items.png' })
 })

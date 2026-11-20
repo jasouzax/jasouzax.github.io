@@ -101,6 +101,7 @@ export type Client_Message =
     | { t: "pty_close", id: number }
     | { t: "auto_start", path: string }
     | { t: "auto_stop", path: string }
+    | { t: "auto_delete", path: string }
     | { t: "auto_state" }
     | { t: "auto_logs", path: string }
     | { t: "auto_clear_logs", path: string }
@@ -134,6 +135,7 @@ export type Agent_Message =
     | { t: "auto_logs", path: string, entries: Log_Entry[] }
     | { t: "auto_log", path: string, entry: Log_Entry }
     | { t: "auto_status", path: string, running: boolean }
+    | { t: "auto_deleted", path: string }
     | { t: "auto_logs_cleared", path: string }
     | { t: "auto_error", path: string, message: string }
     | { t: "fastfetch", text: string, taken_at: number }
@@ -175,13 +177,13 @@ export type Public_Status = { online: boolean, owner: boolean, snapshot: { text:
 // ---- accepted `t` values ------------------------------------------------------------------------------------------------------------------
 
 export const client_message_types: ReadonlySet<string> = new Set([
-    "fs", "pty_open", "pty_input", "pty_resize", "pty_close", "auto_start", "auto_stop", "auto_state", "auto_logs", "auto_clear_logs", "fastfetch",
+    "fs", "pty_open", "pty_input", "pty_resize", "pty_close", "auto_start", "auto_stop", "auto_delete", "auto_state", "auto_logs", "auto_clear_logs", "fastfetch",
     "site_open", "site_close", "feed_watch", "window_input", "window_navigate", "window_close", "window_create", "window_devtools", "window_resize",
     "clipboard_copy", "clipboard_paste",
 ])
 // What the hub forwards from the agent to pages
 export const agent_message_types: ReadonlySet<string> = new Set([
-    "fs_ok", "fs_err", "pty_out", "pty_exit", "pty_err", "auto_state", "auto_logs", "auto_log", "auto_status", "auto_logs_cleared", "auto_error",
+    "fs_ok", "fs_err", "pty_out", "pty_exit", "pty_err", "auto_state", "auto_logs", "auto_log", "auto_status", "auto_deleted", "auto_logs_cleared", "auto_error",
     "fastfetch", "windows", "window_added", "window_updated", "window_removed", "window_hover", "clipboard",
 ])
 // What the hub consumes from the agent itself

@@ -113,6 +113,7 @@ export class Agent {
             case "auto_state": return this.#send_state(peer)
             case "auto_start": return void this.#o.runner.start(String(message.path))
             case "auto_stop": return void this.#o.runner.stop(String(message.path))
+            case "auto_delete": return void this.#o.runner.remove(String(message.path))
             case "auto_logs": return void this.#o.link.send({ t: "auto_logs", path: String(message.path), entries: this.#o.runner.logs(String(message.path)) }, peer)
             case "auto_clear_logs": return this.#o.runner.clear_logs(String(message.path))
             case "fastfetch": return void this.#snapshot().then(snapshot => this.#o.link.send({ t: "fastfetch", text: snapshot.text, taken_at: snapshot.taken_at }, peer))
@@ -198,6 +199,7 @@ export class Agent {
         const { runner } = this.#o
         runner.on("log", (path, entry) => this.#broadcast({ t: "auto_log", path, entry }))
         runner.on("status", (path, running) => this.#broadcast({ t: "auto_status", path, running }))
+        runner.on("deleted", path => this.#broadcast({ t: "auto_deleted", path }))
         runner.on("logs_cleared", path => this.#broadcast({ t: "auto_logs_cleared", path }))
     }
 

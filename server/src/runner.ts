@@ -127,6 +127,21 @@ export class Script_Runner extends EventEmitter {
         await Promise.all([...this.#runs.keys()].map((script_path) => this.stop(script_path)));
     }
 
+    // Remove the session, including stopped runs and manually opened windows.
+    // Its source file is independent of runtime state and stays in Files.
+    async remove(script_path: string): Promise<void> {
+        const run = this.#runs.get(script_path);
+        if (run) {
+            await this.#end_run(run);
+            this.#finish(run);
+            // A newer start may have arrived while the old windows were closing.
+            if (this.#runs.get(script_path) !== run) return;
+            this.#runs.delete(script_path);
+        }
+        this.#logs.delete(script_path);
+        this.emit('deleted', script_path);
+    }
+
     // A blank window in the group of a script, without running any code (the "+" of the window tabs).
     // It joins the run the script has, or a bare one of its own: Stop and the next Start take it away again
     open_window(script_path: string): boolean {

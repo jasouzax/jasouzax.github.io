@@ -25,31 +25,65 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
         if (state.maximized && state.maximized !== item) toggle_maximize(item)
         focus_window(item)
     }
-    const row = (name: string, uri: string, close: () => void): HTMLElement => {
-        const entry = document.createElement("div"); entry.className = "server_session_row"
+    const expanded = new Map<string, boolean>()
+    const icon_of = (mime: string) => state.data?.mimes.find(item => item.mime === mime)?.icon || state.data?.file_icon || ""
+    const action = (name: string, label: string, glyph: string, run: () => void): HTMLButtonElement => {
+        const button = document.createElement("button"); button.type = "button"
+        button.dataset.sessionAction = name; button.title = label; button.setAttribute("aria-label", label)
+        const icon = document.createElement("span"); icon.className = "desk_files_icon"; icon.setAttribute("aria-hidden", "true")
+        icon.textContent = state.data?.icons?.[glyph] || ""
+        button.append(icon, label); button.addEventListener("click", run); return button
+    }
+    const row = (name: string, uri: string, mime: string, tools: HTMLButtonElement[], info = "", default_open = false): { entry: HTMLElement, box: HTMLDetailsElement } => {
+        const entry = document.createElement("article"); entry.className = "desk_side_item"
+        entry.dataset.kind = "file"; entry.dataset.mime = mime; entry.dataset.path = uri
+        const box = document.createElement("details"); box.className = "desk_side_item_box"
+        box.open = expanded.get(uri) ?? default_open
+        box.addEventListener("toggle", () => { if (box.isConnected) expanded.set(uri, box.open) })
+        const head = document.createElement("summary"); head.className = "desk_side_item_head"
+        const icon = document.createElement("span"); icon.className = "desk_side_item_icon"; icon.setAttribute("aria-hidden", "true"); icon.textContent = icon_of(mime)
+        const title = document.createElement("h3"); title.className = "desk_side_item_name"
         const button = document.createElement("button"); button.type = "button"; button.className = "server_session_open"
         button.textContent = name; button.title = uri; button.dataset.sessionUri = uri
-        button.addEventListener("click", () => { void open(uri) })
-        const stop = document.createElement("button"); stop.type = "button"; stop.className = "server_session_close"
-        stop.textContent = "×"; stop.title = stop.ariaLabel = text("close_window"); stop.addEventListener("click", close)
-        entry.append(button, stop); return entry
+        title.append(button); head.append(icon, title)
+        head.addEventListener("click", event => {
+            event.preventDefault()
+            box.open = (event.target as Element).closest("[data-session-uri]") ? true : !box.open
+            expanded.set(uri, box.open); void open(uri)
+        })
+        box.append(head)
+        if (info) { const note = document.createElement("p"); note.className = "desk_side_item_info"; note.textContent = info; box.append(note) }
+        const bar = document.createElement("div"); bar.className = "desk_side_item_tool"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", name)
+        bar.append(...tools); box.append(bar); entry.append(box)
+        return { entry, box }
     }
-    const site = (window: Window_Info) => row(window.title || window.url || `#${window.id}`, window_uri(window.id), () => link.send({ t: "window_close", id: window.id }))
+    const site = (window: Window_Info) => {
+        const { entry } = row(window.title || window.url || `#${window.id}`, window_uri(window.id), "application/auto-site", [
+            action("delete", text("files_delete"), "delete", () => link.send({ t: "window_close", id: window.id })),
+        ])
+        entry.classList.add("server_session_site"); return entry
+    }
     const draw = () => {
         const sessions = scripts.list(windows.all())
         const nodes: HTMLElement[] = []
         for (const script of sessions.scripts) {
-            const group = document.createElement("section"); group.className = "server_session_script"
-            group.append(row(script.path.split("/").pop() || script.path, `file://${script.path}`, () => link.send({ t: "auto_stop", path: script.path })))
-            const children = document.createElement("div"); children.className = "server_session_windows"
-            children.append(...script.windows.map(site)); group.append(children); nodes.push(group)
+            const { entry, box } = row(script.path.split("/").pop() || script.path, `file://${script.path}`, "application/auto-javascript", [
+                action(script.running ? "stop" : "start", text(script.running ? "server_script_stop" : "server_script_start"), script.running ? "pause" : "view", () => link.send({ t: script.running ? "auto_stop" : "auto_start", path: script.path })),
+                action("window", text("server_script_new_window"), "window", () => link.send({ t: "window_create", script: script.path })),
+                action("clear", text("server_script_clear"), "refresh", () => link.send({ t: "auto_clear_logs", path: script.path })),
+                action("delete", text("files_delete"), "delete", () => link.send({ t: "auto_delete", path: script.path })),
+            ], text(script.running ? "server_script_running" : "server_script_stopped"), true)
+            entry.classList.add("server_session_script"); entry.dataset.running = String(script.running)
+            const children = document.createElement("ul"); children.className = "desk_side_item_sub server_session_windows"
+            for (const window of script.windows) { const child = document.createElement("li"); child.append(site(window)); children.append(child) }
+            box.append(children); nodes.push(entry)
         }
         nodes.push(...sessions.windows.map(site))
         if (!nodes.length) { const empty = document.createElement("p"); empty.className = "server_sessions_empty"; empty.textContent = text("server_sessions_empty"); nodes.push(empty) }
         page.replaceChildren(...nodes)
     }
     const update = (message: { t: string, [key: string]: unknown }) => { scripts.apply(message); draw() }
-    const offs = [link.on("auto_state", update), link.on("auto_status", update), windows.on_change(draw),
+    const offs = [link.on("auto_state", update), link.on("auto_status", update), link.on("auto_deleted", update), windows.on_change(draw),
         link.on("disconnected", () => { scripts.clear(); draw() })]
     page.style.display = "block"
     sync_tabs(); draw()

@@ -195,6 +195,6 @@ export class Server_Link {
 }
 
 const hub_and_agent_types: ReadonlySet<string> = new Set([
-    "welcome", "status", "fs_ok", "fs_err", "pty_out", "pty_exit", "pty_err", "auto_state", "auto_logs", "auto_log", "auto_status", "auto_logs_cleared", "auto_error",
+    "welcome", "status", "fs_ok", "fs_err", "pty_out", "pty_exit", "pty_err", "auto_state", "auto_logs", "auto_log", "auto_status", "auto_deleted", "auto_logs_cleared", "auto_error",
     "fastfetch", "windows", "window_added", "window_updated", "window_removed", "window_hover", "clipboard",
 ])

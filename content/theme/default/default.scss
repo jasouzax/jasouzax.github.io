@@ -8503,8 +8503,13 @@ body:has(#motion_pause:checked) {
 .desk_wbox_head_audio[aria-pressed=false] { opacity: .5; }
 .desk_wbox_head_fullscreen[aria-pressed=true] { color: var(--accent); }
 
-.server_session_row { display: flex; gap: .25em; align-items: center; min-width: 0; padding: .25em .5em; }
-.server_session_open { flex: 1; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.server_session_windows { padding-inline-start: 1em; }
-.server_session_script + .server_session_script { border-top: 1px solid var(--edge); }
+.desk_side_page[data-path="server:sessions"] {
+    .desk_side_item_box { --tool-h: 2em; }
+    .server_session_open {
+        display: block; width: 100%; min-width: 0; min-height: 0;
+        margin: 0; padding: 0; border: 0; background: transparent; color: inherit;
+        font: inherit; line-height: inherit; text-align: start;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+}
 .server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }

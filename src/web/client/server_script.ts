@@ -123,6 +123,7 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
         link.on("auto_log", message => { if (message.path === path) append(message.entry as Log_Entry) }),
         link.on("auto_logs_cleared", message => { if (message.path === path) { store.clear(path); redraw_all() } }),
         link.on("auto_status", message => { if (message.path === path) { running = Boolean(message.running); draw_state() } }),
+        link.on("auto_deleted", message => { if (message.path === path) { running = false; store.clear(path); redraw_all(); draw_state() } }),
         link.on("auto_state", message => { running = (message.scripts as { path: string, running: boolean }[]).some(script => script.path === path && script.running); draw_state() }),
         link.on("auto_error", message => {
             if (message.path === path) append({ id: -Date.now(), time: Date.now(), level: "error", text: String(message.message ?? "") })

@@ -24,6 +24,8 @@ test("binary frames carry the window id and, for sound, the timestamp", () => {
 
 test("parse_message accepts only objects whose t is allowed", () => {
     assert.deepEqual(parse_message('{"t":"fastfetch"}', client_message_types), { t: "fastfetch" })
+    assert.deepEqual(parse_message('{"t":"auto_delete","path":"/task.auto.js"}', client_message_types), { t: "auto_delete", path: "/task.auto.js" })
+    assert.deepEqual(parse_message('{"t":"auto_deleted","path":"/task.auto.js"}', agent_message_types), { t: "auto_deleted", path: "/task.auto.js" })
     for (const bad of ['{"t":"api_set"}', '{"t":1}', "[]", "null", "7", "{", '{"x":1}']) assert.equal(parse_message(bad, client_message_types), null, bad)
     assert.equal(parse_message("x".repeat(max_frame_bytes + 1), client_message_types), null)
 })
