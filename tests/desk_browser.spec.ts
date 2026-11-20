@@ -676,6 +676,7 @@ test("portrait window headers keep controls above a full-width joined URL field"
                 return { url: rect(element.querySelector(".desk_wbox_head_address")!), bounds: rect(element), controls: names.map(name => rect(element.querySelector(`.desk_wbox_head_${name}`)!)) }
             })
             const { url, bounds } = metrics
+            expect(metrics.controls[4].x - (metrics.controls[3].x + metrics.controls[3].width)).toBeGreaterThanOrEqual(4)
             let previousRight = url.x
             for (const rect of metrics.controls) {
                 expect(rect.x).toBeGreaterThanOrEqual(previousRight - 1)
@@ -702,6 +703,9 @@ test("portrait window headers keep controls above a full-width joined URL field"
     const url = (await head.locator(".desk_wbox_head_address").boundingBox())!
     const type = (await mime.boundingBox())!
     expect(Math.abs(url.y - type.y)).toBeLessThanOrEqual(1)
+    const source = (await head.locator(".desk_wbox_head_source").boundingBox())!
+    const actions = (await head.locator(".desk_wbox_head_actions").boundingBox())!
+    expect(actions.x - (source.x + source.width)).toBeGreaterThanOrEqual(4)
 })
 
 test("portrait tabs keep their height and the final desk leaves the footer visible", async ({ page }) => {

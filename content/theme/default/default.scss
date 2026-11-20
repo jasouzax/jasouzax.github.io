@@ -8329,7 +8329,7 @@ body:has(#motion_pause:checked) {
 @media (orientation: portrait) {
     .desk_wbox_head {
         display: grid;
-        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) calc(3rem + 2px) repeat(3, auto);
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) calc(3rem + 6px) repeat(3, auto);
         grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
         align-items: center;
         height: auto;
@@ -8515,6 +8515,7 @@ body:has(#motion_pause:checked) {
 .server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }
 
 .desk_wbox_head_actions {
+    margin-inline-start: .25rem;
     display: flex;
     flex: 0 0 auto;
     align-items: center;
