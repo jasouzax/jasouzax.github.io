@@ -205,9 +205,13 @@ function render_window_head(ctx: render_ctx, info: window_info): html {
             </div>
             <div class="desk_wbox_head_mode" role="radiogroup" aria-label={t(ctx, "view_mode")}>{modes}</div>
         </div>,
-        attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true),
+        <div class="desk_wbox_head_actions" role="group" aria-label={t(ctx, "window_actions")}>
+            {head_button(ctx, "desk_wbox_head_audio", t(ctx, "window_audio"), "[audio]", false)}
+            {attrs.save !== "false" && head_button(ctx, "desk_wbox_head_save", t(ctx, "save"), "[save]", true)}
+        </div>,
         attrs.flow !== "false" &&
             head_button(ctx, "desk_wbox_head_split", t(ctx, "split_window"), "[split]", false),
+        head_button(ctx, "desk_wbox_head_fullscreen", t(ctx, "window_fullscreen"), "[fullscreen]", false),
         tool_list(ctx, "desk_wbox_head_drop", t(ctx, "move_window"), "[move]", moves)
     ]
     return (
@@ -528,10 +532,41 @@ const runtime_keys = [
     "choose_file",
     "open_terminal",
     "host_missing",
+    "server_offline",
+    "server_unreachable",
+    "server_last_snapshot",
+    "server_script_start",
+    "server_script_stop",
+    "server_script_clear",
+    "server_script_errors_only",
+    "server_script_message",
+    "server_script_messages",
+    "server_script_empty",
+    "server_script_empty_errors",
+    "server_script_running",
+    "server_script_stopped",
+    "server_script_restarting",
+    "server_script_new_window",
+    "server_site_back",
+    "server_site_forward",
+    "server_site_reload",
+    "server_site_address",
+    "server_site_fit",
+    "server_site_devtools",
+    "server_site_keyboard",
+    "server_site_connecting",
+    "server_site_gone",
+    "server_site_invalid",
+    "server_site_sound",
     "open_folder",
     "open_new_window",
     "files_toggle_hidden",
     "window_source",
+    "window_fullscreen",
+    "window_exit_fullscreen",
+    "window_audio",
+    "window_actions",
+    "server_sessions_empty",
     "previous",
     "forward",
     "folder_navigation",
@@ -648,7 +683,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete"]
+    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 

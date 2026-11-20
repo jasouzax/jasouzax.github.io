@@ -10,10 +10,12 @@ locals {
       { name = "PROJECT_CLONE_ORIGINS", type = "plain_text", text = var.project_clone_origins },
     ],
     var.personal_origin == null ? [] : [{ name = "PERSONAL_ORIGIN", type = "plain_text", text = var.personal_origin }],
+    var.server_owner_emails == null ? [] : [{ name = "SERVER_OWNER_EMAILS", type = "plain_text", text = var.server_owner_emails }],
   )
 
   secret_bindings = concat(
     var.origin_hmac_secret == null ? [] : [{ name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret }],
+    var.server_agent_secret == null ? [] : [{ name = "SERVER_AGENT_SECRET", type = "secret_text", text = var.server_agent_secret }],
     var.access_client_id == null ? [] : [{ name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id }],
     var.access_client_secret == null ? [] : [{ name = "ACCESS_CLIENT_SECRET", type = "secret_text", text = var.access_client_secret }],
   )
@@ -22,6 +24,7 @@ locals {
     { name = "ASSETS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.assets.name },
     { name = "REGISTRY", type = "kv_namespace", namespace_id = cloudflare_workers_kv_namespace.registry.id },
     { name = "DB", type = "d1", id = cloudflare_d1_database.db.id },
+    { name = "SERVER_HUB", type = "durable_object_namespace", class_name = "Server_Hub" },
   ]
 
   route_patterns = ["${var.domain}/*", "*.${var.domain}/*"]
@@ -68,6 +71,11 @@ resource "cloudflare_workers_script" "router" {
   main_module        = "worker.js"
   content            = file(var.worker_bundle)
   compatibility_date = var.compatibility_date
+  # First Durable Object of the production Worker: the /server hub (SQLite-backed, so it fits the free tier)
+  migrations = {
+    new_tag            = "server-v1"
+    new_sqlite_classes = ["Server_Hub"]
+  }
 
   bindings = concat(local.plain_bindings, local.resource_bindings, local.secret_bindings)
 }

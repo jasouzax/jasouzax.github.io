@@ -5,13 +5,13 @@ import { default_config } from "../src/config.ts"
 import { headers_file } from "../src/web/seo.tsx"
 
 const config = { ...default_config, pwa: { ...default_config.pwa, enabled: true } }
-const offline = async (files: Map<string, string | Uint8Array>, skipped = new Map<string, string | Uint8Array>(), media = new Set<string>()) => {
+const offline = async (files: Map<string, string | Buffer>, skipped = new Map<string, string | Uint8Array>(), media = new Set<string>()) => {
     await pwa_files(process.cwd(), files, skipped, config, media)
     return JSON.parse(files.get("offline.json") as string) as { version: string, files: string[], bytes: number }
 }
-const site = () => new Map<string, string | Uint8Array>([
+const site = () => new Map<string, string | Buffer>([
     ["index.html", "<html>home</html>"], ["ja/index.html", "<html>ja</html>"], ["assets/themes/memory/memory.css", "a{}"],
-    ["assets/wasm/busybox.wasm", new Uint8Array([0, 97, 115, 109])], ["assets/media/talk.mp4", new Uint8Array([1, 2, 3])],
+    ["assets/wasm/busybox.wasm", Buffer.from([0, 97, 115, 109])], ["assets/media/talk.mp4", Buffer.from([1, 2, 3])],
     ["api/v1/x.json", "{}"], ["_headers", "/*"], [".jazu_output.json", "[]"], ["projects/app.git/HEAD", "ref"]
 ])
 
@@ -24,7 +24,7 @@ test("offline snapshot lists public pages and themes but never private, toolchai
 test("snapshot version changes with any byte and the worker is emitted only when enabled", async () => {
     const first = await offline(site()), changed = site(); changed.set("ja/index.html", "<html>ja2</html>")
     assert.notEqual(first.version, (await offline(changed)).version)
-    const disabled = new Map<string, string | Uint8Array>([["index.html", "x"]])
+    const disabled = new Map<string, string | Buffer>([["index.html", "x"]])
     await pwa_files(process.cwd(), disabled, new Map(), { ...config, pwa: { ...config.pwa, enabled: false } }, new Set())
     assert.equal(disabled.has("service-worker.js"), false)
 })

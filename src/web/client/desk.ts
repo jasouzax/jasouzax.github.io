@@ -6,6 +6,8 @@ import { init_view, open_source, render_window, save_window } from "./desk_view.
 import { navigate_window } from "./desk_navigation.ts"
 import { init_fs } from "./desk_fs.ts"
 import { init_proc } from "./desk_proc.ts"
+import { init_server } from "./desk_server.ts"
+import { init_server_owner } from "./desk_server_owner.ts"
 import { adopt, release_links } from "./desk_flow.ts"
 import { no_picks, type Child_Picks } from "./desk_flow_rules.ts"
 
@@ -758,6 +760,8 @@ export function bind_desk(): void {
     bound = true
     init_view(new_window)
     init_proc()
+    init_server()
+    init_server_owner()
     document.addEventListener("click", on_click)
     document.addEventListener("jazu:page", init_desk)
     portrait.addEventListener("change", () => arrange())

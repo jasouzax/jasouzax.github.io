@@ -96,7 +96,7 @@ const languages: Record<string, rule[]> = {
 
 const by_mime: Record<string, string> = {
     "text/x-c": "c", "text/x-c++src": "c", "text/x-csrc": "c", "text/x-chdr": "c",
-    "text/javascript": "js", "application/javascript": "js", "application/typescript": "js", "text/typescript": "js",
+    "text/javascript": "js", "application/auto-javascript": "js", "application/javascript": "js", "application/typescript": "js", "text/typescript": "js",
     "text/x-python": "py", "text/x-shellscript": "sh", "application/x-sh": "sh",
     "application/json": "json", "text/css": "css",
     "text/html": "xml", "text/xml": "xml", "application/xml": "xml", "image/svg+xml": "xml",

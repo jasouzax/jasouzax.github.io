@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Jazu server audio capture</title>
+<script>
+    // This page lives in a hidden window of its own. The main process decides whose sound it may take (through
+    // setDisplayMediaRequestHandler), this page turns that sound into Opus packets and hands them back.
+    let current = null;
+
+    async function stop_capture() {
+        const session = current;
+        current = null;
+        if (!session) return;
+        session.is_stopped = true;
+        session.stream.getTracks().forEach((track) => track.stop());
+        await session.reader.cancel().catch(() => {});
+        if (session.encoder.state !== 'closed') session.encoder.close();
+        await session.context.close().catch(() => {});
+    }
+
+    async function start_capture() {
+        await stop_capture();
+        // The picture is not wanted, only the sound: a video track is simply required by getDisplayMedia
+        const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        stream.getVideoTracks().forEach((track) => track.stop());
+        const [track] = stream.getAudioTracks();
+        if (!track) throw new Error('The page has no audio to capture');
+
+        // Whatever the page plays, the encoder is always fed 48 kHz stereo
+        const context = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+        const sink = context.createMediaStreamDestination();
+        context.createMediaStreamSource(new MediaStream([track])).connect(sink);
+        await context.resume();
+
+        const encoder = new AudioEncoder({
+            output: (chunk) => {
+                const bytes = new Uint8Array(chunk.byteLength);
+                chunk.copyTo(bytes);
+                window.jazu_server.packet(chunk.timestamp, bytes);
+            },
+            error: (error) => console.error('encoder:', error.message),
+        });
+        encoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 96000 });
+
+        const reader = new MediaStreamTrackProcessor({ track: sink.stream.getAudioTracks()[0] }).readable.getReader();
+        const session = { stream, context, encoder, reader, is_stopped: false };
+        current = session;
+        (async () => {
+            while (!session.is_stopped) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (encoder.state === 'configured') encoder.encode(value);
+                value.close();
+            }
+        })().catch(() => {});
+        track.addEventListener('ended', () => console.warn('the captured page stopped providing sound'));
+    }
+</script>

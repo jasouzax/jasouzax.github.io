@@ -1,0 +1,24 @@
+services:
+  agent:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: jazu-server:staging
+    container_name: jazu-server-staging
+    hostname: jasouza
+    restart: unless-stopped
+    init: true
+    env_file: ["${JAZU_AGENT_ENV_FILE:-./.env}"]
+    shm_size: 256mb
+    volumes:
+      - "${JAZU_AGENT_HOME:-./home}:/home/jason"
+      - "${JAZU_AGENT_WORKSPACE:-./workspace}:/workspace"
+      - "${JAZU_AGENT_USER_DATA:-./user_data}:/app/user_data"
+    environment:
+      SERVER_ROOT: /
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+    stop_grace_period: 30s

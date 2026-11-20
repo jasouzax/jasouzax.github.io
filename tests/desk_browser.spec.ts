@@ -650,8 +650,9 @@ test("Media connects audio playback, seeking, volume and speed controls", async 
     await window.getByLabel("Volume controls", { exact: true }).click()
     await window.getByRole("slider", { name: "Volume", exact: true }).fill("0.3")
     await expect.poll(() => window.locator("audio").evaluate((media: HTMLAudioElement) => media.volume)).toBeCloseTo(.3)
-    await window.getByRole("button", { name: "Mute", exact: true }).click()
-    await expect(window.getByRole("button", { name: "Unmute", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await window.locator(".desk_wbox_head_audio").click()
+    await expect(window.locator(".desk_wbox_head_audio")).toHaveAttribute("aria-pressed", "false")
+    await expect.poll(() => window.locator("audio").evaluate((media: HTMLAudioElement) => media.muted)).toBe(true)
     await window.getByLabel("Volume controls", { exact: true }).click()
     await window.getByLabel("Settings", { exact: true }).click()
     await window.getByLabel("Playback speed", { exact: true }).selectOption("1.5")
@@ -667,19 +668,25 @@ test("portrait window headers keep controls above a full-width joined URL field"
     for (const width of [320, 390, 560, 768]) {
         await page.setViewportSize({ width, height: 1000 })
         const address = head.locator(".desk_wbox_head_address")
-        const url = (await address.boundingBox())!
-        const bounds = (await head.boundingBox())!
-        const controls = ["icon", "navigation", "mime", "mode", "save", "split", "drop"]
-        let previousRight = url.x
-        for (const name of controls) {
-            const rect = (await head.locator(`.desk_wbox_head_${name}`).boundingBox())!
-            expect(rect.x).toBeGreaterThanOrEqual(previousRight - 1)
-            expect(rect.y + rect.height).toBeLessThanOrEqual(url.y + 1)
-            expect(rect.y).toBeLessThan(url.y)
-            expect(rect.x + rect.width).toBeLessThanOrEqual(url.x + url.width + 1)
-            previousRight = rect.x + rect.width
-        }
-        expect(url.width).toBeGreaterThan(bounds.width - 10)
+        // Resize/orientation handlers can arrange the desk between individual locator reads.
+        await expect(async () => {
+            const metrics = await head.evaluate(element => {
+                const rect = (node: Element) => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height } }
+                const names = ["icon", "navigation", "mime", "mode", "actions", "split", "fullscreen", "drop"]
+                return { url: rect(element.querySelector(".desk_wbox_head_address")!), bounds: rect(element), controls: names.map(name => rect(element.querySelector(`.desk_wbox_head_${name}`)!)) }
+            })
+            const { url, bounds } = metrics
+            expect(metrics.controls[4].x - (metrics.controls[3].x + metrics.controls[3].width)).toBeGreaterThanOrEqual(4)
+            let previousRight = url.x
+            for (const rect of metrics.controls) {
+                expect(rect.x).toBeGreaterThanOrEqual(previousRight - 1)
+                expect(rect.y + rect.height).toBeLessThanOrEqual(url.y + 1)
+                expect(rect.y).toBeLessThan(url.y)
+                expect(rect.x + rect.width).toBeLessThanOrEqual(url.x + url.width + 1)
+                previousRight = rect.x + rect.width
+            }
+            expect(url.width).toBeGreaterThan(bounds.width - 10)
+        }).toPass({ timeout: 5000 })
         await expect(address).toHaveCSS("border-top-left-radius", "4px")
         await expect(address).toHaveCSS("border-bottom-right-radius", "4px")
         for (const name of ["mime", "mode"]) {
@@ -696,6 +703,9 @@ test("portrait window headers keep controls above a full-width joined URL field"
     const url = (await head.locator(".desk_wbox_head_address").boundingBox())!
     const type = (await mime.boundingBox())!
     expect(Math.abs(url.y - type.y)).toBeLessThanOrEqual(1)
+    const source = (await head.locator(".desk_wbox_head_source").boundingBox())!
+    const actions = (await head.locator(".desk_wbox_head_actions").boundingBox())!
+    expect(actions.x - (source.x + source.width)).toBeGreaterThanOrEqual(4)
 })
 
 test("portrait tabs keep their height and the final desk leaves the footer visible", async ({ page }) => {
@@ -750,10 +760,10 @@ test("mode buttons stay square and video controls fit a narrow window", async ({
     await expect(player.locator("video")).toBeVisible()
     await expect(player.getByRole("button", { name: "Play", exact: true }).locator("svg")).toBeVisible()
     await expect(player.getByRole("button", { name: "Subtitles", exact: true })).toBeDisabled()
-    const full = player.getByRole("button", { name: "Fullscreen", exact: true })
+    const full = window.getByRole("button", { name: "Fullscreen", exact: true })
     await full.click()
-    await expect(player.getByRole("button", { name: "Exit fullscreen", exact: true })).toHaveAttribute("aria-pressed", "true")
-    await player.getByRole("button", { name: "Exit fullscreen", exact: true }).click()
+    await expect(window.getByRole("button", { name: "Exit fullscreen", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await window.getByRole("button", { name: "Exit fullscreen", exact: true }).click()
     await page.setViewportSize({ width: 600, height: 800 })
     const narrow = await view.boundingBox()
     expect(narrow!.width).toBe(original!.width)
@@ -768,6 +778,9 @@ test("mode buttons stay square and video controls fit a narrow window", async ({
 })
 
 test("BusyBox terminal, shared file manager, cancellation and private persistence", async ({ page }) => {
+    // This static server has no identity/messaging API; those services are independent of the local terminal.
+    await page.route("**/api/v1/auth/session", route => route.fulfill({ json: { user: null, csrf: "test", google_enabled: false } }))
+    await page.route("**/api/v1/work/session", route => route.fulfill({ json: { owner_email: "", owner_key: null, room: null, guest_room: null } }))
     const failures: string[] = []
     const wasm_requests: string[] = []
     page.on("pageerror", error => failures.push(error.message))
@@ -802,14 +815,14 @@ test("BusyBox terminal, shared file manager, cancellation and private persistenc
     const beforeSleep = await prompts()
     await send("sleep 30")
     await page.waitForTimeout(200)
-    await page.keyboard.press("Control+c")
+    await page.locator(".xterm-helper-textarea").press("Control+c")
     await expect.poll(prompts).toBeGreaterThan(beforeSleep)
     await send("echo INTERRUPT_OK")
     await expect(output("INTERRUPT_OK")).toBeVisible()
     const beforeLoop = await prompts()
     await send("v=kept; while :; do :; done")
     await page.waitForTimeout(200)
-    await page.keyboard.press("Control+c")
+    await page.locator(".xterm-helper-textarea").press("Control+c")
     await expect.poll(prompts).toBeGreaterThan(beforeLoop)
     await send("echo LOOP_$v")
     await expect(output("LOOP_kept")).toBeVisible()
@@ -817,7 +830,7 @@ test("BusyBox terminal, shared file manager, cancellation and private persistenc
     await page.waitForTimeout(200)
     await send("echo NESTED_OK")
     await expect(output("NESTED_OK")).toBeVisible()
-    await page.keyboard.press("Control+d")
+    await page.locator(".xterm-helper-textarea").press("Control+d")
     await send("echo PARENT_OK")
     await expect(output("PARENT_OK")).toBeVisible()
     await page.setViewportSize({ width: 1000, height: 700 })

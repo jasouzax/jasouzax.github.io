@@ -3,6 +3,7 @@
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
 
 import type { desk_window } from "./desk.ts"
+import { find_by_name } from "../../mime.ts"
 import { state, text, new_window, focus_window, refresh_tab, working_directory } from "./desk.ts"
 import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"
@@ -62,6 +63,34 @@ let home_node: fs_node | null = null
 let filesystem_ready: Promise<void> = Promise.resolve()
 export function filesystem_initialized(): Promise<void> { return filesystem_ready }
 
+// While the owner's /server desk shows the Pi, the tree's root is the Pi's directory. Nothing of the shared virtual file system is touched: its
+// handle and children are kept and put back by the returned function. The polling of picked folders and the /bin mount skip a remote root.
+let remote_active = false
+export function remote_root_active(): boolean { return remote_active }
+export async function swap_root(handle: dir_handle, writable: boolean): Promise<() => Promise<void>> {
+    await filesystem_ready
+    const root = shared_root
+    if (!root) throw new Error("No desk file system")
+    const saved = { handle: root.handle, writable: root.writable, children: root.children, readable: root.readable, content_readable: root.content_readable, write_allowed: root.write_allowed }
+    remote_active = true
+    root.handle = handle; root.writable = writable; root.children = null
+    root.readable = root.content_readable = root.write_allowed = undefined
+    await load_children(root)
+    if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
+    redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
+    let restored = false
+    return async () => {
+        if (restored) return
+        restored = true
+        remote_active = false
+        Object.assign(root, saved)
+        if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
+        redraw()
+        document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
+    }
+}
+
 export function replace_directory(node: fs_node, handle: dir_handle, writable: boolean): void {
     node.handle = named_directory(node.name, handle); node.writable = writable; node.children = null
     const parent = node.parent?.handle as memory_handle | null
@@ -90,6 +119,7 @@ let clipboard_mode: "copy" | "cut" = "copy"
 export async function mount_executables(names: string[]): Promise<void> {
     await filesystem_initialized()
     executable_names = names
+    if (remote_active) return
     const bin = find_node("/bin")
     if (!bin) return
     const directory = memory_directory("bin")
@@ -128,8 +158,7 @@ export function find_node(path: string, from: fs_node | null = tree?.root ?? nul
 
 function icon_of(node: fs_node): string {
     if (node.kind === "dir") return state.data?.folder_icon ?? ""
-    const extension = node.name.includes(".") ? (node.name.split(".").pop() ?? "").toLowerCase() : ""
-    return state.data?.mimes.find(info => info.extensions.includes(extension))?.icon ?? state.data?.file_icon ?? ""
+    return (state.data ? find_by_name(state.data.mimes, node.name)?.icon : undefined) ?? state.data?.file_icon ?? ""
 }
 
 // The row of a new item: its icon and a name field. Enter makes the item (when there is a name), Escape or an empty name drops it.
@@ -1444,7 +1473,7 @@ export function init_fs(desk: HTMLElement): void {
 
 let external_refresh = false
 async function refresh_external(): Promise<void> {
-    if (external_refresh || !shared_root) return
+    if (external_refresh || !shared_root || remote_active) return
     external_refresh = true
     try {
         await filesystem_ready

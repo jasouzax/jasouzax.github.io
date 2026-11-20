@@ -13,5 +13,7 @@
         "PROJECT_CLONE_ORIGINS": "{}",
         "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
     },
-    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-staging-assets" }]
+    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-staging-assets" }],
+    "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "Realtime_Hub" }, { "name": "SERVER_HUB", "class_name": "Server_Hub" }] },
+    "migrations": [{ "tag": "realtime-v1", "new_sqlite_classes": ["Realtime_Hub"] }, { "tag": "server-v1", "new_sqlite_classes": ["Server_Hub"] }]
 }

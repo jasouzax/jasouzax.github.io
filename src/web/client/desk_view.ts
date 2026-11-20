@@ -1,6 +1,7 @@
 // What a desk window holds and shows: a file arrives (dropped, uploaded or opened from the file tree), the window learns its name and type and
 // shows it in its mode. The window itself (tabs, layout) is client_desk.ts.
 
+import { is_server_page } from "./server_text.ts"
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 import type { desk_window } from "./desk.ts"
 import { state, text, refresh_tab, window_hooks, focus_window, working_directory } from "./desk.ts"
@@ -16,6 +17,9 @@ import { html_body, pdf_body, image_pdf_body } from "./desk_preview.ts"
 import { comparison_lines } from "./desk_compare.ts"
 import { no_picks } from "./desk_flow_rules.ts"
 import { message_body } from "./desk_messages.ts"
+import { auto_script_body } from "./server_script.ts"
+import { auto_site_body } from "./server_site.ts"
+import { bind_window_controls } from "./desk_window_controls.ts"
 
 export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
     return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
@@ -405,8 +409,12 @@ export const process_hooks = {
     release: (_item: desk_window): void => {},
     release_body: (_item: desk_window): void => {},
 }
-// what the empty window's "Open terminal" starts: the WASM shell, or the device shell once the extension bridge answers (see desk_host.ts)
-export const terminal_hooks = { uri: "pid:" }
+// /server always selects the Pi PTY; the ordinary desk can prefer the device bridge.
+let local_terminal_uri = "pid:"
+export const terminal_hooks = {
+    get uri(): string { return is_server_page(location.pathname) ? "server:sh" : local_terminal_uri },
+    set uri(value: string) { local_terminal_uri = value },
+}
 
 export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
 const renders = new WeakMap<desk_window, AbortController>()
@@ -520,12 +528,28 @@ export async function open_source(item: desk_window, uri: string): Promise<void>
     }
 }
 
+// the log view of an automation script; without the owner's link it is the plain (read-only) code
+function script_body(item: desk_window, signal: AbortSignal): HTMLElement {
+    return auto_script_body(item, signal, () => text_layout_body(item))
+}
+
+// the live feed of a site or of a window of the Pi; a .auto.site file without the owner's link is its text, any other source says why it is empty
+function site_body(item: desk_window, signal: AbortSignal): HTMLElement {
+    return auto_site_body(item, signal, () => {
+        if (item.file) return text_layout_body(item)
+        const note = document.createElement("div")
+        note.className = "server_site_note"
+        note.textContent = text("server_offline")
+        return note
+    })
+}
+
 function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_mirror_body"
     const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
-        messages: message_body, state, text, render_window, save_window }
+        messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
         for (const { context, module } of candidates) {
@@ -556,7 +580,16 @@ function body_for(item: desk_window): void {
         item.el.dataset.plugin = is_folder() ? "folder" : "default"
         sync_save(item)
     }
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, state, text, render_window, save_window }
+    // Site View/Edit are live browser surfaces even for file-less split mirrors.
+    // Do not let a stale plugin catalog send this resource to a file editor.
+    if (!item.error && item.mime === "application/auto-site" && ["view", "edit"].includes(item.mode)
+        && (!flow_kind_of(item) || flow_kind_of(item) === "mirror")) {
+        set_body(item, site_body(item, controller.signal))
+        item.el.dataset.plugin = "auto_site"
+        sync_save(item)
+        return
+    }
+    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
@@ -793,6 +826,7 @@ export function init_view(open_window: () => desk_window | null): void {
     window_hooks.created = item => {
         wire(item, open_window)
         wire_head(item)
+        bind_window_controls(item)
         fill_mime_list(item)
         render_window(item)
     }

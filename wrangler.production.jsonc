@@ -12,5 +12,7 @@
         "PUBLIC_PROJECTS_MANIFEST": "/projects/git.json",
         "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
     },
-    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-assets" }]
+    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-assets" }],
+    "durable_objects": { "bindings": [{ "name": "SERVER_HUB", "class_name": "Server_Hub" }] },
+    "migrations": [{ "tag": "server-v1", "new_sqlite_classes": ["Server_Hub"] }]
 }

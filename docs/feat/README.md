@@ -18,6 +18,16 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Move the Pi listener to Docker, preserving the old checkout/service and documenting rollback.
   - [x] Verify Git/CI after cutover and a container restart.
 
+## Server desk
+
+- [ ] **[Server desk](server.md)** — `/server` and the Pi agent (replaces Browsite)
+  - [ ] Wire protocol shared by agent, Durable Object and page
+  - [ ] Pi agent: outbound link, filesystem, terminal, scripts, windows, APIs, fastfetch
+  - [ ] Worker `Server_Hub` Durable Object, `/api/server/*` and the `/api/{endpoint}` gateway
+  - [ ] MIME types `application/auto-javascript` and `application/auto-site`
+  - [ ] `/server` page: public fastfetch window, offline state, owner mode (Pi filesystem, terminal, script view, site feed)
+  - [ ] Verify on the real Pi, Worker and a phone
+
 ## Content
 
 - [ ] **[Content](content.md)** — open items below

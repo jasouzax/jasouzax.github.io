@@ -6376,6 +6376,196 @@ body::after {
 }
 
 // a process window (pid:N): the terminal of a shell. History above, the line in progress (the prompt) and the input on the last row.
+// Log view of an automation script (application/auto-javascript, view mode): head with count and actions, the log, Start/Stop below
+.server_script {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    font-size: .9em;
+}
+
+.server_script_head,
+.server_script_foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75em;
+    padding: .35em .75em;
+    background: var(--panel-2);
+}
+
+.server_script_count,
+.server_script_state { color: var(--text-dim); }
+
+.server_script_actions { display: flex; gap: .4em; }
+
+.server_script button {
+    font: inherit;
+    padding: .2em .7em;
+    color: var(--text);
+    background: var(--tint-1);
+    border: 1px solid var(--line);
+    border-radius: .4em;
+    cursor: pointer;
+}
+
+.server_script button:hover:not(:disabled) { background: var(--tint-2); }
+.server_script button:disabled { opacity: .5; cursor: default; }
+.server_script button.active { background: var(--tint-3); }
+
+.server_script_toggle { min-width: 5.5em; font-weight: 600; }
+.server_script[data-running="true"] .server_script_toggle { border-color: var(--danger, #d64545); }
+.server_script[data-running="true"] .server_script_state::before { content: "\25CF  "; color: var(--accent); }
+
+.server_script_windows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35em;
+    padding: .35em .75em;
+    border-top: 1px solid var(--line);
+}
+
+.server_script_window { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.server_script_logs {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: .25em 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .95em;
+    line-height: 1.45;
+}
+
+.server_script_logs:empty::after {
+    content: attr(data-empty);
+    display: block;
+    padding: 1em .75em;
+    color: var(--text-dim);
+}
+
+.server_script_log { padding: .1em .75em; border-top: 1px solid var(--tint-1); }
+.server_script_log:hover { background: var(--tint-1); }
+.server_script_time { display: block; font-size: .8em; color: var(--text-dim); }
+.server_script_text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.server_script_log_system .server_script_text { color: var(--text-dim); font-style: italic; }
+.server_script_log_error { background: color-mix(in srgb, var(--danger, #d64545) 12%, transparent); }
+.server_script_log_error .server_script_text { color: var(--danger, #d64545); }
+.server_script_log_warn .server_script_text { color: #b7791f; }
+.server_script_log_info .server_script_text,
+.server_script_log_debug .server_script_text { color: var(--accent); }
+
+.server_site { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.server_site_note { margin: auto; padding: 1.5em; color: var(--text-dim); text-align: center; }
+
+.server_site_feed {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--panel);
+}
+
+.server_site_feed[data-state]::after {
+    content: attr(data-state);
+    position: absolute;
+    padding: .4em .9em;
+    border-radius: 99px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+.server_site_canvas {
+    display: block;
+    background: #fff;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--line);
+    cursor: default;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.server_site_touch {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+// where the next tap clicks; it keeps its size however far the picture is zoomed
+.server_site_cursor {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 3;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.server_site_touch[data-touch="off"] .server_site_cursor { display: none; }
+.server_site_cursor svg { position: absolute; left: -3px; top: -2px; display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .7)); }
+
+.server_site_ring {
+    position: absolute;
+    left: -17px;
+    top: -17px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.server_site_cursor[data-pressed] .server_site_ring { opacity: 1; transform: scale(.8); }
+.server_site_cursor.tap .server_site_ring { animation: server_site_tap .38s ease-out; }
+
+@keyframes server_site_tap {
+    0% { opacity: .9; transform: scale(.4); }
+    100% { opacity: 0; transform: scale(1.15); }
+}
+
+.server_site_zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 4;
+    padding: .35em .8em;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--accent);
+    font: 600 .85em/1 inherit;
+    touch-action: manipulation;
+}
+
+// invisible but focusable (16px keeps iOS from zooming in on it)
+.server_site_keys {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    resize: none;
+    font-size: 16px;
+    pointer-events: none;
+}
+
 .desk_wbox_body_term {
     flex: 1 1 auto;
     min-height: 0;
@@ -8139,7 +8329,7 @@ body:has(#motion_pause:checked) {
 @media (orientation: portrait) {
     .desk_wbox_head {
         display: grid;
-        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) auto auto auto;
+        grid-template-columns: 1.5rem 4.5rem minmax(0, 1fr) calc(3rem + 2px) calc(3rem + 6px) repeat(3, auto);
         grid-template-rows: calc(1.5rem + 1px) calc(1.5rem + 2px);
         align-items: center;
         height: auto;
@@ -8154,10 +8344,12 @@ body:has(#motion_pause:checked) {
             text-align: center;
         }
         > .desk_wbox_head_navigation { grid-area: 1 / 2; }
-        > .desk_wbox_head_save { grid-area: 1 / 5; }
+        > .desk_wbox_head_actions { grid-area: 1 / 5; }
         > .desk_wbox_head_split { grid-area: 1 / 6; }
-        > .desk_wbox_head_drop { grid-area: 1 / 7; }
+        > .desk_wbox_head_fullscreen { grid-area: 1 / 7; }
+        > .desk_wbox_head_drop { grid-area: 1 / 8; }
         > .desk_wbox_head_tool,
+        > .desk_wbox_head_actions > button,
         > .desk_wbox_head_drop > summary {
             box-sizing: border-box;
             width: 1.5rem;
@@ -8305,3 +8497,31 @@ body:has(#motion_pause:checked) {
 .desk_pdf_controls button { padding: .2em .4em; }
 .desk_pdf_viewport { flex: 1; min-height: 0; overflow: auto; padding: 1em; background: #555; }
 .desk_pdf_viewport canvas { display: block; margin: auto; background: white; }
+
+.desk_wbox:fullscreen { display: flex; flex-direction: column; background: var(--panel); padding: 0; }
+.desk_wbox:fullscreen > :not(.desk_wbox_head) { flex: 1 1 auto; min-height: 0; }
+.desk_wbox_head_audio[aria-pressed=false] { opacity: .5; }
+.desk_wbox_head_fullscreen[aria-pressed=true] { color: var(--accent); }
+
+.desk_side_page[data-path="server:sessions"] {
+    .desk_side_item_box { --tool-h: 2em; }
+    .server_session_open {
+        display: block; width: 100%; min-width: 0; min-height: 0;
+        margin: 0; padding: 0; border: 0; background: transparent; color: inherit;
+        font: inherit; line-height: inherit; text-align: start;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+}
+.server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }
+
+.desk_wbox_head_actions {
+    margin-inline-start: .25rem;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--edge);
+    border-radius: var(--r-sm);
+    > button { border: 0; border-radius: 0; margin: 0; }
+    > button + button { border-left: 1px solid var(--edge); }
+}

@@ -4,7 +4,9 @@ import { work_route, type Work_Env } from "./work.ts"
 import { auth_route } from "./auth.ts"
 import { realtime_route } from "./realtime.ts"
 import { push_route } from "./push.ts"
+import { gateway_route, gateway_target, server_route, type Server_Env } from "./server_route.ts"
 export { Realtime_Hub } from "./realtime.ts"
+export { Server_Hub } from "./server_hub.ts"
 
 type object_result = {
     body?: ReadableStream<Uint8Array>
@@ -13,7 +15,7 @@ type object_result = {
     range?: { offset: number, length: number }
     writeHttpMetadata(headers: Headers): void
 }
-export type worker_env = Work_Env & {
+export type worker_env = Work_Env & Server_Env & {
     DOMAIN: string
     PAGES_ORIGIN: string
     PUBLIC_PROJECTS?: string
@@ -156,6 +158,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     }
     if (path === "/api" || path.startsWith("/api/")) {
         if (path === "/api/v1/realtime") return realtime_route(request, env)
+        if (path === "/api/server" || path.startsWith("/api/server/")) return server_route(request, env)
         if (path.startsWith("/api/v1/push/")) return push_route(request, env)
         if (path.startsWith("/api/v1/auth/")) return auth_route(request, env)
         if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
@@ -175,6 +178,8 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
                 return response
             } catch { return api_error("origin_offline", "Personal node is unreachable", 503) }
         }
+        const published = env.SERVER_HUB ? gateway_target(url.pathname) : null
+        if (published) return gateway_route(request, env, published.name, published.rest)
         return api_error("not_implemented", "This API is not enabled; no client data is accepted", 501)
     }
     if (!["GET", "HEAD"].includes(request.method)) return api_error("method_not_allowed", "Static routes allow GET and HEAD", 405)
