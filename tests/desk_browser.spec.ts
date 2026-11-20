@@ -778,6 +778,9 @@ test("mode buttons stay square and video controls fit a narrow window", async ({
 })
 
 test("BusyBox terminal, shared file manager, cancellation and private persistence", async ({ page }) => {
+    // This static server has no identity/messaging API; those services are independent of the local terminal.
+    await page.route("**/api/v1/auth/session", route => route.fulfill({ json: { user: null, csrf: "test", google_enabled: false } }))
+    await page.route("**/api/v1/work/session", route => route.fulfill({ json: { owner_email: "", owner_key: null, room: null, guest_room: null } }))
     const failures: string[] = []
     const wasm_requests: string[] = []
     page.on("pageerror", error => failures.push(error.message))
@@ -812,14 +815,14 @@ test("BusyBox terminal, shared file manager, cancellation and private persistenc
     const beforeSleep = await prompts()
     await send("sleep 30")
     await page.waitForTimeout(200)
-    await page.keyboard.press("Control+c")
+    await page.locator(".xterm-helper-textarea").press("Control+c")
     await expect.poll(prompts).toBeGreaterThan(beforeSleep)
     await send("echo INTERRUPT_OK")
     await expect(output("INTERRUPT_OK")).toBeVisible()
     const beforeLoop = await prompts()
     await send("v=kept; while :; do :; done")
     await page.waitForTimeout(200)
-    await page.keyboard.press("Control+c")
+    await page.locator(".xterm-helper-textarea").press("Control+c")
     await expect.poll(prompts).toBeGreaterThan(beforeLoop)
     await send("echo LOOP_$v")
     await expect(output("LOOP_kept")).toBeVisible()
@@ -827,7 +830,7 @@ test("BusyBox terminal, shared file manager, cancellation and private persistenc
     await page.waitForTimeout(200)
     await send("echo NESTED_OK")
     await expect(output("NESTED_OK")).toBeVisible()
-    await page.keyboard.press("Control+d")
+    await page.locator(".xterm-helper-textarea").press("Control+d")
     await send("echo PARENT_OK")
     await expect(output("PARENT_OK")).toBeVisible()
     await page.setViewportSize({ width: 1000, height: 700 })

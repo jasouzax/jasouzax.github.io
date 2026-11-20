@@ -42,6 +42,11 @@ async function owner(page: Page, stale_plugins = false) {
             if (raw === "ping") return route.send("pong")
             const message = JSON.parse(String(raw)); messages.push(message)
             if (message.t === "auto_state") { send({ t: "auto_state", scripts: script_present ? [{ path: "/run.auto.js", running: script_running, windows: 1 }] : [] }); send({ t: "windows", windows }) }
+            if (message.t === "pty_open") send({ t: "pty_out", id: message.id, data: Buffer.from("jason@jasouza:/home/jason$ ").toString("base64") })
+            if (message.t === "pty_input") {
+                const input = Buffer.from(message.data, "base64").toString()
+                send({ t: "pty_out", id: message.id, data: Buffer.from(input === "\x03" ? "^C\r\njason@jasouza:/home/jason$ " : input.includes("\r") ? "\r\nPi stdout\r\nPi stderr\r\nbash: fastfetch: command not found\r\njason@jasouza:/home/jason$ " : input).toString("base64") })
+            }
             if (message.t === "auto_logs") send({ t: "auto_logs", path: message.path, entries: [] })
             if (message.t === "fastfetch") send({ t: "fastfetch", text: "Test Pi", taken_at: Date.now() })
             if (message.t === "fs") {
@@ -298,4 +303,44 @@ test("a script waiting to restart can be stopped from Sessions and its log view"
     expect(api.messages.filter(message => message.t === 'auto_stop')).toHaveLength(2)
     await expect(session.locator('[data-session-action="start"]')).toHaveCount(1)
     await expect(session.getByRole('button', { name: 'New Window', exact: true })).toHaveCount(1)
+})
+
+
+test("server terminals relay raw PTY bytes without loading the WASM registry or commands", async ({ page }) => {
+    const wasm: string[] = []
+    await page.route('**/assets/wasm/**', route => { wasm.push(route.request().url()); return route.abort() })
+    const api = await owner(page)
+    // A late bridge timeout used to overwrite the server preference with pid:.
+    await page.waitForTimeout(3000)
+    const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
+    for (const uri of ['pid:', 'server:sh', 'host:', 'pid://sh']) {
+        await address.fill(uri); await address.press('Enter')
+        await expect(pane.locator('.xterm-rows')).toContainText('jason@jasouza:/home/jason$')
+    }
+    const input = pane.locator('.xterm-helper-textarea')
+    await input.pressSequentially('fastfetch'); await input.press('Enter')
+    await expect(pane.locator('.xterm-rows')).toContainText('Pi stdout')
+    await expect(pane.locator('.xterm-rows')).toContainText('Pi stderr')
+    await expect(pane.locator('.xterm-rows')).toContainText('fastfetch: command not found')
+    const bytes = () => api.messages.filter(message => message.t === 'pty_input').map(message => Buffer.from(message.data, 'base64').toString()).join('')
+    await expect.poll(bytes).toContain('fastfetch\r')
+    await input.press('Control+c')
+    await expect.poll(bytes).toContain('\x03')
+    api.send({ t: 'status', online: false })
+    await expect(pane.locator('.xterm-rows')).toContainText('The server is offline')
+    await expect(pane.locator('.xterm-rows')).toContainText('[process exited 1]')
+    expect(wasm).toEqual([])
+    await expect(pane.locator('.xterm-rows')).not.toContainText('user@jasouza')
+})
+
+test("an offline server terminal reports unavailable instead of falling back to WASM", async ({ page }) => {
+    const wasm: string[] = []
+    await page.route('**/assets/wasm/**', route => { wasm.push(route.request().url()); return route.abort() })
+    await page.route('**/api/server', route => route.fulfill({ json: { online: false, owner: false, stale: true, snapshot: null } }))
+    await page.goto('/server')
+    const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
+    await address.fill('pid:'); await address.press('Enter')
+    await expect(pane.locator('.xterm-rows')).toContainText('The server is offline.')
+    expect(wasm).toEqual([])
+    await expect(pane.locator('.xterm-rows')).not.toContainText('user@jasouza')
 })

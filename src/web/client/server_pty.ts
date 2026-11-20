@@ -34,6 +34,7 @@ export function open_pty_session(link: Pty_Link, cols: number, rows: number, out
     }))
     offs.push(link.on("pty_exit", message => { if (message.id === id) finish(Number(message.code ?? 0)) }))
     offs.push(link.on("pty_err", message => { if (message.id === id) finish(1, String(message.message ?? "terminal error")) }))
+    offs.push(link.on("status", message => { if (message.online === false) finish(1, "The server is offline") }))
     offs.push(link.on("disconnected", () => finish(1, "The connection to the server was lost")))
     if (!link.send({ t: "pty_open", id, cols, rows, ...(cwd ? { cwd } : {}) })) { queueMicrotask(() => finish(1, "The server is offline")); }
     return {

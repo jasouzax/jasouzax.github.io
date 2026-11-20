@@ -49,18 +49,19 @@ test("a multi-byte character split across two chunks stays whole", () => {
 })
 
 test("exit, error, a lost link and an offline open each end the session once and release the handlers", async () => {
-    for (const ending of ["exit", "err", "lost"] as const) {
+    for (const ending of ["exit", "err", "lost", "offline"] as const) {
         const { api, sent } = link()
         const done: [number, string | undefined][] = []
         open_pty_session(api, 80, 24, () => undefined, (code, reason) => done.push([code, reason]))
         const id = (sent[0] as { id: number }).id
         if (ending === "exit") api.say({ t: "pty_exit", id, code: 3 })
         if (ending === "err") api.say({ t: "pty_err", id, message: "at most 8 terminals at once" })
+        if (ending === "offline") api.say({ t: "status", online: false })
         if (ending === "lost") api.say({ t: "disconnected" })
         api.say({ t: "pty_exit", id, code: 9 })
         assert.equal(done.length, 1, ending)
         assert.equal(api.count(), 0, ending)
-        assert.deepEqual(done[0], ending === "exit" ? [3, undefined] : ending === "err" ? [1, "at most 8 terminals at once"] : [1, "The connection to the server was lost"])
+        assert.deepEqual(done[0], ending === "exit" ? [3, undefined] : ending === "err" ? [1, "at most 8 terminals at once"] : ending === "offline" ? [1, "The server is offline"] : [1, "The connection to the server was lost"])
     }
     const { api } = link()
     api.open = false

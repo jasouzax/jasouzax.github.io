@@ -1,6 +1,7 @@
 // What a desk window holds and shows: a file arrives (dropped, uploaded or opened from the file tree), the window learns its name and type and
 // shows it in its mode. The window itself (tabs, layout) is client_desk.ts.
 
+import { is_server_page } from "./server_text.ts"
 import { token_map, coloured_nodes } from "./desk_syntax.ts"
 import type { desk_window } from "./desk.ts"
 import { state, text, refresh_tab, window_hooks, focus_window, working_directory } from "./desk.ts"
@@ -408,8 +409,12 @@ export const process_hooks = {
     release: (_item: desk_window): void => {},
     release_body: (_item: desk_window): void => {},
 }
-// what the empty window's "Open terminal" starts: the WASM shell, or the device shell once the extension bridge answers (see desk_host.ts)
-export const terminal_hooks = { uri: "pid:" }
+// /server always selects the Pi PTY; the ordinary desk can prefer the device bridge.
+let local_terminal_uri = "pid:"
+export const terminal_hooks = {
+    get uri(): string { return is_server_page(location.pathname) ? "server:sh" : local_terminal_uri },
+    set uri(value: string) { local_terminal_uri = value },
+}
 
 export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
 const renders = new WeakMap<desk_window, AbortController>()
