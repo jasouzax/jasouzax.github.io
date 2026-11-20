@@ -23,6 +23,10 @@ COPY --from=build --chown=node:node /repo/server/dist ./dist
 COPY --chown=node:node server/assets ./assets
 COPY --chown=node:node server/test/interaction.smoke.cjs server/test/restart.smoke.cjs ./test/
 RUN mkdir user_data && chown node:node user_data
-USER node
-ENV NODE_ENV=production JAZU_VIRTUAL_DISPLAY=1
+# Keep UID/GID 1000 so existing persistent data stays writable.
+RUN groupmod -n jason node \
+    && usermod --login jason --home /home/jason --move-home node \
+    && ln -s /home/jason /home/node
+USER jason
+ENV HOME=/home/jason USER=jason LOGNAME=jason NODE_ENV=production JAZU_VIRTUAL_DISPLAY=1
 CMD ["dbus-run-session", "--", "xvfb-run", "-a", "-s", "-screen 0 1440x900x24 -nolisten tcp", "./node_modules/.bin/electron", ".", "--no-sandbox", "--disable-gpu"]

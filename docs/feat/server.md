@@ -132,7 +132,9 @@ remain open.
 Xvfb needs `JAZU_VIRTUAL_DISPLAY=1` (set by the image): parking a window outside
 the virtual screen loads the page but produces no screencast frames. Docker's
 file manager exposes the container's `/`, with persistent files in `/workspace`;
-the host's root filesystem is not mounted.
+the host's root filesystem is not mounted. The container runs as `jason` (UID/GID
+1000), with `/home/jason` backed by the deployment's persistent `home` directory.
+`/home/node` points to that home for compatibility with saved script paths.
 
 ### Embedded-frame input regression
 

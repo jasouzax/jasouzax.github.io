@@ -19,3 +19,8 @@ codebase*.zip
 **/*.tfstate*
 **/*.tfvars*
 **/.terraform
+
+server/home
+server/workspace
+server/user_data
+server/dist

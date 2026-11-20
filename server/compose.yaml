@@ -10,6 +10,7 @@ services:
     env_file: ["${JAZU_AGENT_ENV_FILE:-./.env}"]
     shm_size: 256mb
     volumes:
+      - "${JAZU_AGENT_HOME:-./home}:/home/jason"
       - "${JAZU_AGENT_WORKSPACE:-./workspace}:/workspace"
       - "${JAZU_AGENT_USER_DATA:-./user_data}:/app/user_data"
     environment:

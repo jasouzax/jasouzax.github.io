@@ -20,7 +20,7 @@ From the repository root, `npm run server` does the same as `npm start` here.
 
 ## Docker (headless Linux, including ARM64)
 
-The container runs Electron as the unprivileged `node` user with Xvfb. It only
+The container runs Electron as the unprivileged `jason` user (UID/GID 1000) with Xvfb. It only
 connects outbound; no ports, host display, privileged mode or Docker socket are
 needed. Chromium uses `--no-sandbox` inside this container, as in the existing
 headless command. Files and shells belong to the container's user and filesystem.
@@ -30,7 +30,9 @@ live feed produces frames; ordinary desktop runs still hide and park windows.
 From `server/`:
 
 ```bash
-mkdir -p workspace user_data
+mkdir -p home workspace user_data
+# Bind mounts must be writable by UID/GID 1000.
+sudo chown 1000:1000 home workspace user_data
 cp .env.example .env
 # Set JAZU_ORIGIN=https://staging.jasouza.com and the staging Worker's secret.
 chmod 600 .env
@@ -44,16 +46,18 @@ packaging. Electron is a runtime dependency and its binary is explicitly install
 
 The remote file manager shows the container's `/`; `/workspace` holds persistent
 files. Terminal commands run inside the container. The page currently opens `/`,
-so Compose uses `SERVER_ROOT=/`. Browser sessions persist in `user_data`. Both bind mount directories
+so Compose uses `SERVER_ROOT=/`. The default shell home is `/home/jason`, persisted
+in the `home` bind mount; `/home/node` is a compatibility symlink for older scripts.
+Browser sessions and automation restart state persist in `user_data`. All bind mount directories
 must be writable by UID 1000. To use external storage, set
-`JAZU_AGENT_WORKSPACE`, `JAZU_AGENT_USER_DATA`, and `JAZU_AGENT_ENV_FILE` before
+`JAZU_AGENT_HOME`, `JAZU_AGENT_WORKSPACE`, `JAZU_AGENT_USER_DATA`, and `JAZU_AGENT_ENV_FILE` before
 running Compose. Keep the environment file outside source control.
 
 ### Staging Pi deployment (2026-11-20)
 
 The deployment is under `/home/jason/jazu-server-staging` on `192.168.1.22`:
 `app/server` contains this Compose project, `runtime.env` contains private agent
-settings, and `workspace` and `user_data` contain persistent files. Manage it with:
+settings, and `home`, `workspace` and `user_data` contain persistent files. Manage it with:
 
 ```bash
 cd /home/jason/jazu-server-staging/app/server
@@ -64,6 +68,24 @@ docker compose --env-file ../../compose.env restart agent
 
 The container is `jazu-server-staging` and restarts automatically. The existing
 `jazu-personal` Git/publishing service is a separate Compose project.
+
+### Migrating an existing container home
+
+Before recreating an older agent, stop it and copy its home to the new host bind
+mount. Run this as the deployment user, from `server/` (or use the configured
+`JAZU_AGENT_HOME` path):
+
+```bash
+docker compose stop agent
+mkdir -p home
+docker cp jazu-server-staging:/home/node/. ./home/
+sudo chown -R 1000:1000 home
+docker compose up -d --build
+```
+
+The mount survives container recreation and image upgrades. Keep it with the
+workspace and user_data backups. This is the container account's home; signing
+into the website does not mount the host account's private home directory.
 
 ## Settings (`server/.env`)
 
