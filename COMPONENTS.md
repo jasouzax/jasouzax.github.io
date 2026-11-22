@@ -322,7 +322,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] `icon` -
             - [?] `info` -
             - [?] `date` - 
-            - [ ] `fixed` *(optional)* - Boolean, fixes the window setup, meaning no deleting/creating windows. Any request to open a new window instead opens in an existing window and adds to history. This is useful in `{domain}/work` where clients might get lost by accidentally closing a window or opening a new window.
+            - [?] `fixed` *(optional)* - Boolean, fixes the window setup, meaning no deleting/creating windows. Any request to open a new window instead opens in an existing window and adds to history. This is useful in `{domain}/work` where clients might get lost by accidentally closing a window or opening a new window.
             - [?] `auto` *(optional)* - Boolean, the desk grows with its content and shares the page scrollbar (blogs) instead of filling the viewport
             - [?] **Menu** `<menu>` `cmp:/content/page/desk/menu` - One tab of the desk's side panel menu (e.g. a list of blogs), if contains content it is hard-coded in the XML, rendered as real links, indexable and works without Javascript. At runtime javascript updates the content based on its `path`.
                 - [?] `name`, `icon` - Tab label

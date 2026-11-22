@@ -24,6 +24,7 @@ A desktop-like workspace: a side navigation panel plus tiled windows. One primit
 |---|---|
 | `icon`, `name`, `info`, `date` | Shown in the menu head |
 | `auto` | `bool`; grow with content and share the page scrollbar (blogs) instead of filling the viewport |
+| `fixed` | `bool`; preserve the initial window setup. Open requests reuse the focused window and retain its navigation history. Closing, splitting, minimizing, maximizing, moving and resizing windows are disabled. |
 
 Children: `<menu>`, `<window>`.
 

@@ -218,6 +218,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const flags = {
         "data-cwd": desk.attrs.cwd,
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
+        "data-fixed": is_true(desk.attrs.fixed) ? "" : undefined,
         "data-runtime": runtime ? "" : undefined
     }
     const side = (
