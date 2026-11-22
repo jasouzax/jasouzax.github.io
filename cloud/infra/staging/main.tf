@@ -55,11 +55,11 @@ resource "cloudflare_workers_script" "router" {
   content_file       = var.worker_bundle
   content_sha256     = filesha256(var.worker_bundle)
   compatibility_date = var.compatibility_date
-  migrations = {
+  migrations = var.object_migration_enabled ? {
     old_tag            = "realtime-v1"
     new_tag            = "server-v1"
     new_sqlite_classes = ["Server_Hub"]
-  }
+  } : null
 
   bindings = [for binding in concat([
     { name = "REALTIME", type = "durable_object_namespace", class_name = "Realtime_Hub" },
