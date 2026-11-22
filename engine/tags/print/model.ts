@@ -15,9 +15,11 @@ export function print_person(model: site_model, page: page): xml_node {
     const home = model.pages.find(item => item.path === "/" && item.lang === page.lang)
         ?? model.pages.find(item => item.path === "/" && item.lang === model.config.default_language)
     const hero = home?.node.children.find(node => node.tag === "hero")
-    const attrs: Record<string, string> = { name: hero?.attrs.name ?? "", photo: hero?.attrs.profile ?? "" }
+    const attrs: Record<string, string> = { name: hero?.attrs.name ?? "", photo: "" }
     for (const item of hero?.children ?? []) {
-        if (item.tag === "item" && item.attrs.print) attrs[item.attrs.print] = item.attrs.text ?? ""
+        if (item.tag !== "item" || item.attrs.print !== "true") continue
+        const field = item.attrs.link?.startsWith("mailto:") ? "email" : item.attrs.link?.startsWith("tel:") ? "phone" : item.attrs.icon === "[location]" ? "address" : ""
+        if (field) attrs[field] = item.attrs.text ?? ""
     }
     return element("resume", attrs, hero ?? page.node)
 }

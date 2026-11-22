@@ -1,3 +1,4 @@
+import { jsx, fragment, to_dom } from "../../shared/vnode/vnode.tsx"
 // Slide pager. The dots (one radio-like dot per slide) stop being readable past 10 slides, so then they are replaced by a number
 // input: the number of the slide that is showing, "|" and the total, in a rounded box: "(13|30)". It applies to every list (a skill, Featured,
 // search results), and the numbers are always those of the slides that are shown right now, so they follow the filter chips and the search.
@@ -33,7 +34,7 @@ function pager_of(article: HTMLElement): HTMLElement | null {
     if (pager) return pager
     pager = document.createElement("li")
     pager.className = "expertise_pager"
-    pager.innerHTML = `<input class="pager_input" type="number" min="1" inputmode="numeric" aria-label="${(article.dataset.slide_number ?? "Slide number").replace(/"/g, "&quot;")}"><span class="pager_sep" aria-hidden="true">|</span><span class="pager_total"></span>`
+    pager.replaceChildren(to_dom(jsx(fragment, null, jsx("input", { class: "pager_input", type: "number", min: "1", inputmode: "numeric", "aria-label": article.dataset.slide_number ?? "Slide number" }), jsx("span", { class: "pager_sep", "aria-hidden": "true" }, "|"), jsx("span", { class: "pager_total" }))))
     dots.append(pager)
     return pager
 }

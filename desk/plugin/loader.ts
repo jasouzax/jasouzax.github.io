@@ -4,10 +4,9 @@ import type { desk_window, state as desk_state } from "../index.ts"
 
 export type plugin_host = {
     html: (item: desk_window, signal: AbortSignal) => HTMLElement
-    pdf: (item: desk_window, signal: AbortSignal) => HTMLElement
     image_pdf: (item: desk_window, signal: AbortSignal) => HTMLElement
     mirror: (item: desk_window, signal: AbortSignal) => HTMLElement
-    code: (item: desk_window, hex_mode?: boolean) => HTMLElement
+    editor: (item: desk_window, hex_mode?: boolean) => HTMLElement
     media: (item: desk_window) => HTMLElement
     terminal: (item: desk_window) => HTMLElement | null
     fallback: (item: desk_window) => HTMLElement
@@ -100,11 +99,9 @@ export async function prepare_plugins(item: desk_window, host: plugin_context["h
 function render_host(name: NonNullable<plugin_case["host"]>, { item, host, signal }: plugin_context): HTMLElement | null {
     switch (name) {
         case "html": return host.html(item, signal)
-        case "pdf": return host.pdf(item, signal)
         case "image_pdf": return host.image_pdf(item, signal)
         case "mirror": return host.mirror(item, signal)
-        case "text": return host.code(item)
-        case "hex": return host.code(item, true)
+        case "text": return host.editor(item)
         case "media": return host.media(item)
         case "shell": return host.terminal(item)
         case "markdown": return host.markdown(item, signal)

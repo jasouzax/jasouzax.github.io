@@ -1,7 +1,9 @@
+import { render_item } from "./item.tsx"
+import { render_action } from "./action.tsx"
 import { jsx, fragment, type child } from "../../shared/vnode/vnode.tsx"
 import { child_nodes, type xml_node } from "../../shared/content/xml.ts"
 import type { render_ctx } from "./page/context.tsx"
-import { t, glyph, link_attrs } from "./page/context.tsx"
+import { t, glyph } from "./page/context.tsx"
 import { split_list } from "../../shared/util.ts"
 import { resume_format_of } from "./print/rirekisho.tsx"
 
@@ -20,12 +22,6 @@ export function render_hero(ctx: render_ctx, node: xml_node, next_id = ""): chil
     return (
         <article class="landing article" id={id} aria-labelledby={title}>
             <div class="landing_panel">
-                {node.attrs.status && (
-                    <p class="landing_status">
-                        <span class="landing_dot" aria-hidden="true" />
-                        {node.attrs.status}
-                    </p>
-                )}
                 {heading}
                 {roles.length > 0 && (
                     <p class="landing_job" aria-label={roles.join(", ")}>
@@ -41,42 +37,12 @@ export function render_hero(ctx: render_ctx, node: xml_node, next_id = ""): chil
                         </span>
                     </p>
                 )}
-                {node.attrs.profile && (
-                    <img class="hero_profile" src={node.attrs.profile} alt={node.attrs.name ?? ""} />
-                )}
                 <p class="landing_lead">{node.attrs.info ?? ""}</p>
                 <ul class="landing_contacts" aria-label={t(ctx, "contact")}>
-                    {items.map((item) => {
-                        const body = (
-                            <>
-                                {glyph(ctx, item.attrs.icon, "landing_contact_icon")}
-                                <span class="landing_contact_type">{item.attrs.name ?? ""}</span>
-                                <span class="landing_contact_value">{item.attrs.text ?? ""}</span>
-                            </>
-                        )
-                        return (
-                            <li>
-                                {item.attrs.link ? (
-                                    <a class="landing_contact" {...link_attrs(ctx, item.attrs.link)}>
-                                        {body}
-                                    </a>
-                                ) : (
-                                    <span class="landing_contact">{body}</span>
-                                )}
-                            </li>
-                        )
-                    })}
+                    {items.map(item => render_item(ctx, item))}
                 </ul>
                 <div class="landing_actions">
-                    {child_nodes(node, "action").map((action) => (
-                        <a
-                            class={`landing_btn${action.attrs.primary === "true" ? " primary" : ""}`}
-                            {...link_attrs(ctx, action.attrs.link)}
-                        >
-                            <span>{action.attrs.text}</span>
-                            {glyph(ctx, action.attrs.icon, "landing_btn_icon")}
-                        </a>
-                    ))}
+                    {child_nodes(node, "action").map(action => render_action(ctx, action))}
                 </div>
             </div>
             {next_id && (
@@ -90,7 +56,7 @@ export function render_hero(ctx: render_ctx, node: xml_node, next_id = ""): chil
                     <p class="resume_name">{node.attrs.name ?? ""}</p>
                     <p class="resume_contacts">
                         {items
-                            .filter((item) => item.attrs.print)
+                            .filter((item) => item.attrs.print === "true")
                             .map((item) => (
                                 <span class="resume_contact">{item.attrs.text ?? ""}</span>
                             ))}

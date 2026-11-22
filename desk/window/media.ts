@@ -1,3 +1,4 @@
+import { pdf_body } from "./preview.ts"
 import type { desk_window } from "../index.ts"
 import { window_audio_enabled } from "../action/controls.ts"
 
@@ -169,4 +170,9 @@ export function media_player(item: desk_window, url: string, failed: () => void)
     update()
     box.append(media, head, timeline, tools)
     return box
+}
+
+/* PDFs use the same media window entry; the PDF implementation is loaded only for PDF bytes. */
+export function media_body(item: desk_window, url: string, signal: AbortSignal, failed: () => void): HTMLElement {
+    return item.mime === "application/pdf" ? pdf_body(item, signal) : media_player(item, url, failed)
 }

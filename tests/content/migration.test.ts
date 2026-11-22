@@ -29,7 +29,7 @@ function fixture() {
     const root = mkdtempSync(join(tmpdir(), "jazu_test_"))
     const put = (name: string, text: string) => { mkdirSync(resolve(root, name, ".."), { recursive: true }); writeFileSync(join(root, name), text) }
     put("config.json", JSON.stringify({ base_url: "https://example.com", languages: { en: {} }, default_language: "en", themes: ["basic"], default_theme: "basic" }))
-    put("content/anywhere.xml", `<page path="/" name="Home"><hero name="Published Name"><item print="email" text="public@example.com"/></hero><expertise><skill name="web"/></expertise></page>`)
+    put("content/anywhere.xml", `<page path="/" name="Home"><hero name="Published Name"><item print="true" link="mailto:public@example.com" text="public@example.com"/></hero><expertise><skill name="web"/></expertise></page>`)
     put("content/theme/basic.xml", `<theme name="basic"><style><![CDATA[body {color: black}]]></style></theme>`)
     return { root, put, close: () => rmSync(root, { recursive: true, force: true }) }
 }

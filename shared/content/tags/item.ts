@@ -5,4 +5,5 @@ export const item_rule: Tag_Rule = {
     attrs: ["icon","name","text","link","print"],
     required: [],
     children: [],
+    bools: ["print"],
 }

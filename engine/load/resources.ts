@@ -1,4 +1,4 @@
-import { existsSync, realpathSync, statSync } from "node:fs"
+import { readFileSync, existsSync, realpathSync, statSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import type { site_model } from "./model.ts"
 import { inside } from "../../shared/paths.ts"
@@ -18,4 +18,10 @@ export function configured_resource(model: site_model, name: keyof site_model["c
 
 export function published_resource(model: site_model, reference: string): string | null {
     return model.resources.get(reference.replace(/^file:\/\//, "")) ?? null
+}
+
+/* Read only published or configured content; callers own interpretation, this adapter owns filesystem access. */
+export function resource_text(model: site_model, reference: string, configured = false): string | null {
+    const file = configured ? content_file(model.content_dir, reference) : published_resource(model, reference)
+    return file && existsSync(file) ? readFileSync(file, "utf8") : null
 }

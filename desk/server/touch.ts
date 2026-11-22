@@ -1,3 +1,4 @@
+import { jsx, to_dom } from "../../shared/vnode/vnode.tsx"
 import type { Input_Event } from '../../shared/protocol/wire.ts'
 
 /*
@@ -35,7 +36,7 @@ const max_zoom = 6
 // A cursor this close to the edge of the zoomed picture pushes the picture along
 const follow_margin_px = 44
 
-const cursor_svg = `<svg viewBox="0 0 22 22" width="22" height="22" aria-hidden="true"><path d="M3 2v15l4.2-3.8 2.7 6.2 2.6-1.1-2.7-6.1H15.5z" fill="#fff" stroke="#0b0f17" stroke-width="1.4" stroke-linejoin="round"/></svg>`
+const cursor_svg = jsx("svg", { viewBox: "0 0 22 22", width: "22", height: "22", "aria-hidden": "true" }, jsx("path", { d: "M3 2v15l4.2-3.8 2.7 6.2 2.6-1.1-2.7-6.1H15.5z", fill: "#fff", stroke: "#0b0f17", "stroke-width": "1.4", "stroke-linejoin": "round" }))
 
 // A mouse for a finger, like the touchpad mode of a remote desktop app:
 //  - one finger dragged anywhere on the feed moves a virtual cursor (the picture does not jump to the finger)
@@ -75,7 +76,7 @@ export class Touch_control {
         feed.classList.add('server_site_touch')
 
         this.#cursor = el('div', { class: 'server_site_cursor', hidden: true })
-        this.#cursor.innerHTML = `${cursor_svg}<i class="server_site_ring"></i>`
+        this.#cursor.replaceChildren(to_dom([cursor_svg, jsx("i", { class: "server_site_ring" })]))
         this.#cursor.querySelector('.server_site_ring')!.addEventListener('animationend', () => this.#cursor.classList.remove('tap'))
         this.#badge = el('button', { type: 'button', class: 'server_site_zoom', hidden: true, title: 'Reset the zoom', ariaLabel: 'Reset the zoom', onclick: () => this.reset_view() })
         feed.append(this.#cursor, this.#badge)

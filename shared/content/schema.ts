@@ -1,3 +1,4 @@
+import { valid_subdomain_id } from "./ids.ts"
 import type { xml_node } from "./xml.ts"
 import { walk_nodes, where_of } from "./xml.ts"
 import type { diagnostics } from "../diag.ts"
@@ -114,6 +115,8 @@ function check_node(node: xml_node, diag: diagnostics): void {
     if (node.tag === "project" && node.children.filter(child => child.tag === "research").length > 1)
         report_error(diag, where_of(node), "project may contain only one <research>")
     if (node.tag === "project") {
+        if (node.attrs.collaborators && node.attrs.collaborators.split(",").some(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))) report_error(diag, where_of(node), "project collaborators must be email addresses")
+        if (!valid_subdomain_id(node.attrs.id)) report_error(diag, where_of(node), "project id must be an unreserved DNS label (1 to 63 lowercase characters, no underscores, xn--, -demo or -server)")
         const branches = node.children.filter(child => child.tag === "pipeline").map(child => child.attrs.branch ?? "master")
         if (new Set(branches).size !== branches.length) report_error(diag, where_of(node), "project pipeline branches must be unique")
         if (node.attrs.repo) try { repository_remote(node.attrs.repo) } catch (error) { report_error(diag, where_of(node), (error as Error).message) }
@@ -136,7 +139,9 @@ function check_node(node: xml_node, diag: diagnostics): void {
     for (const name of rule.required) {
         if (!(name in node.attrs)) report_error(diag, where_of(node), `missing required attribute "${name}"`)
     }
-    if (node.tag === "window" && node.attrs.mode && !["view", "edit"].includes(node.attrs.mode)) report_error(diag, where_of(node), "window mode must be view or edit")
+    if (node.tag === "window" && node.attrs.view === "true" && node.attrs.edit === "true") report_error(diag, where_of(node), "window view and edit are mutually exclusive")
+    if (node.tag === "window" && node.attrs.split !== undefined && !/^[1-9][0-9]*$/.test(node.attrs.split)) report_error(diag, where_of(node), "window split must name a positive parent window ID")
+    if (node.tag === "window" && node.attrs.split && Number(node.attrs.split) >= (node.parent?.children.filter(child => child.tag === "window").indexOf(node) ?? -1) + 1) report_error(diag, where_of(node), "window split must refer to an earlier sibling window (IDs start at 1)")
     if (node.tag === "plugin" && node.attrs.wasm && !/^[a-f0-9]{64}$/i.test(node.attrs.sha256 ?? "")) report_error(diag, where_of(node), "WASM requires a SHA-256 integrity hash")
     if (node.tag === "case") {
         if (node.attrs.host && !(plugin_hosts as readonly string[]).includes(node.attrs.host)) report_error(diag, where_of(node), `unknown plugin host "${node.attrs.host}"`)

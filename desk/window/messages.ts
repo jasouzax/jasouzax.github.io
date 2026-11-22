@@ -67,7 +67,7 @@ async function rooms(context: Work_Context): Promise<Work_Room[]> {
 }
 function clients_panel(context: Work_Context): void {
     const desk = state.desk
-    if (!desk?.hasAttribute("data-server")) return
+    if (!desk || !document.body.classList.contains("page_work")) return
     const aside = desk.querySelector<HTMLElement>(".desk_side")
     const tabs = aside?.querySelector(".desk_side_tabs_ul")
     if (!aside || !tabs || aside.querySelector("[data-work-clients]")) return
@@ -146,7 +146,7 @@ function remove_panel(): void {
 
 export function message_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const root = element("section", "", "desk_messages"); root.setAttribute("aria-label", label("messages"))
-    if (!item.el.closest(".desk[data-server]")) { root.append(element("p", label("work_only"))); return root }
+    if (!document.body.classList.contains("page_work")) { root.append(element("p", label("work_only"))); return root }
     let current: AbortController | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
     let generation = 0

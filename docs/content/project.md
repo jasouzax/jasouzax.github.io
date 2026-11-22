@@ -13,7 +13,7 @@ A project is a **generator**: from one element the engine produces `/projects/{i
 
 ## `<project>` attributes
 
-Required: `id`, `name`, `date`.
+Required: `id`, `name`, `date`. IDs are unreserved lowercase DNS labels of 1–63 characters, with no underscores, edge hyphens, `xn--` prefix, version-like service names, `-demo` or `-server` suffix.
 
 | Attribute | Meaning |
 |---|---|
@@ -22,8 +22,10 @@ Required: `id`, `name`, `date`.
 | `short`, `sub`, `note`, `role`, `rank` | Display, timeline data and ordering (`rank` higher = earlier) |
 | `date`, `icon` | See [value types](README.md#2-value-types) |
 | `featured` | `bool`; included in the slideshow when no skill is focused. Its `featured="true"` slide (or first public slide) is used |
-| `private` | `bool`; excludes the project from rendering, watching and generation |
-| `repo` | External Git repository synchronized by the personal server: `github.com/org/repo`, `https://host/org/repo.git`, `ssh://git@host/org/repo.git`, or `git@host:org/repo.git`. Hostname/path expands to HTTPS. Credentials and local paths belong in the server’s private Git/server configuration. The attribute and pipeline commands are excluded from generated page payloads |
+| `private` | `bool`; excludes the project from static rendering, watching and generation. Git reads require an authorized token. |
+| `confidental` | `bool`; page remains public, anonymous Git/fallback sources are withheld and code windows are not published. Authenticated virtual project mounts remain planned. |
+| `collaborators` | Comma-separated emails. Existing Git tokens bind an optional `email` in private server configuration; listed projects restrict token access to those emails or an owner. |
+| `repo` | Ordered `type:value` sources (`git`, `npm`, `pypi`, `docker`, `deb`, `rpm`); a bare URL remains Git. The first Git source is synchronized by the personal server: `github.com/org/repo`, `https://host/org/repo.git`, `ssh://git@host/org/repo.git`, or `git@host:org/repo.git`. Hostname/path expands to HTTPS. Credentials and local paths belong in the server’s private Git/server configuration. The attribute and pipeline commands are excluded from generated page payloads |
 | `website`, `source`, `paper`, `event` | Action buttons: *View Website / Source Code / Paper / Event*. They stay visible while slide content crossfades |
 | `lang` | Language of this root; keep translations in the same file |
 | `media`, `poster`, `alt`, `tags`, `menu`, `image`, `keywords`, `canonical`, `robots`, `lastmod`, `cover`, `print`, `noindex`, `path` | Shared attribute pool; rarely needed here |
@@ -70,7 +72,7 @@ A project with `repo` or `<pipeline>` becomes a managed personal-server project.
 
 ```xml
 <project id="example" name="Example" date="Jan 2026" repo="gitlab.com/team/example">
-    <pipeline branch="main" poll_seconds="60">
+    <pipeline branch="main">
         <step name="Install CI dependencies" command="npm" args='["ci"]'/>
         <step name="Test" command="npm" args='["test"]' timeout_seconds="900"/>
         <step name="Prepare build" phase="build" command="npm" args='["ci"]'/>
@@ -90,7 +92,7 @@ For public projects, `repo` also supplies the preferred clone/fetch provider whe
 | Attribute | Default | Rule |
 |---|---|---|
 | `branch` | `master` | Git branch to receive, synchronize, test and deploy (unique within the project); a safe branch name without traversal, empty segments or `.lock` components |
-| `poll_seconds` | `60` | Integer 10–86400; checks external and local checkout commits at startup and while the sequential runner is idle |
+Upstream sync runs once on startup or a changed source declaration. Later updates use local post-receive jobs or explicit sync; external webhook ingestion is not implemented. No interval polls run.
 
 ### `<step>` attributes
 
@@ -160,3 +162,5 @@ Sync status, CI approval and publication state are isolated per branch. The prim
 The public clone mirror continues to advertise only the primary branch and its approved tags. Staging does not change that mirror or queue a production mirror publication. A CD-only mirror-publication request for the primary engine branch is deferred while its checkout is on another branch; it is included when the primary branch next updates. Direct file edits run the pipeline of the currently checked-out declared branch.
 
 Use `server run --project <id> --branch staging`, `server status --project <id> --branch staging`, or `GET /api/_/ci/<id>/runs?branch=staging`. For Jazu deployment instructions after merging this feature, see [staging setup](../infra-staging.md). Keep all engine branches on a version supporting branch pipelines; incompatible old workers fail their capability check before executing a pipeline.
+
+Steps may nest. A parent without `command` logs a point before its descendants; phases inherit from the parent and stay ordered ci/build/deploy. `args` and credentials require a command. `continue="true"` retains the failed result in the log while permitting later steps. Repository post-receive and manual sync are available; external HTTP hook ingestion remains unimplemented.

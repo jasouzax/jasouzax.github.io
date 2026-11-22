@@ -3,8 +3,8 @@
 Quick, direct information. One component serves landing pages, contact sections, sitemap and error pages. Back to [content guide](README.md).
 
 ```xml
-<hero tab="Home" name="Your Name" status="Available for new projects" tags="Engineer, Maker" info="One-line pitch.">
-    <item icon="[mail]" name="Email" text="you@example.com" link="mailto:you@example.com" print="email"/>
+<hero tab="Home" name="Your Name" tags="Engineer, Maker" info="One-line pitch.">
+    <item icon="[mail]" name="Email" text="you@example.com" link="mailto:you@example.com" print="true"/>
     <action icon="[contact]" text="Contact" link="#contact" primary/>
 </hero>
 ```
@@ -13,12 +13,10 @@ Quick, direct information. One component serves landing pages, contact sections,
 
 | Attribute | Meaning |
 |---|---|
-| `status` | Small status line (for example "Available for new projects") |
 | `name` | The owner's name on a landing page, or a header for contact/error/sitemap heroes |
 | `tab` | Header-tab label override; defaults to `name`. Does not change the visible name or the published print name. The landing hero uses `Home` / `ホーム` |
 | `tags` | `list`; the owner's roles. All are rendered and cycled by CSS only; the first is the static state |
 | `info` | Description |
-| `profile` | Profile image (also the photo for print modes that use one). Leave empty unless you intend to publish a photo |
 
 Children: `<item>`, `<action>`.
 
@@ -35,7 +33,7 @@ One entry of the link list: contact detail, page, location.
 | Attribute | Meaning |
 |---|---|
 | `icon`, `name`, `text`, `link` | Display and destination |
-| `print` | A **label** (`email`, `phone`, `address`, `kana`, `birth`, `gender`, `postal`, …) that print layouts look up to find this value. It never changes how the item shows on screen. **Only add a `print` label for data you intentionally publish** |
+| `print` | `bool`; include this item’s text in print output. `false` excludes it. Only mark information intentionally published. |
 
 ## `<action>`
 

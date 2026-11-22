@@ -1,4 +1,3 @@
-/* Build a deterministic allowlist: public output only, never API responses or Git mirrors. */
 import { build } from "esbuild"
 import { join } from "node:path"
 import { sha256 } from "../../shared/util.ts"

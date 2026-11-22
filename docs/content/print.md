@@ -25,11 +25,11 @@ Children: `<style>`, `<font>` (same as in [themes](theme.md), but scoped to prin
 
 **Only published information is used.**
 
-- Personal details come from the website's **first `<hero>`**: `name`, `profile`, and `<item print="label">` entries.
+- Personal details come from the website's **first `<hero>`**: `name` and `<item print>` entries.
 - History comes from `<expertise>`: events by `type`, featured projects, skills with their stacks.
 - Events marked `resume="license"` supply dated rows in the rirekisho Licenses area.
 - Any missing value prints as an empty box or line. Nothing is invented and no other personal source exists. A form such as the 履歴書 can therefore never expose more than the owner chose to publish.
-- Labels a layout reads from hero items: for `rirekisho` — `name`, `kana`, `birth`, `gender`, `postal`, `address`, `phone`, `email`.
+- Printed contact fields use the published text of boolean print items: `mailto:` links identify email, `tel:` links identify phone, and `[location]` identifies address. Other structured fields and the removed hero profile photo remain blank for the existing form editor. No fields are inferred from translated labels.
 - The sample personal values that used to be in the old form (birth date, phone numbers, postal code, family and commute fields, application text) were removed on purpose and must not be restored.
 
 ## Dates

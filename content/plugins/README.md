@@ -111,3 +111,5 @@ conversion behavior and any options/menu/map UI belong to that script.
 ## Split windows
 
 See [the shipped flow declarations and limits](../../docs/content/plugin.md#shipped-split-behavior). A `mirror` case delegates to ordinary cases with the child's mode. It shares the parent's current bytes, not its DOM, so navigation and scrolling remain independent. `text` renders line comparison annotations for independent text resources. `image_pdf` executes the existing registered WASM tool; a plugin script must use the injected host factories rather than bundling another copy of the page kernel or document registry.
+
+Text and hex share the `text` host (binary MIME types open in hex); PDF/image/audio/video share `media`. Scripts receive `host.editor` for text/hex and `host.media` for media.

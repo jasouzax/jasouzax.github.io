@@ -1,40 +1,15 @@
+import { redirects_file } from "../routes/_redirects.tsx"
+import { headers_file } from "../routes/_headers.tsx"
+import { sitemap_xml } from "../routes/sitemap.xml.tsx"
+import { robots_txt } from "../routes/robots.txt.tsx"
 import { jsx, fragment, raw_text, type child } from "../../shared/vnode/vnode.tsx"
 import type { page, site_model } from "../load/model.ts"
 import { page_url, in_menu, crumb_chain } from "../load/model.ts"
-import { esc_attr, sha256, split_list, unique } from "../../shared/util.ts"
-import {
-    page_title,
-    page_description,
-    canonical_url,
-    indexable,
-    page_lastmod,
-    text_direction
-} from "./model.tsx"
+import { sha256, split_list, unique } from "../../shared/util.ts"
+import { page_title, page_description, canonical_url, indexable, page_lastmod, text_direction } from "./model.tsx"
 import { cover_of, has_icon } from "./cover.tsx"
 
 export { page_title, page_description, canonical_url, indexable, page_lastmod }
-
-const ai_bots = [
-    "GPTBot",
-    "ChatGPT-User",
-    "OAI-SearchBot",
-    "ClaudeBot",
-    "Claude-Web",
-    "anthropic-ai",
-    "Google-Extended",
-    "Applebot-Extended",
-    "PerplexityBot",
-    "CCBot",
-    "Bytespider",
-    "Amazonbot",
-    "cohere-ai",
-    "Meta-ExternalAgent",
-    "FacebookBot",
-    "Diffbot",
-    "ImagesiftBot",
-    "omgili",
-    "Timpibot"
-]
 
 // ---------- structured data ----------
 
@@ -300,128 +275,6 @@ export function html_attrs(page: page): string {
     return `lang="${page.lang}" dir="${text_direction(page.lang)}"`
 }
 
-// ---------- sitemap, robots, host files ----------
-
-export function sitemap_xml(model: site_model): string {
-    const entries = model.pages
-        .filter((page) => indexable(model, page))
-        .map((page) => {
-            const variants = model.pages.filter((item) => item.path === page.path && indexable(model, item))
-            const links =
-                variants.length > 1
-                    ? [
-                          ...variants.map((item) => ({ lang: item.lang, page: item })),
-                          {
-                              lang: "x-default",
-                              page:
-                                  variants.find((item) => item.lang === model.config.default_language) ??
-                                  variants[0]
-                          }
-                      ]
-                    : []
-            const alternates = links.map(
-                (link) =>
-                    `<xhtml:link rel="alternate" hreflang="${esc_attr(link.lang)}" href="${esc_attr(canonical_url(model, link.page))}"/>`
-            )
-            const modified = page_lastmod(model, page)
-            return `<url><loc>${esc_attr(canonical_url(model, page))}</loc>${modified ? `<lastmod>${modified}</lastmod>` : ""}${alternates.join("")}</url>`
-        })
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${entries.join("\n")}\n</urlset>\n`
-}
-
-export function robots_txt(model: site_model): string {
-    const robots = model.config.seo.robots
-    const rules = ["User-agent: *", "Allow: /", ...robots.disallow.map((path) => `Disallow: ${path}`)]
-    const groups = [rules.join("\n")]
-    if (robots.ai_bots === "disallow") groups.push(...ai_bots.map((bot) => `User-agent: ${bot}\nDisallow: /`))
-    groups.push(`Sitemap: ${model.config.base_url}/sitemap.xml`)
-    return groups.join("\n\n") + "\n"
-}
-
-export function headers_file(inline_hashes: string[], style_hashes: string[] = [], base_url = ""): string {
-    const script_hashes = inline_hashes.map((hash) => `'sha256-${hash}'`).join(" ")
-    const websocket = base_url ? new URL(base_url).origin.replace(/^http/, "ws") : ""
-    const csp = [
-        "default-src 'self'",
-        `script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' ${script_hashes}`.trim(),
-        `style-src 'self' ${style_hashes.map(hash => `'sha256-${hash}'`).join(" ")}`.trim(),
-        "style-src-attr 'unsafe-inline'",
-        // Any page can enter the desktop through the SPA. xterm generates
-        // dimension/theme style elements when a terminal is opened there.
-        "style-src-elem 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob: https://*.googleusercontent.com",
-        "font-src 'self'",
-        "media-src 'self' blob:",
-        `connect-src 'self' ${websocket} https://*.googleapis.com https://accounts.google.com`.replace(/ +/g, " "),
-        "frame-src 'self' blob: https://accounts.google.com",
-        "frame-ancestors 'none'"
-    ].join("; ")
-    const text = (path: string, type: string, age: number): string[] => [
-        path,
-        `  Content-Type: ${type}`,
-        `  Cache-Control: public, max-age=${age}`
-    ]
-    return [
-        "/*",
-        "  X-Content-Type-Options: nosniff",
-        "  Referrer-Policy: strict-origin-when-cross-origin",
-        "  Strict-Transport-Security: max-age=31536000; includeSubDomains",
-        // Isolation belongs to the document, so enable it before an SPA visit
-        // to the desktop instead of requiring a new document at /desk.
-        "  Cross-Origin-Opener-Policy: same-origin",
-        "  Cross-Origin-Embedder-Policy: require-corp",
-        `  Content-Security-Policy: ${csp}`,
-        "/work",
-        "  Referrer-Policy: no-referrer",
-        "  X-Robots-Tag: noindex",
-        "  Cache-Control: no-store",
-        "/work/*",
-        "  Referrer-Policy: no-referrer",
-        "  X-Robots-Tag: noindex",
-        "  Cache-Control: no-store",
-        "/assets/*",
-        "  Cache-Control: public, max-age=31536000, immutable",
-        "/assets/wasm/manifest.json",
-        "  Cache-Control: no-cache",
-        "/assets/pdfjs.json",
-        "  Cache-Control: no-cache",
-        "/assets/plugins.json",
-        "  Cache-Control: no-cache",
-        ...text("/manifest.json", "application/manifest+json; charset=utf-8", 3600),
-        ...text("/service-worker.js", "text/javascript; charset=utf-8", 0),
-        ...text("/offline.json", "application/json; charset=utf-8", 0),
-        ...text("/robots.txt", "text/plain; charset=utf-8", 3600),
-        ...text("/sitemap.xml", "application/xml; charset=utf-8", 3600),
-        ...text("/llms.txt", "text/plain; charset=utf-8", 3600),
-        ...text("/llms-full.txt", "text/plain; charset=utf-8", 3600),
-        ...text("/security.txt", "text/plain; charset=utf-8", 86400),
-        ...text("/.well-known/security.txt", "text/plain; charset=utf-8", 86400),
-        // generated icons keep one URL, so they are cached for a day; covers carry ?v=<hash> in og:image, so a week is safe
-        "/favicon.ico",
-        "  Cache-Control: public, max-age=86400",
-        "/icon.svg",
-        "  Cache-Control: public, max-age=86400",
-        "/apple-touch-icon.png",
-        "  Cache-Control: public, max-age=86400",
-        "/icons/*",
-        "  Cache-Control: public, max-age=604800",
-        "/og/*",
-        "  Cache-Control: public, max-age=604800",
-        ""
-    ].join("\n")
-}
-
-export function redirects_file(): string {
-    return [
-        "/work/*   /work/index.html   200",
-        "/blog     /blogs             301",
-        "/blog/*   /blogs/:splat      301",
-        "/ja/blog     /ja/blogs             301",
-        "/ja/blog/*   /ja/blogs/:splat      301",
-        ""
-    ].join("\n")
-}
-
 export function inline_script_hash(script: string): string {
     return Buffer.from(sha256(script), "hex").toString("base64")
 }
@@ -437,3 +290,11 @@ export function nav_index(model: site_model): object[] {
             lang: page.lang
         }))
 }
+
+export { robots_txt } from "../routes/robots.txt.tsx"
+
+export { sitemap_xml } from "../routes/sitemap.xml.tsx"
+
+export { headers_file } from "../routes/_headers.tsx"
+
+export { redirects_file } from "../routes/_redirects.tsx"

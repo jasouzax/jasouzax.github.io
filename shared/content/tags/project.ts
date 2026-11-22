@@ -2,8 +2,8 @@
 import type { Tag_Rule } from "../rule.ts"
 
 export const project_rule: Tag_Rule = {
-    attrs: ["path","lang","name","rank","featured","date","icon","image","noindex","menu","short","note","role","sub","media","poster","alt","tags","website","paper","event","source","keywords","canonical","robots","lastmod","cover","print","id","repo","private","lang"],
+    attrs: ["id", "name", "date", "short", "sub", "note", "role", "rank", "icon", "featured", "collaborators", "private", "confidental", "repo", "website", "source", "paper", "event", "lang", "image", "cover", "keywords", "canonical", "robots", "lastmod", "noindex"],
     required: ["id","name","date"],
     children: ["slide","menu","window","action","research","pipeline"],
-    bools: ["featured","private"],
+    bools: ["featured", "private", "confidental", "noindex"],
 }

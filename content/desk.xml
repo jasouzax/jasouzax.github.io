@@ -31,7 +31,7 @@
         <desk name="PNG to JPEG" icon="[image]" info="Drop a PNG on the left window and get a JPEG on the right." auto="true">
             <menu name="Options" icon="[edit]" path="window:2:/options" />
             <window />
-            <window type="image/jpeg" path="window:0" mode="view" />
+            <window type="image/jpeg" path="window:0" view="true" />
         </desk>
     </page>
 
@@ -68,6 +68,6 @@
         <desk name="PNGからJPEGへ" icon="[image]" info="左のウィンドウにPNGをドロップすると、右のウィンドウにJPEGが表示されます。" auto="true">
             <menu name="オプション" icon="[edit]" path="window:2:/options" />
             <window />
-            <window type="image/jpeg" path="window:0" mode="view" />
+            <window type="image/jpeg" path="window:0" view="true" />
         </desk>
     </page>

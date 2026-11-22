@@ -115,14 +115,15 @@ function clear_links(article: HTMLElement): void {
     for (const item of article.querySelectorAll(".search_current")) item.classList.remove("search_current")
 }
 
-function make_link(article: HTMLElement, query: string, id: string, label: string, classes: string, html: string): HTMLAnchorElement {
+function make_link(article: HTMLElement, query: string, id: string, label: string, classes: string, content: Element | string): HTMLAnchorElement {
     const link = document.createElement("a")
     link.className = `${classes} search_link`
     // a real address, so "open in new tab" and copy link keep working; #search/<id> is the pin created below for this result
     link.href = `${location.pathname}?search=${encodeURIComponent(query.trim())}#search/${encodeURIComponent(id)}`
     link.dataset.searchGo = id
     link.setAttribute("aria-label", label)
-    link.innerHTML = html
+    if (typeof content === "string") link.textContent = content
+    else link.replaceChildren(...[...content.childNodes].map(node => node.cloneNode(true)))
     return link
 }
 
@@ -163,8 +164,8 @@ function install_links(article: HTMLElement, query: string): void {
         // arrows: the same two per slide as the generated ones (each sits beside its own slide and is revealed while the neighbour is shown)
         const next_label = `${slide.querySelector(".arrow_next")?.getAttribute("aria-label")?.split(":")[0] ?? "Next"}: ${name}`
         const prev_label = `${slide.querySelector(".arrow_prev")?.getAttribute("aria-label")?.split(":")[0] ?? "Previous"}: ${name}`
-        const next_glyph = slide.querySelector(".arrow_next")?.innerHTML ?? "Next"
-        const prev_glyph = slide.querySelector(".arrow_prev")?.innerHTML ?? "Previous"
+        const next_glyph = slide.querySelector(".arrow_next") ?? "Next"
+        const prev_glyph = slide.querySelector(".arrow_prev") ?? "Previous"
         if (slide !== slides[0]) slide.append(make_link(article, query, id, next_label, "arrow arrow_next", next_glyph))
         if (slide !== slides[slides.length - 1]) slide.append(make_link(article, query, id, prev_label, "arrow arrow_prev", prev_glyph))
         // the radio dot

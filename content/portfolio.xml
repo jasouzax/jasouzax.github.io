@@ -1,8 +1,8 @@
 <page lang="en" path="/" name="Portfolio" icon="[briefcase]" rank="100" info="Jason D'Souza, computer engineer in Iloilo, Philippines: firmware, circuit boards, graphics and the web." print="resume">
         <hero tab="Home" name="Jason Catalan D'Souza" info="I build across the stack, from firmware and circuit boards to shaders and the web, and I like writing about the math and physics underneath." tags="Computer Engineer, Embedded Systems, Graphics Programmer, Math &amp; Physics Nerd">
-            <item icon="[github]" name="GitHub" text="jasouzax" print="github" link="https://github.com/jasouzax" />
-            <item icon="[contact]" name="E-Mail" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="email" />
-            <item icon="[location]" name="Location" text="Iloilo, Philippines" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
+            <item icon="[github]" name="GitHub" text="jasouzax" print="true" link="https://github.com/jasouzax" />
+            <item icon="[contact]" name="E-Mail" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="true" />
+            <item icon="[location]" name="Location" text="Iloilo, Philippines" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="true" />
             <action text="Let's work together" link="#contact" icon="[arrow_right]" primary="true" />
             <action text="View projects" link="#expertise" icon="[arrow_down]" />
             <action text="Open Desktop" link="/desk" icon="[arrow_right]" />
@@ -86,10 +86,10 @@
     </print>
 
 <page path="/" lang="ja" name="ポートフォリオ" icon="[briefcase]" rank="100" info="ジェイソン・ディスーザ（Jason D'Souza）。フィリピン・イロイロ在住のコンピュータエンジニア。ファームウェア、回路基板、グラフィックス、Webを手がけています。" print="rirekisho">
-        <hero tab="ホーム" name="Jason Catalan D'Souza" status="新しいプロジェクトのご相談を受付中" info="ファームウェアや回路基板からシェーダー、Webまで、スタック全体にわたって開発しています。その土台にある数学や物理について書くのも好きです。" tags="コンピュータエンジニア, 組込みシステム, グラフィックスプログラマー, 数学・物理オタク">
-            <item icon="[github]" name="GitHub" text="jasouzax" print="github" link="https://github.com/jasouzax" />
-            <item icon="[contact]" name="メール" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="email" />
-            <item icon="[location]" name="所在地" text="フィリピン、イロイロ" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="address" />
+        <hero tab="ホーム" name="Jason Catalan D'Souza" info="ファームウェアや回路基板からシェーダー、Webまで、スタック全体にわたって開発しています。その土台にある数学や物理について書くのも好きです。" tags="コンピュータエンジニア, 組込みシステム, グラフィックスプログラマー, 数学・物理オタク">
+            <item icon="[github]" name="GitHub" text="jasouzax" print="true" link="https://github.com/jasouzax" />
+            <item icon="[contact]" name="メール" text="jason@jasouza.com" link="mailto:jason@jasouza.com" print="true" />
+            <item icon="[location]" name="所在地" text="フィリピン、イロイロ" link="https://maps.app.goo.gl/PiJezhBxkWB8UTUR9" print="true" />
             <action text="一緒に仕事をしましょう" link="#contact" icon="[arrow_right]" primary="true" />
             <action text="プロジェクトを見る" link="#expertise" icon="[arrow_down]" />
         </hero>

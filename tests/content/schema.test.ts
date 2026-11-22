@@ -32,3 +32,12 @@ test("research uses similar and history wording comes from event dates", () => {
 test("retired page tags cannot silently discard authored content", () => {
     for (const tag of ["landing", "contact", "error", "resume"]) assert(errors(`<page path="/" name="Home"><${tag}/></page>`).some(error => error.includes(`unknown element <${tag}>`)))
 })
+
+test("hero print items are booleans and windows declare view/edit with prior split parents", () => {
+    assert.deepEqual(errors('<page path="/" name="Home"><hero name="Owner"><item print text="Published"/><item print="false" text="Screen only"/></hero><desk><window view/><window edit split="1"/></desk></page>'), [])
+    for (const content of ['<hero status="old"/>', '<hero profile="old.png"/>', '<hero><item print="email"/></hero>', '<desk server/>', '<desk><window mode="view"/></desk>', '<desk><window view edit/></desk>', '<desk><window split="1"/></desk>']) assert(errors(`<page path="/" name="Home">${content}</page>`).length > 0, content)
+})
+
+test("unmanaged project IDs follow the same reserved DNS rules as managed projects", () => {
+    for (const id of ["with_underscore", "trailing-", "repo", "v2", "sample-demo", "sample-server"]) assert(errors(`<project id="${id}" name="Example" date="2026"/>`).some(error => error.includes("DNS label")), id)
+})

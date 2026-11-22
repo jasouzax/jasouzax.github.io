@@ -1,33 +1,32 @@
+import { text_layout_body } from "./text.ts"
+import { sync_save, save_window } from "../action/save.ts"
+export { sync_save, save_window } from "../action/save.ts"
+import { mime_icon, fill_mime_list, set_mime, set_mode } from "../action/resource.ts"
+export { fill_mime_list, set_mime, set_mode } from "../action/resource.ts"
+import { head_part } from "./head.ts"
+export { head_part } from "./head.ts"
 // What a desk window holds and shows: a file arrives (dropped, uploaded or opened from the file tree), the window learns its name and type and
 // shows it in its mode. The window itself (tabs, layout) is client_desk.ts.
 
 import { is_server_page } from "../server/text.ts"
-import { token_map, coloured_nodes } from "./text/syntax.ts"
+
 import type { desk_window } from "../index.ts"
 import { state, text, refresh_tab, window_hooks, focus_window, working_directory } from "../index.ts"
-import { detect_mimes, mime_matches, is_mime } from "../mime/detect.ts"
+import { detect_mimes } from "../mime/detect.ts"
 import { prepare_plugins } from "../plugin/loader.ts"
-import { media_player } from "./media.ts"
+import { media_body as media_window_body } from "./media.ts"
 import { markdown_body } from "./note.ts"
 import { folder_body } from "./folder.ts"
 import { bind_navigation, sync_navigation } from "../action/history.ts"
 import { desk_drag_type } from "../fs/opfs.ts"
-import { link_hooks, refresh_children, flow_kind_of, document_of, latest_bytes, announce_edit, subscribe_edits, forget_edits, is_dirty, accept_save } from "../plugin/flow.ts"
-import { html_body, pdf_body, image_pdf_body } from "./preview.ts"
-import { comparison_lines } from "../plugin/compare.ts"
+import { link_hooks, refresh_children, flow_kind_of, document_of, forget_edits, is_dirty } from "../plugin/flow.ts"
+import { html_body, image_pdf_body } from "./preview.ts"
+
 import { no_picks } from "../plugin/rules.ts"
 import { message_body } from "./messages.ts"
 import { auto_script_body } from "../server/script.ts"
 import { auto_site_body } from "../server/site.ts"
 import { bind_window_controls } from "../action/controls.ts"
-
-export function head_part<element extends HTMLElement>(item: desk_window, selector: string): element | null {
-    return item.el.querySelector<element>(`.desk_wbox_head ${selector}`)
-}
-
-function mime_icon(mime: string): string {
-    return state.data?.mimes.find(info => info.mime === mime)?.icon ?? state.data?.file_icon ?? ""
-}
 
 // every child of the window except its head is the body
 export function set_body(item: desk_window, body: Node): void {
@@ -40,7 +39,7 @@ function size_label(size: number): string {
 }
 
 // The view for a file nothing above can show: what it is (name, type, size) and a way to get it back out.
-function unknown_body(item: desk_window): HTMLElement {
+export function unknown_body(item: desk_window): HTMLElement {
     const note = document.createElement("div")
     note.className = "desk_wbox_body_none"
     note.setAttribute("role", "status")
@@ -59,73 +58,6 @@ function unknown_body(item: desk_window): HTMLElement {
         note.append(facts, save)
     }
     return note
-}
-
-// ---- the type list ------------------------------------------------------------------------------------------------------------
-
-function list_button(icon: string, label: string, current: boolean, attrs: Record<string, string>): HTMLLIElement {
-    const row = document.createElement("li")
-    row.className = "list_drop_li"
-    const button = document.createElement("button")
-    button.type = "button"
-    for (const [key, value] of Object.entries(attrs)) button.setAttribute(key, value)
-    if (current) button.setAttribute("aria-current", "true")
-    if (icon) {
-        const mark = document.createElement("span")
-        mark.className = "list_drop_icon"
-        mark.setAttribute("aria-hidden", "true")
-        mark.textContent = icon
-        button.append(mark)
-    }
-    button.append(label)
-    row.append(button)
-    return row
-}
-
-// With nothing typed the list is what the detector found (the likeliest one first and picked). Typing searches every known type; a type
-// that is not known can still be used by typing it in full (type/subtype) and pressing Enter.
-export function fill_mime_list(item: desk_window, query: string = ""): void {
-    const list = head_part(item, ".desk_wbox_head_mime > .list_drop")
-    if (!list) return
-    for (const row of [...list.children]) if (!row.matches(".list_drop_search")) row.remove()
-    const known = state.data?.mimes ?? []
-    const rows: HTMLElement[] = []
-    if (query.trim() === "") {
-        item.candidates.forEach((mime, index) => {
-            const info = known.find(entry => entry.mime === mime)
-            rows.push(list_button(info?.icon ?? state.data?.file_icon ?? "", index === 0 ? `${mime} (${text("guess_mime").toLowerCase()})` : mime, mime === item.mime, { "data-mime": mime }))
-        })
-        if (item.mime && !item.candidates.includes(item.mime)) rows.unshift(list_button(state.data?.file_icon ?? "", item.mime, true, { "data-mime": item.mime }))
-    } else {
-        for (const info of mime_matches(query)) rows.push(list_button(info.icon, info.mime, info.mime === item.mime, { "data-mime": info.mime }))
-        const typed = query.trim().toLowerCase()
-        if (rows.length === 0 && is_mime(typed)) rows.push(list_button(state.data?.file_icon ?? "", `${text("use_mime")} ${typed}`, false, { "data-mime": typed }))
-        if (rows.length === 0) {
-            const none = document.createElement("li")
-            none.className = "list_drop_none"
-            none.textContent = text("no_mime_match")
-            rows.push(none)
-        }
-    }
-    list.append(...rows)
-}
-
-export function set_mime(item: desk_window, mime: string): void {
-    if (item.parent) item.picks.mime = true
-    if (flow_kind_of(item) === "convert") {
-        item.file = null; item.path = item.name = ""; item.save = null
-        forget_edits(item)
-    }
-    item.mime = mime
-    item.icon = mime_icon(mime)
-    render_window(item)
-}
-
-export function set_mode(item: desk_window, mode: string): void {
-    if (item.mode === mode) return
-    if (item.parent) item.picks.mode = true
-    item.mode = mode
-    render_window(item)
 }
 
 // ---- viewers ------------------------------------------------------------------------------------------------------------------
@@ -148,259 +80,7 @@ function url_of(item: desk_window): string {
 
 // image, video and audio: the browser's own player over the file, which stays in this tab (a blob: address, nothing is uploaded)
 function media_body(item: desk_window): HTMLElement {
-    return media_player(item, url_of(item), () => fail_window(item, item.path || item.name, text("files_open_failed")))
-}
-
-// One shared line/byte layout for Code and Hex. The byte buffer remains authoritative
-// until text is explicitly changed, including when UTF-8 decoding is lossy.
-function text_layout_body(item: desk_window, hex_mode = false): HTMLElement {
-    const file = item.file!
-    if (file.size > edit_limit) return too_large(item)
-    const editable = item.mode === "edit"
-    const signal = renders.get(item)!.signal
-    const comparing = flow_kind_of(item) === "compare" && item.parent?.mime.startsWith("text/") && item.mime.startsWith("text/") && !!item.parent.file && item.parent.file.size <= edit_limit
-    let source_text: string | null = null
-    const box = document.createElement("div")
-    box.className = "desk_wbox_body_text"
-    const part = (tag: string, name: string): HTMLElement => {
-        const node = document.createElement(tag)
-        node.className = `desk_wbox_body_text_${name}`
-        return node
-    }
-    const line = part("div", "line")
-    const dec = part("pre", "line_dec")
-    const hex = part("pre", "line_hex")
-    const toggle = document.createElement("details")
-    toggle.className = "desk_wbox_body_text_tog"
-    toggle.open = hex_mode
-    const summary = document.createElement("summary")
-    summary.title = "Hex / Text"
-    summary.setAttribute("aria-label", "Hex / Text")
-    const chevron = document.createElement("span")
-    chevron.textContent = "›"
-    summary.append(chevron)
-    toggle.append(summary)
-    line.append(dec, hex, toggle)
-    const byte_column = part("div", "byte")
-    const split = part("pre", "body desk_wbox_body_text_body_split")
-    const plain = part("div", "body desk_wbox_body_text_body_plain")
-    const holder = part("div", "edit")
-    const layer = part("pre", "colour")
-    const area = document.createElement("textarea")
-    area.className = "desk_wbox_body_text_input"
-    area.spellcheck = false
-    area.wrap = "off"
-    area.readOnly = !editable
-    area.disabled = true
-    area.setAttribute("aria-label", item.name)
-    const bytes_input = document.createElement("textarea")
-    bytes_input.className = "desk_wbox_body_text_hex_input"
-    bytes_input.spellcheck = false
-    bytes_input.wrap = "off"
-    bytes_input.readOnly = !editable
-    bytes_input.disabled = true
-    bytes_input.setAttribute("aria-label", `Hex: ${item.name}`)
-    byte_column.append(bytes_input)
-    holder.append(layer, area)
-    plain.append(holder)
-    box.append(line, byte_column, split, plain)
-    let bytes = new Uint8Array()
-    let ready = false
-    const draw = (): void => {
-        const value = area.value
-        const map = token_map(value, item.mime)
-        holder.classList.toggle("is_coloured", map !== null || !!comparing)
-        if (comparing && source_text !== null) {
-            const changes = comparison_lines(source_text, value)
-            layer.replaceChildren(...value.split("\n").map((value, index) => {
-                const row = document.createElement("span")
-                row.className = "desk_diff_line"
-                if (changes.added.has(index)) row.classList.add("desk_diff_added")
-                const removed = changes.removed.get(index)
-                if (removed) { row.classList.add("desk_diff_removed"); row.dataset.removed = String(removed); row.title = `${removed} removed line(s)` }
-                row.textContent = value + "\n"
-                return row
-            }))
-            box.dataset.comparison = changes.limited ? "limited" : "ready"
-        } else
-        layer.replaceChildren(...(map ? coloured_nodes(value, map, 0, value.length, false) : [document.createTextNode(value)]), document.createTextNode("\n"))
-        dec.textContent = value.split("\n").map((_, index) => index + 1).join("\n")
-        const count = Math.max(1, Math.ceil(bytes.length / 16))
-        hex.textContent = Array.from({ length: count }, (_, index) => (index * 16).toString(16).padStart(6, "0").toUpperCase()).join("\n")
-        split.textContent = printable(bytes)
-        bytes_input.rows = count
-        bytes_input.cols = 48
-        bytes_input.style.height = `${count * 1.5}em`
-    }
-    const valid = (message: string): void => {
-        item.problem = message
-        bytes_input.setAttribute("aria-invalid", String(!!message))
-        sync_save(item)
-    }
-    area.addEventListener("input", () => {
-        bytes = new TextEncoder().encode(area.value)
-        bytes_input.value = hex_lines(bytes)
-        valid("")
-        draw()
-        announce_edit(item, bytes)
-    })
-    bytes_input.addEventListener("input", () => {
-        const parsed = parse_hex(bytes_input.value)
-        valid(parsed.bad ? `${text("hex_invalid")} ${parsed.bad}` : "")
-        if (parsed.bad) return
-        bytes = new Uint8Array(parsed.bytes)
-        area.value = new TextDecoder().decode(bytes)
-        draw()
-        announce_edit(item, bytes)
-    })
-    toggle.addEventListener("toggle", () => {
-        if (item.problem) { toggle.open = true; return }
-        if (ready) draw()
-    })
-    area.addEventListener("keydown", event => {
-        if (event.key === "Tab" && !event.shiftKey && editable) {
-            event.preventDefault()
-            area.setRangeText("\t", area.selectionStart, area.selectionEnd, "end")
-            area.dispatchEvent(new Event("input", { bubbles: true }))
-        }
-    })
-    void file.arrayBuffer().then(buffer => {
-        if (!box.isConnected) return
-        bytes = new Uint8Array(latest_bytes(item) ?? buffer)
-        area.value = new TextDecoder().decode(bytes)
-        bytes_input.value = hex_lines(bytes)
-        area.disabled = bytes_input.disabled = false
-        ready = true
-        box.dataset.ready = "true"
-        draw()
-        sync_save(item)
-    }).catch(() => valid(text("files_failed")))
-    const receive = (next: Uint8Array): void => {
-        item.dirty = is_dirty(item)
-        sync_save(item)
-        if (!ready || signal.aborted || bytes === next) return
-        const selection = [area.selectionStart, area.selectionEnd] as const
-        const scroll = [box.scrollTop, box.scrollLeft]
-        bytes = new Uint8Array(next)
-        const value = new TextDecoder().decode(bytes)
-        if (area.value !== value) { area.value = value; area.setSelectionRange(...selection) }
-        bytes_input.value = hex_lines(bytes)
-        draw()
-        box.scrollTop = scroll[0]; box.scrollLeft = scroll[1]
-    }
-    signal.addEventListener("abort", subscribe_edits(item, receive), { once: true })
-    if (comparing && item.parent?.file) {
-        const parent = item.parent
-        void parent.file!.text().then(value => {
-            if (signal.aborted) return
-            source_text = latest_bytes(parent) ? new TextDecoder().decode(latest_bytes(parent)!) : value
-            if (ready) draw()
-        })
-        signal.addEventListener("abort", subscribe_edits(parent, bytes => {
-            source_text = new TextDecoder().decode(bytes)
-            if (ready) draw()
-        }), { once: true })
-    }
-    const viewport = editable
-        ? edit_shell(item, box, async () => ready && !item.problem ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null)
-        : document.createElement("div")
-    viewport.classList.add("desk_wbox_body_editor")
-    if (!editable) viewport.append(box)
-    return viewport
-}
-
-// ---- editors ------------------------------------------------------------------------------------------------------------------
-// Editor factories report valid data to the shared Save control.
-
-const edit_limit = 2_000_000
-
-function edit_shell(item: desk_window, editor: HTMLElement, commit: () => Promise<Blob | null>): HTMLElement {
-    const box = document.createElement("div")
-    box.className = "desk_wbox_body_edit"
-    // the save button is in the window's head: the editor only says what there is to save
-    item.commit = commit
-    box.append(editor)
-    box.addEventListener("desk:invalid", event => {
-        item.problem = (event as CustomEvent<string>).detail
-        sync_save(item)
-    })
-    sync_save(item)
-    return box
-}
-
-// ---- save (the button in the head) ---------------------------------------------------------------------------------------------
-// The button is enabled while the window has an editor with something valid to save, and is marked while the editor holds a change that
-// has not been saved. Saving writes to the file system when the file lives there; a file only held by the window is kept in the window.
-
-export function sync_save(item: desk_window): void {
-    const button = head_part<HTMLButtonElement>(item, ".desk_wbox_head_save")
-    if (!button) return
-    const ready = item.commit !== null && item.problem === ""
-    button.disabled = !ready
-    button.classList.toggle("is_dirty", item.commit !== null && item.dirty)
-    button.title = item.problem !== "" ? item.problem : item.dirty && item.commit ? text("unsaved") : text("save")
-    button.setAttribute("aria-label", button.title)
-}
-
-function announce(item: desk_window, message: string): void {
-    let live = item.el.querySelector<HTMLElement>(".desk_wbox_head_status")
-    if (!live) {
-        live = document.createElement("span")
-        live.className = "desk_wbox_head_status visually_hidden"
-        live.setAttribute("role", "status")
-        item.el.querySelector(".desk_wbox_head")?.append(live)
-    }
-    live.textContent = message
-}
-
-export async function save_window(item: desk_window): Promise<void> {
-    const commit = item.commit
-    if (!commit || item.problem !== "") return
-    const root = document_of(item), original = root.file, save = root.save, mime = root.mime
-    const bytes = latest_bytes(root)
-    try {
-        const blob = await commit()
-        if (!blob || root.file !== original) return
-        const file = new Blob([blob], { type: mime })
-        await save?.(file)
-        if (root.file !== original) return
-        accept_save(root, file, bytes)
-        item.dirty = is_dirty(item)
-        announce(item, text(save ? "text_saved" : "text_kept"))
-    } catch {
-        announce(item, text("files_failed"))
-    }
-    sync_save(item)
-}
-
-function too_large(item: desk_window): HTMLElement {
-    const note = unknown_body(item)
-    note.firstElementChild!.textContent = text("edit_too_large")
-    return note
-}
-
-// Bytes as hex, 16 to a line, with the offsets and the characters beside them. Edit the hex; anything that is not a byte is reported and
-// the save is held back.
-function parse_hex(value: string): { bytes: Uint8Array, bad: string } {
-    const tokens = value.split(/\s+/).filter(token => token.length > 0)
-    const bytes = new Uint8Array(tokens.length)
-    for (let index = 0; index < tokens.length; index++) {
-        if (!/^[0-9a-fA-F]{1,2}$/.test(tokens[index])) return { bytes, bad: tokens[index] }
-        bytes[index] = parseInt(tokens[index], 16)
-    }
-    return { bytes, bad: "" }
-}
-
-function hex_lines(bytes: Uint8Array): string {
-    const rows: string[] = []
-    for (let at = 0; at < bytes.length; at += 16) rows.push([...bytes.slice(at, at + 16)].map(byte => byte.toString(16).padStart(2, "0")).join(" "))
-    return rows.join("\n")
-}
-
-function printable(bytes: Uint8Array): string {
-    const rows: string[] = []
-    for (let at = 0; at < bytes.length; at += 16) rows.push([...bytes.slice(at, at + 16)].map(byte => (byte >= 32 && byte < 127 ? String.fromCharCode(byte) : ".")).join(""))
-    return rows.join("\n")
+    return media_window_body(item, url_of(item), renders.get(item)!.signal, () => fail_window(item, item.path || item.name, text("files_open_failed")))
 }
 
 // Process rendering is installed by desk_proc; plugin scripts choose when to use it.
@@ -417,7 +97,7 @@ export const terminal_hooks = {
 }
 
 export const uri_handlers: ((item: desk_window, uri: string, current?: () => boolean) => Promise<boolean>)[] = []
-const renders = new WeakMap<desk_window, AbortController>()
+export const renders = new WeakMap<desk_window, AbortController>()
 
 function fallback_body(item: desk_window): HTMLElement {
     if (flow_kind_of(item) === "convert") {
@@ -547,7 +227,7 @@ function site_body(item: desk_window, signal: AbortSignal): HTMLElement {
 function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_mirror_body"
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body,
+    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
         messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     void prepare_plugins(item, host, signal, true).then(candidates => {
@@ -589,7 +269,7 @@ function body_for(item: desk_window): void {
         sync_save(item)
         return
     }
-    const host = { html: html_body, pdf: pdf_body, image_pdf: image_pdf_body, mirror: mirror_body, code: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
+    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return

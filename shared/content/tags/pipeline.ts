@@ -2,7 +2,7 @@
 import type { Tag_Rule } from "../rule.ts"
 
 export const pipeline_rule: Tag_Rule = {
-    attrs: ["branch","poll_seconds"],
+    attrs: ["branch"],
     required: [],
     children: ["step"],
 }

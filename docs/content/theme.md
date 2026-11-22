@@ -70,3 +70,9 @@ Role-label behaviour shared between themes lives in `content/theme/roles.scss`; 
 ## Related
 
 [Contract and status](../feat/themes.md) · [compiler internals](../src/helper.md#themes-and-fonts)
+
+## Icon registry alignment
+
+Tokens retain their existing names. `engine/style/icons.ts` owns the canonical token map from the pinned Material Design subset in `engine/style/icons/material.json`; `config.json.icons` is the public projection. The subset records the upstream revision and SVG paths, with its license beside it. Both authored theme fonts contain the same glyph codepoints. A new glyph requires updating the subset, public projection and both fonts together; arbitrary sequential private-use assignments are rejected. Supplementary-plane icons must round-trip through JSON as complete surrogate pairs.
+
+The fixed shared canvas/empty-slot renderer is still absent. The current background adapters remain until that capability is implemented; their relocation does not constitute completion of the canvas contract.

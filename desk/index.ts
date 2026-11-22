@@ -104,9 +104,13 @@ export function label_of(item: desk_window): string {
 }
 
 export function refresh_tab(item: desk_window): void {
-    const icon = item.icon ? `<span aria-hidden="true"></span>` : ""
-    item.tab.innerHTML = icon
-    if (item.icon) item.tab.firstElementChild!.textContent = item.icon
+    item.tab.replaceChildren()
+    if (item.icon) {
+        const icon = document.createElement("span")
+        icon.setAttribute("aria-hidden", "true")
+        icon.textContent = item.icon
+        item.tab.append(icon)
+    }
     const name = document.createElement("span")
     name.className = "head_tab_name"
     name.textContent = label_of(item)
@@ -709,17 +713,23 @@ export function init_desk(): void {
     init_fs(desk)
     const initial = [...desk.querySelectorAll<HTMLElement>(":scope > .desk_wbox")]
     for (const tab of document.querySelectorAll('#head_tabs a[href^="#window-"]')) tab.remove()
-    for (const element of initial) {
-        const item = new_window(element)
+    const initial_windows = new Map<number, desk_window>()
+    for (const [index, element] of initial.entries()) {
+        const parent = element.dataset.split ? initial_windows.get(Number(element.dataset.split)) ?? null : null
+        const item = new_window(element, parent)
         if (!item) continue
+        initial_windows.set(index + 1, item)
         const path = element.dataset.path ?? ""
         const mode = element.dataset.mode || "view"
         const mime = element.dataset.mime || ""
+        item.mode = mode
+        if (parent) item.picks = { own: Boolean(path), mime: Boolean(mime), mode: true }
         if (path) void open_source(item, path).then(() => {
             if (mime) item.mime = mime
             item.mode = mode
             render_window(item)
         })
+        else if (parent) render_window(item)
     }
     // A desk whose windows are all made by the runtime starts blank: it opens with one empty window (the first file opened fills it).
     if (state.windows.length === 0) new_window()

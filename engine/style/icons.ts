@@ -1,5 +1,14 @@
+/* Canonical Material Design token map; public config is its checked projection. */
 import { readFileSync, writeFileSync } from "node:fs"
 import { jazu_error } from "../../shared/diag.ts"
+
+const material = JSON.parse(readFileSync(new URL("./icons/material.json", import.meta.url), "utf8")) as { icons: Record<string, string>, glyphs: Record<string, { codepoint: string }> }
+export const material_icons: Record<string, string> = Object.fromEntries(Object.entries(material.icons).map(([token, name]) => [token, material.glyphs[name].codepoint]))
+
+export function icon_map(configured: Record<string, string>): Record<string, string> {
+    for (const [token, codepoint] of Object.entries(material_icons)) if (configured[token] && configured[token].toUpperCase() !== codepoint) throw new jazu_error(`icon ${token} must use Material Design codepoint ${codepoint}`, 1)
+    return { ...configured, ...material_icons }
+}
 
 export type icon_registry = {
     start: string
@@ -8,19 +17,14 @@ export type icon_registry = {
 
 export function load_icons(file: string): icon_registry {
     const data = JSON.parse(readFileSync(file, "utf8"))
-    return { start: data.start ?? "E000", icons: data.icons ?? {} }
-}
-
-export function next_codepoint(registry: icon_registry): string {
-    const used = Object.values(registry.icons).map(hex => parseInt(hex, 16))
-    const top = Math.max(parseInt(registry.start, 16) - 1, ...used)
-    return (top + 1).toString(16).toUpperCase()
+    return { start: data.start ?? "E000", icons: icon_map(data.icons ?? {}) }
 }
 
 export function add_icon(file: string, name: string, codepoint?: string): string {
     const registry = load_icons(file)
     if (registry.icons[name]) throw new jazu_error(`icon ${name} already registered`, 1)
-    const hex = codepoint ?? next_codepoint(registry)
+    const hex = codepoint ?? material.glyphs[name.replaceAll("_", "-")]?.codepoint
+    if (!hex || !Object.values(material.glyphs).some(glyph => glyph.codepoint === hex.toUpperCase())) throw new jazu_error("Choose a glyph from the pinned Material Design subset; update its metadata and both theme fonts to add a new glyph", 1)
     registry.icons[name] = hex.toUpperCase()
     const data = JSON.parse(readFileSync(file, "utf8"))
     writeFileSync(file, JSON.stringify({ ...data, icons: registry.icons }, null, 4) + "\n")

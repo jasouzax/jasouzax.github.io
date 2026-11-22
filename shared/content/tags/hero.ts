@@ -2,7 +2,7 @@
 import type { Tag_Rule } from "../rule.ts"
 
 export const hero_rule: Tag_Rule = {
-    attrs: ["status","name","tab","tags","info","profile"],
+    attrs: ["name","tab","tags","info"],
     required: [],
     children: ["item","action"],
 }

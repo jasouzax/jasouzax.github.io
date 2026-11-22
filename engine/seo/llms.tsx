@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
-import { published_resource } from "../load/resources.ts"
+import { published_resource, resource_text } from "../load/resources.ts"
 import type { site_model, page } from "../load/model.ts"
 import { pages_in, order_pages, find_page } from "../load/model.ts"
 import type { xml_node } from "../../shared/content/xml.ts"
@@ -120,7 +119,7 @@ function resolve_list(value: string | undefined, table: Map<string, string>): st
 function read_window_file(model: site_model, path: string): string | null {
     const file = published_resource(model, path)
     if (!file || !/\.(md|markdown|txt)$/i.test(file)) return null
-    return existsSync(file) ? readFileSync(file, "utf8").trim() : null
+    return resource_text(model, path)?.trim() ?? null
 }
 
 function node_lines(model: site_model, page: page, node: xml_node, names: names): string[] {

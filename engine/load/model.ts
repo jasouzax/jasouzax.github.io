@@ -7,10 +7,11 @@ import type { diagnostics } from "../../shared/diag.ts"
 import { report_error, report_warning } from "../../shared/diag.ts"
 import type { site_config } from "../../shared/config.ts"
 import type { icon_registry } from "../style/icons.ts"
-import { load_icons, icon_chars } from "../style/icons.ts"
+import { icon_map, icon_chars } from "../style/icons.ts"
 import { year_fraction } from "../helper/dates.ts"
 import { normalize_path, parent_path, path_depth } from "../../shared/util.ts"
-import { expand_objects, collect_resources } from "../tags/objects.ts"
+import { expand_objects } from "../tags/objects.ts"
+import { collect_resources } from "./resources/collect.ts"
 import { configured_resource } from "./resources.ts"
 import { project_declarations } from "../../shared/content/pipeline.ts"
 
@@ -87,7 +88,7 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
     const content_dir = join(root, "content")
     const model: site_model = {
         config, root, content_dir, pages: [], themes: [], objects: [], prints: [], plugins: [], resources: new Map(), diag, build_date, mode, now: year_fraction(build_date),
-        icons: { start: "E000", icons: config.icons },
+        icons: { start: "E000", icons: icon_map(config.icons) },
     }
     for (const file of source_files(content_dir)) {
         const roots = parse_xml(readFileSync(file, "utf8"), file)

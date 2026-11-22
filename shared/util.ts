@@ -20,7 +20,7 @@ export function json_ascii_pua(json: string): string {
     return json.replace(/[\ue000-\uf8ff]|[\ud800-\udbff][\udc00-\udfff]/g, char => {
         const code = char.codePointAt(0)!
         if (code > 0xffff && code < 0xf0000) return char
-        return Array.from(char, unit => "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")).join("")
+        return char.split("").map(unit => "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")).join("")
     })
 }
 

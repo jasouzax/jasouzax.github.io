@@ -1,12 +1,11 @@
-import { existsSync, statSync, readFileSync, realpathSync } from "node:fs"
-import { dirname, resolve, relative, basename, sep, extname } from "node:path"
+import { project_children } from "./project.tsx"
+import { event_children } from "./event.tsx"
+import { valid_subdomain_id } from "../../shared/content/ids.ts"
+import { relative } from "node:path"
 import type { xml_node } from "../../shared/content/xml.ts"
-import { walk_nodes, where_of } from "../../shared/content/xml.ts"
+import { where_of } from "../../shared/content/xml.ts"
 import type { site_model, page } from "../load/model.ts"
-import { report_error, report_warning } from "../../shared/diag.ts"
-import { split_list, short_hash } from "../../shared/util.ts"
-import { inside } from "../../shared/paths.ts"
-import { research_sections } from "../../shared/content/schema.ts"
+import { report_error } from "../../shared/diag.ts"
 
 export function element(tag: string, attrs: Record<string, string>, source: xml_node, children: xml_node[] = []): xml_node {
     const node: xml_node = { tag, attrs, children, text: "", file: source.file, line: source.line, parent: null }
@@ -34,41 +33,19 @@ export function expand_objects(model: site_model): void {
     for (const object of model.objects) {
         object.children = object.children.filter(node => node.attrs.private !== "true")
         const id = object.attrs.id
-        if (!/^[a-z0-9][a-z0-9_-]*$/.test(id ?? "")) {
+        if (object.tag === "project" ? !valid_subdomain_id(id) : !/^[a-z0-9][a-z0-9_-]*$/.test(id ?? "")) {
             report_error(model.diag, where_of(object), "id must be a safe URL segment")
             continue
         }
         const path = `/${object.tag}s/${id}`
         const info = object_info(object)
         const children = object.children.filter(node => ["menu", "window"].includes(node.tag))
-        if (object.tag === "event") {
-            const entries = (nodes: xml_node[]): xml_node[] => nodes.filter(node => node.tag === "event").map(node =>
-                element("entry", { name: node.attrs.name, info: node.attrs.info ?? "", date: node.attrs.date ?? "", type: "Note" }, node, entries(node.children)))
-            children.unshift(element("menu", { name: "Events" }, object, entries(object.children)))
-        }
-        if (object.tag === "project") {
-            const folder = (name: string, children: xml_node[] = []): xml_node =>
-                element("entry", { name, type: "Folder" }, object, children)
-            const root = folder("/", ["bin", "boot", "dev", "etc", "home", "lib", "media", "mnt", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"].map(name =>
-                folder(name, name === "home" ? [folder("user")] : name === "srv" ? [folder("projects", [folder(id)])] : [])))
-            children.unshift(element("menu", { name: "Files", path: "file:///" }, object, [root]))
-            const research = object.children.find(node => node.tag === "research")
-            if (research) {
-                const point = (node: xml_node, name = node.attrs.name): xml_node => element("entry", {
-                    name, type: "Post", data: node.text.trim(),
-                }, node, node.children.filter(child => child.tag === "point").map(child => point(child)))
-                const sections = Object.entries(research_sections).map(([tag, name]) => {
-                    const section = research.children.find(node => node.tag === tag)
-                    return section ? point(section, name) : element("entry", { name, type: "Post" }, research)
-                })
-                children.splice(1, 0, element("menu", { name: "Overview" }, research, sections))
-            }
-            children.push(element("menu", { name: "Version", path: `/api/_/git/${id}/log` }, object))
-        }
+        if (object.tag === "event") event_children(object, children)
+        if (object.tag === "project") project_children(model, object, children)
         if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
-            type: "inode/directory", mode: "view", path: `file:///srv/projects/${id}`,
+            type: "inode/directory", view: "true", path: `file:///srv/projects/${id}`,
         } : {
-            type: "text/markdown", mode: "view", data: info || object.attrs.name,
+            type: "text/markdown", view: "true", data: info || object.attrs.name,
         }, object))
         const desk = element("desk", {
             name: object.tag === "project" ? object.attrs.short ?? object.attrs.name : object.attrs.name,
@@ -76,7 +53,7 @@ export function expand_objects(model: site_model): void {
             auto: "true",
             ...(object.tag === "project" ? { cwd: `/srv/projects/${id}` } : {}),
         }, object, children)
-        const { repo: _server_repo, ...public_attrs } = object.attrs
+        const { repo: _server_repo, collaborators: _server_collaborators, ...public_attrs } = object.attrs
         const node = element("page", { ...public_attrs, info, path }, object, [desk])
         model.pages.push(page_of(model, node))
     }
@@ -105,45 +82,5 @@ export function expand_objects(model: site_model): void {
             // The existing timeline uses periods as contextual filters as well as skills.
             expertise.children.push(...events.map(node => ({ ...node, attrs: { ...node.attrs, resume: node.attrs.resume ?? (["education", "experience"].includes(node.attrs.type) ? node.attrs.type : "") } })))
         }
-    }
-}
-
-export function collect_resources(model: site_model): void {
-    const base = resolve(model.content_dir)
-    function publish(node: xml_node, value: string, owner: string, window: boolean): string {
-        if (/^(?:https?:|mailto:|im:|data:|window:|pid:|shell:|#)/.test(value) || value.startsWith("/api/")) return value
-        if (value === "file:///" || value.startsWith("file:///home/user")) return value
-        if (model.resources.has(value.replace(/^file:\/\//, ""))) return value
-        let source: string
-        let url: string
-        if (value.startsWith("file:///srv/")) return value
-        if (value.startsWith("/")) { source = resolve(base, value.slice(1)); url = value }
-        else { source = resolve(dirname(node.file), value); url = `${owner}/${basename(value)}` }
-        const rel = relative(base, source)
-        if (rel === ".." || rel.startsWith(`..${sep}`) || resolve(source) === base) {
-            report_error(model.diag, where_of(node), `resource escapes content: ${value}`)
-            return value
-        }
-        if (!existsSync(source) || !statSync(source).isFile()) {
-            report_warning(model.diag, where_of(node), `missing resource ${value}`)
-            return value
-        }
-        if (!inside(realpathSync(base), realpathSync(source))) {
-            report_error(model.diag, where_of(node), `resource symlink escapes content: ${value}`)
-            return value
-        }
-        if (model.resources.has(url) && model.resources.get(url) !== source) report_error(model.diag, where_of(node), `resource collision at ${url}`)
-        if (!window && /\.(?:png|jpg|jpeg|avif|webp|gif|svg|mp4|webm|mp3|ogg|wav)$/i.test(source)) url = `/assets/media/${short_hash(readFileSync(source))}${extname(source).toLowerCase()}`
-        model.resources.set(url, source)
-        return window ? `file://${url}` : url
-    }
-    for (const page of [...model.pages, ...model.objects.map(node => ({ path: `/${node.tag}s/${node.attrs.id}`, node }))]) {
-        const owner = `/srv/${page.path === "/" ? "pages/home" : page.path.slice(1)}`
-        walk_nodes(page.node, node => {
-            for (const key of ["media", "poster", "image", "profile", "cover", "photo"]) {
-                if (node.attrs[key]) node.attrs[key] = publish(node, node.attrs[key], owner, false)
-            }
-            if (node.tag === "window" && node.attrs.path) node.attrs.path = publish(node, node.attrs.path, owner, true)
-        })
     }
 }
