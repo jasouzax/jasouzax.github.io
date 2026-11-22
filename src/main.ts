@@ -1,6 +1,12 @@
 #!/usr/bin/env node
-import { register } from "tsx/esm/api"
 import { fileURLToPath } from "node:url"
+// Bootstrap must precede loading any installed dependencies.
+if (process.argv[2] === "inst") {
+    await (await import("./step/inst.ts")).inst_command(process.cwd())
+    process.argv.splice(2, 1)
+    if (process.argv.length === 2) process.exit(0)
+}
+const { register } = await import("tsx/esm/api")
 register({ tsconfig: fileURLToPath(new URL("../tsconfig.json", import.meta.url)) })
 if (process.argv[2] === "node") (await import("../server/main.ts")).listener_command()
 else {
