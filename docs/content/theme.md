@@ -52,8 +52,10 @@ Generated at build time to WOFF2/WOFF/COLRv0.
 Children: `<palette>`, `<sym>`.
 
 - `<palette mode="light|dark" colors="#hex, #hex…">` — both attributes required. Palette 0 = light, 1 = dark.
-- `<sym char="…" path="…">` — **`char` required**: one character, a 4–6 digit hex codepoint, or a `[token]`. `path` is SVG path data (y flipped, no auto-scaling); `img` is a bitmap glyph; `width` overrides the advance; `name`; `variant` for alternates (repeat `char` with different `variant`). Multi-character strings are rejected so no accidental ligatures occur. Duplicate codepoints are errors.
+- `<sym char="…" path="…">` — **`char` required**: a registered `[token]` for icons (resolved through `config.json.icons`), one literal character, or a 4–6 digit hex codepoint. Prefer tokens for PUA glyphs so codepoint changes do not require editing theme XML. `path` is SVG path data (y flipped, no auto-scaling); `img` is a bitmap glyph; `width` overrides the advance; `name` is optional and unnecessary when `char` names a token; `variant` for alternates (repeat `char` with different `variant`). Multi-character strings are rejected so no accidental ligatures occur. Duplicate codepoints are errors.
 - `<layer path="…" color="palette-index | #rrggbb" paint="…">` (child of `<sym>`; `path` required) — one colour layer of a multi-colour glyph.
+
+For example, write `<sym char="[home]" width="120" path="…"/>` instead of repeating the numeric codepoint and `name="home"`. Tokens sharing a codepoint are aliases: define that glyph once using one token, and all aliases resolve to it.
 
 Every icon registered in `config.json.icons` must exist in the default theme's icon font; other themes fall back to it through font fallback. `check` verifies glyph coverage.
 

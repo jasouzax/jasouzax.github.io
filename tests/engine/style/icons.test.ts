@@ -23,14 +23,28 @@ test("Material tokens survive JSON and every theme provides their real generated
     const model = load_site(process.cwd(), config, diag, new Date("2026-11-22"))
     for (const theme of model.themes.filter(theme => theme.attrs.name)) {
         const font = theme.children.find(node => node.tag === "font" && node.attrs.name === "Jasouza")!
+        const raw_font = { ...font, children: font.children.map(node => {
+            if (node.tag !== "sym" || !/^\[[^\]]+\]$/.test(node.attrs.char)) return node
+            const token = node.attrs.char.slice(1, -1)
+            assert(Object.hasOwn(config.icons, token), `Unregistered glyph ${node.attrs.char}`)
+            assert.equal(node.attrs.name, undefined, "Token glyphs do not need a redundant name")
+            return { ...node, attrs: { ...node.attrs, char: config.icons[token] } }
+        }) }
+        assert.equal(font.children.filter(node => node.tag === "sym" && /^\[[^\]]+\]$/.test(node.attrs.char)).length, new Set(icons).size)
         const output = build_font(model, font, ["woff2"])
+        const raw_output = build_font(model, raw_font, ["woff2"])
         try {
-            const decoded = create(readFileSync(join(output.dir, output.files.woff2))) as Font
+            const bytes = readFileSync(join(output.dir, output.files.woff2))
+            assert.deepEqual(bytes, readFileSync(join(raw_output.dir, raw_output.files.woff2)), "Token and numeric definitions produce identical fonts")
+            const decoded = create(bytes) as Font
             for (const code of icons) {
                 assert(decoded.hasGlyphForCodePoint(code), `${theme.attrs.name}: U+${code.toString(16)}`)
                 assert(decoded.glyphForCodePoint(code).bbox.width > 0)
             }
-        } finally { rmSync(output.dir, { recursive: true, force: true }) }
+        } finally {
+            rmSync(output.dir, { recursive: true, force: true })
+            rmSync(raw_output.dir, { recursive: true, force: true })
+        }
     }
     assert.equal(diag.errors.length, 0)
 })
