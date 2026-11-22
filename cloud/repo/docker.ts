@@ -7,7 +7,7 @@ import type { worker_env } from "../router/index.ts"
  */
 type Object_Meta = { size: number, httpEtag: string, range?: { offset: number, length: number } }
 type Object_Body = Object_Meta & { body: ReadableStream<Uint8Array>, text(): Promise<string> }
-export type Registry_Env = { DOMAIN: string, SITE_DOMAIN?: string, PAGES_ORIGIN?: string, PUBLIC_PROJECTS?: string, PROJECT_CLONE_ORIGINS?: string, PERSONAL_ORIGIN?: string, ORIGIN_HMAC_SECRET?: string, ACCESS_CLIENT_ID?: string, ACCESS_CLIENT_SECRET?: string, BLOBS: { get(key: string, options?: { range?: Headers }): Promise<Object_Body | null>, head(key: string): Promise<Object_Meta | null> } }
+export type Registry_Env = { DOMAIN: string, LEGACY_DOMAIN?: string, SITE_DOMAIN?: string, PAGES_ORIGIN?: string, PUBLIC_PROJECTS?: string, PROJECT_CLONE_ORIGINS?: string, PERSONAL_ORIGIN?: string, ORIGIN_HMAC_SECRET?: string, ACCESS_CLIENT_ID?: string, ACCESS_CLIENT_SECRET?: string, BLOBS: { get(key: string, options?: { range?: Headers }): Promise<Object_Body | null>, head(key: string): Promise<Object_Meta | null> } }
 type Repository_Index = { schema: number, tags: Record<string, string>, manifests: Record<string, string>, blobs: string[] }
 const digest_pattern = /^sha256:[a-f0-9]{64}$/
 const repository_pattern = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/
@@ -19,7 +19,7 @@ function failure(code: string, message: string, status = 404): Response {
 
 export async function registry_route(request: Request, env: Registry_Env): Promise<Response> {
     const url = new URL(request.url)
-    if (url.hostname !== env.DOMAIN && !["localhost", "127.0.0.1"].includes(url.hostname)) return failure("NAME_UNKNOWN", "Unknown registry host")
+    if (![env.DOMAIN, env.LEGACY_DOMAIN, "localhost", "127.0.0.1"].includes(url.hostname)) return failure("NAME_UNKNOWN", "Unknown registry host")
     if (!["GET", "HEAD"].includes(request.method)) return failure("UNSUPPORTED", "This registry is pull-only; use the authenticated release publisher", 405)
     const head = request.method === "HEAD"
     if (["/v2", "/v2/"].includes(url.pathname)) return new Response(head ? null : "{}", { headers: { ...api_headers, "content-type": "application/json", "cache-control": "no-store" } })
@@ -54,7 +54,7 @@ export async function registry_route(request: Request, env: Registry_Env): Promi
 export default {
     async fetch(request: Request, env: Registry_Env, context: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
         try {
-            if (new URL(request.url).hostname !== env.DOMAIN && !["localhost", "127.0.0.1"].includes(new URL(request.url).hostname)) return failure("NAME_UNKNOWN", "Unknown registry host")
+            if (![env.DOMAIN, env.LEGACY_DOMAIN, "localhost", "127.0.0.1"].includes(new URL(request.url).hostname)) return failure("NAME_UNKNOWN", "Unknown registry host")
             if (!/^\/v2(?:\/|$)/.test(new URL(request.url).pathname)) {
                 const repository_env = { ...env, DOMAIN: env.SITE_DOMAIN ?? env.DOMAIN.replace(/^repo\./, ""), PAGES_ORIGIN: env.PAGES_ORIGIN ?? "https://invalid.example" } as worker_env
                 return repository_route(request, repository_env, JSON.parse(env.PUBLIC_PROJECTS ?? "[]"))
