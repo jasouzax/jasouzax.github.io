@@ -2,9 +2,9 @@
 import { buildPushPayload, type PushSubscription } from "@block65/webcrypto-web-push"
 import { read_session, valid_csrf, session_token, auth_hash } from "./auth.ts"
 import type { Work_Env, Work_Message } from "./work.ts"
-import { work_access } from "./realtime_work.ts"
+import { work_access } from "../room/work.ts"
 import { decode_key } from "../../shared/work/crypto.ts"
-import { api_error } from "./security.ts"
+import { api_error } from "../security/headers.ts"
 const reply = (data: unknown) => Response.json(data, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } })
 export function push_endpoint(value: string): boolean {
     try {
@@ -20,8 +20,8 @@ export async function push_route(request: Request, env: Work_Env): Promise<Respo
     if (!session) return api_error("forbidden", "Sign in to receive notifications", 403)
     const url = new URL(request.url)
     if (request.headers.has("origin") && request.headers.get("origin") !== url.origin) return api_error("forbidden", "Use this website", 403)
-    if (url.pathname === "/api/v1/push/config" && request.method === "GET") return reply({ public_key: env.VAPID_PUBLIC_KEY ?? "", enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT) })
-    if (url.pathname === "/api/v1/push/message" && request.method === "GET") {
+    if (url.pathname === "/api/_/push/config" && request.method === "GET") return reply({ public_key: env.VAPID_PUBLIC_KEY ?? "", enabled: Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT) })
+    if (url.pathname === "/api/_/push/message" && request.method === "GET") {
         const conversation = url.searchParams.get("conversation") ?? "", id = url.searchParams.get("id") ?? ""
         if (!/^[a-f0-9-]{36}$/i.test(conversation) || !/^[a-f0-9-]{36}$/i.test(id)) return api_error("bad_request", "Invalid notification", 400)
         try { await work_access(env, { session, guest_id: null, csrf: session.csrf }, conversation, url.origin) }
@@ -31,7 +31,7 @@ export async function push_route(request: Request, env: Work_Env): Promise<Respo
         if (!message || !room) return api_error("not_found", "Notification unavailable", 404)
         return reply({ email: session.email, owner_wrap: room.owner_wrap ? JSON.parse(room.owner_wrap) : null, message: { id: message.id, author: message.author, envelope: JSON.parse(message.envelope) } })
     }
-    if (url.pathname !== "/api/v1/push/subscription" || request.method !== "POST" || !valid_csrf(request, session)) return api_error("forbidden", "Invalid notification request", 403)
+    if (url.pathname !== "/api/_/push/subscription" || request.method !== "POST" || !valid_csrf(request, session)) return api_error("forbidden", "Invalid notification request", 403)
     try {
         if (Number(request.headers.get("content-length")) > 4096) throw new Error("Too large")
         const reader = request.body?.getReader(); if (!reader) throw new Error("Missing subscription")

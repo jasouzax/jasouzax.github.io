@@ -3,13 +3,13 @@
  * Automatic guest cookies or verified Google sessions authenticate participants.
  * D1 stores cookie hashes, public/wrapped keys, ciphertext and separately sealed client recovery keys.
  */
-import { api_error } from "./security.ts"
+import { api_error } from "../security/headers.ts"
 import { decode_key, encode_key, type Work_Envelope } from "../../shared/work/crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
 import { google_picture } from "../../shared/work/profile.ts"
-import { unstored_route } from "./work_unstored.ts"
-import { work_outbox, wake_delivery, work_changed, type Realtime_Actor } from "./realtime_work.ts"
-import type { Realtime_Namespace } from "./realtime_bus.ts"
+import { unstored_route } from "./work/recovery.ts"
+import { work_outbox, wake_delivery, work_changed, type Realtime_Actor } from "../room/work.ts"
+import type { Realtime_Namespace } from "../room/bus.ts"
 
 export type Work_Statement = {
     bind(...values: unknown[]): Work_Statement
@@ -91,8 +91,8 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
     if (dependencies.actor) guest_row = dependencies.actor.guest_id ? { id: dependencies.actor.guest_id } : null
     const owner = session?.role === "owner"
     const owner_key = await env.DB.prepare("SELECT key_id, public_jwk FROM work_owner_keys WHERE id = 1").first<Owner_Key>()
-    const base = "/api/v1/work/rooms"
-    if (url.pathname === "/api/v1/work/session" && request.method === "POST") {
+    const base = "/api/_/work/rooms"
+    if (url.pathname === "/api/_/work/session" && request.method === "POST") {
         if (session && !valid_csrf(request, session)) return api_error("forbidden", "Refresh the workspace", 403)
         if (!session && guest_row) {
             const previous = await env.DB.prepare("SELECT google_subject, revoked FROM work_rooms WHERE guest_id = ?").bind(guest_row.id).first<{ google_subject: string | null, revoked: number }>()
@@ -113,12 +113,12 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
     }
     if (!session && !guest_row) return api_error("unauthorized", "Refresh the messaging window", 401)
     if (request.method === "POST" && (session ? !valid_csrf(request, session) : request.headers.get("x-jazu-csrf") !== (dependencies.actor?.csrf ?? await auth_hash(`guest-csrf\n${guest}`)))) return api_error("forbidden", "Refresh the messaging window", 403)
-    if (url.pathname === "/api/v1/work/unstored-key" && request.method === "POST") {
+    if (url.pathname === "/api/_/work/unstored-key" && request.method === "POST") {
         let data: Record<string, unknown>
         try { data = await read_json(request) } catch { return api_error("invalid_request", "Invalid recovery storage request", 400) }
         return unstored_route(request, env, session, guest_row?.id, data, dependencies.fetch)
     }
-    if (url.pathname === "/api/v1/work/key-file") {
+    if (url.pathname === "/api/_/work/key-file") {
         if (!session) return api_error("forbidden", "Sign in to use private Google Drive storage", 403)
         if (request.method === "POST") {
             try {
@@ -129,7 +129,7 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
         }
         return reply({ file_id: (await env.DB.prepare("SELECT file_id FROM work_key_files WHERE subject = ?").bind(session.subject).first<{ file_id: string }>())?.file_id ?? null })
     }
-    if (url.pathname === "/api/v1/work/owner-key" && request.method === "POST") {
+    if (url.pathname === "/api/_/work/owner-key" && request.method === "POST") {
         if (!owner) return api_error("forbidden", "Owner access required", 403)
         try {
             const data = await read_json(request)
@@ -168,7 +168,7 @@ export async function work_route(request: Request, env: Work_Env, dependencies: 
             return permitted && room.owner_wrap === serialized ? reply({ room: room_info(room) }, 201) : api_error("conversation_exists", "A conversation already exists; refresh the window", 409)
         } catch { return api_error("invalid_request", "Could not start the conversation", 400) }
     }
-    const match = /^\/api\/v1\/work\/rooms\/([^/]+)(\/messages|\/bind)?$/.exec(url.pathname)
+    const match = /^\/api\/_\/work\/rooms\/([^/]+)(\/messages|\/bind)?$/.exec(url.pathname)
     if (!match || !uuid.test(match[1])) return api_error("not_found", "Unknown workspace route", 404)
     const room = await env.DB.prepare("SELECT * FROM work_rooms WHERE id = ?").bind(match[1]).first<Room>()
     const client_access = room && !room.revoked && (room.google_subject ? room.google_subject === session?.subject : Boolean(guest_row && room.guest_id === guest_row.id))

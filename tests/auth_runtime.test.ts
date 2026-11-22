@@ -9,7 +9,7 @@ import { generateKeyPair, exportJWK, SignJWT } from "jose"
 test("edge callback exchanges tokens, verifies identity, sets a session and refuses redirects", async () => {
     const keys = await generateKeyPair("RS256")
     const jwk = { ...await exportJWK(keys.publicKey), kid: "runtime-test", alg: "RS256" }
-    const bundle = await build({ stdin: { contents: 'import {auth_route} from "./src/node/auth.ts"; export default {fetch:auth_route}', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
+    const bundle = await build({ stdin: { contents: 'import {auth_route} from "./cloud/api/auth.ts"; export default {fetch:auth_route}', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
     let calls = 0
     let redirect = false
     let id_token = ""
@@ -34,22 +34,22 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
         }
         for (const redirects of [false, true]) {
             redirect = redirects
-            const start = await runtime.dispatchFetch("https://staging.example.com/api/v1/auth/google/start", { redirect: "manual" })
+            const start = await runtime.dispatchFetch("https://staging.example.com/api/_/auth/google/start", { redirect: "manual" })
             const state = new URL(start.headers.get("location")!).searchParams.get("state")
             const cookie = start.headers.get("set-cookie")!.split(";")[0]
-            const callback = await runtime.dispatchFetch(`https://staging.example.com/api/v1/auth/google/callback?state=${state}&code=synthetic-code`, { redirect: "manual", headers: { cookie } })
+            const callback = await runtime.dispatchFetch(`https://staging.example.com/api/_/auth/google/callback?state=${state}&code=synthetic-code`, { redirect: "manual", headers: { cookie } })
             assert.equal(callback.headers.get("location"), "/work?auth_error=token_exchange")
         }
         assert.equal(calls, 2, "redirects must never receive the authorization code or client secret")
         assert.equal((await db.prepare("SELECT count(*) AS n FROM auth_sessions").first<{ n: number }>())!.n, 0)
         redirect = false
-        const start = await runtime.dispatchFetch("https://staging.example.com/api/v1/auth/google/start", { redirect: "manual" })
+        const start = await runtime.dispatchFetch("https://staging.example.com/api/_/auth/google/start", { redirect: "manual" })
         const authorize = new URL(start.headers.get("location")!)
         id_token = await new SignJWT({ email: "jason@jasouza.com", email_verified: true, nonce: authorize.searchParams.get("nonce"), name: "Owner" }).setProtectedHeader({ alg: "RS256", kid: jwk.kid }).setIssuer("https://accounts.google.com").setAudience("test.apps.googleusercontent.com").setSubject("synthetic-owner").setIssuedAt().setExpirationTime("5m").sign(keys.privateKey)
-        const callback = await runtime.dispatchFetch(`https://staging.example.com/api/v1/auth/google/callback?state=${authorize.searchParams.get("state")}&code=synthetic-code`, { redirect: "manual", headers: { cookie: start.headers.get("set-cookie")!.split(";")[0] } })
+        const callback = await runtime.dispatchFetch(`https://staging.example.com/api/_/auth/google/callback?state=${authorize.searchParams.get("state")}&code=synthetic-code`, { redirect: "manual", headers: { cookie: start.headers.get("set-cookie")!.split(";")[0] } })
         assert.equal(callback.headers.get("location"), "/work")
         const cookie = callback.headers.getSetCookie().find(value => value.startsWith("__Host-jazu_session="))!.split(";")[0]
-        const session = await runtime.dispatchFetch("https://staging.example.com/api/v1/auth/session", { headers: { cookie } })
+        const session = await runtime.dispatchFetch("https://staging.example.com/api/_/session", { headers: { cookie } })
         assert.deepEqual((await session.json() as any).user, { email: "jason@jasouza.com", name: "Owner", picture: "", role: "owner" })
     } finally { await runtime.dispose() }
 })

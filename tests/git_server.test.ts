@@ -12,8 +12,8 @@ import { once } from "node:events"
 import { Readable } from "node:stream"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
-import worker, { route } from "../src/node/worker.ts"
-import { sign_origin, verify_origin } from "../src/node/security.ts"
+import worker, { route } from "../cloud/router/index.ts"
+import { sign_origin, verify_origin } from "../cloud/security/headers.ts"
 import { hash_token, load_server_config, make_token, update_server_file, verify_token } from "../src/node/server_config.ts"
 import type { Server_Config } from "../src/node/server_config.ts"
 import { check_push, jobs_for_push, parse_updates, sync_repository } from "../src/node/git_hooks.ts"
@@ -404,7 +404,7 @@ test("extensionless public clones use Pages even with the node offline; API root
     assert.equal((await route(new Request("https://example.com/projects/jazu/info/refs?service=git-receive-pack"), env, upstream)).status, 503)
     const discovery = await route(new Request("https://example.com/api"), env, upstream)
     assert.equal(discovery.status, 200)
-    assert.equal((await discovery.json() as any).health, "/api/v1/health")
+    assert.equal((await discovery.json() as any).health, "/api/_/health")
 })
 
 

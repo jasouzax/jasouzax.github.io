@@ -1,10 +1,10 @@
 /* Client recovery keys sealed outside D1, with immutable writes and verified Drive handoff. */
-import type { Work_Env } from "./work.ts"
-import { auth_hash, session_token, type Auth_Session } from "./auth.ts"
-import { google_access } from "./google_grant.ts"
-import { decode_key, encode_key } from "../../shared/work/crypto.ts"
-import type { Client_Key } from "../../shared/work/drive.ts"
-import { api_error } from "./security.ts"
+import type { Work_Env } from "../work.ts"
+import { auth_hash, session_token, type Auth_Session } from "../auth.ts"
+import { google_access } from "../auth/google.ts"
+import { decode_key, encode_key } from "../../../shared/work/crypto.ts"
+import type { Client_Key } from "../../../shared/work/drive.ts"
+import { api_error } from "../../security/headers.ts"
 
 type Backup = { room_id: string, sealed: string }
 const reply = (data: unknown) => Response.json(data, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer", vary: "Cookie" } })

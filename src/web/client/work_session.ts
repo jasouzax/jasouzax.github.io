@@ -31,7 +31,7 @@ export async function work_context(retry = false): Promise<Work_Context> {
     return cached.pending.catch(error => { cached = null; throw error })
 }
 async function initialize(auth: Auth_State): Promise<Work_Context> {
-    const context: Work_Context = { auth, ...await work_api("/api/v1/work/session", auth.csrf, {}) }
+    const context: Work_Context = { auth, ...await work_api("/api/_/work/session", auth.csrf, {}) }
     const local = guest_key()
     if (!auth.user) {
         if (context.guest_room) {
@@ -46,11 +46,11 @@ async function initialize(auth: Auth_State): Promise<Work_Context> {
     }
     const api = (path: string, body?: unknown) => work_api(path, auth.csrf, body)
     const fallback = async (candidate?: Client_Key): Promise<void> => {
-        if (candidate) context.key = (await api("/api/v1/work/unstored-key", { action: "save", client: candidate })).client
+        if (candidate) context.key = (await api("/api/_/work/unstored-key", { action: "save", client: candidate })).client
         context.storage = "fallback"
     }
     try {
-        const backup = auth.user.role === "client" ? await api("/api/v1/work/unstored-key", { action: "load" }) : null
+        const backup = auth.user.role === "client" ? await api("/api/_/work/unstored-key", { action: "load" }) : null
         let vault: Drive_Vault
         try { vault = context.vault = await open_drive(auth.user.email, api) }
         catch (error) {
@@ -58,7 +58,7 @@ async function initialize(auth: Auth_State): Promise<Work_Context> {
             if (backup.client) { context.key = backup.client; await fallback() }
             else {
                 // An unavailable existing Drive vault cannot safely be replaced with a fresh key.
-                if (context.room || backup.drive_stored || (await api("/api/v1/work/key-file")).file_id) throw new Error("Reconnect Google Drive to restore your existing conversation key. No keys were replaced.")
+                if (context.room || backup.drive_stored || (await api("/api/_/work/key-file")).file_id) throw new Error("Reconnect Google Drive to restore your existing conversation key. No keys were replaced.")
                 await fallback(local && context.guest_room?.id === local.room ? local : undefined)
             }
             await connect_key(context)
@@ -71,7 +71,7 @@ async function initialize(auth: Auth_State): Promise<Work_Context> {
                 await vault.create({ v: 2, owner: await generate_owner_key() })
             }
             if (!vault.value?.owner) throw new Error("This Google account does not contain the owner's private encryption key")
-            const published = await api("/api/v1/work/owner-key", { public_jwk: vault.value.owner.public_jwk })
+            const published = await api("/api/_/work/owner-key", { public_jwk: vault.value.owner.public_jwk })
             context.owner_key = { key_id: published.key_id, public_jwk: vault.value.owner.public_jwk }
             return context
         }
@@ -80,7 +80,7 @@ async function initialize(auth: Auth_State): Promise<Work_Context> {
             try {
                 const saved = await vault.create({ v: 2, client: backup.client })
                 if (!same_key(saved.client, backup.client)) throw new Error("Google Drive contains a different key. Both keys were preserved; messages were not transferred.")
-                await api("/api/v1/work/unstored-key", { action: "drive" })
+                await api("/api/_/work/unstored-key", { action: "drive" })
             } catch (error) {
                 await fallback()
                 context.warning = error instanceof Error ? error.message : "Drive verification is pending. Your recovery backup was retained."
@@ -107,7 +107,7 @@ async function connect_key(context: Work_Context): Promise<void> {
     if (context.room && context.room.id !== context.key.room) throw new Error("The stored key does not match this account's conversation. Messages and keys were preserved.")
     if (context.guest_room && context.guest_room.id !== context.key.room) context.warning = conflict
     if (context.guest_room?.id === context.key.room) {
-        await work_api(`/api/v1/work/rooms/${context.key.room}/bind`, context.csrf, {})
+        await work_api(`/api/_/work/rooms/${context.key.room}/bind`, context.csrf, {})
         localStorage.removeItem(guest_storage)
     }
 }
@@ -126,7 +126,7 @@ async function prepare_locked(context: Work_Context): Promise<Client_Key> {
     if (!context.auth.user && !context.key) {
         // Another window/tab may have created the same guest's room while this composer was open.
         const local = guest_key()
-        const latest = await work_api("/api/v1/work/session", context.csrf, {})
+        const latest = await work_api("/api/_/work/session", context.csrf, {})
         context.csrf = latest.csrf
         if (latest.guest_room && local?.room !== latest.guest_room.id) throw new Error("This browser's conversation key is missing. Existing messages were preserved.")
         if (local) context.key = local
@@ -137,7 +137,7 @@ async function prepare_locked(context: Work_Context): Promise<Client_Key> {
         const raw = encode_key(crypto.getRandomValues(new Uint8Array(32)))
         key = { room, key: raw, key_id: context.owner_key.key_id, owner_wrap: await wrap_room_key(raw, context.owner_key.public_jwk, room) }
         if (context.auth.user) {
-            if (context.storage === "fallback") key = (await work_api("/api/v1/work/unstored-key", context.csrf, { action: "save", client: key })).client as Client_Key
+            if (context.storage === "fallback") key = (await work_api("/api/_/work/unstored-key", context.csrf, { action: "save", client: key })).client as Client_Key
             else {
                 if (!context.vault) throw new Error("Reconnect Google Drive to save your conversation key")
                 try {
@@ -145,14 +145,14 @@ async function prepare_locked(context: Work_Context): Promise<Client_Key> {
                     if (!stored.client) throw new Error("Invalid client key storage")
                     key = stored.client
                 } catch {
-                    key = (await work_api("/api/v1/work/unstored-key", context.csrf, { action: "save", client: key })).client as Client_Key
+                    key = (await work_api("/api/_/work/unstored-key", context.csrf, { action: "save", client: key })).client as Client_Key
                     context.storage = "fallback"
                 }
             }
         } else localStorage.setItem(guest_storage, JSON.stringify(key))
         context.key = key
     }
-    await work_api("/api/v1/work/rooms", context.csrf, { id: key.room, owner_wrap: key.owner_wrap, key_id: key.key_id })
+    await work_api("/api/_/work/rooms", context.csrf, { id: key.room, owner_wrap: key.owner_wrap, key_id: key.key_id })
     document.dispatchEvent(new Event("jazu:work-key"))
     return key
 }

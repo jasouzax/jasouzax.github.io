@@ -25,7 +25,7 @@ test("standalone hosting streams complete assets with HEAD and valid ranges with
     await once(server, "listening")
     const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`
     try {
-        assert.equal((await (await fetch(url + "/api/v1/health")).json()).status, "ok")
+        assert.equal((await (await fetch(url + "/api/_/health")).json()).status, "ok")
         const partial = await fetch(url + "/movie.mp4", { headers: { range: "bytes=2-5" } })
         assert.equal(partial.status, 206)
         assert.equal(partial.headers.get("content-range"), "bytes 2-5/10")

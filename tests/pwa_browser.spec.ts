@@ -22,6 +22,6 @@ test("downloads public snapshots and both themes, then navigates unvisited pages
     await page.evaluate(() => { localStorage.setItem("jazu_theme", "memory") })
     await page.reload()
     await expect(page.locator("html")).toHaveAttribute("data-theme", "memory", { timeout: 30000 })
-    expect(await page.evaluate(async () => { try { await fetch("/api/v1/auth/session"); return false } catch { return true } })).toBe(true)
+    expect(await page.evaluate(async () => { try { await fetch("/api/_/session"); return false } catch { return true } })).toBe(true)
     await page.screenshot({ path: ".cache/pwa-offline-memory.png", fullPage: true })
 })

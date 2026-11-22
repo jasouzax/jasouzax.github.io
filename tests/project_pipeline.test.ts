@@ -19,7 +19,7 @@ import { poll_project, read_sync_state } from "../src/node/repo_sync.ts"
 import { run_pipeline } from "../src/node/pipeline.ts"
 import type { Run_Record } from "../src/node/pipeline.ts"
 import { list_runs, start_runner } from "../src/node/runner.ts"
-import { route } from "../src/node/worker.ts"
+import { route } from "../cloud/router/index.ts"
 import { refresh_mirrors } from "../src/node/git_mirror.ts"
 
 function git(path: string, ...args: string[]): string {

@@ -2,7 +2,7 @@ import { createServer } from "node:http"
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs"
 import { join, extname, resolve } from "node:path"
 import { inside } from "../../shared/paths.ts"
-import { is_work_path } from "./security.ts"
+import { is_work_path } from "../../shared/http.ts"
 
 const types: Record<string, string> = {
     ".wasm": "application/wasm",
@@ -44,7 +44,7 @@ export function resolve_request(out: string, url_path: string): string | null {
 export function serve(out: string, port: number, host = "127.0.0.1") {
     return createServer((request, response) => {
         if (!["GET", "HEAD"].includes(request.method ?? "GET")) { response.writeHead(405, { allow: "GET, HEAD" }); response.end(); return }
-        if ((request.url ?? "").split("?")[0] === "/api/v1/health") {
+        if ((request.url ?? "").split("?")[0] === "/api/_/health") {
             response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" })
             response.end(request.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", role: "website" }))
             return

@@ -44,7 +44,7 @@ npm run tf:staging -- plan
 npm run tf:staging -- apply
 ```
 
-The setup command bundles `src/node/worker.ts` into `.cache/staging-infra/worker.js`, initializes the standalone root at `terraform/staging/`, and runs Terraform. Review the plan and approve the apply. It provisions:
+The setup command bundles `cloud/router/index.ts` into `.cache/staging-infra/worker.js`, initializes the standalone root at `terraform/staging/`, and runs Terraform. Review the plan and approve the apply. It provisions:
 
 - Pages project `jazu-staging`, with production branch `staging`.
 - R2 bucket `jazu-staging-assets`.
@@ -115,7 +115,7 @@ export PATH="$HOME/.local/bin:$PATH"
 node --env-file=.env src/main.ts server status --project jazu --branch staging
 git branch --show-current
 curl -I https://staging.jasouza.com
-curl 'https://jasouza.com/api/v1/ci/jazu/runs?branch=staging'
+curl 'https://jasouza.com/api/_/ci/jazu/runs?branch=staging'
 ```
 
 The successful job lists `refs/heads/staging`; the checkout remains on `staging`. The pipeline builds canonical URLs for `https://staging.jasouza.com`, publishes to Pages project `jazu-staging` with branch `staging`, and uploads large assets to bucket `jazu-staging-assets`. It does not publish the primary clone mirror or deploy the production Pages project. The staging site is public; protect the hostname with Cloudflare Access if experiments must be private.

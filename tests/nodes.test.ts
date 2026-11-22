@@ -5,8 +5,8 @@ import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
-import worker, { route, type worker_env } from "../src/node/worker.ts"
-import { sign_origin, verify_origin, secure_response, is_work_path } from "../src/node/security.ts"
+import worker, { route, type worker_env } from "../cloud/router/index.ts"
+import { sign_origin, verify_origin, secure_response, is_work_path } from "../cloud/security/headers.ts"
 import { git_read } from "../src/node/personal.ts"
 import { prepare_deploy } from "../src/node/deploy.ts"
 import type { build_result } from "../src/build.ts"
@@ -19,10 +19,10 @@ test("Worker routes only published project subdomains and rejects unknown hosts/
     assert.equal(redirect.headers.get("location"), "https://example.com/projects/calculator")
     assert.equal((await route(new Request("https://private.example.com"), env)).status, 404)
     assert.equal((await route(new Request("https://evil.com"), env)).status, 404)
-    const api = await route(new Request("https://example.com/api/v1/messages", { method: "POST", body: "private" }), env)
+    const api = await route(new Request("https://example.com/api/_/messages", { method: "POST", body: "private" }), env)
     assert.equal(api.status, 501)
     assert.equal(api.headers.get("cache-control"), "no-store")
-    assert.equal((await route(new Request("https://example.com/api/v1/git/calculator/refs"), env)).status, 503)
+    assert.equal((await route(new Request("https://example.com/api/_/git/calculator/refs"), env)).status, 503)
 })
 
 test("Worker strips private request data from Pages and applies work security headers", async () => {
@@ -41,7 +41,7 @@ test("Worker strips private request data from Pages and applies work security he
         assert.equal(private_shell.headers.get("referrer-policy"), "no-referrer")
     }
     assert.equal(is_work_path("/workshop"), false)
-    const secured = await worker.fetch(new Request("https://example.com/api/v1/health"), env)
+    const secured = await worker.fetch(new Request("https://example.com/api/_/health"), env)
     assert.equal(secured.headers.get("x-content-type-options"), "nosniff")
 })
 

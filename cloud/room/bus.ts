@@ -1,5 +1,5 @@
 /* Private Durable Object routing. Public callers never choose a principal or an internal action. */
-import type { Work_Env } from "./work.ts"
+import type { Work_Env } from "../api/work.ts"
 export type Realtime_Namespace = { idFromName(name: string): unknown, get(id: unknown): { fetch(request: Request): Promise<Response> } }
 export async function realtime_call(env: Work_Env, principal: string, action: string, data: unknown): Promise<Response> {
     if (!env.REALTIME) throw new Error("Realtime is not configured")

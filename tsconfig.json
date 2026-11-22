@@ -23,6 +23,7 @@
     "src",
     "tests",
     "extension",
-    "shared"
+    "shared",
+    "cloud"
   ]
 }

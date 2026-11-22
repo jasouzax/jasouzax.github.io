@@ -3,13 +3,13 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
-import { work_route, type Work_Env, type Work_Statement } from "../src/node/work.ts"
-import { work_outbox } from "../src/node/realtime_work.ts"
-import { Realtime_Hub } from "../src/node/realtime.ts"
-import { auth_hash, auth_route } from "../src/node/auth.ts"
-import { save_google_grant } from "../src/node/google_grant.ts"
+import { work_route, type Work_Env, type Work_Statement } from "../cloud/api/work.ts"
+import { work_outbox } from "../cloud/room/work.ts"
+import { Realtime_Hub } from "../cloud/room/room.ts"
+import { auth_hash, auth_route } from "../cloud/api/auth.ts"
+import { save_google_grant } from "../cloud/api/auth/google.ts"
 import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../shared/work/crypto.ts"
-const origin = "https://example.com", base = "/api/v1/work/rooms"
+const origin = "https://example.com", base = "/api/_/work/rooms"
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 type Identity = { cookie: string, csrf: string }
 async function fixture() {
@@ -30,11 +30,11 @@ async function fixture() {
     const owner = await client("jason@jasouza.com", "owner")
     db.prepare("INSERT INTO auth_owner VALUES (1, 'owner')").run()
     const pair = await generate_owner_key()
-    const published = await api("/api/v1/work/owner-key", owner, { public_jwk: pair.public_jwk })
+    const published = await api("/api/_/work/owner-key", owner, { public_jwk: pair.public_jwk })
     assert.equal(published.status, 200)
     const { key_id } = await published.json() as any
     const guest = async (): Promise<Identity> => {
-        const response = await api("/api/v1/work/session", undefined, {})
+        const response = await api("/api/_/work/session", undefined, {})
         assert.equal(response.status, 200)
         return { cookie: response.headers.get("set-cookie")!.split(";")[0], csrf: (await response.json() as any).csrf }
     }
@@ -49,7 +49,7 @@ async function fixture() {
 }
 
 test("client fallback keys are immutable, sealed outside D1 and isolated from guests, owners and other accounts", async () => {
-    const f = await fixture(), path = "/api/v1/work/unstored-key"
+    const f = await fixture(), path = "/api/_/work/unstored-key"
     try {
         const client = await f.client("recovery@example.com"), stranger = await f.client("stranger@example.com"), guest = await f.guest()
         const make = async () => { const room = crypto.randomUUID(), key = random(); return { room, key, key_id: f.key_id, owner_wrap: await wrap_room_key(key, f.pair.public_jwk, room) } }
@@ -73,19 +73,19 @@ test("client fallback keys are immutable, sealed outside D1 and isolated from gu
         f.env.WORK_FALLBACK_KEY = secret
         f.db.prepare("INSERT INTO unstored_keys VALUES (?, ?, ?, ?, ?)").run("stranger@example.com", "stranger@example.com", crypto.randomUUID(), row.sealed, Date.now())
         assert.equal((await f.api(path, stranger, { action: "load" })).status, 503, "AAD prevents copying a backup to another identity or room")
-        const deletion = await auth_route(new Request(origin + "/api/v1/auth/account/delete", { method: "POST", headers: { origin, cookie: client.cookie, "x-jazu-work": "1", "x-jazu-csrf": client.csrf, "x-jazu-confirm-delete": "account" } }), f.env)
+        const deletion = await auth_route(new Request(origin + "/api/_/auth/account/delete", { method: "POST", headers: { origin, cookie: client.cookie, "x-jazu-work": "1", "x-jazu-csrf": client.csrf, "x-jazu-confirm-delete": "account" } }), f.env)
         assert.equal(deletion.status, 200)
         assert.equal(f.db.prepare("SELECT count(*) AS n FROM unstored_keys WHERE subject = 'recovery@example.com'").get()!.n, 0)
     } finally { f.db.close() }
 })
 
 test("Drive handoff independently verifies the uploaded key, retains failures and deletes the backup without allowing resurrection", async () => {
-    const f = await fixture(), path = "/api/v1/work/unstored-key"
+    const f = await fixture(), path = "/api/_/work/unstored-key"
     try {
         const client = await f.client("handoff@example.com"), room = await f.room(client)
         const value = { room: room.id, key: room.key, key_id: f.key_id, owner_wrap: room.body.owner_wrap }
         assert.equal((await f.api(path, client, { action: "save", client: value })).status, 200)
-        await f.api("/api/v1/work/key-file", client, { file_id: "reserved-drive-file" })
+        await f.api("/api/_/work/key-file", client, { file_id: "reserved-drive-file" })
         const action = { action: "drive" }
         assert.equal((await f.api(path, client, action)).status, 503, "no Drive credentials keeps the backup")
         await save_google_grant(f.env, client.cookie.split("=")[1], { access_token: "test-drive-access", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.appdata" })
@@ -183,7 +183,7 @@ test("automatic guests send ciphertext without invitations; cookies isolate room
         assert.equal(stored.includes("secret guest message"), false)
         assert.equal(stored.includes('"d":'), false)
         assert.equal((await (await f.api(`${path}?after=${messages.messages[0].seq}`, first)).json() as any).messages.length, 0)
-        assert.equal((await (await f.api("/api/v1/work/session", first, {})).json() as any).guest_room.id, room.id)
+        assert.equal((await (await f.api("/api/_/work/session", first, {})).json() as any).guest_room.id, room.id)
     } finally { f.db.close() }
 })
 
@@ -198,7 +198,7 @@ test("guest claims require the original browser; existing account conversations 
         assert.equal((await f.api(path, guest)).status, 404)
         assert.equal((await f.api(path, client)).status, 200)
         assert.equal((await f.api(path, stranger)).status, 404)
-        const fresh_session = await f.api("/api/v1/work/session", guest, {})
+        const fresh_session = await f.api("/api/_/work/session", guest, {})
         const fresh_guest = { cookie: fresh_session.headers.get("set-cookie")!.split(";")[0], csrf: (await fresh_session.json() as any).csrf }
         assert.notEqual(fresh_guest.cookie, guest.cookie, "sign-out after linking creates a new anonymous identity")
         const fresh_room = await f.room(fresh_guest)
@@ -209,22 +209,22 @@ test("guest claims require the original browser; existing account conversations 
         assert.equal((await f.api(`${base}/${later_room.id}/bind`, conflicted, {})).status, 409)
         assert.equal((f.db.prepare("SELECT google_subject FROM work_rooms WHERE id = ?").get(later_room.id) as any).google_subject, null)
         assert.equal((await f.api(`${base}/${later_room.id}`, later_guest)).status, 200)
-        assert.equal((await (await f.api("/api/v1/work/session", conflicted, {})).json() as any).room.id, room.id)
-        assert.equal((await f.api("/api/v1/work/key-file", client, { file_id: "immutable-key-file-0001" })).status, 200)
-        assert.equal((await (await f.api("/api/v1/work/key-file", client, { file_id: "another-key-file-0002" })).json() as any).file_id, "immutable-key-file-0001")
-        assert.equal((await (await f.api("/api/v1/work/key-file", await f.client("other@example.com"))).json() as any).file_id, null)
+        assert.equal((await (await f.api("/api/_/work/session", conflicted, {})).json() as any).room.id, room.id)
+        assert.equal((await f.api("/api/_/work/key-file", client, { file_id: "immutable-key-file-0001" })).status, 200)
+        assert.equal((await (await f.api("/api/_/work/key-file", client, { file_id: "another-key-file-0002" })).json() as any).file_id, "immutable-key-file-0001")
+        assert.equal((await (await f.api("/api/_/work/key-file", await f.client("other@example.com"))).json() as any).file_id, null)
     } finally { f.db.close() }
 })
 
 test("messaging rejects CSRF, invalid envelopes and owner key replacement, with durable burst limits", async () => {
     const f = await fixture()
     try {
-        assert.equal((await f.api("/api/v1/work/session", undefined, {}, { origin: "https://evil.example" })).status, 403)
-        assert.equal((await f.api("/api/v1/work/session", undefined, {}, { "x-jazu-work": "" })).status, 403)
+        assert.equal((await f.api("/api/_/work/session", undefined, {}, { origin: "https://evil.example" })).status, 403)
+        assert.equal((await f.api("/api/_/work/session", undefined, {}, { "x-jazu-work": "" })).status, 403)
         const guest = await f.guest(), room = await f.room(guest)
         assert.equal((await f.api(base, guest, room.body, { "x-jazu-csrf": "" })).status, 403)
-        assert.equal((await f.api("/api/v1/work/owner-key", guest, { public_jwk: f.pair.public_jwk })).status, 403)
-        assert.equal((await f.api("/api/v1/work/owner-key", f.owner, { public_jwk: (await generate_owner_key()).public_jwk })).status, 409)
+        assert.equal((await f.api("/api/_/work/owner-key", guest, { public_jwk: f.pair.public_jwk })).status, 403)
+        assert.equal((await f.api("/api/_/work/owner-key", f.owner, { public_jwk: (await generate_owner_key()).public_jwk })).status, 409)
         const path = `${base}/${room.id}/messages`
         assert.equal((await f.api(path, guest, { id: crypto.randomUUID(), body: "plaintext" })).status, 400)
         assert.equal((await f.api(path + "?after=-1", guest)).status, 400)
@@ -234,7 +234,7 @@ test("messaging rejects CSRF, invalid envelopes and owner key replacement, with 
             assert.equal((await f.api(path, guest, message)).status, index < 30 ? 201 : 429)
         }
         for (let index = 1; index < 20; index++) await f.guest()
-        assert.equal((await f.api("/api/v1/work/session", undefined, {})).status, 429)
+        assert.equal((await f.api("/api/_/work/session", undefined, {})).status, 429)
     } finally { f.db.close() }
 })
 

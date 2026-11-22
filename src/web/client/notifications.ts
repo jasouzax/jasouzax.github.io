@@ -43,7 +43,7 @@ export async function notification_preview(data: Message_Notice & { seq?: number
     }
     const context = await work_context()
     if (context.auth.user || !context.key || context.key.room !== data.conversation) throw new Error("Notification key unavailable")
-    const result = await work_api(`/api/v1/work/rooms/${context.key.room}/messages?after=${Math.max(0, (data.seq ?? 1) - 1)}`, context.csrf)
+    const result = await work_api(`/api/_/work/rooms/${context.key.room}/messages?after=${Math.max(0, (data.seq ?? 1) - 1)}`, context.csrf)
     const message = result.messages.find((row: any) => row.id === data.id)
     if (!message) throw new Error("Notification unavailable")
     return decrypt_message(context.key.key, message.envelope, { room: data.conversation, id: data.id, author: message.author })
@@ -52,7 +52,7 @@ export async function enable_push(): Promise<boolean> {
     const auth = await get_auth(), registration = await pwa_registration()
     if (!auth.user || !registration || !("PushManager" in window)) return false
     const ready = await navigator.serviceWorker.ready
-    const response = await fetch("/api/v1/push/config", { credentials: "same-origin", cache: "no-store" })
+    const response = await fetch("/api/_/push/config", { credentials: "same-origin", cache: "no-store" })
     if (!response.ok) return false
     const config = await response.json()
     if (!config.enabled) return false
@@ -61,7 +61,7 @@ export async function enable_push(): Promise<boolean> {
     if (subscription?.options.applicationServerKey && encode_buffer(subscription.options.applicationServerKey) !== config.public_key) { await subscription.unsubscribe(); subscription = null }
     subscription ??= await ready.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decode_key(config.public_key) })
     if ((await get_auth()).user?.email !== auth.user.email) { await subscription.unsubscribe(); return false }
-    await work_api("/api/v1/push/subscription", auth.csrf, { subscription: subscription.toJSON() })
+    await work_api("/api/_/push/subscription", auth.csrf, { subscription: subscription.toJSON() })
     return true
 }
 function encode_buffer(value: ArrayBuffer): string { return btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") }

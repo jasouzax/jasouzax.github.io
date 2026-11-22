@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/node/personal.ts`, `src/node/security.ts`
+- **Code:** `src/node/personal.ts`, `cloud/security/headers.ts`
 - **Related guides:** [docs/src/node.md](../src/node.md), [README → Server Use](../../README.md#server-use)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -56,7 +56,7 @@ If the server goes down, git pull and push stop and live dashboards show their l
 
 Functional commit `5c7fcfaf3ca20fa1830ec7c77af45acb5e5cd815` was pushed over authenticated HTTPS to `https://jasouza.com/projects/jazu`. The post-receive hook queued CI/CD; all 136 tests passed on the ARM Pi with no skips, content validation completed, and Pages deployment succeeded. An earlier test timeout failed CI and correctly prevented deployment. The website serves from `jazu-1ws.pages.dev` through `jazu_router`; the origin is protected by Access and the existing Cloudflare Tunnel.
 
-A fresh, unauthenticated clone from the extensionless production URL checked out `master` at that exact commit and passed `git fsck --connectivity-only --no-dangling`. Static refs returned 200, unsigned push discovery returned 401, and an oversized R2 pack returned 206 with its `PACK` magic for bytes 0–3. The homepage SHA-256 matched the Pi's generated `dist/index.html` byte for byte. `/api` returned JSON discovery and `/api/v1/git/jazu/blob?path=package.json` returned the repository resource.
+A fresh, unauthenticated clone from the extensionless production URL checked out `master` at that exact commit and passed `git fsck --connectivity-only --no-dangling`. Static refs returned 200, unsigned push discovery returned 401, and an oversized R2 pack returned 206 with its `PACK` magic for bytes 0–3. The homepage SHA-256 matched the Pi's generated `dist/index.html` byte for byte. `/api` returned JSON discovery and `/api/_/git/jazu/blob?path=package.json` returned the repository resource.
 
 The node stayed running during the production clone: automatic approval review rejected the proposed service-stop test with `blocked by policy`. Node-independent clone routing is verified by tests that omit the personal origin, including R2 range requests. Do not describe a real shutdown test as completed.
 

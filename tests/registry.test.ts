@@ -1,7 +1,7 @@
 /* OCI pull contracts: mutable tags, immutable digests, repository isolation and anonymous write rejection. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { registry_route, type Registry_Env } from "../src/node/registry.ts"
+import { registry_route, type Registry_Env } from "../cloud/repo/docker.ts"
 
 const digest = `sha256:${"a".repeat(64)}`
 const index = JSON.stringify({ schema: 1, tags: { latest: digest }, manifests: { [digest]: "application/vnd.oci.image.index.v1+json" }, blobs: [digest] })

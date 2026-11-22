@@ -33,7 +33,7 @@ export type Incoming = Relayed<Client_Message> | Hub_To_Agent;
 export type Open_Socket = (url: string, headers: Record<string, string>) => Socket_Like;
 
 export interface Link_Options {
-    // wss://host/api/server/agent
+    // wss://host/api/_/server/agent
     url: string;
     sign: (url: string) => Record<string, string>;
     open: Open_Socket;

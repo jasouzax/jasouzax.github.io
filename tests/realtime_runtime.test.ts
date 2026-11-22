@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { readFileSync, readdirSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
-import { auth_hash } from "../src/node/auth.ts"
+import { auth_hash } from "../cloud/api/auth.ts"
 import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../shared/work/crypto.ts"
 
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
@@ -25,7 +25,7 @@ function message(ws: any): Promise<any> {
     return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new Error("WebSocket response timed out")), 10000); ws.addEventListener("message", (event: any) => { clearTimeout(timer); resolve(event.data === "pong" ? "pong" : JSON.parse(event.data)) }, { once: true }) })
 }
 async function fixture() {
-    const bundle = await build({ entryPoints: ["src/node/worker.ts"], bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
+    const bundle = await build({ entryPoints: ["cloud/router/index.ts"], bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
     const runtime = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: "2026-11-04", bindings: { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.net", GOOGLE_CLIENT_ID: "synthetic" }, d1Databases: ["DB"], durableObjects: { REALTIME: { className: "Realtime_Hub", useSQLite: true } } }))
     const db = await runtime.getD1Database("DB")
     for (const name of readdirSync("migrations").filter(name => name.endsWith(".sql")).sort()) await db.exec(readFileSync(`migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
@@ -35,7 +35,7 @@ async function fixture() {
         await db.prepare("INSERT INTO auth_sessions VALUES (?, ?, ?, ?)").bind(await auth_hash(token), subject, now, now).run()
         return { cookie: `__Host-jazu_session=${token}`, token, csrf: await auth_hash(`csrf\n${token}`) }
     }
-    const connect = async (cookie: string, origin = "https://example.com") => runtime.dispatchFetch("https://example.com/api/v1/realtime", { headers: { upgrade: "websocket", origin, cookie } })
+    const connect = async (cookie: string, origin = "https://example.com") => runtime.dispatchFetch("https://example.com/api/_/realtime", { headers: { upgrade: "websocket", origin, cookie } })
     return { runtime, db, session, connect }
 }
 test("hibernating sockets authenticate, aggregate tabs, auto-pong, enforce guest caps and revoke sessions", async () => {
@@ -52,7 +52,7 @@ test("hibernating sockets authenticate, aggregate tabs, auto-pong, enforce guest
         first.close(1000, "Bye")
         await new Promise(resolve => setTimeout(resolve, 50))
         assert.equal((await f.db.prepare("SELECT last_online FROM last_signed_in WHERE principal = 'a:client'").first())!.last_online, null)
-        await f.runtime.dispatchFetch("https://example.com/api/v1/auth/logout", { method: "POST", headers: { origin: "https://example.com", cookie: user.cookie, "x-jazu-work": "1", "x-jazu-csrf": user.csrf } })
+        await f.runtime.dispatchFetch("https://example.com/api/_/auth/logout", { method: "POST", headers: { origin: "https://example.com", cookie: user.cookie, "x-jazu-work": "1", "x-jazu-csrf": user.csrf } })
         await new Promise(resolve => setTimeout(resolve, 50))
         assert.equal(typeof (await f.db.prepare("SELECT last_online FROM last_signed_in WHERE principal = 'a:client'").first())!.last_online, "number")
         const guest = random()
@@ -71,9 +71,9 @@ test("WebSocket messages commit ciphertext before fanout, recover cursors, isola
         const owner = await f.session("owner"), client = await f.session("client"), stranger = await f.session("stranger")
         await f.db.prepare("INSERT INTO auth_owner VALUES (1,'owner')").run()
         const api = (path: string, who: typeof owner, body: unknown) => f.runtime.dispatchFetch(`https://example.com${path}`, { method: "POST", headers: { origin: "https://example.com", cookie: who.cookie, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who.csrf }, body: JSON.stringify(body) })
-        const pair = await generate_owner_key(), published = await (await api("/api/v1/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
+        const pair = await generate_owner_key(), published = await (await api("/api/_/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
         const conversation = crypto.randomUUID(), key = random()
-        assert.equal((await api("/api/v1/work/rooms", client, { id: conversation, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, conversation) })).status, 201)
+        assert.equal((await api("/api/_/work/rooms", client, { id: conversation, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, conversation) })).status, 201)
         const connect = async (who: typeof owner) => { const ws = (await f.connect(who.cookie)).webSocket!; ws.accept(); const events = stream(ws); await events.wait(value => value.type === "ready"); return { ws, ...events } }
         const a = await connect(owner), b = await connect(client), c = await connect(stranger)
         assert.equal((await a.command({ type: "watch", conversation, after: 0 })).result.presence.online, true)
@@ -111,7 +111,7 @@ test("account deletion revokes every device and removes private presence/queued 
         const b = (await f.connect(second.cookie)).webSocket!; b.accept(); await message(b)
         const closed_a = new Promise<number>(resolve => a.addEventListener("close", (event: any) => { a.close(); resolve(event.code) }, { once: true }))
         const closed_b = new Promise<number>(resolve => b.addEventListener("close", (event: any) => { b.close(); resolve(event.code) }, { once: true }))
-        const response = await f.runtime.dispatchFetch("https://example.com/api/v1/auth/account/delete", { method: "POST", headers: { origin: "https://example.com", cookie: first.cookie, "x-jazu-work": "1", "x-jazu-csrf": first.csrf, "x-jazu-confirm-delete": "account" } })
+        const response = await f.runtime.dispatchFetch("https://example.com/api/_/auth/account/delete", { method: "POST", headers: { origin: "https://example.com", cookie: first.cookie, "x-jazu-work": "1", "x-jazu-csrf": first.csrf, "x-jazu-confirm-delete": "account" } })
         assert.equal(response.status, 200)
         assert.deepEqual(await Promise.all([closed_a, closed_b]), [4003, 4003])
         assert.equal(await f.db.prepare("SELECT * FROM last_signed_in WHERE principal = 'a:deleted'").first(), null)
@@ -125,10 +125,10 @@ test("concurrent conversations on one socket retain every subscription", async (
         const owner = await f.session("owner"), first = await f.session("first"), second = await f.session("second")
         await f.db.prepare("INSERT INTO auth_owner VALUES (1,'owner')").run()
         const api = (path: string, who: typeof owner, body: unknown) => f.runtime.dispatchFetch(`https://example.com${path}`, { method: "POST", headers: { origin: "https://example.com", cookie: who.cookie, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who.csrf }, body: JSON.stringify(body) })
-        const pair = await generate_owner_key(), published = await (await api("/api/v1/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
+        const pair = await generate_owner_key(), published = await (await api("/api/_/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
         const rooms = await Promise.all([first, second].map(async who => {
             const id = crypto.randomUUID(), key = random()
-            await api("/api/v1/work/rooms", who, { id, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, id) })
+            await api("/api/_/work/rooms", who, { id, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, id) })
             const ws = (await f.connect(who.cookie)).webSocket!; ws.accept(); const events = stream(ws); await events.wait(value => value.type === "ready")
             return { id, key, ws, events }
         }))

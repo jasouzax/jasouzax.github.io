@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/work.xml`, `src/node/worker.ts`, `migrations/0001_work.sql`
+- **Code:** `content/work.xml`, `cloud/router/index.ts`, `migrations/0001_work.sql`
 - **Related guides:** [docs/src/node.md](../src/node.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -53,7 +53,7 @@ The owner signs in once with the configured admin Google account to initialize e
 
 ### Live delivery and presence
 
-`GET /api/v1/realtime` upgrades an authenticated, same-origin cookie request to one hibernating Durable Object socket per browser tab. Google accounts connect across the entire website; guest connections are acquired only by mounted Work views. A principal is the stable Google subject or existing guest-cookie identity, never a client-supplied email. Guests may have one active socket (a newer tab replaces the old one); accounts may have eight. Upgrades are limited to 40 per IP/minute, real commands to 60 guest / 120 account per minute, queued commands to 64 and payloads to 12 KB. At most 32 conversations may be watched per socket, with 512 watchers per peer. Existing room send limits remain in force. Heartbeat auto-responses are not counted as commands.
+`GET /api/_/realtime` upgrades an authenticated, same-origin cookie request to one hibernating Durable Object socket per browser tab. Google accounts connect across the entire website; guest connections are acquired only by mounted Work views. A principal is the stable Google subject or existing guest-cookie identity, never a client-supplied email. Guests may have one active socket (a newer tab replaces the old one); accounts may have eight. Upgrades are limited to 40 per IP/minute, real commands to 60 guest / 120 account per minute, queued commands to 64 and payloads to 12 KB. At most 32 conversations may be watched per socket, with 512 watchers per peer. Existing room send limits remain in force. Heartbeat auto-responses are not counted as commands.
 
 The browser sends the literal `ping` every 30 seconds; Cloudflare's hibernation API returns `pong` without waking application handlers. Durable alarms examine automatic-response timestamps and expire leases at roughly 90 seconds without activity. A dead socket cannot keep an account online when no other live device remains. `last_signed_in.last_online` is NULL while connected; graceful closes store the disconnect time and stale expiry stores the last confirmed activity. The Durable Object reconciles the D1 projection before serving presence snapshots, so clients do not infer presence from NULL alone. No D1 write is made for every ping. Presence snapshots include a monotonic version and opaque peer ID; outdated updates cannot overwrite a newer state. Failed presence fanout is retained in object storage and retried by alarms.
 

@@ -1,9 +1,9 @@
 /* Worker side of /server: owner gate, edge-cached public status, agent signature, and the /api/{name} gateway's header and sandbox rules. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { gateway_route, gateway_target, server_route, type Edge_Cache, type Server_Env } from "../src/node/server_route.ts"
-import { route, type worker_env } from "../src/node/worker.ts"
-import { sign_origin } from "../src/node/security.ts"
+import { gateway_route, gateway_target, server_route, type Edge_Cache, type Server_Env } from "../cloud/api/server.ts"
+import { route, type worker_env } from "../cloud/router/index.ts"
+import { sign_origin } from "../cloud/security/headers.ts"
 import { agent_client_id } from "../shared/protocol/wire.ts"
 
 const token = "A".repeat(43)
@@ -23,7 +23,7 @@ const memory_cache = () => { const map = new Map<string, Response>(); const cach
 const site = "https://jasouza.com"
 
 test("without the binding every server route fails closed and unknown APIs keep their 501", async () => {
-    assert.equal((await server_route(new Request(`${site}/api/server`), {})).status, 503)
+    assert.equal((await server_route(new Request(`${site}/api/_/server`), {})).status, 503)
     assert.equal((await gateway_route(new Request(`${site}/api/sample`), {}, "sample", "")).status, 501)
     const env: worker_env = { DOMAIN: "jasouza.com", PAGES_ORIGIN: "https://p.pages.dev" }
     assert.equal((await route(new Request(`${site}/api/sample`), env)).status, 501)
@@ -32,37 +32,37 @@ test("without the binding every server route fails closed and unknown APIs keep 
 test("public status is cached for a minute and is never owner-flavoured; the owner's answer is private", async () => {
     const { env, seen } = hub_env()
     const { cache, map } = memory_cache()
-    const first = await server_route(new Request(`${site}/api/server`), env, cache)
+    const first = await server_route(new Request(`${site}/api/_/server`), env, cache)
     assert.deepEqual(await first.json(), { online: true, snapshot: { text: "OS", taken_at: 1 }, stale: false, owner: false })
     assert.match(first.headers.get("cache-control")!, /max-age=60/)
-    await server_route(new Request(`${site}/api/server`), env, cache)
+    await server_route(new Request(`${site}/api/_/server`), env, cache)
     assert.equal(seen.filter(item => item.path === "/status").length, 1, "second visitor served from the edge")
     assert.equal(map.size, 1)
-    const owner = await server_route(new Request(`${site}/api/server`, { headers: { cookie } }), env, cache)
+    const owner = await server_route(new Request(`${site}/api/_/server`, { headers: { cookie } }), env, cache)
     assert.equal((await owner.json() as any).owner, true)
     assert.equal(owner.headers.get("cache-control"), "no-store")
     assert.equal(seen.filter(item => item.path === "/status").length, 2)
     const stranger = hub_env({ DB: db("someone@else.com") })
-    assert.equal((await (await server_route(new Request(`${site}/api/server`, { headers: { cookie } }), stranger.env, memory_cache().cache)).json() as any).owner, false)
+    assert.equal((await (await server_route(new Request(`${site}/api/_/server`, { headers: { cookie } }), stranger.env, memory_cache().cache)).json() as any).owner, false)
 })
 
 test("the owner socket needs an upgrade, the site's own origin and an allowed e-mail", async () => {
     const { env, seen } = hub_env()
-    const ws = (headers: Record<string, string>) => server_route(new Request(`${site}/api/server/ws`, { headers: { upgrade: "websocket", ...headers } }), env)
-    assert.equal((await server_route(new Request(`${site}/api/server/ws`), env)).status, 426)
+    const ws = (headers: Record<string, string>) => server_route(new Request(`${site}/api/_/server/ws`, { headers: { upgrade: "websocket", ...headers } }), env)
+    assert.equal((await server_route(new Request(`${site}/api/_/server/ws`), env)).status, 426)
     assert.equal((await ws({ cookie, origin: "https://evil.example" })).status, 403)
     assert.equal((await ws({ origin: site })).status, 403)
     assert.equal((await ws({ cookie, origin: site })).status, 200)
     assert.equal(seen.at(-1)!.path, "/connect-owner"); assert.equal(seen.at(-1)!.role, "owner")
     const other = hub_env({ DB: db("someone@else.com") })
-    assert.equal((await server_route(new Request(`${site}/api/server/ws`, { headers: { upgrade: "websocket", cookie, origin: site } }), other.env)).status, 403)
+    assert.equal((await server_route(new Request(`${site}/api/_/server/ws`, { headers: { upgrade: "websocket", cookie, origin: site } }), other.env)).status, 403)
     const list = hub_env({ SERVER_OWNER_EMAILS: "a@x.com, Jason@JASOUZA.com" })
-    assert.equal((await server_route(new Request(`${site}/api/server/ws`, { headers: { upgrade: "websocket", cookie, origin: site } }), list.env)).status, 200)
+    assert.equal((await server_route(new Request(`${site}/api/_/server/ws`, { headers: { upgrade: "websocket", cookie, origin: site } }), list.env)).status, 200)
 })
 
 test("the agent socket needs the HMAC of the shared secret, once", async () => {
     const { env, seen } = hub_env()
-    const url = `${site}/api/server/agent`
+    const url = `${site}/api/_/server/agent`
     const attempt = async (secret: string, headers?: Headers) => server_route(new Request(url, { headers: new Headers({ upgrade: "websocket", ...Object.fromEntries((headers ?? await sign_origin(new Request(url), secret, agent_client_id)).entries()) }) }), env)
     assert.equal((await attempt("x".repeat(40))).status, 401)
     const good = await sign_origin(new Request(url), env.SERVER_AGENT_SECRET!, agent_client_id)
@@ -76,7 +76,7 @@ test("the agent socket needs the HMAC of the shared secret, once", async () => {
 test("gateway: names, reserved words and the shape of what reaches the script", async () => {
     assert.deepEqual(gateway_target("/api/sample/a/b"), { name: "sample", rest: "a/b" })
     assert.deepEqual(gateway_target("/api/sample"), { name: "sample", rest: "" })
-    for (const bad of ["/api", "/api/", "/api/v1/x", "/api/server/x", "/api/api", "/api/.x", "/api/a b"]) assert.equal(gateway_target(bad), null, bad)
+    for (const bad of ["/api", "/api/", "/api/_/x", "/api/_/server/x", "/api/api", "/api/.x", "/api/a b"]) assert.equal(gateway_target(bad), null, bad)
     const { env, seen } = hub_env()
     const request = new Request(`${site}/api/sample/friend/7?x=1&x=2&y=3`, { method: "POST", headers: { cookie, authorization: "Bearer t", "content-type": "application/json", "x-evil": "1", "cf-connecting-ip": "5.5.5.5" }, body: '{"a":1}' })
     await gateway_route(request, env, "sample", "friend/7")

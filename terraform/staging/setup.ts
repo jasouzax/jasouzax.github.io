@@ -37,7 +37,7 @@ export function staging_environment(source: NodeJS.ProcessEnv, bundle: string): 
 export async function prepare_staging(): Promise<string> {
     const bundle = join(root, ".cache/staging-infra/worker.js")
     mkdirSync(dirname(bundle), { recursive: true })
-    await build({ entryPoints: [join(root, "src/node/worker.ts")], outfile: bundle, bundle: true, format: "esm", platform: "browser", target: "es2022", minify: true })
+    await build({ entryPoints: [join(root, "cloud/router/index.ts")], outfile: bundle, bundle: true, format: "esm", platform: "browser", target: "es2022", minify: true })
     return bundle
 }
 

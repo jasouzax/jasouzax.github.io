@@ -15,8 +15,8 @@
  */
 import { agent_direct_types, agent_message_types, api_body_limit, api_name_pattern, client_message_types, parse_message, reserved_api_names } from "../../shared/protocol/wire.ts"
 import type { Api_Answer, Api_Info, Public_Status } from "../../shared/protocol/wire.ts"
-import { api_error } from "./security.ts"
-import { Rate_Limit } from "./server_limits.ts"
+import { api_error } from "../security/headers.ts"
+import { Rate_Limit } from "./limits.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): { peer: string, watching: boolean } | null }
 type State = {

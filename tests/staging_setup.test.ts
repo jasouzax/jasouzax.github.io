@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { staging_environment } from "../terraform/staging/setup.ts"
 
 test("staging setup maps existing private environment names and preserves explicit Terraform inputs", () => {
-    const source = { CLOUDFLARE_API_TOKEN: "api-test", CLOUDFLARE_ACCOUNT_ID: "account-test", CLOUDFLARE_ZONE_ID: "zone-test", HMAC_SECRET: "legacy-hmac-test", ORIGIN_HMAC_SECRET: "origin-hmac-test", ACCESS_CLIENT_ID: "client-test", ACCESS_CLIENT_SECRET: "secret-test", TF_VAR_access_client_id: "explicit-client-test", TF_VAR_pages_project: "production-project", WORK_OWNER_TOKEN: "work-test-secret", WORK_OWNER_EMAIL: "owner@example.com", WORK_FALLBACK_KEY: "fallback-test-secret" }
+    const source = { CLOUDFLARE_API_TOKEN: "api-test", CLOUDFLARE_ACCOUNT_ID: "account-test", CLOUDFLARE_ZONE_ID: "zone-test", HMAC_SECRET: "legacy-hmac-test", ORIGIN_HMAC_SECRET: "origin-hmac-test", ACCESS_CLIENT_ID: "client-test", ACCESS_CLIENT_SECRET: "secret-test", TF_VAR_access_client_id: "explicit-client-test", TF_VAR_pages_project: "production-project", WORK_OWNER_EMAIL: "owner@example.com", WORK_FALLBACK_KEY: "fallback-test-secret" }
     const env = staging_environment(source, "/cache/worker.js")
     assert.equal(env.CLOUDFLARE_API_TOKEN, "api-test")
     assert.equal(env.TF_VAR_account_id, "account-test")

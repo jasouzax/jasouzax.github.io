@@ -4,14 +4,14 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
-import { auth_hash } from "../src/node/auth.ts"
+import { auth_hash } from "../cloud/api/auth.ts"
 import { encode_key, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
 
 test("edge fallback survives a new session and is removed only after verified private Drive storage", async () => {
     const token = encode_key(crypto.getRandomValues(new Uint8Array(32))), secret = encode_key(crypto.getRandomValues(new Uint8Array(32)))
     const pair = await generate_owner_key(), room = crypto.randomUUID(), raw = encode_key(crypto.getRandomValues(new Uint8Array(32)))
     const client = { room, key: raw, key_id: await auth_hash(JSON.stringify(pair.public_jwk)), owner_wrap: await wrap_room_key(raw, pair.public_jwk, room) }
-    const source = `import {work_route} from "./src/node/work.ts"; import {save_google_grant} from "./src/node/google_grant.ts";
+    const source = `import {work_route} from "./cloud/api/work.ts"; import {save_google_grant} from "./cloud/api/auth/google.ts";
         export default {async fetch(request,env){if(new URL(request.url).pathname==="/seed-grant"){await save_google_grant(env,${JSON.stringify(token)},{access_token:"synthetic-access",expires_in:3600,scope:"https://www.googleapis.com/auth/drive.appdata"});return Response.json({});}return work_route(request,env)}}`
     const bundle = await build({ stdin: { contents: source, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
     let uploaded = false
@@ -26,7 +26,7 @@ test("edge fallback survives a new session and is removed only after verified pr
         const now = Date.now(), hash = await auth_hash(token), csrf = await auth_hash(`csrf\n${token}`)
         await db.prepare("INSERT INTO auth_users VALUES ('client-subject','client@example.com','Client',?)").bind(now).run()
         await db.prepare("INSERT INTO auth_sessions VALUES (?,'client-subject',?,?)").bind(hash, now, now).run()
-        const api = (body: unknown, credential = token, protection = csrf) => runtime.dispatchFetch("https://example.com/api/v1/work/unstored-key", { method: "POST", headers: { origin: "https://example.com", cookie: `__Host-jazu_session=${credential}`, "x-jazu-work": "1", "x-jazu-csrf": protection, "content-type": "application/json" }, body: JSON.stringify(body) })
+        const api = (body: unknown, credential = token, protection = csrf) => runtime.dispatchFetch("https://example.com/api/_/work/unstored-key", { method: "POST", headers: { origin: "https://example.com", cookie: `__Host-jazu_session=${credential}`, "x-jazu-work": "1", "x-jazu-csrf": protection, "content-type": "application/json" }, body: JSON.stringify(body) })
         assert.equal((await api({ action: "save", client })).status, 200)
         const stored = await db.prepare("SELECT sealed FROM unstored_keys").first<{ sealed: string }>()
         assert.equal(stored!.sealed.includes(raw), false)

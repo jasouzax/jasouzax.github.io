@@ -1,5 +1,5 @@
 /*
- * Wire contract between the Pi agent (server/), the Server_Hub Durable Object (src/node/server_hub.ts) and the page (src/web/client/server_*.ts).
+ * Wire contract between the Pi agent (server/), the Server_Hub Durable Object (cloud/hub/hub.ts) and the page (src/web/client/server_*.ts).
  * Types and constants only: no imports, no I/O, erasable TypeScript, so Node, the Worker bundler, esbuild and tsc can all read this file.
  *
  * Entities
@@ -16,7 +16,7 @@
  */
 
 export const protocol_version = 1
-// The `client` the agent signs its upgrade request with (HMAC, see src/node/security.ts sign_origin)
+// The `client` the agent signs its upgrade request with (HMAC, see cloud/security/headers.ts sign_origin)
 export const agent_client_id = "server-agent"
 // Text heartbeat: the Durable Object answers it with setWebSocketAutoResponse, so it never wakes the object
 export const heartbeat_ping = "ping"
@@ -30,7 +30,7 @@ export const binary_audio = 2
 export const video_header_size = 5
 export const audio_header_size = 13
 // Names a script may not publish: the site's own routes and files
-export const reserved_api_names = ["api", "css", "js", "ws", "v1", "server"] as const
+export const reserved_api_names = ["_", "api", "css", "js", "ws", "v1", "server"] as const
 export const api_name_pattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
 // ---- filesystem ----------------------------------------------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ export type Hub_To_Client =
     | { t: "welcome", peer: string, online: boolean }
     | { t: "status", online: boolean }
 
-// What GET /api/server answers to everybody (the snapshot is never older than a minute unless the agent is offline)
+// What GET /api/_/server answers to everybody (the snapshot is never older than a minute unless the agent is offline)
 export type Public_Status = { online: boolean, owner: boolean, snapshot: { text: string, taken_at: number } | null, stale: boolean }
 
 // ---- accepted `t` values ------------------------------------------------------------------------------------------------------------------

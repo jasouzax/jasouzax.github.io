@@ -779,8 +779,8 @@ test("mode buttons stay square and video controls fit a narrow window", async ({
 
 test("BusyBox terminal, shared file manager, cancellation and private persistence", async ({ page }) => {
     // This static server has no identity/messaging API; those services are independent of the local terminal.
-    await page.route("**/api/v1/auth/session", route => route.fulfill({ json: { user: null, csrf: "test", google_enabled: false } }))
-    await page.route("**/api/v1/work/session", route => route.fulfill({ json: { owner_email: "", owner_key: null, room: null, guest_room: null } }))
+    await page.route("**/api/_/session", route => route.fulfill({ json: { user: null, csrf: "test", google_enabled: false } }))
+    await page.route("**/api/_/work/session", route => route.fulfill({ json: { owner_email: "", owner_key: null, room: null, guest_room: null } }))
     const failures: string[] = []
     const wasm_requests: string[] = []
     page.on("pageerror", error => failures.push(error.message))

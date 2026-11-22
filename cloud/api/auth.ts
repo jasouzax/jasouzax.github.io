@@ -5,35 +5,28 @@
  */
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose"
 import type { Work_Env } from "./work.ts"
-import { api_error } from "./security.ts"
+import { api_error } from "../security/headers.ts"
 import { encode_key } from "../../shared/work/crypto.ts"
-import { google_access, save_google_grant } from "./google_grant.ts"
+import { google_access, save_google_grant } from "./auth/google.ts"
 import { google_picture } from "../../shared/work/profile.ts"
-import { realtime_revoke } from "./realtime_bus.ts"
-import { work_changed } from "./realtime_work.ts"
+import { realtime_revoke } from "../room/bus.ts"
+import { work_changed } from "../room/work.ts"
 
-const session_cookie = "__Host-jazu_session"
+import { session_route } from "./session.ts"
+import { session_cookie, session_lifetime as month, cookie, read_cookie } from "./auth/cookies.ts"
 const flow_cookie = "__Host-jazu_oauth"
-const month = 30 * 86400000
-const callback_path = "/api/v1/auth/google/callback"
+const callback_path = "/api/_/auth/google/callback"
 const google_keys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"))
 type Identity = { subject: string, email: string, name: string, picture?: string }
 export type Auth_Session = Identity & { role: "owner" | "client", csrf: string }
 export type Auth_Dependencies = { fetch?: typeof fetch, keys?: JWTVerifyGetKey }
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
-const cookie = (name: string, value: string, seconds: number) => `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${seconds}`
 const reply = (data: unknown) => Response.json(data, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer", vary: "Cookie" } })
 
 export async function auth_hash(value: string): Promise<string> {
     return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, "0")).join("")
 }
 
-function read_cookie(request: Request, name: string): string {
-    const values = (request.headers.get("cookie") ?? "").split(";").map(value => value.trim()).filter(value => value.startsWith(name + "="))
-    if (values.length !== 1) return ""
-    const value = values[0].slice(name.length + 1)
-    return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : ""
-}
 export const session_token = (request: Request) => read_cookie(request, session_cookie)
 
 export async function read_session(request: Request, env: Work_Env): Promise<Auth_Session | null> {
@@ -63,14 +56,8 @@ export async function verify_google_token(token: string, client: string, nonce: 
 export async function auth_route(request: Request, env: Work_Env, dependencies: Auth_Dependencies = {}): Promise<Response> {
     const url = new URL(request.url)
     if (!env.DB) return api_error("auth_unconfigured", "Sign-in is not configured", 503)
-    if (url.pathname === "/api/v1/auth/session" && request.method === "GET") {
-        const session = await read_session(request, env)
-        const response = reply({ user: session ? { email: session.email, name: session.name, picture: session.picture, role: session.role } : null, csrf: session?.csrf ?? "", google_enabled: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_ADMIN_EMAIL) })
-        const token = read_cookie(request, session_cookie)
-        if (session && token) response.headers.set("set-cookie", cookie(session_cookie, token, month / 1000))
-        return response
-    }
-    if (url.pathname === "/api/v1/auth/logout" && request.method === "POST") {
+    if (url.pathname === "/api/_/session") return session_route(request, env)
+    if (url.pathname === "/api/_/auth/logout" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Invalid sign-out request", 403)
         await env.DB.prepare("DELETE FROM push_receipts WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE session_hash = ?)").bind(await auth_hash(session_token(request))).run()
@@ -82,7 +69,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response
     }
-    if (url.pathname === "/api/v1/auth/account/delete" && request.method === "POST") {
+    if (url.pathname === "/api/_/auth/account/delete" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session) || request.headers.get("x-jazu-confirm-delete") !== "account") return api_error("forbidden", "Confirm account deletion from the signed-in account menu", 403)
         if (!env.DB.batch) return api_error("unavailable", "Account deletion is temporarily unavailable", 503)
@@ -111,13 +98,13 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
         return response
     }
-    if (url.pathname === "/api/v1/auth/drive" && request.method === "POST") {
+    if (url.pathname === "/api/_/auth/drive" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before opening your key storage", 403)
         try { return reply({ access_token: await google_access(env, read_cookie(request, session_cookie), dependencies.fetch) }) }
         catch { return api_error("drive_consent_required", "Sign in again and allow private app data storage in Google Drive", 403) }
     }
-    if (url.pathname === "/api/v1/auth/profile" && request.method === "POST") {
+    if (url.pathname === "/api/_/auth/profile" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before loading your profile image", 403)
         if (session.picture) return reply({ picture: session.picture })
@@ -134,7 +121,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (request.method !== "GET") return api_error("method_not_allowed", "Use GET", 405)
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_ADMIN_EMAIL) return api_error("auth_unconfigured", "Google sign-in is not configured", 503)
     const redirect_uri = `${url.origin}${callback_path}`
-    if (url.pathname === "/api/v1/auth/google/start") {
+    if (url.pathname === "/api/_/auth/google/start") {
         if (request.headers.has("origin") && request.headers.get("origin") !== url.origin) return api_error("forbidden", "Use this site's sign-in button", 403)
         const state = random(), browser = random(), nonce = random(), verifier = random()
         await env.DB.prepare("DELETE FROM auth_flows WHERE expires_at < ?").bind(Date.now()).run()

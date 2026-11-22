@@ -4,8 +4,8 @@
  * pack responses stream without buffering. Pi discovery redirects stay on this website and pin subsequent
  * fetch requests to the Pi so provider recovery cannot switch repositories halfway through negotiation.
  */
-import type { worker_env } from "./worker.ts"
-import { api_error } from "./security.ts"
+import type { worker_env } from "../router/index.ts"
+import { api_error } from "../security/headers.ts"
 
 type Fetcher = (request: Request) => Promise<Response>
 const negotiation_limit = 8 * 1024 * 1024

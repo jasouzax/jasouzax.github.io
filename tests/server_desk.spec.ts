@@ -34,8 +34,8 @@ async function owner(page: Page, stale_plugins = false) {
         for (const plugin of plugins) if (plugin.id === "mirror") plugin.cases = plugin.cases.filter((entry: any) => entry.host !== "auto_site")
         await route.fulfill({ json: plugins })
     })
-    await page.route("**/api/server", route => route.fulfill({ json: { online: true, owner: true, stale: false, snapshot: { text: "Test Pi", taken_at: Date.now() } } }))
-    await page.routeWebSocket("**/api/server/ws", route => {
+    await page.route("**/api/_/server", route => route.fulfill({ json: { online: true, owner: true, stale: false, snapshot: { text: "Test Pi", taken_at: Date.now() } } }))
+    await page.routeWebSocket("**/api/_/server/ws", route => {
         socket = route
         route.send(JSON.stringify({ t: "welcome", peer: "test", online: true }))
         route.onMessage(raw => {
@@ -336,7 +336,7 @@ test("server terminals relay raw PTY bytes without loading the WASM registry or 
 test("an offline server terminal reports unavailable instead of falling back to WASM", async ({ page }) => {
     const wasm: string[] = []
     await page.route('**/assets/wasm/**', route => { wasm.push(route.request().url()); return route.abort() })
-    await page.route('**/api/server', route => route.fulfill({ json: { online: false, owner: false, stale: true, snapshot: null } }))
+    await page.route('**/api/_/server', route => route.fulfill({ json: { online: false, owner: false, stale: true, snapshot: null } }))
     await page.goto('/server')
     const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
     await address.fill('pid:'); await address.press('Enter')

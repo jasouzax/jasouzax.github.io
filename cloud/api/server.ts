@@ -2,13 +2,13 @@
  * Worker routes of the /server feature: who may do what, then a hand-off to the Server_Hub Durable Object.
  *
  * Entities
- *   server_route    /api/server (public status), /api/server/ws (owner's page), /api/server/agent (the Pi)
+ *   server_route    /api/_/server (public status), /api/_/server/ws (owner's page), /api/_/server/agent (the Pi)
  *   gateway_route   /api/{name}/... for APIs that scripts on the Pi publish
  *   is_owner        the signed-in session belongs to an allowed owner e-mail
  *
  * Responsibilities
  *   Owner = Jazu's own session (read_session) whose verified Google e-mail is in SERVER_OWNER_EMAILS (default GOOGLE_ADMIN_EMAIL). Decided here, never in the object.
- *   The agent proves itself with the HMAC of src/node/security.ts (SERVER_AGENT_SECRET); replays are refused.
+ *   The agent proves itself with the HMAC of cloud/security/headers.ts (SERVER_AGENT_SECRET); replays are refused.
  *   The public status is cached at the edge for a minute, so visitors cost the Durable Object nothing beyond one refresh a minute.
  *   Gateway requests never carry the session cookie to a script and a script's reply can never set a cookie or run as the site (CSP sandbox).
  * Limits
@@ -17,7 +17,7 @@
 import { agent_client_id, api_body_limit, api_name_pattern, reserved_api_names } from "../../shared/protocol/wire.ts"
 import type { Public_Status } from "../../shared/protocol/wire.ts"
 import { read_session } from "./auth.ts"
-import { api_error, verify_origin } from "./security.ts"
+import { api_error, verify_origin } from "../security/headers.ts"
 import type { Work_Env } from "./work.ts"
 
 export type Hub_Namespace = { idFromName(name: string): unknown, get(id: unknown): { fetch(request: Request): Promise<Response> } }
@@ -60,16 +60,16 @@ export async function server_route(request: Request, env: Server_Env, cache: Edg
     const url = new URL(request.url)
     const hub = hub_of(env)
     if (!hub) return api_error("server_unconfigured", "The server desk is not configured", 503)
-    if (url.pathname === "/api/server") return status_route(request, env, hub, cache)
-    if (url.pathname === "/api/server/ws") return owner_socket(request, env, hub)
-    if (url.pathname === "/api/server/agent") return agent_socket(request, env, hub)
+    if (url.pathname === "/api/_/server") return status_route(request, env, hub, cache)
+    if (url.pathname === "/api/_/server/ws") return owner_socket(request, env, hub)
+    if (url.pathname === "/api/_/server/agent") return agent_socket(request, env, hub)
     return api_error("not_found", "Unknown route", 404)
 }
 
 async function status_route(request: Request, env: Server_Env, hub: { fetch(request: Request): Promise<Response> }, cache: Edge_Cache | undefined): Promise<Response> {
     if (!["GET", "HEAD"].includes(request.method)) return api_error("method_not_allowed", "Use GET", 405)
     const owner = await is_owner(request, env)
-    const key = new Request(new URL("/api/server", request.url).href)
+    const key = new Request(new URL("/api/_/server", request.url).href)
     if (!owner) {
         const hit = await cache?.match(key)
         if (hit) return hit

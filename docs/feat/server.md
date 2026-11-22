@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `server/` (Electron agent, own `package.json`), `shared/protocol/wire.ts` (the wire contract), `src/node/server_hub.ts` (Durable Object + routes), `src/web/client/server_*.ts` (desk integration), `content/server.xml`
+- **Code:** `server/` (Electron agent, own `package.json`), `shared/protocol/wire.ts` (the wire contract), `cloud/hub/hub.ts` (Durable Object + routes), `src/web/client/server_*.ts` (desk integration), `content/server.xml`
 - **Replaces:** the standalone *Browsite* prototype. Everything it did (scripts, windows, live feed, APIs) lives here; nothing of Browsite remains to deploy.
 - **Related guides:** [desk.md](desk.md), [filesystem.md](filesystem.md), [personal_server.md](personal_server.md), [desk_env.md](desk_env.md)
 
@@ -12,7 +12,7 @@
 
 - [x] Wire protocol shared by agent, Durable Object and page (`shared/protocol/wire.ts`)
 - [x] Pi agent: Electron app that dials out to the Worker, reconnects with backoff, serves fs, pty, scripts, windows, APIs and fastfetch (logic tested without Electron)
-- [x] Worker: `Server_Hub` Durable Object (hibernating sockets, endpoint map, one-minute public snapshot) and `/api/server/*`
+- [x] Worker: `Server_Hub` Durable Object (hibernating sockets, endpoint map, one-minute public snapshot) and `/api/_/server/*`
 - [x] Worker: `jasouza.com/api/{endpoint}` gateway to scripts that publish APIs
 - [x] MIME types `application/auto-javascript` (`*.auto.js`) and `application/auto-site` (`*.auto.site`) with plugin cases
 - [x] `/server` page: shared virtual desk with one fastfetch window; offline state
@@ -25,7 +25,7 @@
 
 | File | Job |
 |---|---|
-| `desk_server.ts` | `server:fastfetch` source, one-minute refresh, mode from `GET /api/server` (`unknown`/`offline`/`public`/`owner`); `server_text.ts` holds the pure rules |
+| `desk_server.ts` | `server:fastfetch` source, one-minute refresh, mode from `GET /api/_/server` (`unknown`/`offline`/`public`/`owner`); `server_text.ts` holds the pure rules |
 | `desk_server_owner.ts` | Owner mode on `/server` only: opens `Server_Link`, swaps the desk root (`swap_root` in `desk_fs.ts`) for the Pi and puts the virtual one back when leaving; `owner_link()`, `owner_windows` |
 | `server_link.ts` | The socket: heartbeat `ping`, backoff 1-30 s, numbered `fs` requests with a 30 s timeout, subscriptions by message type |
 | `server_fs.ts` | The Pi's files as `dir_handle`/`file_handle`; a file opens whole up to 32 MiB; devices and sockets are not listed |
@@ -54,8 +54,8 @@ Authentication is Jazu's existing session (`__Host-jazu_session`, `read_session`
 ### Topology
 
 ```
-browser ──wss /api/server/ws (cookie, same origin)──▶ Worker ──▶ Server_Hub (Durable Object "main") ◀── wss /api/server/agent (HMAC signed) ── Pi agent (Electron)
-public GET /api/server ───────────────────────────────▶ Worker (edge cache 60 s) ──▶ Server_Hub (snapshot)
+browser ──wss /api/_/server/ws (cookie, same origin)──▶ Worker ──▶ Server_Hub (Durable Object "main") ◀── wss /api/_/server/agent (HMAC signed) ── Pi agent (Electron)
+public GET /api/_/server ───────────────────────────────▶ Worker (edge cache 60 s) ──▶ Server_Hub (snapshot)
 GET|POST /api/{name}/… ───────────────────────────────▶ Worker ──▶ Server_Hub (endpoint map) ──▶ Pi agent ──▶ the script that published `name`
 ```
 
@@ -71,7 +71,7 @@ Wrangler/Terraform cannot run inside a Worker and redeploying per endpoint would
 |---|---|
 | Durable Object requests, 100 000/day; incoming WebSocket messages count 1 per 20 | Hibernation API; the agent and page heartbeats are answered by `setWebSocketAutoResponse` and never wake the object; the agent sends **nothing** while no owner is connected (logs are kept in its ring buffer and replayed) |
 | Durable Object duration, 13 000 GB-s/day | A hibernated object is not billed; only active streaming (a watched site window) keeps it awake |
-| Worker requests, 100 000/day | Public `/api/server` is cached at the edge for 60 s; one snapshot refresh per minute at most, shared by every visitor |
+| Worker requests, 100 000/day | Public `/api/_/server` is cached at the edge for 60 s; one snapshot refresh per minute at most, shared by every visitor |
 | WebSocket message size, 1 MiB | File transfers are chunked at 384 KiB raw; API request and answer bodies are capped at 600 KiB (base64 inside one JSON frame stays under the 900 KiB frame limit) |
 | Feed frames | Agent → object frames are the only costly traffic: capped at 6 fps, JPEG, dropped when the page's socket is backed up, and sent only while someone watches |
 
@@ -89,7 +89,7 @@ An Electron app started by hand on the Pi (`cd server && npm start`, or `npm run
 
 ### Page
 
-`desk_server.ts` reads `/api/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector hints and sound. The existing window head owns back/refresh/forward and the live URL, following Chromium history for link clicks and typed addresses. Every window groups Volume and Save in a rounded control, with Fullscreen between Split and Move, in every mode; the audio preference stays with the window across mode/type changes. For `application/auto-site`, View shows the page and Edit shows that page's DevTools feed in the same pane. This built-in live host also serves file-less split mirrors before plugin lookup, so a stale plugin catalog cannot substitute a file editor. The Sessions side uses the standard `.desk_side_item` icon, name, details and toolbar layout for scripts and their windows, standalone sites, and parentless popups. Clicking an entry opens it in View. Script actions are Start/Stop, New Window, Clear Logs and Delete; stopped scripts remain available to restart. Delete removes the runtime session, its windows and logs, while its source file stays in Files. Site entries provide Delete to close the native window. A site split inherits the same native session: selecting Edit in the child streams its DevTools beside the parent page. Closing a desk pane leaves its server session running.
+`desk_server.ts` reads `/api/_/server`. Public mode shows the snapshot. Owner mode opens the WebSocket, replaces the root node's handle with a remote directory handle (File System Access shaped, so the file manager, folder windows and editors need no changes), and points `terminal_hooks.uri` at `server:`. `application/auto-javascript` in *view* mode is the log view with Start/Stop; in *edit* mode it is the text editor. `application/auto-site` (or an `http(s)://` source in owner mode) is the live site feed with the virtual touch mouse, zoom, selector hints and sound. The existing window head owns back/refresh/forward and the live URL, following Chromium history for link clicks and typed addresses. Every window groups Volume and Save in a rounded control, with Fullscreen between Split and Move, in every mode; the audio preference stays with the window across mode/type changes. For `application/auto-site`, View shows the page and Edit shows that page's DevTools feed in the same pane. This built-in live host also serves file-less split mirrors before plugin lookup, so a stale plugin catalog cannot substitute a file editor. The Sessions side uses the standard `.desk_side_item` icon, name, details and toolbar layout for scripts and their windows, standalone sites, and parentless popups. Clicking an entry opens it in View. Script actions are Start/Stop, New Window, Clear Logs and Delete; stopped scripts remain available to restart. Delete removes the runtime session, its windows and logs, while its source file stays in Files. Site entries provide Delete to close the native window. A site split inherits the same native session: selecting Edit in the child streams its DevTools beside the parent page. Closing a desk pane leaves its server session running.
 
 ### Wire protocol (summary)
 
@@ -124,7 +124,7 @@ The existing Git/publishing container remains separate.
 All 56 agent tests and the TypeScript build passed on the Pi. A real Electron
 smoke run also verified filesystem read/write and confinement, a Python PTY shell,
 script execution, an HTTP page, live JPEG screencast frames, and Opus audio capture.
-The staging Worker accepted the agent's signed connection and `/api/server`
+The staging Worker accepted the agent's signed connection and `/api/_/server`
 reported `online: true`, `stale: false` with a fresh snapshot. This does not verify
 the signed-in owner's browser DOM integration or a phone; those checklist items
 remain open.

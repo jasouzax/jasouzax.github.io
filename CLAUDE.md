@@ -11,7 +11,7 @@ This file is the fast map for an AI session. **Keep it current:** when you learn
 ```sh
 npm ci                       # install (needs network)
 npm run types                # tsc --noEmit over src + tests
-npm test                     # node:test contract/unit tests (tests/*.test.ts)
+npm test                     # node:test contract/unit tests (tests/**/*.test.ts)
 npm run check [-- --strict]  # content validation; warnings are real findings
 npm run build [-- --date YYYY-MM-DD]   # generate dist/ (incremental; --force to redo)
 npm run serve -- --port 8080 # build + http://127.0.0.1:8080
@@ -30,37 +30,31 @@ Shared contracts live under `shared/`; import them directly rather than restorin
 ## Repository map
 
 ```
-config.json            site/owner/languages/icons/slots/seo/deploy (no secrets). Loaded+validated by shared/config.ts
-content/               OWNER-MANAGED. XML roots found by tag, anywhere: page theme project event blog print plugin
-  *.xml                portfolio, projects, desk, work, privacy …   (names are conventions only)
-  theme/               layout.xml = UNNAMED skeleton theme (inlined in every page); default/ memory/ skins; *.scss
-  plugins/plugins.xml  default desk plugins; README.md = plugin authoring reference
-  assets/              tracked site artwork (signature, icon, favicon) → config.json.resources
-  media/               git-ignored owner archive (may be missing → check warns)
-src/
-  main.ts, commands.ts CLI
-  build.ts             build_site(): THE pipeline (see docs/src/engine.md)
-  model.ts objects.ts  load_site(); project/event/blog generators; resource collection
-  schema.ts xml.ts     THE validator (tags/attrs/children) and strict XML parser
-  expertise.ts         build-time timeline/slides model (pure)
-  theme_css.ts layout_css.ts font_build.ts font/   SCSS→CSS, geometry split, TS font writer
-  plugins.ts plugin_types.ts   plugin compile + case matching (shared with browser)
-  check.ts graph.ts cache.ts   checks, dependency graph, .cache/hashes.json
-  config.ts resources.ts paths.ts util.ts diag.ts dates.ts era.ts icons.ts mime.ts gitignore.ts raster.ts prints.ts
-  web/                 TSX generators (vnode.tsx = JSX factory → to_html / serialize / to_dom)
-    html_page.tsx (page shell) html_head.tsx (header) html_expertise.tsx html_desk.tsx html_sections.tsx
-    seo*.tsx           head tags, sitemap/robots/_headers/manifest/llms/icons/covers
-    partials/          background_default|memory.tsx, window_*.tsx
-    client/            browser runtime → bundled to assets/runtime/*.js (boot, spa, loading, desk*, kernel, wasm_*)
-  node/                worker.ts (Cloudflare router) security.ts (HMAC) personal.ts (node HTTP) serve.ts deploy.ts publish.ts d1_migrate.ts
-                       personal-server hub: server_config git_http git_hooks hook_main git_mirror queue runner ci_jazu server_cli (docs/src/node.md#git-hub)
-  desk/                WASM toolchains: busybox/ programs/ (build.sh, port.py, artifacts/). Not TypeScript.
-extension/             Chromium extension (plain JS, MV3) + native messaging host (host/*.ts, pty_shim.py): real device shell for /desk via `host:`. Not part of the site build; see extension/README.md
-migrations/            D1 SQL (0001_work.sql)
-terraform/             Cloudflare infra (Pages, Worker, R2, KV, D1, routes)
-tests/                 *.test.ts (node:test) and *.spec.ts (Playwright) + configs
-docs/                  README.md (process) · content/ (tag rules) · src/ (code guides) · feat/ (feature checklists) · infra.md
-dist/ .cache/ .wrangler/   generated, ignored
+config.json            public settings; shared/config.ts loads and validates them
+content/               owner-managed XML/Markdown/SCSS; root tag determines interpretation
+shared/                content/tags + schema/xml/pipeline/plugin; protocol/wire + codec; work/crypto + profile + drive
+                       vnode/vnode.tsx; print/form.tsx; notification/preview + store; sign.ts; http.ts; basic helpers
+cloud/
+  router/index.ts      Worker entry; Wrangler and deploy use this path
+  api/                 auth.ts + auth/{cookies,google}; session.ts; health.ts; work.ts + work/recovery; push.ts; server.ts
+  room/                room.ts (Realtime_Hub and route), bus.ts, channels.ts, work.ts
+  hub/                 hub.ts (Server_Hub), limits.ts
+  repo/                fallback.ts (provider-first Git reads), docker.ts (current public registry Worker)
+  security/headers.ts  response headers; shared transport exports
+src/                   remaining engine + CLI pending the full root split in COMPONENTS.md
+  main.ts commands.ts  CLI entry and command dispatch
+  build.ts model.ts objects.ts expertise.ts theme_css.ts layout_css.ts font_build.ts font/ plugins.ts
+  check.ts graph.ts cache.ts resources.ts dates.ts icons.ts gitignore.ts raster.ts prints.ts
+  web/                 TSX generators, SEO, markup and PWA worker; browser runtime remains in client/
+  node/                personal Git hub, pipelines, exact-commit workers, local serving, deployment/publishing
+server/                automation-browser agent (not a desktop app); src/, test/, assets/, own npm dependencies
+                       build emits dist/server/src/ + dist/shared/; Electron entry follows package.json
+extension/             Chromium MV3 extension + native messaging host in host/
+terraform/ migrations/ current infra and D1 migration locations (not moved yet)
+ops/                   Docker/service/recovery files; website image includes src/, shared/ and cloud/
+tests/                 node:test *.test.ts at any depth; Playwright *.spec.ts and configs
+docs/                  content contracts, implementation guides, feature checklists, infra guides
+dist/ .cache/ .wrangler/ generated, ignored
 ```
 
 ## Architecture in one screen
@@ -71,7 +65,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 4. `render_page` (TSX → vnodes) → `to_html` for `index.html`, `serialize` for `index.json` (SPA payload). Page skipped if its hash + outputs match `.cache/hashes.json`.
 5. SEO files, icons, covers, `_headers` (CSP hashes), `_redirects`; `write_files` writes only changed bytes and prunes via `dist/.jazu_output.json`.
 6. Browser: inline `boot` → skeleton → theme CSS → `page` bundle (SPA, search, desk). Desk = kernel + shared VFS + WASM Workers (`wasm_host.ts`).
-7. Cloud: Pages serves `dist`; Worker (`src/node/worker.ts`) routes subdomains/`/assets` (R2)/`/api` (health, signed git reads, else 501); optional personal node serves signed Git reads over Tunnel+Access.
+7. Cloud: Pages serves `dist`; Worker (`cloud/router/index.ts`) routes subdomains/`/assets` (R2)/`/api` (health, signed git reads, else 501); optional personal node serves signed Git reads over Tunnel+Access.
 
 ## Where do I change…
 
@@ -88,7 +82,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 | Shell / WASM program | `src/desk/**`, `src/web/client/wasm_*.ts`, `kernel.ts`; docs `src/desk/README.md` |
 | Personal server desk (`/server`, Pi agent) | `server/**`, `src/node/server_*.ts`, `src/web/client/{desk_server,desk_server_owner,server_*}.ts`, `content/server.xml`; docs `docs/feat/server.md`; tests `tests/server_*.test.ts` |
 | Device shell / extension bridge | `extension/**` (+ `src/web/client/desk_host.ts`, `desk_proc.ts`); docs `extension/README.md`, `docs/feat/desk_env.md`; tests `tests/host*.test.ts` |
-| Worker route / API | `src/node/worker.ts` (+ test in `tests/nodes.test.ts`); keep `{error:{code,message}}` shape and fail closed |
+| Worker route / API | `cloud/router/index.ts` (+ test in `tests/nodes.test.ts`); keep `{error:{code,message}}` shape and fail closed |
 | Infra | `terraform/*.tf`; deploy glue `src/node/deploy.ts` |
 | Fonts | `src/font/*`, `src/font_build.ts`; tests `tests/font.test.ts` |
 
@@ -153,7 +147,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 - `ci_jazu.ts` is meant as the template for other projects' pipelines; its steps are data (`jazu_steps`). CI/CD children get a scrubbed env on purpose; test doubles must signal through files, not env vars.
 - `content/projects.xml` has a placeholder `<project id="jazu">` (needed so the Worker's `PUBLIC_PROJECTS` includes it and `/projects/jazu` exists). It was added without a build; run `npm run check` and rewrite the text.
 
-- **PWA/Web Push:** `src/pwa.ts` emits `service-worker.js` + `offline.json` from the finished output map (allowlist = public files only). Pages serves `/x/index.html` as `/x/` via 308, so the worker installs from canonical URLs and verifies SHA-256 revisions (never `redirect: "error"`). Push payloads carry routing metadata only; the device fetches ciphertext from `/api/v1/push/message` and decrypts with a non-extractable key kept in IndexedDB (`notification_store.ts`). Never regenerate `VAPID_*` while subscriptions exist (`npm run push:keys` refuses). The PWA feature was finished without `node_modules`: run `npm run types && npm test && npm run test:pwa:browser` first. Details: `docs/feat/pwa.md`.
+- **PWA/Web Push:** `src/pwa.ts` emits `service-worker.js` + `offline.json` from the finished output map (allowlist = public files only). Pages serves `/x/index.html` as `/x/` via 308, so the worker installs from canonical URLs and verifies SHA-256 revisions (never `redirect: "error"`). Push payloads carry routing metadata only; the device fetches ciphertext from `/api/_/push/message` and decrypts with a non-extractable key kept in IndexedDB (`notification_store.ts`). Never regenerate `VAPID_*` while subscriptions exist (`npm run push:keys` refuses). The PWA feature was finished without `node_modules`: run `npm run types && npm test && npm run test:pwa:browser` first. Details: `docs/feat/pwa.md`.
 
 ## Docs maintenance (do this as you work)
 
@@ -183,3 +177,5 @@ dist/ .cache/ .wrangler/   generated, ignored
 - Split hosts live in the page bundle (`desk_flow`, `desk_preview`, `desk_pdf`). Do not import the kernel/document registry into separately bundled plugin scripts: that creates a second singleton. Use injected host factories. PDF.js is copied from its installed package with local versioned worker/font/CMap/WASM assets and loaded only for PDFs.
 - Playwright `setInputFiles`/`fill` can run while an ancestor is inert. Desk tests must wait for `#main-content` to lose `inert` after navigation; otherwise edits/search may be issued before the loading overlay releases focus. The editor's scroll container is `.desk_wbox_body_text`, not its focus-frame wrapper.
 - Container CI requires both Python command names: ZIP verification invokes `python`, while the Debian image installs `python3`. `ops/docker/python` provides the alias in full and runtime-patch releases. Final public image `docker-cd8323c` passed the Pi's complete 185-test production pipeline and deployment; keep the stopped previous controller and native installation as rollback options, never concurrent controllers.
+
+Component alignment verification (2026-11-22, Windows): the main suite has four pre-existing failures in `tests/server_fs.test.ts`, and the agent suite has seven in `server/test/{agent,fs_channel}.test.ts` because native Windows temp paths violate the Pi channel's POSIX-only absolute-path contract. Both were reproduced with original revision files; do not treat these as shared/cloud migration regressions or silently skip them. Google sign-in Playwright verification passed against local Wrangler/D1. Before deploying the new API paths, register `/api/_/auth/google/callback` with Google and deploy the site, Worker and agent together.

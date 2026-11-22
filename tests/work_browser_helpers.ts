@@ -30,7 +30,7 @@ export async function account(context: BrowserContext, email: string, owner = fa
         if (route.request().headers().referer) throw new Error("Profile images must not receive chat referrers")
         await route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#387db0"/><circle cx="40" cy="30" r="14" fill="#fff"/><path d="M12 80a28 28 0 0 1 56 0" fill="#fff"/></svg>' })
     })
-    await context.route("**/api/v1/auth/drive", route => denied_drive.has(accounts.get(context)!) ? route.fulfill({ status: 403, json: { error: { message: "Drive permission was not granted" } } }) : route.fulfill({ json: { access_token: "synthetic-drive-" + accounts.get(context) } }))
+    await context.route("**/api/_/auth/drive", route => denied_drive.has(accounts.get(context)!) ? route.fulfill({ status: 403, json: { error: { message: "Drive permission was not granted" } } }) : route.fulfill({ json: { access_token: "synthetic-drive-" + accounts.get(context) } }))
     await context.route("https://www.googleapis.com/**", async route => {
         const email = accounts.get(context)!, files = drive_files.get(email)!
         if (route.request().headers().authorization !== "Bearer synthetic-drive-" + email) throw new Error("Wrong Drive account")

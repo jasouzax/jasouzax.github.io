@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     runner.on("web", (script_path: string, web: Web) => windows.track(script_path, web))
     const sites = new Site_Registry({ make_web: url => new Web(url), windows })
     const link = new Hub_Link({
-        url: `${config.origin.replace(/^http/, "ws")}/api/server/agent`,
+        url: `${config.origin.replace(/^http/, "ws")}/api/_/server/agent`,
         sign: url => sign_upgrade(config.secret, url),
         open: open_ws,
         app: "jazu-server",

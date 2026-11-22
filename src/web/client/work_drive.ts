@@ -29,20 +29,20 @@ export class Drive_Vault {
     private async request(path: string, init: RequestInit = {}): Promise<Response> {
         const send = () => fetch(`https://www.googleapis.com/${path}`, { ...init, credentials: "omit", redirect: "error", signal: AbortSignal.timeout(15000), headers: { ...init.headers, authorization: `Bearer ${this.access}` } })
         let response = await send()
-        if (response.status === 401) { this.access = (await this.api("/api/v1/auth/drive", {})).access_token; response = await send() }
+        if (response.status === 401) { this.access = (await this.api("/api/_/auth/drive", {})).access_token; response = await send() }
         if (!response.ok && response.status !== 404 && response.status !== 409) throw new Error(response.status === 401 ? "Sign in again to reconnect Google Drive" : "Google Drive is unavailable. Check that Drive API is enabled and private app data access is allowed.")
         return response
     }
     static async open(api: Api): Promise<Drive_Vault> {
         const vault = new Drive_Vault(api)
-        vault.access = (await api("/api/v1/auth/drive", {})).access_token
-        let file_id = (await api("/api/v1/work/key-file")).file_id
+        vault.access = (await api("/api/_/auth/drive", {})).access_token
+        let file_id = (await api("/api/_/work/key-file")).file_id
         if (!file_id) {
             const query = new URLSearchParams({ spaces: "appDataFolder", q: `name = '${filename}' and trashed = false`, fields: "files(id),nextPageToken", pageSize: "100" })
             const files = await (await vault.request(`drive/v3/files?${query}`)).json()
             if (files.nextPageToken || files.files?.length > 1) throw new Error("Multiple private key files exist. They have been preserved; no keys were overwritten.")
             const generated = files.files?.[0]?.id ?? (await (await vault.request("drive/v3/files/generateIds?count=1&space=appDataFolder&type=files")).json()).ids?.[0]
-            file_id = (await api("/api/v1/work/key-file", { file_id: generated })).file_id
+            file_id = (await api("/api/_/work/key-file", { file_id: generated })).file_id
         }
         vault.file_id = file_id
         await vault.read()

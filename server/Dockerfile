@@ -6,7 +6,7 @@ RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY server/tsconfig.json ./
 COPY server/src ./src
 COPY server/test ./test
-COPY src/node/security.ts /repo/src/node/security.ts
+COPY shared /repo/shared
 RUN npm test && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim

@@ -3,8 +3,8 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, readdirSync } from "node:fs"
-import { Realtime_Hub } from "../src/node/realtime.ts"
-import type { Work_Env, Work_Statement } from "../src/node/work.ts"
+import { Realtime_Hub } from "../cloud/room/room.ts"
+import type { Work_Env, Work_Statement } from "../cloud/api/work.ts"
 
 test("alarms expire dead sockets, preserve another device, survive reconstruction and retain the last confirmed time", async () => {
     const original = (globalThis as any).WebSocketRequestResponsePair

@@ -6,7 +6,7 @@
  *   on_owner_link   subscribe to the link appearing and disappearing
  *   init_server_owner  starts and stops the owner mode as pages come and go
  * Scope
- *   Only on /server (and /ja/server) and only when GET /api/server says owner + online. Leaving the page closes the socket and puts the
+ *   Only on /server (and /ja/server) and only when GET /api/_/server says owner + online. Leaving the page closes the socket and puts the
  *   shared virtual file system back exactly as it was; the Pi is never reachable from any other page.
  * Limits
  *   One socket per tab. While the agent is away the root keeps the Pi's tree and operations fail with a readable error until it returns.

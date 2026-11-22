@@ -35,8 +35,8 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
    - `{name}-demo.{domain}` / `{name}-work.{domain}` → proxy to the **explicit HTTPS origin** stored in KV key `host:{name}-demo|work`. Origins on the same domain are refused (would loop); cookies/auth are never forwarded.
    - anything else → 404.
 3. `/api/*`:
-   - `GET /api/v1/health` → `{ status: "ok", generation: 12, services: { work: "not_implemented" } }`.
-   - `GET /api/v1/git/{public_id}/{refs|tree|blob|log}` for ids in `PUBLIC_PROJECTS` → signed request to `PERSONAL_ORIGIN` (HMAC headers + optional `CF-Access-Client-Id/Secret`), 10 s timeout, redirects refused. Failures → `503` (`origin_offline`).
+   - `GET /api/_/health` → `{ status: "ok", generation: 12, services: { work: "not_implemented" } }`.
+   - `GET /api/_/git/{public_id}/{refs|tree|blob|log}` for ids in `PUBLIC_PROJECTS` → signed request to `PERSONAL_ORIGIN` (HMAC headers + optional `CF-Access-Client-Id/Secret`), 10 s timeout, redirects refused. Failures → `503` (`origin_offline`).
    - everything else → `501 not_implemented` (fail closed; no client data accepted).
 4. Non-GET/HEAD → `405`.
 5. `/assets/media/*`, `/assets/wasm/*` → R2 (`ASSETS`) with range/conditional support, long immutable caching, `application/wasm` type, CORS for the site origin; fall through to Pages if the object is missing.
@@ -93,7 +93,7 @@ git push  https://{user}:{token}@{domain}/projects/jazu.git
 
 **File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) website assets and Git packs are uploaded to R2 before Pages; unchanged large objects are skipped using recorded content hashes.
 
-**Environment of commands.** Pipeline steps run with a scrubbed `PATH`, `HOME=<project-state>/home` and `CI=true` environment. Each deploy step receives its explicitly requested credential names. Network Git/SSH separately uses the service user’s credential setup. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
+**Environment of commands.** Pipeline steps run with a scrubbed `PATH`, `HOME=<project-state>/home` and `CI=true` environment. Each deploy step receives its explicitly requested credential names. Network Git/SSH separately uses the service user’s credential setup. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/_/ci/jazu/runs` shows a public summary (no pusher, message or paths).
 
 **Wire details.** The Worker signs git requests with `x-jazu-body: stream`, which leaves the (huge, binary) body out of the HMAC; the node accepts that mode only on `/git-http/*`. Request bodies are capped at 512 MiB by the node, and Cloudflare's own request-size limit for your plan applies first.
 
@@ -116,7 +116,7 @@ Runs as a script (`node src/node/d1_migrate.ts`, invoked by Terraform's `local-e
 
 ### Personal-server deployment
 
-`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/v1/health` works while the Pi is offline.
+`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/_/health` works while the Pi is offline.
 
 Set `site.branch` to `master` for the hub's public deploy branch. Set optional `site.checkout_branch` to `feature/personal-server` to keep the server checkout on the development branch while fast-forwarding commits accepted on the hub's master. It defaults to `site.branch`. CI restores the ignored `build/` artifacts and `content/media/` from the deployment checkout after cleaning its isolated checkout. Mirror failures block publication.
 

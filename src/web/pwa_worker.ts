@@ -59,7 +59,7 @@ async function show_message(data: Message_Notice): Promise<void> {
     catch {
         // Recheck auth before showing even a generic preview or using a stale device key.
         try {
-            const response = await fetch("/api/v1/auth/session", { credentials: "same-origin", cache: "no-store" })
+            const response = await fetch("/api/_/session", { credentials: "same-origin", cache: "no-store" })
             if (!response.ok) return
             const auth = await response.json()
             if (auth.user?.email !== key.email) { await device_key(null); return }

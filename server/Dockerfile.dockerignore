@@ -9,6 +9,5 @@
 !server/test/**
 !server/assets
 !server/assets/**
-!src
-!src/node
-!src/node/security.ts
+!shared
+!shared/**

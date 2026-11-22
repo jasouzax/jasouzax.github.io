@@ -81,16 +81,16 @@ npm run cloud:dev       # terminal 2: wrangler dev --config wrangler.local.jsonc
 
 Wrangler serves the Worker on <http://localhost:8787> and proxies public HTML to `http://127.0.0.1:8080`. Try:
 
-- <http://localhost:8787/api/v1/health> → Work reports `not_configured` until its D1 binding and owner secret are configured, then `encrypted_chat`.
+- <http://localhost:8787/api/_/health> → Work reports `not_configured` until its D1 binding and owner secret are configured, then `encrypted_chat`.
 - <http://localhost:8787/work> → the Work shell with `no-referrer`/`no-store`
-- unfinished `/api/…` → `501` (no data accepted); encrypted messaging uses `/api/v1/work/rooms` after [Work setup](docs/feat/work.md#staging-setup).
+- unfinished `/api/…` → `501` (no data accepted); encrypted messaging uses `/api/_/work/rooms` after [Work setup](docs/feat/work.md#staging-setup).
 
 Optionally emulate the personal node's Git read API (**not verified in this environment**):
 
 1. Copy `.env.example` to `.env`; set `ORIGIN_HMAC_SECRET` (≥ 32 random chars) and `JAZU_REPOSITORIES_JSON` to e.g. `{"stesis":"/path/to/a/public/clone"}`.
 2. `npm run node -- --port 8788` in a third terminal.
 3. Create `.dev.vars` (ignored) with `ORIGIN_HMAC_SECRET=<same value>` and `PERSONAL_ORIGIN=http://127.0.0.1:8788`, and set `PUBLIC_PROJECTS` in `wrangler.local.jsonc` to `"[\"stesis\"]"`.
-4. Restart `cloud:dev`, then request <http://localhost:8787/api/v1/git/stesis/refs>.
+4. Restart `cloud:dev`, then request <http://localhost:8787/api/_/git/stesis/refs>.
 
 `wrangler.local.jsonc` holds synthetic identifiers; **never deploy it**.
 
@@ -133,7 +133,7 @@ Do not set `PAGES_ORIGIN` by hand: Terraform derives it from the Pages project (
 
 ### Verify
 
-- `https://<your-domain>/` loads; `https://<your-domain>/api/v1/health` returns `status: ok`.
+- `https://<your-domain>/` loads; `https://<your-domain>/api/_/health` returns `status: ok`.
 - `https://<your-domain>/assets/media/<a large file>` supports range requests (`206`).
 - `https://<project>.<your-domain>` redirects (301) to `/projects/<project>` for each project id.
 
@@ -180,7 +180,7 @@ Set up the **personal server**: your own machine running an instance of this rep
    2. *Access → Applications:* protect that hostname with a **Service Auth** policy.
    3. *Access → Service Auth:* create a **service token**; keep its Client ID and Secret.
 5. **Tell the Worker.** In `.env` set `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` (same `ORIGIN_HMAC_SECRET` as the node); in `config.json` set `"personal_server": "https://node.example.net"`. Then `npm run deploy -- --target worker`.
-6. **Verify:** `https://<your-domain>/api/v1/git/<public_project_id>/refs` returns refs. With the node stopped it returns `503` — the rest of the site keeps working. Browser cookies/tokens are never forwarded to the node.
+6. **Verify:** `https://<your-domain>/api/_/git/<public_project_id>/refs` returns refs. With the node stopped it returns `503` — the rest of the site keeps working. Browser cookies/tokens are never forwarded to the node.
 
    Query parameters: `?ref=HEAD&path=readme.md`. Limits: 100 log entries; blobs ≤ 16 MiB; refs/paths cannot run arbitrary Git commands.
 
@@ -245,7 +245,7 @@ Generated, never commit: `dist/`, `.cache/`, `.wrangler/`, `.env`, Terraform sta
 
 ### Personal-server production configuration
 
-The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu-1ws.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/v1/ci/jazu/runs` reports deployment status.
+The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu-1ws.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/_/ci/jazu/runs` reports deployment status.
 
 Worker updates are an operator action (CI deploys Pages only):
 
@@ -315,3 +315,5 @@ journalctl -u jazu-node -f
 ```
 
 Detailed logs remain in `<state_dir>/runs/`. Non-engine project sync/approval/publication state is under `<state_dir>/projects/<id>/`. Production activation was verified on 2026-11-12 at `8d39520`: the Pi checkout, personal Git hub, and GitHub `master` agree; all 157 tests passed and Pages/R2 publication succeeded. The node is enabled at boot.
+
+API migration: fixed endpoints now use `/api/_/{id}` and session discovery is `/api/_/session`. Before deploying this revision, register `https://<domain>/api/_/auth/google/callback` in the Google OAuth client (including staging if used) and update external system-API callers. Deploy the rebuilt site, Worker and agent together; legacy API URLs have no aliases.

@@ -1,10 +1,10 @@
 /* Hibernating account/guest sockets, private event routing and heartbeat-derived presence. */
-import { read_session, auth_hash, session_token, type Auth_Session } from "./auth.ts"
-import { guest_token, type Work_Env } from "./work.ts"
-import { api_error } from "./security.ts"
-import { realtime_call } from "./realtime_bus.ts"
-import { realtime_channels } from "./realtime_channels.ts"
-import { push_deliver } from "./push.ts"
+import { read_session, auth_hash, session_token, type Auth_Session } from "../api/auth.ts"
+import { guest_token, type Work_Env } from "../api/work.ts"
+import { api_error } from "../security/headers.ts"
+import { realtime_call } from "./bus.ts"
+import { realtime_channels } from "./channels.ts"
+import { push_deliver } from "../api/push.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): Attachment }
 type Attachment = { principal: string, credential: string, origin: string, connected: number, activity: number, watches: Record<string, { channel: string, conversation: string, target: string, cursor: number, presence_version?: number }> }

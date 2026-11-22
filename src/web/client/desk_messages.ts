@@ -16,7 +16,7 @@ type Pending = { id: string, envelope: Work_Envelope, text: string }
 const pending = new Map<string, Pending>()
 const drafts = new Map<string, string>()
 const label = (key: string) => text(`work_${key}`)
-const base = "/api/v1/work/rooms"
+const base = "/api/_/work/rooms"
 let identity = ""
 let panel_timer: ReturnType<typeof setTimeout> | undefined
 let panel_revision = 0

@@ -23,7 +23,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 - [ ] **[Server desk](server.md)** — `/server` and the Pi agent (replaces Browsite)
   - [ ] Wire protocol shared by agent, Durable Object and page
   - [ ] Pi agent: outbound link, filesystem, terminal, scripts, windows, APIs, fastfetch
-  - [ ] Worker `Server_Hub` Durable Object, `/api/server/*` and the `/api/{endpoint}` gateway
+  - [ ] Worker `Server_Hub` Durable Object, `/api/_/server/*` and the `/api/{endpoint}` gateway
   - [ ] MIME types `application/auto-javascript` and `application/auto-site`
   - [ ] `/server` page: public fastfetch window, offline state, owner mode (Pi filesystem, terminal, script view, site feed)
   - [ ] Verify on the real Pi, Worker and a phone

@@ -8,8 +8,8 @@ test("Drive key creation recovers after a lost acknowledgement and never overwri
     const files = new Map<string, Key_Vault>()
     let reserved = "", ids = 0, accesses = 0, fail_ack = true
     const api = async (path: string, body?: any) => {
-        if (path === "/api/v1/auth/drive") return { access_token: `synthetic-${++accesses}` }
-        assert.equal(path, "/api/v1/work/key-file")
+        if (path === "/api/_/auth/drive") return { access_token: `synthetic-${++accesses}` }
+        assert.equal(path, "/api/_/work/key-file")
         if (body && !reserved) reserved = body.file_id
         assert.equal(JSON.stringify(body ?? {}).includes("private_jwk"), false)
         return { file_id: reserved || null }

@@ -2,11 +2,11 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, readdirSync } from "node:fs"
-import { push_route, push_deliver, push_endpoint } from "../src/node/push.ts"
-import { auth_hash, auth_route } from "../src/node/auth.ts"
+import { push_route, push_deliver, push_endpoint } from "../cloud/api/push.ts"
+import { auth_hash, auth_route } from "../cloud/api/auth.ts"
 import { encode_key, decode_key, encrypt_message, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
 import { preview_message } from "../shared/notification/preview.ts"
-import type { Work_Env, Work_Statement } from "../src/node/work.ts"
+import type { Work_Env, Work_Statement } from "../cloud/api/work.ts"
 const origin = "https://example.com", random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 async function fixture() {
     const db = new DatabaseSync(":memory:")
@@ -30,22 +30,22 @@ test("push subscriptions require verified session, CSRF and real push service ke
     const f = await fixture()
     try {
         for (const endpoint of ["http://fcm.googleapis.com/x", "https://127.0.0.1/x", "https://fcm.googleapis.com.evil.com/x", "https://user@fcm.googleapis.com/x", "https://fcm.googleapis.com:8443/x"]) assert.equal(push_endpoint(endpoint), false)
-        assert.equal((await push_route(f.request("/api/v1/push/subscription", { subscription: f.subscription }, { cookie: "" }), f.env)).status, 403)
-        assert.equal((await push_route(f.request("/api/v1/push/subscription", { subscription: f.subscription }, { "x-jazu-csrf": "wrong" }), f.env)).status, 403)
-        assert.equal((await push_route(f.request("/api/v1/push/subscription", { subscription: { ...f.subscription, endpoint: "https://localhost/private" } }), f.env)).status, 400)
-        assert.equal((await push_route(f.request("/api/v1/push/subscription", { subscription: f.subscription }), f.env)).status, 200)
-        assert.equal((await push_route(f.request("/api/v1/push/subscription", { subscription: f.subscription }), f.env)).status, 200)
+        assert.equal((await push_route(f.request("/api/_/push/subscription", { subscription: f.subscription }, { cookie: "" }), f.env)).status, 403)
+        assert.equal((await push_route(f.request("/api/_/push/subscription", { subscription: f.subscription }, { "x-jazu-csrf": "wrong" }), f.env)).status, 403)
+        assert.equal((await push_route(f.request("/api/_/push/subscription", { subscription: { ...f.subscription, endpoint: "https://localhost/private" } }), f.env)).status, 400)
+        assert.equal((await push_route(f.request("/api/_/push/subscription", { subscription: f.subscription }), f.env)).status, 200)
+        assert.equal((await push_route(f.request("/api/_/push/subscription", { subscription: f.subscription }), f.env)).status, 200)
         assert.equal((f.db.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").get() as any).n, 1)
-        assert.equal((await auth_route(f.request("/api/v1/auth/logout", {}), f.env)).status, 200)
+        assert.equal((await auth_route(f.request("/api/_/auth/logout", {}), f.env)).status, 200)
         assert.equal((f.db.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").get() as any).n, 0)
     } finally { f.db.close() }
 })
 test("push is encrypted, retries failed devices, removes expired subscriptions, and never delivers twice after acceptance", async () => {
     const f = await fixture()
     try {
-        await push_route(f.request("/api/v1/push/subscription", { subscription: f.subscription }), f.env)
+        await push_route(f.request("/api/_/push/subscription", { subscription: f.subscription }), f.env)
         const second = { ...f.subscription, endpoint: "https://web.push.apple.com/synthetic-device" }
-        await push_route(f.request("/api/v1/push/subscription", { subscription: second }), f.env)
+        await push_route(f.request("/api/_/push/subscription", { subscription: second }), f.env)
         const notice = { channel: "work", conversation: crypto.randomUUID(), id: crypto.randomUUID(), sender: "owner@example.com", href: "/work/", created_at: Date.now(), self: false }
         let fail = true, sends = 0
         const upstream: typeof fetch = async (input, options) => {

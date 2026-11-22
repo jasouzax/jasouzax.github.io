@@ -63,7 +63,7 @@ export function expand_objects(model: site_model): void {
                 })
                 children.splice(1, 0, element("menu", { name: "Overview" }, research, sections))
             }
-            children.push(element("menu", { name: "Version", path: `/api/v1/git/${id}/log` }, object))
+            children.push(element("menu", { name: "Version", path: `/api/_/git/${id}/log` }, object))
         }
         if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
             type: "inode/directory", mode: "view", path: `file:///srv/projects/${id}`,

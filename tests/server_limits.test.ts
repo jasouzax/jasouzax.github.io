@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { Rate_Limit } from "../src/node/server_limits.ts"
+import { Rate_Limit } from "../cloud/hub/limits.ts"
 
 test("one key is limited per window and gets a retry time", () => {
     const limit = new Rate_Limit({ per_key: 2, total: 100 })

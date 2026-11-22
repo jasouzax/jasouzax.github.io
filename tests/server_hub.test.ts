@@ -1,7 +1,7 @@
 /* Server_Hub with fake sockets: relaying and peer injection, endpoint privacy, gateway answers/timeouts/limits, one-minute snapshot, picture routing. */
 import { test, mock } from "node:test"
 import assert from "node:assert/strict"
-import { Server_Hub, snapshot_max_age } from "../src/node/server_hub.ts"
+import { Server_Hub, snapshot_max_age } from "../cloud/hub/hub.ts"
 
 class Fake {
     readyState = 1

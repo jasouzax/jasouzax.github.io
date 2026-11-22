@@ -1,8 +1,8 @@
 /*
- * The page's connection to the Pi through the Server_Hub Durable Object (wire contract: server/src/shared/protocol.ts).
+ * The page's connection to the Pi through the Server_Hub Durable Object (wire contract: shared/protocol/wire.ts).
  *
  * Entities
- *   fetch_public_status   GET /api/server: online flag, owner flag and the (at most one minute old) fastfetch snapshot
+ *   fetch_public_status   GET /api/_/server: online flag, owner flag and the (at most one minute old) fastfetch snapshot
  *   Server_Link           the owner's WebSocket: request/answer for the filesystem, subscriptions by message type, binary feed frames,
  *                         heartbeat and reconnect with backoff
  *   Fs_Error              a filesystem failure of the Pi, carrying the errno-like code
@@ -23,7 +23,7 @@ export class Fs_Error extends Error {
 }
 
 export async function fetch_public_status(fetcher: typeof fetch = fetch, origin = ""): Promise<Public_Status> {
-    const response = await fetcher(`${origin}/api/server`, { headers: { accept: "application/json" }, credentials: "same-origin" })
+    const response = await fetcher(`${origin}/api/_/server`, { headers: { accept: "application/json" }, credentials: "same-origin" })
     if (!response.ok) throw new Error(`Server status: ${response.status}`)
     const value = await response.json() as Partial<Public_Status>
     return { online: Boolean(value.online), owner: Boolean(value.owner), snapshot: value.snapshot ?? null, stale: Boolean(value.stale) }
@@ -49,7 +49,7 @@ const open_state = 1
 const real_timers: Timer_Api = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id as number), set_interval: (fn, ms) => setInterval(fn, ms) }
 
 export function default_socket_url(location_like: { protocol: string, host: string } = location): string {
-    return `${location_like.protocol === "https:" ? "wss:" : "ws:"}//${location_like.host}/api/server/ws`
+    return `${location_like.protocol === "https:" ? "wss:" : "ws:"}//${location_like.host}/api/_/server/ws`
 }
 
 export class Server_Link {

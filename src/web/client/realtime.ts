@@ -24,7 +24,7 @@ async function refresh(): Promise<void> {
 }
 function connect(): void {
     if (!identity || socket || replaced) return
-    const revision = generation, url = new URL("/api/v1/realtime", location.href); url.protocol = location.protocol === "https:" ? "wss:" : "ws:"
+    const revision = generation, url = new URL("/api/_/realtime", location.href); url.protocol = location.protocol === "https:" ? "wss:" : "ws:"
     const ws = socket = new WebSocket(url)
     ws.addEventListener("message", event => {
         if (socket !== ws || revision !== generation) return

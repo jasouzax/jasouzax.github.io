@@ -1,12 +1,14 @@
-import { api_error, secure_response, sign_origin, is_work_path } from "./security.ts"
-import { public_git_read } from "./git_read_proxy.ts"
-import { work_route, type Work_Env } from "./work.ts"
-import { auth_route } from "./auth.ts"
-import { realtime_route } from "./realtime.ts"
-import { push_route } from "./push.ts"
-import { gateway_route, gateway_target, server_route, type Server_Env } from "./server_route.ts"
-export { Realtime_Hub } from "./realtime.ts"
-export { Server_Hub } from "./server_hub.ts"
+import { api_error, secure_response, sign_origin, is_work_path } from "../security/headers.ts"
+import { public_git_read } from "../repo/fallback.ts"
+import { work_route, type Work_Env } from "../api/work.ts"
+import { session_route } from "../api/session.ts"
+import { health_route } from "../api/health.ts"
+import { auth_route } from "../api/auth.ts"
+import { realtime_route } from "../room/room.ts"
+import { push_route } from "../api/push.ts"
+import { gateway_route, gateway_target, server_route, type Server_Env } from "../api/server.ts"
+export { Realtime_Hub } from "../room/room.ts"
+export { Server_Hub } from "../hub/hub.ts"
 
 type object_result = {
     body?: ReadableStream<Uint8Array>
@@ -105,7 +107,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         if (path !== "/.well-known/security.txt") return api_error("bad_path", "Invalid path", 400)
     }
     const projects: string[] = JSON.parse(env.PUBLIC_PROJECTS ?? "[]")
-    const candidate = /^\/(?:projects\/([a-z0-9_-]+)(?:\.git)?\/|api\/v1\/(?:git|ci)\/([a-z0-9_-]+)(?:\/|$))/.exec(path)
+    const candidate = /^\/(?:projects\/([a-z0-9_-]+)(?:\.git)?\/|api\/_\/(?:git|ci)\/([a-z0-9_-]+)(?:\/|$))/.exec(path)
     const subdomain = url.hostname.endsWith(`.${env.DOMAIN}`) ? url.hostname.slice(0, -(env.DOMAIN.length + 1)) : undefined
     const requested_project = candidate?.[1] ?? candidate?.[2] ?? subdomain
     if (requested_project && !projects.includes(requested_project)) projects.push(...await catalog_projects(request, env, upstream))
@@ -157,14 +159,15 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
         return new Response(response.body, { status: response.status, statusText: response.statusText, headers: output })
     }
     if (path === "/api" || path.startsWith("/api/")) {
-        if (path === "/api/v1/realtime") return realtime_route(request, env)
-        if (path === "/api/server" || path.startsWith("/api/server/")) return server_route(request, env)
-        if (path.startsWith("/api/v1/push/")) return push_route(request, env)
-        if (path.startsWith("/api/v1/auth/")) return auth_route(request, env)
-        if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/v1/health", git: "/api/v1/git/jazu/refs", runs: "/api/v1/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
-        if (path === "/api/v1/health" && ["GET", "HEAD"].includes(request.method)) return Response.json({ status: "ok", generation: 12, services: { work: env.DB && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? "encrypted_chat" : "not_configured" } }, { headers: { "cache-control": "no-store" } })
-        if (path === "/api/v1/work" || path.startsWith("/api/v1/work/")) return work_route(request, env)
-        const read = /^\/api\/v1\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
+        if (path === "/api/_/realtime") return realtime_route(request, env)
+        if (path === "/api/_/server" || path.startsWith("/api/_/server/")) return server_route(request, env)
+        if (path.startsWith("/api/_/push/")) return push_route(request, env)
+        if (path === "/api/_/session") return session_route(request, env)
+        if (path.startsWith("/api/_/auth/")) return auth_route(request, env)
+        if (path === "/api" && ["GET", "HEAD"].includes(request.method)) return Response.json({ name: "jazu", version: "v1", health: "/api/_/health", git: "/api/_/git/jazu/refs", runs: "/api/_/ci/jazu/runs" }, { headers: { "cache-control": "no-store" } })
+        if (path === "/api/_/health") return health_route(request, env)
+        if (path === "/api/_/work" || path.startsWith("/api/_/work/")) return work_route(request, env)
+        const read = /^\/api\/_\/(git|ci)\/([a-z0-9_-]+)(\/.*)?$/.exec(path)
         if (read && projects.includes(read[2]) && request.method === "GET") {
             if (!env.PERSONAL_ORIGIN || !env.ORIGIN_HMAC_SECRET) return api_error("origin_offline", "Personal node is not configured", 503)
             const target = new URL(`/${read[1]}/${read[2]}${read[3] ?? (read[1] === "ci" ? "/runs" : "/refs")}${url.search}`, env.PERSONAL_ORIGIN)
@@ -199,7 +202,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
 export default {
     async fetch(request: Request, env: worker_env): Promise<Response> {
         const path = new URL(request.url).pathname
-        const private_response = is_work_path(path) || path.startsWith("/api/v1/auth/")
+        const private_response = is_work_path(path) || path === "/api/_/session" || path.startsWith("/api/_/auth/")
         try { const response = await route(request, env); return response.status === 101 ? response : secure_response(response, private_response) }
         catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), private_response) }
     },

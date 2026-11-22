@@ -1,8 +1,8 @@
 /* Work authorization/delivery adapter. The socket hub itself routes generic channels and identities. */
-import { work_route, type Work_Env, type Work_Message } from "./work.ts"
-import type { Auth_Session } from "./auth.ts"
-import { realtime_call } from "./realtime_bus.ts"
-import type { Realtime_Channel } from "./realtime_channels.ts"
+import { work_route, type Work_Env, type Work_Message } from "../api/work.ts"
+import type { Auth_Session } from "../api/auth.ts"
+import { realtime_call } from "./bus.ts"
+import type { Realtime_Channel } from "./channels.ts"
 export type Realtime_Actor = { session: Auth_Session | null, guest_id: number | null, csrf: string }
 type Room = { id: string, google_subject: string | null, guest_id: number | null, email: string, revoked: number }
 export async function work_peers(env: Work_Env, conversation: string) {
@@ -18,7 +18,7 @@ export async function work_access(env: Work_Env, actor: Realtime_Actor, conversa
         return { target: `a:${owner.subject}` }
     }
     if (!/^[a-f0-9-]{36}$/i.test(conversation)) throw new Error("Invalid conversation")
-    const response = await work_route(new Request(`${origin}/api/v1/work/rooms/${conversation}`), env, { actor })
+    const response = await work_route(new Request(`${origin}/api/_/work/rooms/${conversation}`), env, { actor })
     if (!response.ok) throw new Error("Conversation unavailable")
     const peers = await work_peers(env, conversation)
     return { ...peers, target: actor.session?.role === "owner" ? peers.client : peers.owner }
@@ -58,7 +58,7 @@ export const work_channel: Realtime_Channel = {
         return results.map(row => ({ ...row, envelope: JSON.parse(row.envelope) }))
     },
     async send(env, actor, origin, data, dispatch) {
-        const response = await work_route(new Request(`${origin}/api/v1/work/rooms/${data.conversation}/messages`, { method: "POST", headers: { origin, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": actor.csrf }, body: JSON.stringify({ id: data.id, envelope: data.envelope }) }), env, { actor, dispatch })
+        const response = await work_route(new Request(`${origin}/api/_/work/rooms/${data.conversation}/messages`, { method: "POST", headers: { origin, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": actor.csrf }, body: JSON.stringify({ id: data.id, envelope: data.envelope }) }), env, { actor, dispatch })
         const result = await response.json() as any
         return response.ok ? { value: result } : { error: result.error?.message ?? "Message was not saved" }
     },

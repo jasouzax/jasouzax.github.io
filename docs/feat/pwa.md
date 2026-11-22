@@ -10,7 +10,7 @@ Implemented in code but **unverified**: no dependencies or network were availabl
 - [x] Installation fetches canonical URLs (`/x/` for `/x/index.html`, because Pages redirects the latter), verifies each revision hash and deletes the whole cache on any mismatch; old snapshots are deleted on activation
 - [x] Offline banner; Desk is disabled while offline (`html[data-offline]`)
 - [x] Notifications show `{email}` (low opacity in the page, title in native alerts) above the **decrypted** message. The device key is loaded after the page loads (`init_notification_keys`) and persisted as a non-extractable `CryptoKey` in IndexedDB; no plaintext is stored
-- [x] Web Push: VAPID-signed, payload holds routing metadata only (never text); the worker fetches ciphertext from `/api/v1/push/message` and decrypts locally; unreadable messages fall back to a generic line
+- [x] Web Push: VAPID-signed, payload holds routing metadata only (never text); the worker fetches ciphertext from `/api/_/push/message` and decrypts locally; unreadable messages fall back to a generic line
 - [x] Subscriptions are per session, capped at 8 devices, removed on sign-out/account deletion, on 404/410 and after 30 days of session inactivity; receipts prevent duplicates and failed devices are retried
 - [ ] Run `npm run types`, `npm test` (`tests/pwa.test.ts`, `tests/push.test.ts`) and `npm run test:pwa:browser` on a machine with dependencies; nothing here has been executed yet
 - [ ] Verify real Web Push on Chrome/Android, Firefox and iOS (home-screen install required) against staging

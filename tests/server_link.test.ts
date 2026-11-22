@@ -20,7 +20,7 @@ function harness() {
         set_interval: (fn, ms) => { const t = { id: timers.length, fn, ms, repeat: true, live: true }; timers.push(t); return t.id },
         clear: id => { const t = timers[id as number]; if (t) t.live = false },
     }
-    const link = new Server_Link({ url: "wss://x/api/server/ws", make_socket: () => { const s = new Fake(); sockets.push(s); return s }, timers: api })
+    const link = new Server_Link({ url: "wss://x/api/_/server/ws", make_socket: () => { const s = new Fake(); sockets.push(s); return s }, timers: api })
     return { link, sockets, timers }
 }
 
@@ -92,8 +92,8 @@ test("subscriptions get their message types, binary frames are unpacked", () => 
 test("send is refused while the socket is not open; the socket url follows the page's scheme", () => {
     const { link } = harness()
     assert.equal(link.send({ t: "auto_state" }), false)
-    assert.equal(default_socket_url({ protocol: "https:", host: "jasouza.com" }), "wss://jasouza.com/api/server/ws")
-    assert.equal(default_socket_url({ protocol: "http:", host: "127.0.0.1:8787" }), "ws://127.0.0.1:8787/api/server/ws")
+    assert.equal(default_socket_url({ protocol: "https:", host: "jasouza.com" }), "wss://jasouza.com/api/_/server/ws")
+    assert.equal(default_socket_url({ protocol: "http:", host: "127.0.0.1:8787" }), "ws://127.0.0.1:8787/api/_/server/ws")
 })
 
 test("fetch_public_status normalises the answer and rejects an error status", async () => {

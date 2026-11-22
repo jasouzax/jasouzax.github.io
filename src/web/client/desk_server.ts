@@ -3,7 +3,7 @@
  *
  * Entities
  *   server            { mode, status }: what the page knows about the server; mode is "unknown" until the first answer
- *   load_status       GET /api/server through one shared request; the answer is reused for a minute (the Worker caches it for a minute too)
+ *   load_status       GET /api/_/server through one shared request; the answer is reused for a minute (the Worker caches it for a minute too)
  *   snapshot_text     the text shown in the fastfetch window for a status (pure)
  *   init_server       registers the `server:fastfetch` source, refreshes its windows once a minute while the tab is visible
  * Scope
