@@ -1,6 +1,7 @@
 import { pdf_body } from "./preview.ts"
 import type { desk_window } from "../index.ts"
 import { window_audio_enabled } from "../action/controls.ts"
+import { window_volume } from "../action/volume.ts"
 
 // Inline strokes stay legible even before the site's icon font has loaded.
 const icons: Record<string, string> = {
@@ -85,6 +86,7 @@ export function media_player(item: desk_window, url: string, failed: () => void)
     media.src = url
     media.preload = "metadata"
     media.muted = !window_audio_enabled(item)
+    media.volume = window_volume(item)
     if (media instanceof HTMLVideoElement) media.playsInline = true
     const timeline = document.createElement("div")
     timeline.className = "desk_wbox_body_media_time"

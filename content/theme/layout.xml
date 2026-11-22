@@ -9,6 +9,8 @@
     <style src="slide_skills.scss"/>
     <style src="desk_map.scss"/>
     <style src="desk_save.scss"/>
+    <style src="desk_volume.scss"/>
+    <style src="desk_fullscreen.scss"/>
     <style><![CDATA[
         #head_tray, #theme_background { display: contents; }
         .needs_js { display: none; }

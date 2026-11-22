@@ -6,13 +6,14 @@ import type { html } from "../../shared/util.ts"
 import type { render_ctx } from "./page/context.tsx"
 import { glyph, link_attrs } from "./page/context.tsx"
 import { ui_text } from "../load/model.ts"
+import { map_image_icon } from "../../shared/content/tags/map.ts"
 
 export function render_map(ctx: render_ctx, node: xml_node): html {
     const nodes = (parent: xml_node): child => child_nodes(parent, "node").map(item => (
         <li data-map-node={item.attrs.id} data-map-parent={parent.tag === "node" ? parent.attrs.id : undefined} data-map-x={item.attrs.x} data-map-y={item.attrs.y}>
             <span class="desk_map_label">
-                {glyph(ctx, item.attrs.icon)}
-                {item.attrs.link ? <a {...link_attrs(ctx, item.attrs.link)}>{item.attrs.name ?? item.attrs.id}</a> : (item.attrs.name ?? item.attrs.id)}
+                {map_image_icon(item.attrs.icon) ? <img class="desk_map_icon" src={item.attrs.icon} alt=""/> : glyph(ctx, item.attrs.icon, "desk_map_icon")}
+                <span class="desk_map_name">{item.attrs.link ? <a {...link_attrs(ctx, item.attrs.link)}>{item.attrs.name ?? item.attrs.id}</a> : (item.attrs.name ?? item.attrs.id)}</span>
             </span>
             {item.attrs.info ? <p>{item.attrs.info}</p> : null}
             {child_nodes(item, "node").length ? <ul>{nodes(item)}</ul> : null}

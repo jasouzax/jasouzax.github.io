@@ -23,6 +23,7 @@ import { Touch_control } from "./touch.ts"
 import { server_audio } from "./audio.ts"
 import { override_navigation, sync_navigation, type Live_Navigation } from "../action/history.ts"
 import { window_audio_enabled } from "../action/controls.ts"
+import { window_volume, remote_audio_state } from "../action/volume.ts"
 import { Click_Counter, copy_shortcut, key_events, modifiers, mouse_button, page_point, wheel_pixels } from "./input.ts"
 import { is_site_url, site_key, site_url_of, window_id_of } from "./windows.ts"
 import type { Input_Event, Window_Info } from "../../shared/protocol/wire.ts"
@@ -136,6 +137,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     }
     const sync = (): void => {
         const window_info = info()
+        remote_audio_state(item, Boolean(window_info?.audible))
         if (window_info) { asked_open = true; seen_window = true }
         navigation.path = window_info?.url || navigation.path
         navigation.can_back = Boolean(window_info?.can_back)
@@ -280,6 +282,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const change_sound = (): void => {
         active_feed = item
         audio.enabled = window_audio_enabled(item)
+        audio.volume = window_volume(item)
         if (!audio.enabled) audio.reset()
         watch(true)
     }
@@ -290,6 +293,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
         if (active_feed !== item) audio.reset()
         active_feed = item
         if (audio.enabled !== window_audio_enabled(item)) audio.enabled = window_audio_enabled(item)
+        audio.volume = window_volume(item)
         watch(true)
     }
     item.el.addEventListener("pointerdown", claim)
@@ -300,6 +304,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     draw_sound()
     const offs = [store.on_change(sync), link.on_state(sync), off_frames, off_clipboard]
     signal.addEventListener("abort", () => {
+        remote_audio_state(item, false)
         for (const off of offs) off()
         restore_navigation()
         item.el.removeEventListener("jazu:window-audio", change_sound)

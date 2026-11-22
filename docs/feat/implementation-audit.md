@@ -1,6 +1,14 @@
 # Component implementation audit
 
-This pass follows the requested branch/Conventional Commit/no-ff merge workflow into `staging`. `[?]` means implemented and awaiting human acceptance; `[!]` names missing functionality or an operational notice. No acceptance marks were invented. This is an implementation attempt and a complete gap inventory, not completion of every target system.
+The original 2026-11-22 pass used feature branches/no-ff merges. The 2026-11-23 continuation works directly on `staging` only, as requested. `[?]` means implemented and awaiting human acceptance; `[!]` names missing functionality or an operational notice. No acceptance marks were invented. This is an implementation attempt and a gap inventory, not completion of every target system.
+
+## Staging continuation — 2026-11-23
+
+The menu-head specification was committed first as `4e566ae` with the requested message. `f365c33` implements automatic head height, active-menu map/window mode, accessible pan/zoom, authored maps, live files/windows/flows/processes and plugin resource contributions; it also adds the VFS Save destination picker with cancellation and explicit overwrite handling. The continuation adds draggable/keyboard node placement saved per page/menu, per-window audio controls and native fullscreen video inactivity. `b320d4c` fixes a pre-existing fastfetch test that compared volatile live memory readings from separate snapshots.
+
+Validation: root/server typechecks, static build (71 pages), server build, focused map/render/layout/gain/protocol tests and 16 real Chrome regressions pass across the focused runs. The main suite reports 307 passes, 4 skips and the 4 documented Windows/POSIX filesystem failures. After correcting the volatile-memory assertion, the server suite reports 65 passes, 1 skip and its 7 documented filesystem failures. Content validation reports 71 pages and 39 existing warnings. The desk browser configuration now builds before serving; plain `serve` can reuse stale output. No branch other than staging, live service, DNS, infrastructure state or published image was changed.
+
+Continue from the component statuses, preserving `[?]` for human review. The desktop and Specific actions remain `[/]`: resource-bound comments (including Work persistence/annotations), grouped persistent desktops, full MIME conversion graph and shell restoration/accounting remain unfinished. The broader Blog/People/collaboration/custom API/multi-server/cloud/native application gaps in this inventory also remain open; this continuation does not relabel them as delivered.
 
 ## Delivered changes
 

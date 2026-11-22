@@ -4,6 +4,9 @@ The [2026-11-22 implementation audit](implementation-audit.md) records this pass
 
 - [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+- [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
+- [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
+- [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
 - [?] RSS 2.0 and Atom feeds with per-language autodiscovery and private-page exclusion.
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.

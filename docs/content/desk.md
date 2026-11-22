@@ -66,6 +66,7 @@ A zoomable node-and-arrow diagram belonging to a menu tab. Drag the background o
 
 - `<map/>` with no children is **automatic** (derived from menu content and live resources).
 - Automatic maps include files, windows, split flows and processes. Dashed borders indicate minimized windows or processes without windows.
+- Drag a node's background to place it, or focus it and use Shift+arrow keys. Positions stay in this browser per page/menu; changing the viewport or switching tabs preserves them. Moving nodes updates their arrows. Authored icons support glyphs and HTTP/relative image URLs.
 - With children it is **manual**:
 
 | Element | Attributes |
@@ -95,6 +96,10 @@ The body is chosen by the [plugin](plugin.md) whose case matches (mime, url, mod
 Windows whose source is known at build time (markdown, text, images, code) are pre-rendered into the HTML so search engines and no-JavaScript readers get the content.
 
 Save writes to an existing writable source. New/read-only documents open a VFS destination picker at `/home/user`; choose a folder and filename. Replacing files requires selecting the overwrite checkbox. Cancel preserves the dirty draft. Later saves reuse the chosen path.
+
+Volume: click to mute/unmute; right-click, touch, or press ArrowDown on the button to open the slider. Nonaudio windows disable it. Mute/level survive viewer changes, and a badge identifies muted playback, including remote browser audio. Escape closes the slider.
+
+Fullscreen removes the frame. During video playback, idle tools fade after 2.5 seconds; the fullscreen head overlays the video and fades too. Pointer/touch/keyboard interaction restores controls. Keyboard focus or open menus keeps them visible.
 
 ## Related
 

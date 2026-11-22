@@ -26,7 +26,7 @@ import { no_picks } from "../plugin/rules.ts"
 import { message_body } from "./messages.ts"
 import { auto_script_body } from "../server/script.ts"
 import { auto_site_body } from "../server/site.ts"
-import { bind_window_controls } from "../action/controls.ts"
+import { bind_window_controls, dispose_window_controls } from "../action/controls.ts"
 import { register_map_resources } from "../menu/map.ts"
 
 // every child of the window except its head is the body
@@ -323,6 +323,7 @@ export function render_window(item: desk_window): void {
     item.problem = ""
     body_for(item)
     sync_save(item)
+    item.el.dispatchEvent(new Event("jazu:window-state"))
     // the children hold this window's resource: they draw themselves again
     refresh_children(item)
 }
@@ -500,6 +501,7 @@ function wire(item: desk_window, open_window: () => desk_window | null): void {
 export function init_view(open_window: () => desk_window | null): void {
     link_hooks.render = render_window
     window_hooks.closed = item => {
+        dispose_window_controls(item)
         renders.get(item)?.abort()
         item.el.querySelectorAll<HTMLMediaElement>("video, audio").forEach(media => media.pause())
         release_url(item)

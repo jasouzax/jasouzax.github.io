@@ -111,7 +111,7 @@ export function render_entry(ctx: render_ctx, node: xml_node, side_index: number
     const open = is_true(attrs.open) || (kind === "dir" && children.length > 0)
     return (
         <>
-            <article class={"desk_side_item"} data-kind={kind}>
+            <article class={"desk_side_item"} data-kind={kind} data-entry-id={id}>
                 <details class={"desk_side_item_box"} open={open}>
                     {head}
                     {body}

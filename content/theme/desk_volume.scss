@@ -1,0 +1,5 @@
+.desk_volume_popup { position: fixed; z-index: 10000; padding: .75em; background: var(--panel); color: var(--text); border: 1px solid currentColor; border-radius: .25em; }
+.desk_volume_popup input { width: 12em; max-width: calc(100vw - 3em); }
+.desk_wbox_head_audio { position: relative; }
+.desk_wbox_head_audio[data-muted-playing]::after { content: ''; position: absolute; right: 0; top: 0; width: .4em; height: .4em; border-radius: 50%; background: var(--accent, currentColor); }
+.desk_wbox_head_audio:disabled { opacity: .35; cursor: default; }

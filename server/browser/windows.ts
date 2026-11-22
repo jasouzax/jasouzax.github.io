@@ -436,6 +436,7 @@ export class Window_Registry extends EventEmitter {
             this.#measure(item);
             const refresh = () => this.#refresh(item);
             contents.on('page-title-updated', refresh);
+            contents.on('audio-state-changed', refresh);
             contents.on('page-favicon-updated', (_event, icons) => {
                 item.info.icon = icons[0] ?? '';
                 refresh();
@@ -496,6 +497,7 @@ export class Window_Registry extends EventEmitter {
             };
             item.info.can_back = navigation.canGoBack?.() ?? false;
             item.info.can_forward = navigation.canGoForward?.() ?? false;
+            item.info.audible = contents.isCurrentlyAudible();
         }
         this.#measure(item);
         this.emit('updated', item.info);

@@ -29,6 +29,7 @@ export class Server_audio {
     #analyser: AnalyserNode | null = null
     #decoder: AudioDecoder | null = null
     #enabled = storage.get('audio') !== 'off'
+    #volume = 1
     #next_time = 0
     #samples: Float32Array<ArrayBuffer> | null = null
 
@@ -48,7 +49,7 @@ export class Server_audio {
     set enabled(value: boolean) {
         this.#enabled = value
         storage.set('audio', value ? 'on' : 'off')
-        if (this.#gain) this.#gain.gain.value = value ? 1 : 0
+        if (this.#gain) this.#gain.gain.value = value ? this.#volume : 0
         // Pressing the button is the touch the browser wants to see
         if (value) this.unlock()
         else this.reset()
@@ -57,6 +58,13 @@ export class Server_audio {
 
     get is_running(): boolean {
         return this.#context?.state === 'running'
+    }
+
+    get volume(): number { return this.#volume }
+    set volume(value: number) {
+        if (!Number.isFinite(value)) return
+        this.#volume = Math.max(0, Math.min(1, value))
+        if (this.#gain) this.#gain.gain.value = this.#enabled ? this.#volume : 0
     }
 
     // Whether the server should be sending sound at all
@@ -71,7 +79,7 @@ export class Server_audio {
             const context = new AudioContext({ sampleRate: sample_rate, latencyHint: 'interactive' })
             this.#context = context
             this.#gain = context.createGain()
-            this.#gain.gain.value = this.#enabled ? 1 : 0
+            this.#gain.gain.value = this.#enabled ? this.#volume : 0
             this.#analyser = context.createAnalyser()
             this.#analyser.fftSize = 512
             this.#gain.connect(this.#analyser).connect(context.destination)

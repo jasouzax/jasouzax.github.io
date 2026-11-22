@@ -47,10 +47,10 @@ npm run types                         # optional: TypeScript check
 npm test                              # optional: contract tests
 npm run check                         # optional: validate content (warnings are expected, see below)
 npm run build                         # generate dist/
-npm run serve -- --port 8080          # build, then serve http://127.0.0.1:8080
+npm run serve -- --port 8080          # serve dist; build automatically only if dist is absent
 ```
 
-Open <http://127.0.0.1:8080>. `serve` builds first, so `build` before it is optional. The same commands work in PowerShell, cmd or a POSIX shell.
+Open <http://127.0.0.1:8080>. `serve` builds only when output is absent; run `build` first after source changes, or use `node src/main.ts make serve --port 8080`. The same commands work in PowerShell, cmd or a POSIX shell.
 
 Handy variants:
 

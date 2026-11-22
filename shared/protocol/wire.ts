@@ -78,6 +78,7 @@ export type Window_Info = {
     height: number
     can_back?: boolean
     can_forward?: boolean
+    audible?: boolean
     // Chromium's DevTools of this window when open: a picture of their own, numbered like a window
     devtools: { id: number, width: number, height: number } | null
 }

@@ -9,6 +9,9 @@
 ## Status
 
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+- [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
+- [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
+- [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 

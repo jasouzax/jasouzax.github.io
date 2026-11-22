@@ -35,6 +35,8 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 `desk/action/save/destination.ts` owns the VFS destination dialog and permission/name/overwrite checks. `desk/action/save.ts` serializes duplicate saves per shared document, preserves drafts on cancellation/failure and updates navigation after writing.
 
+`desk/menu/map/positions.ts` validates browser-local placement records. Entry resource paths/IDs keep file-node placement stable across redraws. `desk/action/volume.ts` shares mute/level between media and remote audio; `desk/server/audio.ts` applies level through its GainNode. Optional `Window_Info.audible` comes from Electron audio-state events, so remote muted playback can still show a badge. Nested asynchronous body updates and `jazu:window-state` refresh control availability. `desk/action/fullscreen.ts` owns native fullscreen and video inactivity; `controls.ts` disposes both controllers on close/navigation.
+
 `desk_plugins.ts` loads the plugin manifest, picks the first matching plugin/case via `plugin_types.ts`, and asks `desk_view.ts` for the body (`text`, `hex`, `folder`, `media`, `shell`, `markdown`, `default`) or a plugin script's `render`. Plugin scripts can contribute through `host.state.desk` / `host.state.windows`.
 
 ## <a id="artifacts"></a>Build artifacts (important)

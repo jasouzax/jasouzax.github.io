@@ -7,6 +7,8 @@ import { open_source } from "../window/index.ts"
 import { kernel, subscribe_processes } from "../kernel/process.ts"
 import { flow_kind_of } from "../plugin/flow.ts"
 import { place_nodes, zoom_at, type Map_Graph } from "./map/model.ts"
+import { read_positions, save_positions, type Node_Positions } from "./map/positions.ts"
+import { map_image_icon } from "../../shared/content/tags/map.ts"
 
 type Map_Source = () => Map_Graph
 const sources = new Set<Map_Source>()
@@ -30,25 +32,29 @@ function numeric(value: string | undefined): number | undefined {
 }
 
 function manual_graph(map: HTMLElement): Map_Graph {
-    return {
+    const graph: Map_Graph = {
         nodes: [...map.querySelectorAll<HTMLElement>("[data-map-node]")].map(node => ({
-            id: node.dataset.mapNode!, name: node.querySelector(".desk_map_label")?.textContent?.trim() ?? node.dataset.mapNode!,
-            info: node.querySelector(":scope > p")?.textContent ?? "", link: node.querySelector(":scope > .desk_map_label > a")?.getAttribute("href") ?? undefined,
+            id: node.dataset.mapNode!, name: (node.querySelector(":scope > .desk_map_label > .desk_map_name") ?? node.querySelector(":scope > .desk_map_label"))?.textContent?.trim() ?? node.dataset.mapNode!,
+            info: node.querySelector(":scope > p")?.textContent ?? "", link: node.querySelector(":scope > .desk_map_label a")?.getAttribute("href") ?? undefined,
+            icon: node.querySelector(":scope > .desk_map_label > .desk_map_icon")?.getAttribute("src") ?? node.querySelector(":scope > .desk_map_label > .desk_map_icon")?.textContent ?? undefined,
             parent: node.dataset.mapParent, x: numeric(node.dataset.mapX), y: numeric(node.dataset.mapY),
         })),
         edges: [...map.querySelectorAll<HTMLElement>("[data-map-from]")].map(edge => ({ from: edge.dataset.mapFrom!, to: edge.dataset.mapTo!, text: edge.dataset.mapText })),
     }
+    for (const node of graph.nodes) if (node.parent && !graph.edges.some(edge => edge.from === node.parent && edge.to === node.id)) graph.edges.push({ from: node.parent, to: node.id })
+    return graph
 }
 
 function auto_graph(page: HTMLElement): Map_Graph {
     const graph: Map_Graph = { nodes: [], edges: [] }
     const entries = [...page.querySelectorAll<HTMLElement>(".desk_side_item")]
-    for (const [index, entry] of entries.entries()) {
+    const entry_id = (entry: HTMLElement) => `entry:${entry.dataset.path ?? entry.dataset.entryId ?? entries.indexOf(entry)}`
+    for (const entry of entries) {
         const head = entry.querySelector(":scope > details > summary, :scope > summary") ?? entry.querySelector(".desk_side_item_head")
         const link = head?.querySelector<HTMLAnchorElement>("a")
         const parent = entry.parentElement?.closest<HTMLElement>(".desk_side_item")
-        const id = `entry:${index}`
-        const parent_id = parent ? `entry:${entries.indexOf(parent)}` : undefined
+        const id = entry_id(entry)
+        const parent_id = parent ? entry_id(parent) : undefined
         graph.nodes.push({ id, name: head?.querySelector(".desk_side_item_name")?.textContent?.trim() || link?.textContent || id, link: link?.getAttribute("href") ?? (entry.dataset.path ? `file://${entry.dataset.path}` : undefined), parent: parent_id })
         if (parent_id) graph.edges.push({ from: parent_id, to: id })
     }
@@ -71,9 +77,11 @@ function auto_graph(page: HTMLElement): Map_Graph {
         if (proc.ppid) graph.edges.push({ from: `pid:${proc.ppid}`, to: `pid:${proc.pid}` })
     }
     for (const source of sources) {
-        const contributed = source()
-        graph.nodes.push(...contributed.nodes)
-        graph.edges.push(...contributed.edges)
+        try {
+            const contributed = source()
+            graph.nodes.push(...contributed.nodes.filter(node => typeof node.id === "string" && typeof node.name === "string"))
+            graph.edges.push(...contributed.edges.filter(edge => typeof edge.from === "string" && typeof edge.to === "string"))
+        } catch (error) { console.warn("Map resource provider failed", error) }
     }
     graph.nodes = [...new Map(graph.nodes.map(node => [node.id, node])).values()]
     return graph
@@ -105,6 +113,7 @@ export function init_map(desk: HTMLElement): () => void {
     button.setAttribute("aria-controls", viewport.id)
     let active_map: HTMLElement | null = null, active_page: HTMLElement | null = null
     let view = { x: 0, y: 0, scale: 1 }, graph_key = ""
+    let positions: Node_Positions = {}, positions_key = ""
     const views = new WeakMap<HTMLElement, typeof view>()
     const transform = () => { canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }
     const zoom = (factor: number, x = surface.clientWidth / 2, y = surface.clientHeight / 2) => { view = zoom_at(view, factor, x, y); transform() }
@@ -130,7 +139,7 @@ export function init_map(desk: HTMLElement): () => void {
         if (key === graph_key) return
         graph_key = key
         const focused_id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>("[data-map-id]")?.dataset.mapId
-        const nodes = place_nodes(graph, active_map.dataset.mapLayout ?? "tree")
+        const nodes = place_nodes(graph, active_map.dataset.mapLayout ?? "tree").map(node => ({ ...node, ...positions[node.id] }))
         const by_id = new Map(nodes.map(node => [node.id, node]))
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
         svg.classList.add("desk_map_edges")
@@ -152,12 +161,21 @@ export function init_map(desk: HTMLElement): () => void {
         canvas.replaceChildren(svg)
         for (const node of nodes) {
             const card = element("div", "desk_map_node")
+            if (!node.link) card.tabIndex = 0
             card.dataset.mapId = node.id
             card.toggleAttribute("data-active", Boolean(node.active))
             card.toggleAttribute("data-hidden-resource", Boolean(node.hidden))
             card.style.left = `${node.x}px`; card.style.top = `${node.y}px`
             const label = element(node.link ? "a" : "span", "desk_map_node_name")
-            label.textContent = `${node.icon ? node.icon + " " : ""}${node.name}`
+            label.textContent = node.name
+            if (node.icon) {
+                const image = map_image_icon(node.icon)
+                const icon = element(image ? "img" : "span", "desk_map_icon")
+                icon.setAttribute("aria-hidden", "true")
+                if (icon instanceof HTMLImageElement) { icon.src = node.icon; icon.alt = "" }
+                else icon.textContent = node.icon
+                card.append(icon)
+            }
             if (label instanceof HTMLAnchorElement) label.href = safe_link(node.link!)
             card.append(label)
             if (node.info) { const info = element("p", "desk_map_node_info"); info.textContent = node.info; card.append(info) }
@@ -186,6 +204,8 @@ export function init_map(desk: HTMLElement): () => void {
             active_map = map
             active_page = page
             graph_key = ""
+            positions_key = `jazu:map:${location.pathname}:${page?.dataset.path ?? index}`
+            positions = Object.assign(Object.create(null), read_positions(positions_key))
             view = (map && views.get(map)) || { x: 0, y: 0, scale: 1 }
             transform()
         }
@@ -202,6 +222,14 @@ export function init_map(desk: HTMLElement): () => void {
         zoom(Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * .002), event.clientX - rect.left, event.clientY - rect.top)
     }, { signal, passive: false })
     surface.addEventListener("keydown", event => {
+        const card = (event.target as Element).closest<HTMLElement>("[data-map-id]")
+        if (card && event.shiftKey && event.key.startsWith("Arrow")) {
+            event.preventDefault()
+            const id = card.dataset.mapId!, x = parseFloat(card.style.left), y = parseFloat(card.style.top)
+            positions[id] = { x: x + (event.key === "ArrowLeft" ? -10 : event.key === "ArrowRight" ? 10 : 0), y: y + (event.key === "ArrowUp" ? -10 : event.key === "ArrowDown" ? 10 : 0) }
+            graph_key = ""; render(); save_positions(positions_key, positions)
+            return
+        }
         if (event.target !== surface) return
         if (["+", "=", "-", "0"].includes(event.key)) {
             event.preventDefault()
@@ -214,21 +242,31 @@ export function init_map(desk: HTMLElement): () => void {
             transform()
         }
     }, { signal })
-    let drag: { id: number, x: number, y: number } | null = null
+    let drag: { id: number, x: number, y: number, node?: string, node_x: number, node_y: number } | null = null
     surface.addEventListener("pointerdown", event => {
         if (event.button !== 0 || (event.target as Element).closest("a, button")) return
-        drag = { id: event.pointerId, x: event.clientX, y: event.clientY }
+        const card = (event.target as Element).closest<HTMLElement>("[data-map-id]")
+        drag = { id: event.pointerId, x: event.clientX, y: event.clientY, node: card?.dataset.mapId, node_x: card ? parseFloat(card.style.left) : 0, node_y: card ? parseFloat(card.style.top) : 0 }
         surface.setPointerCapture(event.pointerId)
         surface.focus({ preventScroll: true })
     }, { signal })
     surface.addEventListener("pointermove", event => {
         if (!drag || drag.id !== event.pointerId) return
-        view.x += event.clientX - drag.x; view.y += event.clientY - drag.y
+        if (drag.node) {
+            drag.node_x += (event.clientX - drag.x) / view.scale
+            drag.node_y += (event.clientY - drag.y) / view.scale
+            positions[drag.node] = { x: drag.node_x, y: drag.node_y }
+            graph_key = ""; render()
+        } else { view.x += event.clientX - drag.x; view.y += event.clientY - drag.y }
         drag.x = event.clientX; drag.y = event.clientY
         transform()
     }, { signal })
-    surface.addEventListener("lostpointercapture", () => { drag = null }, { signal })
-    surface.addEventListener("pointerup", event => { if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId); drag = null }, { signal })
+    surface.addEventListener("lostpointercapture", () => { if (drag?.node) save_positions(positions_key, positions); drag = null }, { signal })
+    surface.addEventListener("pointerup", event => {
+        if (drag?.node) save_positions(positions_key, positions)
+        if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId)
+        drag = null
+    }, { signal })
     viewport.addEventListener("click", event => {
         const link = (event.target as Element).closest<HTMLAnchorElement>("a")
         if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
@@ -241,6 +279,9 @@ export function init_map(desk: HTMLElement): () => void {
         } else if (/^(?:pid:|file:\/\/|im:)/.test(uri)) {
             event.preventDefault()
             mode(false)
+            const pid = /^pid:(\d+)$/.exec(uri)
+            const existing = pid ? state.windows.find(item => item.pid === Number(pid[1])) : null
+            if (existing) { focus_window(existing); existing.el.focus({ preventScroll: true }); return }
             const item = new_window()
             if (item) void open_source(item, uri)
         }
