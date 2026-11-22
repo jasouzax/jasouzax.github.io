@@ -4,15 +4,68 @@
     "main": "../../router/index.ts",
     "compatibility_date": "2026-11-04",
     "workers_dev": false,
-    "routes": [{ "pattern": "jasouza.com/*", "zone_name": "jasouza.com" }],
+    "routes": [
+        {
+            "pattern": "jasouza.com/*",
+            "zone_name": "jasouza.com"
+        },
+        {
+            "pattern": "*.jasouza.com/*",
+            "zone_name": "jasouza.com"
+        }
+    ],
     "vars": {
         "DOMAIN": "jasouza.com",
         "PAGES_ORIGIN": "https://jazu-1ws.pages.dev",
-        "PUBLIC_PROJECTS": "[\"jazu\"]",
+        "PUBLIC_PROJECTS": "[\"jazu\",\"galactic-strike\",\"hypro\",\"stesis\",\"lasortech\",\"linguachat\",\"dost-assistant\",\"eva\",\"aswang-king\",\"traffic\",\"obbo\",\"ncl-pos\",\"gdsc\",\"noble-city\"]",
         "PUBLIC_PROJECTS_MANIFEST": "/projects/git.json",
-        "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
+        "PERSONAL_ORIGIN": "https://personal-server.jasouza.com",
+        "PROJECT_CLONE_ORIGINS": "{\"jazu\":\"https://github.com/jasouzax/jasouzax.github.io.git\"}"
     },
-    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-assets" }],
-    "durable_objects": { "bindings": [{ "name": "SERVER_HUB", "class_name": "Server_Hub" }] },
-    "migrations": [{ "tag": "server-v1", "new_sqlite_classes": ["Server_Hub"] }]
+    "r2_buckets": [
+        {
+            "binding": "ASSETS",
+            "bucket_name": "jazu-assets"
+        }
+    ],
+    "durable_objects": {
+        "bindings": [
+            {
+                "name": "SERVER_HUB",
+                "class_name": "Server_Hub"
+            },
+            {
+                "name": "REALTIME",
+                "class_name": "Realtime_Hub"
+            }
+        ]
+    },
+    "migrations": [
+        {
+            "tag": "server-v1",
+            "new_sqlite_classes": [
+                "Server_Hub"
+            ]
+        },
+        {
+            "tag": "realtime-v2",
+            "new_sqlite_classes": [
+                "Realtime_Hub"
+            ]
+        }
+    ],
+    "keep_vars": true,
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "jazu-work",
+            "database_id": "338d45b3-26d4-44c8-af4b-79767d716cb7"
+        }
+    ],
+    "kv_namespaces": [
+        {
+            "binding": "REGISTRY",
+            "id": "31fdae39f96441139c2391aaa186e007"
+        }
+    ]
 }
