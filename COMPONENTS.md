@@ -433,7 +433,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             > New trigger methods
             > AI: polling exists today as `poll_seconds` (default 60, 10 to 86400) in `src/node/server_config.ts`, `src/schema.ts` and `src/pipeline_types.ts`, used for upstream git sync. Replacement: the repository hub fires a `post-receive` hook for pushes to `repo.{domain}`, and external hosts call the `hook` URL. `poll_seconds` is removed from the schema.
             - [?] `branch` *(optional)* - The git branch name it keep tracks/follow of, triggering the pipeline if the branch as a commit.
-            - [ ] `hook` *(optional)* - Triggers if the hook name at `{domain}/api/_/projects/{project_name}/{hookname}` is called
+            - [?] `hook` *(optional)* - Triggers if the hook name at `{domain}/api/_/projects/{project_name}/{hookname}` is called
             - [?] **Step** `<step>` `cmp:/content/project/pipeline/step` - Represents one automation step, a step could have another step as a child representing multi-steps, if no commands or action it just acts as a log/point to indicate that step as reached (especiall step with sub-steps).
                 > **Alignment review (AI, 2026-11-22):** Command is optional; log-only parents and nested steps execute in author order. Phases inherit and remain ordered. args/credentials require command, and continue retains a failed result while allowing following steps.
                 > Refactor: `command` is required today, the rule says it is optional (a step without command is a log point). Add `continue`. `phase` is accepted but unused.
