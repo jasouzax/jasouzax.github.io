@@ -11,7 +11,7 @@ For people (and AI agents) changing how the website is **built, rendered, run or
 | Nodes: Worker, personal server, local server, deploy | [node.md](node.md) | `src/node/` |
 | Google sign-in and encrypted Work chat | [Work contract and setup](../feat/work.md#encrypted-messaging-implementation) | `shared/work/crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_messages,sign}.ts` |
 | Helpers: paths, util, dates, icons, mime, fonts, theme CSS | [helper.md](helper.md) | `shared/util.ts`, `paths.ts`, `diag.ts`, `dates.ts`, `era.ts`, `icons.ts`, `mime.ts`, `gitignore.ts`, `raster.ts`, `font_build.ts`, `font/`, `theme_css.ts`, `layout_css.ts` |
-| Infrastructure as code | [../infra.md](../infra.md) | `cloud/infra/`, `migrations/`, `cloud/infra/wrangler/local.jsonc` |
+| Infrastructure as code | [../infra.md](../infra.md) | `cloud/infra/`, `cloud/db/migrations/`, `cloud/infra/wrangler/local.jsonc` |
 | Tests | [tests.md](tests.md) | `tests/` |
 
 ## Layout of the repository
@@ -40,7 +40,7 @@ src/
     client/              browser runtime (bundled with esbuild into assets/runtime/*)
   node/                  Worker, personal node, local static server, deploy, D1 migrate
   desk/                  WASM toolchains (busybox, programs) — the only non-TypeScript code
-migrations/              D1 SQL
+cloud/db/migrations/              D1 SQL
 cloud/infra/               Cloudflare infrastructure
 tests/                   node:test unit/contract tests + Playwright browser specs
 docs/                    this documentation

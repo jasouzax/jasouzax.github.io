@@ -74,7 +74,7 @@ Useful URLs: `/` (portfolio), `/desk` (desktop; enter `pid:` in a window's sourc
 To exercise the Worker, R2 range requests, KV and D1 locally with synthetic bindings (no credentials, no production effect):
 
 ```sh
-npm run db:local        # apply migrations/*.sql to the local D1 (stored in ignored .wrangler/)
+npm run db:local        # apply cloud/db/migrations/*.sql to the local D1 (stored in ignored .wrangler/)
 npm run serve           # terminal 1: static site on http://127.0.0.1:8080
 npm run cloud:dev       # terminal 2: wrangler dev --config cloud/infra/wrangler/local.jsonc
 ```
@@ -148,7 +148,7 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 ## Docker use
 
 ```sh
-docker run --rm --init -p 8080:8080 registry.jasouza.com/jazu:latest
+docker run --rm --init -p 8080:8080 repo.jasouza.com/jazu:latest
 ```
 
 The image serves its prebuilt website at `http://localhost:8080`, including prepared WASM packages and public assets. Custom content uses a read-only host mount and `--content=/content`. Personal-server mode uses `--personal-server`, external credentials and a persistent `/data` volume. See [Docker installation, custom content, registry releases and recovery](docs/feat/docker.md) for commands, Compose profiles, migration and rollback. Back up the data volume separately from the image.
@@ -229,14 +229,14 @@ cp extension/xinitrc.example ~/.xinitrc     # edit JAZU_DIR / PORT
 startx                                      # or: xinit ~/.xinitrc -- :0 vt1
 ```
 
-Use **Chromium** (or Chrome for Testing): branded Google Chrome removed `--load-extension` in version 137. Full guide, protocol, threat model and troubleshooting: [extension/README.md](extension/README.md). Status: [docs/feat/desk_env.md](docs/feat/desk_env.md). The host and the page-to-host chain are covered by `tests/host.test.ts` and `tests/host_bridge.test.ts`; running it inside a real Chromium/X session has **not** been verified yet.
+Use **Chromium** (or Chrome for Testing): branded Google Chrome removed `--load-extension` in version 137. Full guide, protocol, threat model and troubleshooting: [extension/README.md](extension/README.md). Status: [docs/feat/desk_env.md](docs/feat/desk_env.md). The host and the page-to-host chain are covered by `tests/extension/host/host.test.ts` and `tests/desk/host/host.test.ts`; running it inside a real Chromium/X session has **not** been verified yet.
 
 ---
 
 ## Repository at a glance
 
 ```
-config.json   content/   src/   extension/   docs/   migrations/   cloud/infra/   tests/
+config.json   content/   src/   extension/   docs/   cloud/db/migrations/   cloud/infra/   tests/
 .env.example  cloud/infra/wrangler/local.jsonc  CLAUDE.md
 ```
 

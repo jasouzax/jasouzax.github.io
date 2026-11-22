@@ -1,9 +1,4 @@
-/*
- * Public Smart HTTP reads prefer the XML-configured HTTPS provider, then the personal Git backend.
- * External requests never receive visitor/server credentials. Negotiation bodies are bounded and replayable;
- * pack responses stream without buffering. Pi discovery redirects stay on this website and pin subsequent
- * fetch requests to the Pi so provider recovery cannot switch repositories halfway through negotiation.
- */
+/* Read-only, pinned public provider fallback; no visitor credentials leave the edge. */
 import type { worker_env } from "../router/index.ts"
 import { api_error } from "../security/headers.ts"
 
@@ -40,11 +35,6 @@ async function negotiation_body(request: Request): Promise<ArrayBuffer> {
     return body.buffer
 }
 
-function pi_discovery(request: Request, id: string): Response {
-    const target = new URL(`/projects/${id}/_git/pi/info/refs?service=git-upload-pack`, request.url)
-    return new Response(null, { status: 307, headers: { location: target.href, "cache-control": "no-store" } })
-}
-
 async function external_read(request: Request, origin: URL, operation: string, body: ArrayBuffer | undefined, upstream: Fetcher): Promise<Response | null> {
     let target = new URL(`${origin.href.replace(/\/+$/, "")}/${operation}${operation === "info/refs" ? "?service=git-upload-pack" : ""}`)
     const headers = new Headers()
@@ -78,7 +68,7 @@ async function external_read(request: Request, origin: URL, operation: string, b
     return null
 }
 
-export async function public_git_read(request: Request, env: worker_env, id: string, operation: string, upstream: Fetcher, personal: Fetcher): Promise<Response> {
+export async function public_git_read(request: Request, env: worker_env, id: string, operation: string, upstream: Fetcher): Promise<Response> {
     const method = operation === "info/refs" ? "GET" : "POST"
     if (request.method !== method) return api_error("method_not_allowed", `Use ${method}`, 405)
     let body: ArrayBuffer | undefined
@@ -93,6 +83,5 @@ export async function public_git_read(request: Request, env: worker_env, id: str
             if (response) return response
         } catch { /* An unavailable provider falls back before any response bytes are returned. */ }
     }
-    if (method === "GET") return pi_discovery(request, id)
-    return personal(new Request(request.url, { method, headers: request.headers, body, signal: request.signal }))
+    return api_error("origin_offline", "Repository and read-only source are unavailable", 503)
 }

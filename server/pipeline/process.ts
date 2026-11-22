@@ -34,6 +34,11 @@ export function child_environment(config: Server_Config, extra: NodeJS.ProcessEn
 export function run_command(step: Step_Command, cwd: string, env: NodeJS.ProcessEnv, log: Log, extra_args: string[] = []): Promise<Command_Output> {
     return new Promise(resolve_output => {
         const started = Date.now()
+        if (!step.command) {
+            log(`\n[step] ${step.name}\n`)
+            resolve_output({ result: { name: step.name, ok: true, code: 0, ms: 0 }, tail: "" })
+            return
+        }
         log(`\n$ ${step.command} ${[...step.args, ...extra_args].join(" ")}   (${cwd})\n`)
         const resolved = executable({ ...step, args: [...step.args, ...extra_args] })
         const child = spawn(resolved.command, resolved.args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })

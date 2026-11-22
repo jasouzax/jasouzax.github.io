@@ -4,11 +4,11 @@ import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
 import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose"
-import { auth_route, verify_google_token } from "../cloud/api/auth.ts"
-import { work_route, type Work_Env, type Work_Statement } from "../cloud/api/work.ts"
-import { encode_key } from "../shared/work/crypto.ts"
-import { secure_response } from "../cloud/security/headers.ts"
-import worker from "../cloud/router/index.ts"
+import { auth_route, verify_google_token } from "../../../cloud/api/auth.ts"
+import { work_route, type Work_Env, type Work_Statement } from "../../../cloud/api/work.ts"
+import { encode_key } from "../../../shared/work/crypto.ts"
+import { secure_response } from "../../../cloud/security/headers.ts"
+import worker from "../../../cloud/router/index.ts"
 
 const origin = "https://staging.example.com"
 const client_id = "test.apps.googleusercontent.com"
@@ -23,7 +23,7 @@ async function token(claims: Record<string, unknown> = {}): Promise<string> {
 
 function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) db.exec(readFileSync(`cloud/db/migrations/${file}`, "utf8"))
     const env: Work_Env = { GOOGLE_CLIENT_ID: client_id, GOOGLE_CLIENT_SECRET: "secret-never-shown-to-browser", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = {

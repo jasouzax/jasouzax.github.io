@@ -47,7 +47,7 @@ Synthetic bindings for `wrangler dev`: `DOMAIN=localhost`, `PAGES_ORIGIN=http://
 
 Scripts: `npm run db:local` (apply migrations locally), `npm run cloud:dev` (`wrangler dev --config cloud/infra/wrangler/local.jsonc`, Worker on :8787).
 
-## D1 schema (`cloud/db/migrations/0001_work.sql`)
+## D1 schema (`cloud/db/cloud/db/migrations/0001_work.sql`)
 
 `clients` (uuid **hash**, slug, Google subject), `device_sessions` (hashed token), `files`, `messages` (idempotency unique per client, soft delete, kinds `text|file|dashboard|receipt|pin`), `receipts` (minor units, `paid|pending`), `pins` (tenant-consistent foreign keys), `dashboards`, `desk_state` (versioned), `admin_audit`. Timestamps are Unix seconds; ids are sortable ULIDs. The schema exists; **no endpoint uses it yet**.
 
@@ -63,3 +63,9 @@ Scripts: `npm run db:local` (apply migrations locally), `npm run cloud:dev` (`wr
 | KV `host:*` | Cloudflare KV | Worker subdomain proxy |
 
 `.env`, `.env.*` (except `.env.example`), `.dev.vars*`, `*.tfstate`, `terraform.tfvars` are git-ignored.
+
+## Repository host alignment (pending operator cutover)
+
+Git clone/push now use `https://repo.<domain>/<id>`; public history JSON is `<id>/_/{refs,tree,blob,log,runs}` on that host. The front attempts the signed personal-server Tunnel first. Public discovery may fall back only after timeout or 5xx, and redirects pin one backend for the full negotiation. Authentication failures never trigger fallback. Private/confidential repositories and pushes require the personal server. Retired website Git URLs and static packs fail closed, including stale R2 objects. Pipelines no longer add Git mirrors to website publication.
+
+The registry Terraform retains its bucket/resource identities and changes the hostname default to `repo.jasouza.com`. Its Worker serves existing pull-only OCI `/v2/` plus the Git front; setup supplies the public catalog and private origin bindings. Apply the reviewed registry plan and update deployed consumers together. No DNS, Terraform apply or image publication was performed during refactoring. The existing live host remains reserved until operator cutover. A personal-server OCI backend and KV multi-source fallback registry are unimplemented.

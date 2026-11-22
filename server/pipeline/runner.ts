@@ -2,7 +2,7 @@
  * Runner of the personal node: the one place where pipeline jobs are taken from the queue and executed.
  *
  * Entities:
- *   start_runner(...)       drains the queue one job at a time (watching queue/ plus a slow poll as a safety net)
+ *   start_runner(...)       drains the queue one job at a time (watching queue/ with native filesystem events)
  *   plan_batch(...)         coalescing rule: which queued jobs run, which are superseded by a newer one
  *   list_runs(...)          public view of recent runs (no pusher names, no messages, no paths)
  *   start_site_watcher(...) debounced fs.watch on the working copy that queues a `site_changed` job
@@ -17,14 +17,14 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs"
 import type { FSWatcher } from "node:fs"
 import { execFileSync } from "node:child_process"
-import { join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { claim, enqueue, finish, pending, recover } from "./queue.ts"
 import type { Job, Queued } from "./queue.ts"
 import type { Log, Pipeline_Steps, Run_Record } from "./pipeline.ts"
 import type { Server_Config } from "../config/repositories.ts"
 import { is_active, load_server_config, project_ids, project_view, project_branches, project_branch } from "../config/repositories.ts"
 import { sync_repositories } from "../repo/git/hooks.ts"
-import { hub_tip, poll_project } from "./sync.ts"
+import { hub_tip, sync_project } from "./sync.ts"
 import { fresh_catalog, listener_fingerprint, listener_updated, run_job_process } from "./job_process.ts"
 
 export type Runner = { stop(): void, drain(): Promise<void>, busy(): boolean }
@@ -79,17 +79,17 @@ export function list_runs(state: string, project: string, limit: number, branch?
     }).slice(0, limit)
 }
 
-export function start_runner(config: Server_Config, options: { steps?: Pipeline_Steps, server_env?: NodeJS.ProcessEnv, poll_ms?: number, isolated?: boolean, on_restart?: () => void } = {}): Runner {
+export function start_runner(config: Server_Config, options: { steps?: Pipeline_Steps, server_env?: NodeJS.ProcessEnv, isolated?: boolean, on_restart?: () => void } = {}): Runner {
     const state = config.state_dir
     let running = false
     let again = false
     let watcher: FSWatcher | undefined
-    let timer: NodeJS.Timeout | undefined
+    const runtime_watchers: FSWatcher[] = []
     let stopped = false
     let catalog_error = ""
     const isolated = options.isolated !== false && !options.steps
     const fingerprint = listener_fingerprint(config.site.dir)
-    const last_upstream_poll = new Map<string, number>()
+    const synchronized = new Map<string, string>()
     const watch_catalog = Boolean(config.catalog)
 
     const process_job = async (item: Queued): Promise<void> => {
@@ -134,8 +134,7 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
                 again = false
                 if (options.on_restart && listener_updated(config.site.dir, fingerprint)) {
                     stopped = true
-                    watcher?.close()
-                    clearInterval(timer)
+                    watcher?.close(); runtime_watchers.forEach(item => item.close())
                     console.log("[listener] engine runtime changed; restarting before the next job")
                     options.on_restart()
                     break
@@ -154,7 +153,7 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
                         catalog_error = ""
                     } catch (error) {
                         const message = error instanceof Error ? error.message : String(error)
-                        if (message !== catalog_error) console.error(`[catalog] ${message}; retaining last valid catalog and continuing repository polling`)
+                        if (message !== catalog_error) console.error(`[catalog] ${message}; retaining last valid catalog and continuing queued work`)
                         catalog_error = message
                     }
                 }
@@ -162,10 +161,10 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
                 for (const id of active) for (const branch of project_branches(config, id)) {
                     const view = project_view(config, id, branch)
                     const key = `${id}:${branch}`
-                    const interval = (view.upstream?.poll_seconds ?? view.pipeline?.poll_seconds ?? 60) * 1000
-                    if (Date.now() - (last_upstream_poll.get(key) ?? 0) < interval) continue
-                    last_upstream_poll.set(key, Date.now())
-                    const sync = await poll_project(view)
+                    const source = JSON.stringify(view.upstream)
+                    if (synchronized.get(key) === source) continue
+                    synchronized.set(key, source)
+                    const sync = await sync_project(view)
                     if (sync?.status === "error") console.error(`[sync:${id}] ${sync.message}`)
                     if (sync?.status === "imported") console.log(`[sync:${id}] imported ${sync.commit?.slice(0, 8)}; CI/CD queued`)
                 }
@@ -191,9 +190,16 @@ export function start_runner(config: Server_Config, options: { steps?: Pipeline_
     if (recovered) console.log(`[ci] re-queued ${recovered} interrupted job(s)`)
     mkdirSync(join(state, "queue"), { recursive: true })
     watcher = watch(join(state, "queue"), () => void drain())
-    timer = setInterval(() => void drain(), options.poll_ms ?? 5000)
+    if (existsSync(config.file)) runtime_watchers.push(watch(dirname(config.file), (_event, name) => { if (name === basename(config.file)) void drain() }))
+    if (options.on_restart) {
+        const git_dir = join(config.site.dir, ".git")
+        if (existsSync(git_dir) && statSync(git_dir).isDirectory()) {
+            runtime_watchers.push(watch(git_dir, (_event, name) => { if (name === "HEAD" || name === "packed-refs") void drain() }))
+            if (existsSync(join(git_dir, "refs"))) runtime_watchers.push(watch(join(git_dir, "refs"), { recursive: true }, () => void drain()))
+        }
+    }
     void drain()
-    return { stop: () => { stopped = true; watcher?.close(); clearInterval(timer) }, drain, busy: () => running }
+    return { stop: () => { stopped = true; watcher?.close(); runtime_watchers.forEach(item => item.close()) }, drain, busy: () => running }
 }
 
 const ignored_edit = /(~|\.swp|\.swx|\.tmp|\.#.*|^\.DS_Store|Thumbs\.db)$/

@@ -1,3 +1,4 @@
+import { valid_subdomain_id } from "../../shared/content/ids.ts"
 /*
  * Server configuration of the personal node (`server.json`, git-ignored).
  *
@@ -21,9 +22,9 @@ import { apply_project_catalog } from "../pipeline/catalog.ts"
 
 export type Role = "owner" | "write" | "read"
 export type Action = "read" | "write"
-export type Project_Entry = { visibility: "public" | "private", path: string, active?: boolean, dir?: string, branch?: string, checkout_branch?: string, pipeline?: Project_Pipeline, pipelines?: Record<string, Project_Pipeline>, upstream?: Upstream_Config }
-export type Collaborator = { role: Role, token_hash: string }
-export type Upstream_Config = { remote: string, branch: string, poll_seconds: number }
+export type Project_Entry = { visibility: "public" | "private", confidental?: boolean, collaborators?: string[], path: string, active?: boolean, dir?: string, branch?: string, checkout_branch?: string, pipeline?: Project_Pipeline, pipelines?: Record<string, Project_Pipeline>, upstream?: Upstream_Config }
+export type Collaborator = { role: Role, token_hash: string, email?: string }
+export type Upstream_Config = { remote: string, branch: string }
 export type Server_Config = {
     file: string
     repos_dir: string
@@ -41,7 +42,7 @@ export type Server_Config = {
     catalog?: boolean
 }
 
-const id_pattern = /^[a-z0-9][a-z0-9_-]{0,63}$/
+const id_pattern = { test: valid_subdomain_id }
 const user_pattern = /^[a-z0-9][a-z0-9_-]{0,31}$/
 const branch_pattern = /^[a-zA-Z0-9_][a-zA-Z0-9_./-]*$/
 const roles: Role[] = ["owner", "write", "read"]
@@ -83,12 +84,12 @@ export function project_view(config: Server_Config, id: string, selected_branch?
     return { ...base, root_config: root, primary_branch: branch, shared_checkout, work_state_dir: base.state_dir,
         state_dir: selected_branch === branch ? base.state_dir : join(base.state_dir, "branches", encodeURIComponent(selected_branch)),
         site: { ...base.site, branch: selected_branch, checkout_branch: shared_checkout ? selected_branch : base.site.checkout_branch }, pipeline,
-        upstream: base.upstream ? { ...base.upstream, branch: selected_branch, poll_seconds: pipeline?.poll_seconds ?? base.upstream.poll_seconds } : undefined }
+        upstream: base.upstream ? { ...base.upstream, branch: selected_branch } : undefined }
 }
 
 export function queue_root(config: Server_Config): string { return (config.root_config ?? config).state_dir }
 
-export function is_public(config: Server_Config, id: string): boolean { return (config.projects[id]?.visibility ?? "public") === "public" }
+export function is_public(config: Server_Config, id: string): boolean { return (config.projects[id]?.visibility ?? "public") === "public" && !config.projects[id]?.confidental }
 
 export function can(role: Role, action: Action): boolean {
     return action === "read" ? roles.includes(role) : role === "owner" || role === "write"
@@ -116,7 +117,7 @@ export function load_server_config(file: string, legacy: Record<string, string> 
     if (raw.upstream && raw.upstream.enabled !== false) {
         const remote = raw.upstream.remote
         const branch = raw.upstream.branch ?? site.branch
-        const poll_seconds = raw.upstream.poll_seconds ?? 60
+        if (raw.upstream.poll_seconds !== undefined) throw new Error("upstream.poll_seconds was removed; use explicit sync or repository post-receive")
         if (typeof remote !== "string" || !remote || /[\x00-\x1f]/.test(remote) || (!isAbsolute(remote) && /\s/.test(remote)) || remote.startsWith("-")) throw new Error("upstream.remote must be a credential-free Git URL or absolute local path")
         if (!isAbsolute(remote) && !/^[a-zA-Z0-9_.-]+@[a-zA-Z0-9.-]+:[a-zA-Z0-9_./-]+$/.test(remote)) {
             let url: URL
@@ -124,8 +125,7 @@ export function load_server_config(file: string, legacy: Record<string, string> 
             if (!["https:", "ssh:"].includes(url.protocol) || url.password || (url.protocol === "https:" && url.username)) throw new Error("upstream.remote must use HTTPS or SSH without embedded credentials")
         }
         if (typeof branch !== "string" || !branch_pattern.test(branch) || branch.includes("..")) throw new Error("upstream.branch is not a safe branch name")
-        if (!Number.isInteger(poll_seconds) || poll_seconds < 10 || poll_seconds > 86400) throw new Error("upstream.poll_seconds must be an integer between 10 and 86400")
-        config.upstream = { remote, branch, poll_seconds }
+        config.upstream = { remote, branch }
     }
     for (const [id, source] of Object.entries(legacy)) config.projects[id] = { visibility: "public", path: absolute(base, source, "") }
     for (const [id, entry] of Object.entries<any>(raw.projects ?? {})) {
@@ -141,7 +141,8 @@ export function load_server_config(file: string, legacy: Record<string, string> 
         if (!user_pattern.test(name)) throw new Error(`collaborators: invalid name "${name}"`)
         if (!roles.includes(entry?.role)) throw new Error(`collaborators.${name}.role must be one of ${roles.join(", ")}`)
         if (!/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(String(entry?.token_hash))) throw new Error(`collaborators.${name}.token_hash is not a scrypt hash (use "server user add")`)
-        config.collaborators[name] = { role: entry.role, token_hash: entry.token_hash }
+        if (entry.email !== undefined && (typeof entry.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry.email))) throw new Error(`collaborators.${name}.email must be an email address`)
+        config.collaborators[name] = { role: entry.role, token_hash: entry.token_hash, ...(entry.email ? { email: entry.email.toLowerCase() } : {}) }
     }
     apply_project_catalog(config, catalog_dir)
     if (site.checkout_branch === undefined) config.site.checkout_branch = config.site.branch

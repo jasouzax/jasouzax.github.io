@@ -4,14 +4,14 @@ import assert from "node:assert/strict"
 import { execFileSync, spawn } from "node:child_process"
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { load_server_config, repository_path } from "../server/config/repositories.ts"
-import { sync_repositories } from "../server/repo/git/hooks.ts"
-import { enqueue, pending } from "../server/pipeline/queue.ts"
-import { list_runs, start_runner } from "../server/pipeline/runner.ts"
-import { listener_fingerprint, listener_updated } from "../server/pipeline/job_process.ts"
-import { parse_xml } from "../shared/content/xml.ts"
-import { validate_roots } from "../shared/content/schema.ts"
-import { new_diagnostics } from "../shared/diag.ts"
+import { load_server_config, repository_path } from "../../../server/config/repositories.ts"
+import { sync_repositories } from "../../../server/repo/git/hooks.ts"
+import { enqueue, pending } from "../../../server/pipeline/queue.ts"
+import { list_runs, start_runner } from "../../../server/pipeline/runner.ts"
+import { listener_fingerprint, listener_updated } from "../../../server/pipeline/job_process.ts"
+import { parse_xml } from "../../../shared/content/xml.ts"
+import { validate_roots } from "../../../shared/content/schema.ts"
+import { new_diagnostics } from "../../../shared/diag.ts"
 
 function git(dir: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -76,7 +76,7 @@ test("incoming engine uses its own new schema, pipeline commands and implementat
         const commit = f.publish()
         const job = enqueue(f.config.state_dir, { kind: "push", project: "engine", commit })
         let restarts = 0
-        runner = start_runner(f.config, { poll_ms: 100000, server_env: { ...process.env, PRIVATE_SECRET: "hidden" }, on_restart: () => { restarts++ } })
+        runner = start_runner(f.config, { server_env: { ...process.env, PRIVATE_SECRET: "hidden" }, on_restart: () => { restarts++ } })
         await idle(runner)
         const result = list_runs(f.config.state_dir, "engine", 1)[0]
         assert.equal(result.state, "passed", JSON.stringify(result))
@@ -99,7 +99,7 @@ test("a crashing incoming worker is recorded once and a later corrective commit 
         writeFileSync(worker, 'console.error("broken worker"); process.exit(42)')
         const failed = f.publish()
         enqueue(f.config.state_dir, { kind: "push", project: "engine", commit: failed })
-        runner = start_runner(f.config, { server_env: {}, poll_ms: 100000 })
+        runner = start_runner(f.config, { server_env: {}, })
         await idle(runner)
         assert.equal(list_runs(f.config.state_dir, "engine", 1)[0].state, "failed")
         assert.equal(git(f.engine, "rev-parse", "HEAD"), f.old)
@@ -130,7 +130,7 @@ test("failed catalog reload cannot block a queued corrective commit; content alo
         writeFileSync(join(f.author, "old.mjs"), "process.exit(0)")
         const commit = f.publish()
         enqueue(f.config.state_dir, { kind: "push", project: "engine", commit })
-        runner = start_runner(f.config, { poll_ms: 100000 })
+        runner = start_runner(f.config, { })
         await idle(runner)
         assert.equal(list_runs(f.config.state_dir, "engine", 1)[0].state, "passed")
         assert(existsSync(join(f.config.state_dir, "runtime/server/pipeline/job_main.ts")))
@@ -184,7 +184,7 @@ test("an engine staging job uses its own branch and rejects workers without bran
             return commit
         }
         const approved = queue()
-        runner = start_runner(f.config, { poll_ms: 100000 })
+        runner = start_runner(f.config, { })
         await idle(runner)
         assert.equal(list_runs(f.config.state_dir, "engine", 1, "staging")[0].state, "passed")
         assert.equal(git(f.engine, "branch", "--show-current"), "staging")

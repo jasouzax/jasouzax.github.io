@@ -5,22 +5,22 @@ import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { parse_xml } from "../shared/content/xml.ts"
-import { validate_roots } from "../shared/content/schema.ts"
-import { new_diagnostics } from "../shared/diag.ts"
-import { load_config } from "../shared/config.ts"
-import { load_site } from "../engine/load/model.ts"
-import { is_active, load_server_config, project_view, repository_path } from "../server/config/repositories.ts"
-import type { Server_Config } from "../server/config/repositories.ts"
-import { check_push, jobs_for_push, sync_repositories } from "../server/repo/git/hooks.ts"
-import { claim, finish, pending } from "../server/pipeline/queue.ts"
-import type { Job } from "../server/pipeline/queue.ts"
-import { poll_project, read_sync_state } from "../server/pipeline/sync.ts"
-import { run_pipeline } from "../server/pipeline/pipeline.ts"
-import type { Run_Record } from "../server/pipeline/pipeline.ts"
-import { list_runs, start_runner } from "../server/pipeline/runner.ts"
-import { route } from "../cloud/router/index.ts"
-import { refresh_mirrors } from "../server/repo/git/mirror.ts"
+import { parse_xml } from "../../../shared/content/xml.ts"
+import { validate_roots } from "../../../shared/content/schema.ts"
+import { new_diagnostics } from "../../../shared/diag.ts"
+import { load_config } from "../../../shared/config.ts"
+import { load_site } from "../../../engine/load/model.ts"
+import { is_active, load_server_config, project_view, repository_path } from "../../../server/config/repositories.ts"
+import type { Server_Config } from "../../../server/config/repositories.ts"
+import { check_push, jobs_for_push, sync_repositories } from "../../../server/repo/git/hooks.ts"
+import { claim, finish, pending } from "../../../server/pipeline/queue.ts"
+import type { Job } from "../../../server/pipeline/queue.ts"
+import { sync_project, read_sync_state } from "../../../server/pipeline/sync.ts"
+import { run_pipeline } from "../../../server/pipeline/pipeline.ts"
+import type { Run_Record } from "../../../server/pipeline/pipeline.ts"
+import { list_runs, start_runner } from "../../../server/pipeline/runner.ts"
+import { route } from "../../../cloud/router/index.ts"
+import { refresh_mirrors } from "../../../server/repo/git/mirror.ts"
 
 function git(path: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", path, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -29,7 +29,7 @@ function git(path: string, ...args: string[]): string {
 const attribute = (value: string) => value.replace(/&/g, "&amp;").replace(/'/g, "&apos;").replace(/</g, "&lt;")
 function declaration(id: string, branch: string, private_project = false): string {
     const step = (phase: string) => `<step name="${phase}" phase="${phase}" command="node" args='${attribute(JSON.stringify(["phase.mjs", phase, "${commit}", "${project}"]))}'${phase === "deploy" ? ' credentials="DEPLOY_TOKEN"' : ""}/>`
-    return `<project id="${id}" name="${id}" date="Jan 2026" repo="git.example/${id}" private="${private_project}"><pipeline branch="${branch}" poll_seconds="10">${["ci", "build", "deploy"].map(step).join("")}</pipeline></project>`
+    return `<project id="${id}" name="${id}" date="Jan 2026" repo="git.example/${id}" private="${private_project}"><pipeline branch="${branch}">${["ci", "build", "deploy"].map(step).join("")}</pipeline></project>`
 }
 
 function fixture() {
@@ -121,7 +121,7 @@ test("catalog registers independent projects, branches and paths; archive and ro
 test("multiple upstreams bootstrap empty hubs and run XML pipelines with isolated state and deploy-only credentials", async () => {
     const f = fixture()
     try {
-        for (const id of ["alpha", "beta"]) assert.equal((await poll_project(project_view(f.config, id)))?.status, "imported")
+        for (const id of ["alpha", "beta"]) assert.equal((await sync_project(project_view(f.config, id)))?.status, "imported")
         assert.deepEqual(pending(f.config.state_dir).map(item => item.job.project), ["alpha", "beta"])
         for (const id of ["alpha", "beta"]) {
             const job = pending(f.config.state_dir).find(item => item.job.project === id)!.job
@@ -137,7 +137,7 @@ test("multiple upstreams bootstrap empty hubs and run XML pipelines with isolate
         assert(readFileSync(join(f.config.state_dir, "mirror/projects/alpha.git/info/refs"), "utf8").includes(f.remotes.alpha.commit))
         assert(!existsSync(join(f.config.state_dir, "mirror/projects/beta.git")))
         assert(pending(f.config.state_dir).some(item => item.job.project === "engine" && item.job.kind === "site_changed"))
-        for (const id of ["alpha", "beta"]) await poll_project(project_view(f.config, id))
+        for (const id of ["alpha", "beta"]) await sync_project(project_view(f.config, id))
         assert(!pending(f.config.state_dir).some(item => ["alpha", "beta"].includes(item.job.project)), "matching tips must not loop")
     } finally { f.cleanup() }
 })
@@ -146,13 +146,13 @@ test("commits made directly in a project checkout are tested before reaching its
     const f = fixture()
     try {
         const view = project_view(f.config, "alpha")
-        await poll_project(view)
+        await sync_project(view)
         await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         writeFileSync(join(view.site.dir, "local.txt"), "owner's committed change")
         git(view.site.dir, "add", "local.txt")
         git(view.site.dir, "commit", "-q", "-m", "feat: local checkout change")
         const commit = git(view.site.dir, "rev-parse", "HEAD")
-        await poll_project(view)
+        await sync_project(view)
         assert.equal(git(f.remotes.alpha.bare, "rev-parse", "main"), f.remotes.alpha.commit)
         const job = pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job
         assert.equal(job.kind, "push")
@@ -160,7 +160,7 @@ test("commits made directly in a project checkout are tested before reaching its
         assert.equal((await execute(f.config, job)).state, "passed")
         assert.equal(git(f.remotes.alpha.bare, "rev-parse", "main"), commit)
         writeFileSync(join(view.site.dir, "local.txt"), "uncommitted")
-        await poll_project(view)
+        await sync_project(view)
         assert(!pending(f.config.state_dir).some(item => item.job.project === "alpha"))
     } finally { f.cleanup() }
 })
@@ -169,14 +169,14 @@ test("failed project CI keeps the existing working copy and static mirror on the
     const f = fixture()
     try {
         const view = project_view(f.config, "alpha")
-        await poll_project(view)
+        await sync_project(view)
         await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         const remote = f.remotes.alpha
         writeFileSync(join(remote.work, "fail-ci"), "fail")
         git(remote.work, "add", "fail-ci")
         git(remote.work, "commit", "-q", "-m", "test: failed CI")
         git(remote.work, "push", "-q", remote.bare, "main")
-        await poll_project(view)
+        await sync_project(view)
         const result = await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         assert.equal(result.state, "failed")
         assert.equal(git(view.site.dir, "rev-parse", "HEAD"), remote.commit)
@@ -189,7 +189,7 @@ test("runner reloads the project catalog and executes multiple independent proje
     const f = fixture()
     let runner: ReturnType<typeof start_runner> | undefined
     try {
-        runner = start_runner(f.config, { isolated: false, server_env: { DEPLOY_TOKEN: "test-secret" }, poll_ms: 10000 })
+        runner = start_runner(f.config, { isolated: false, server_env: { DEPLOY_TOKEN: "test-secret" }, })
         const deadline = Date.now() + 45000
         while ((!list_runs(f.config.state_dir, "alpha", 1)[0]?.finished_at || !list_runs(f.config.state_dir, "beta", 1)[0]?.finished_at || runner.busy()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20))
         assert.equal(list_runs(f.config.state_dir, "alpha", 1)[0]?.state, "passed")
@@ -230,7 +230,7 @@ test("declared npm commands run through an executable with their argument arrays
         pipeline.steps.unshift({ name: "npm version", phase: "ci", command: "npm", args: ["--version"], timeout_ms: 30000, credentials: [] })
         const literal = "a&b $(literal) quoted text"
         pipeline.steps.unshift({ name: "literal arguments", phase: "ci", command: "node", args: ["-e", "if (process.argv[1] !== 'a&b $(literal) quoted text') process.exit(1)", literal], timeout_ms: 30000, credentials: [] })
-        await poll_project(project_view(f.config, "alpha"))
+        await sync_project(project_view(f.config, "alpha"))
         const result = await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         assert.equal(result.state, "passed", result.message ?? "pipeline failed")
         assert(result.steps.some(step => step.name === "npm version" && step.ok))
@@ -247,21 +247,21 @@ test("Worker discovers public project mirrors from the published catalog while t
         assert.equal(request.headers.get("cookie"), null)
         return new URL(request.url).pathname === "/projects/git.json" ? Response.json(["alpha"]) : new Response("static Git data")
     }
-    const response = await route(new Request("https://example.com/projects/alpha/info/refs?service=git-upload-pack", { headers: { authorization: "Basic private", cookie: "session=private" } }), env, upstream)
-    assert.equal(response.status, 200)
+    const response = await route(new Request("https://repo.example.com/alpha/info/refs?service=git-upload-pack", { headers: { authorization: "Basic private", cookie: "session=private" } }), env, upstream)
+    assert.equal(response.status, 307)
     assert.equal(seen[0].url, "https://project-catalog.example.dev/projects/git.json")
-    assert.equal(seen[1].url, "https://project-catalog.example.dev/projects/alpha.git/info/refs")
-    assert.equal((await route(new Request("https://example.com/projects/alpha/HEAD"), env, upstream)).status, 200)
-    assert.equal(seen.length, 3, "the catalog is cached between static Git reads")
-    assert.equal((await route(new Request("https://example.com/projects/private/info/refs?service=git-upload-pack"), env, upstream)).status, 503)
-    assert.equal(seen.length, 3, "undeclared private reads must not fall through to Pages")
+    assert.match(response.headers.get("location")!, /_git\/source/)
+    assert.equal((await route(new Request("https://repo.example.com/alpha/HEAD"), env, upstream)).status, 404)
+    assert.equal(seen.length, 1, "the catalog is cached between static Git reads")
+    assert.equal((await route(new Request("https://repo.example.com/private/info/refs?service=git-upload-pack"), env, upstream)).status, 503)
+    assert.equal(seen.length, 1, "undeclared private reads must not fall through to Pages")
 })
 
 test("archiving or removing a managed declaration never publishes its private review branches", async () => {
     const f = fixture()
     try {
         const view = project_view(f.config, "alpha")
-        await poll_project(view)
+        await sync_project(view)
         await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         git(view.site.dir, "checkout", "-q", "-b", "review")
         git(view.site.dir, "commit", "-q", "--allow-empty", "-m", "private review work")
@@ -288,8 +288,21 @@ test("an independent project's pipeline is not blocked by a broken unrelated arc
         mkdirSync(broken)
         writeFileSync(join(broken, "HEAD"), "not a git repository")
         f.config.projects.broken = { path: broken, visibility: "public" }
-        await poll_project(project_view(f.config, "alpha"))
+        await sync_project(project_view(f.config, "alpha"))
         const result = await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
         assert.equal(result.state, "passed", result.message ?? "pipeline failed")
+    } finally { f.cleanup() }
+})
+
+test("continued command failure is recorded and later project steps still execute", async () => {
+    const f = fixture()
+    try {
+        const pipeline = f.config.projects.alpha.pipeline!
+        pipeline.steps.unshift({ name: "allowed failure", phase: "ci", command: "node", args: ["-e", "process.exit(7)"], timeout_ms: 10000, credentials: [], continue: true })
+        await sync_project(project_view(f.config, "alpha"))
+        const result = await execute(f.config, pending(f.config.state_dir).find(item => item.job.project === "alpha")!.job)
+        assert.equal(result.state, "passed", result.message ?? "pipeline failed")
+        assert.equal(result.steps.find(step => step.name === "allowed failure")?.code, 7)
+        assert(result.steps.some(step => step.name !== "allowed failure" && step.ok))
     } finally { f.cleanup() }
 })

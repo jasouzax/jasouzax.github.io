@@ -10,7 +10,7 @@ test("project research Overview expands explanations without opening windows or 
     await expect(panel).toBeVisible()
     await expect(page.locator(".desk_files_bar")).toBeHidden()
     await expect(panel.locator(":scope > .desk_side_item > details > summary > h3")).toHaveText([
-        "Terminology", "Problem", "Solution", "Significance", "Objectives", "Literature Review", "Frameworks", "Methodology", "Results",
+        "Terminology", "Problem", "Solution", "Significance", "Objectives", "Similar", "Frameworks", "Methodology", "Results",
     ])
     await expect(panel.locator("a,button")).toHaveCount(0)
     await panel.getByText("Terminology", { exact: true }).click()
@@ -512,7 +512,7 @@ test("desk plugins show code lines, toggle hex, preserve binary edits and report
     await page.goto("/desk")
     const window = page.locator(".desk_wbox").first()
     await window.locator('input[type="file"]').setInputFiles({ name: "sample.js", mimeType: "application/javascript", buffer: Buffer.from("const answer = 42;\nconsole.log(answer);\n") })
-    await expect(window).toHaveAttribute("data-plugin", "code")
+    await expect(window).toHaveAttribute("data-plugin", "text")
     await expect(window.locator(".desk_wbox_body_text_line_dec")).toHaveText("1\n2\n3")
     await expect(window.locator(".desk_wbox_body_text_line_dec")).toBeVisible()
     await expect(window.locator(".tok_keyword").first()).toHaveText("const")
@@ -541,7 +541,7 @@ test("desk plugins show code lines, toggle hex, preserve binary edits and report
     }
     await assertFocusFrame()
     await page.screenshot({ path: ".cache/desk-browser-results/editor-focus.png" })
-    await expect(window).toHaveAttribute("data-plugin", "code")
+    await expect(window).toHaveAttribute("data-plugin", "text")
     await expect(toggle).not.toHaveAttribute("open", "")
     await toggle.locator("summary").click()
     const bytes = window.locator(".desk_wbox_body_text_hex_input")
@@ -601,13 +601,13 @@ test("a declarative host can add an optional case script and cleans up its actio
     await page.goto("/desk")
     const window = page.locator(".desk_wbox").first()
     await window.locator('input[type="file"]').setInputFiles({ name: "custom.js", mimeType: "application/javascript", buffer: Buffer.from("const sample = 1;\n") })
-    await expect(window).toHaveAttribute("data-plugin", "code")
+    await expect(window).toHaveAttribute("data-plugin", "text")
     await window.locator('[data-mode="view"]').click()
     await expect(window).toHaveAttribute("data-plugin", "custom")
     await expect(window).toHaveAttribute("data-custom-action", "text")
     await expect(window.locator(".desk_wbox_body_text_line_dec")).toHaveText("1\n2")
     await window.locator('[data-mode="edit"]').click()
-    await expect(window).toHaveAttribute("data-plugin", "code")
+    await expect(window).toHaveAttribute("data-plugin", "text")
     await expect(window).toHaveAttribute("data-custom-cleaned", "true")
     await expect(window).not.toHaveAttribute("data-custom-action")
     await expect(window.locator(".desk_wbox_body_text_tog")).not.toHaveAttribute("open", "")
@@ -615,7 +615,7 @@ test("a declarative host can add an optional case script and cleans up its actio
     await window.locator(".desk_wbox_head_path").press("Enter")
     await window.locator('input[type="file"]').setInputFiles({ name: "bytes.bin", mimeType: "application/octet-stream", buffer: Buffer.from([0, 255, 195, 40]) })
     await window.locator('[data-mode="edit"]').click()
-    await expect(window).toHaveAttribute("data-plugin", "hex")
+    await expect(window).toHaveAttribute("data-plugin", "text")
     await expect(window.locator(".desk_wbox_body_text_tog")).toHaveAttribute("open", "")
 })
 

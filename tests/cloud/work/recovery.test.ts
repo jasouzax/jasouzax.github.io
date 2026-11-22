@@ -4,8 +4,8 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
-import { auth_hash } from "../cloud/api/auth.ts"
-import { encode_key, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
+import { auth_hash } from "../../../cloud/api/auth.ts"
+import { encode_key, generate_owner_key, wrap_room_key } from "../../../shared/work/crypto.ts"
 
 test("edge fallback survives a new session and is removed only after verified private Drive storage", async () => {
     const token = encode_key(crypto.getRandomValues(new Uint8Array(32))), secret = encode_key(crypto.getRandomValues(new Uint8Array(32)))
@@ -22,7 +22,7 @@ test("edge fallback survives a new session and is removed only after verified pr
     } }))
     try {
         const db = await runtime.getD1Database("DB")
-        for (const name of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) await db.exec(readFileSync(`migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
+        for (const name of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) await db.exec(readFileSync(`cloud/db/migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
         const now = Date.now(), hash = await auth_hash(token), csrf = await auth_hash(`csrf\n${token}`)
         await db.prepare("INSERT INTO auth_users VALUES ('client-subject','client@example.com','Client',?)").bind(now).run()
         await db.prepare("INSERT INTO auth_sessions VALUES (?,'client-subject',?,?)").bind(hash, now, now).run()

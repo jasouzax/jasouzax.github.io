@@ -12,4 +12,4 @@ if ! docker container inspect jazu-image-registry >/dev/null 2>&1; then
 fi
 docker buildx build --platform linux/arm64,linux/amd64 --provenance=false --build-arg "JAZU_REVISION=$(git rev-parse HEAD)" --tag "localhost:5000/jazu:$tag" --push .
 node --env-file=.env ops/docker/publish_registry.ts "$storage"
-printf 'Published registry.jasouza.com/jazu:%s\n' "$tag"
+printf 'Published repo.jasouza.com/jazu:%s\n' "$tag"

@@ -3,15 +3,15 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, readdirSync } from "node:fs"
-import { Realtime_Hub } from "../cloud/room/room.ts"
-import type { Work_Env, Work_Statement } from "../cloud/api/work.ts"
+import { Realtime_Hub } from "../../../cloud/room/room.ts"
+import type { Work_Env, Work_Statement } from "../../../cloud/api/work.ts"
 
 test("alarms expire dead sockets, preserve another device, survive reconstruction and retain the last confirmed time", async () => {
     const original = (globalThis as any).WebSocketRequestResponsePair
     ;(globalThis as any).WebSocketRequestResponsePair = class {}
     const real_now = Date.now
     const db = new DatabaseSync(":memory:"), now = Date.now()
-    for (const name of readdirSync("migrations").filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(`migrations/${name}`, "utf8"))
+    for (const name of readdirSync("cloud/db/migrations").filter(name => name.endsWith(".sql")).sort()) db.exec(readFileSync(`cloud/db/migrations/${name}`, "utf8"))
     db.prepare("INSERT INTO auth_users VALUES ('u','u@example.com','User',?)").run(now)
     db.prepare("INSERT INTO auth_sessions VALUES ('credential','u',?,?)").run(now, now)
     db.prepare("INSERT INTO last_signed_in VALUES ('a:u',NULL)").run()

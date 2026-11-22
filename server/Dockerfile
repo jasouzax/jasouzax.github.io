@@ -3,7 +3,7 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /repo/server
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --no-audit --no-fund && npm cache clean --force
-COPY server/tsconfig.json ./
+COPY server/tsconfig.json server/build.cjs ./
 COPY server/browser ./browser
 COPY server/link ./link
 COPY server/terminal ./terminal

@@ -9,10 +9,10 @@ resource "cloudflare_workers_script" "registry" {
   content_file       = var.worker_bundle
   content_sha256     = filesha256(var.worker_bundle)
   compatibility_date = "2026-11-04"
-  bindings = [
+  bindings = concat([
     { name = "DOMAIN", type = "plain_text", text = var.registry_domain },
     { name = "BLOBS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.images.name },
-  ]
+  ], var.repository_bindings)
 }
 resource "cloudflare_workers_custom_domain" "registry" {
   account_id = var.account_id
@@ -36,4 +36,10 @@ resource "cloudflare_ruleset" "registry_clients" {
     action_parameters = { bic = false }
     enabled           = true
   }]
+}
+
+resource "cloudflare_workers_route" "repository" {
+  zone_id = var.zone_id
+  pattern = "${var.registry_domain}/*"
+  script = cloudflare_workers_script.registry.script_name
 }

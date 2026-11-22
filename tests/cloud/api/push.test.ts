@@ -2,15 +2,15 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync, readdirSync } from "node:fs"
-import { push_route, push_deliver, push_endpoint } from "../cloud/api/push.ts"
-import { auth_hash, auth_route } from "../cloud/api/auth.ts"
-import { encode_key, decode_key, encrypt_message, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
-import { preview_message } from "../shared/notification/preview.ts"
-import type { Work_Env, Work_Statement } from "../cloud/api/work.ts"
+import { push_route, push_deliver, push_endpoint } from "../../../cloud/api/push.ts"
+import { auth_hash, auth_route } from "../../../cloud/api/auth.ts"
+import { encode_key, decode_key, encrypt_message, generate_owner_key, wrap_room_key } from "../../../shared/work/crypto.ts"
+import { preview_message } from "../../../shared/notification/preview.ts"
+import type { Work_Env, Work_Statement } from "../../../cloud/api/work.ts"
 const origin = "https://example.com", random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 async function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of readdirSync("migrations").filter(file => file.endsWith(".sql")).sort()) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of readdirSync("cloud/db/migrations").filter(file => file.endsWith(".sql")).sort()) db.exec(readFileSync(`cloud/db/migrations/${file}`, "utf8"))
     const vapid = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])
     const private_jwk = await crypto.subtle.exportKey("jwk", vapid.privateKey)
     const env: Work_Env = { GOOGLE_CLIENT_ID: "synthetic.apps.googleusercontent.com", VAPID_PUBLIC_KEY: encode_key(new Uint8Array(await crypto.subtle.exportKey("raw", vapid.publicKey))), VAPID_PRIVATE_KEY: private_jwk.d!, VAPID_SUBJECT: "mailto:owner@example.com", DB: { prepare(sql) {

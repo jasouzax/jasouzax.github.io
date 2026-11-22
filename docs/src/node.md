@@ -19,7 +19,7 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 | `publish.ts` | Deploy machine / personal server | Pages staging with overlay, content fingerprint, wrangler call; shared by `deploy` and `publish` |
 | `server_cli.ts` | Operator | `node src/main.ts server …`: init, repo init, user add/remove, run, status, sync |
 | `deploy.ts` | Deploy machine | Stage `dist`, bundle Worker, run Terraform and the Pages upload |
-| `d1_migrate.ts` | Deploy machine (called by Terraform) | Apply `migrations/*.sql` through the D1 HTTP API |
+| `d1_migrate.ts` | Deploy machine (called by Terraform) | Apply `cloud/db/migrations/*.sql` through the D1 HTTP API |
 
 ## Local server (`serve.ts`)
 
@@ -46,7 +46,7 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 
 Bindings/vars (`worker_env`): `DOMAIN`, `PAGES_ORIGIN`, `PUBLIC_PROJECTS` (JSON array of ids), `PERSONAL_ORIGIN`, secrets `ORIGIN_HMAC_SECRET`, `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET`; `ASSETS` (R2), `REGISTRY` (KV), `DB` (D1, schema only for now).
 
-**Adding an API:** add a branch before the `501` fallback in `route()`, keep errors in the `{ error: { code, message } }` shape via `api_error`, validate method and input, and add a test in `tests/nodes.test.ts`.
+**Adding an API:** add a branch before the `501` fallback in `route()`, keep errors in the `{ error: { code, message } }` shape via `api_error`, validate method and input, and add a test in `tests/cloud/router/index.test.ts`.
 
 ## <a id="personal-node"></a>Personal node (`personal.ts`, `security.ts`)
 
@@ -112,7 +112,7 @@ Terraform targets: `pages` → `cloudflare_pages_project.site`, `aws_s3_object.l
 
 ## D1 migrations (`d1_migrate.ts`)
 
-Runs as a script (`node cloud/db/migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
+Runs as a script (`node cloud/db/migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `cloud/db/migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
 
 ### Personal-server deployment
 

@@ -17,7 +17,7 @@ import type { Server_Config } from "../config/repositories.ts"
 import { push_upstream } from "./sync.ts"
 import { child_environment, run_command } from "./process.ts"
 
-export type Step_Command = { name: string, command: string, args: string[], timeout_ms?: number, credentials?: string[] }
+export type Step_Command = { name: string, command: string, args: string[], timeout_ms?: number, credentials?: string[], continue?: boolean }
 export type Pipeline_Steps = { install?: Step_Command, ci: Step_Command[], build?: Step_Command[], deploy?: Step_Command[], publish?: Step_Command }
 export type Step_Result = { name: string, ok: boolean, code: number | null, ms: number }
 export type Run_State = "queued" | "running" | "passed" | "failed" | "superseded"
@@ -133,7 +133,7 @@ async function run_ci(config: Server_Config, commit: string, steps: Pipeline_Ste
     for (const step of steps.ci) {
         const { result } = await run_command(expand_command(step, config, commit), dir, env, log)
         record.steps.push(result)
-        if (!result.ok) return false
+        if (!result.ok && !step.continue) return false
     }
     writeFileSync(last_green_file(config), JSON.stringify({ commit, at: new Date().toISOString() }))
     return true
@@ -168,7 +168,7 @@ async function run_cd(config: Server_Config, job: Job, steps: Pipeline_Steps, se
     for (const step of steps.build ?? []) {
         const { result } = await run_command(expand_command(step, config, head[0] ?? ""), config.site.dir, env, log)
         record.steps.push(result)
-        if (!result.ok) throw new Error(`build failed at "${step.name}"`)
+        if (!result.ok && !step.continue) throw new Error(`build failed at "${step.name}"`)
     }
     let outcome: { deployed: boolean, reason: string } | undefined
     const deployments = steps.publish ? [steps.publish] : steps.deploy ?? []
@@ -176,10 +176,10 @@ async function run_cd(config: Server_Config, job: Job, steps: Pipeline_Steps, se
         const names = step.credentials ?? (steps.publish ? ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] : [])
         const credentials = Object.fromEntries(names.filter(name => server_env[name] !== undefined).map(name => [name, server_env[name]]))
         const publish_env = child_environment(config, { ...credentials, WRANGLER_SEND_METRICS: "false" })
-        const flags = steps.publish ? ["--overlay", mirror_dir(config), "--state_file", join(config.state_dir, "published.json"), "--commit", head[0] ?? "", "--message", head[1] ?? "site files changed"] : []
+        const flags = steps.publish ? ["--state_file", join(config.state_dir, "published.json"), "--commit", head[0] ?? "", "--message", head[1] ?? "site files changed"] : []
         const { result, tail } = await run_command(expand_command(step, config, head[0] ?? ""), config.site.dir, publish_env, log, flags)
         record.steps.push(result)
-        if (!result.ok) throw new Error(`publish failed at "${step.name}"`)
+        if (!result.ok && !step.continue) throw new Error(`publish failed at "${step.name}"`)
         const line = tail.split("\n").reverse().find(text => text.startsWith("JAZU_PUBLISH "))
         if (line) outcome = JSON.parse(line.slice("JAZU_PUBLISH ".length))
     }

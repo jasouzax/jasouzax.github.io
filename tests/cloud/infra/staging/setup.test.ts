@@ -1,7 +1,7 @@
 /* Infrastructure entry must reuse private credentials without generating secret files or overriding explicit TF inputs. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { staging_environment } from "../cloud/infra/staging/setup.ts"
+import { staging_environment } from "../../../../cloud/infra/staging/setup.ts"
 
 test("staging setup maps existing private environment names and preserves explicit Terraform inputs", () => {
     const source = { CLOUDFLARE_API_TOKEN: "api-test", CLOUDFLARE_ACCOUNT_ID: "account-test", CLOUDFLARE_ZONE_ID: "zone-test", HMAC_SECRET: "legacy-hmac-test", ORIGIN_HMAC_SECRET: "origin-hmac-test", ACCESS_CLIENT_ID: "client-test", ACCESS_CLIENT_SECRET: "secret-test", TF_VAR_access_client_id: "explicit-client-test", TF_VAR_pages_project: "production-project", WORK_OWNER_EMAIL: "owner@example.com", WORK_FALLBACK_KEY: "fallback-test-secret" }

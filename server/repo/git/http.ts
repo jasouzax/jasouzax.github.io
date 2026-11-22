@@ -56,8 +56,10 @@ export function service_of(operation: string, search: URLSearchParams): string |
 
 export function authorize(config: Server_Config, throttle: Throttle, id: string, service: string, authorization: string | undefined): Decision {
     const action: Action = service === "git-receive-pack" ? "write" : "read"
-    if (!existsSync(join(repository_path(config, id), "HEAD"))) return { status: 404, message: "Unknown repository" }
-    if (action === "read" && is_public(config, id)) return { status: 200, user: "anonymous", role: "anonymous" }
+    const entry = config.projects[id], known = Boolean(entry) || id === config.site.project
+    const exists = () => known && existsSync(join(repository_path(config, id), "HEAD"))
+    if (action === "read" && known && is_public(config, id)) return exists() ? { status: 200, user: "anonymous", role: "anonymous" } : { status: 404, message: "Unknown repository" }
+    // Unknown and private repositories issue the same challenge; only valid credentials may check existence.
     const credentials = parse_basic(authorization)
     if (!credentials) return { status: 401, message: "Credentials required" }
     if (throttle.blocked(credentials.user) || throttle.blocked("*")) return { status: 429, message: "Too many failed attempts; wait a minute" }
@@ -68,6 +70,10 @@ export function authorize(config: Server_Config, throttle: Throttle, id: string,
         return { status: 401, message: "Invalid credentials" }
     }
     throttle.clear(credentials.user)
+    if (!exists()) return { status: 404, message: "Unknown repository" }
+    const allowed = entry?.collaborators
+    const restricted = entry?.visibility === "private" || entry?.confidental
+    if (role !== "owner" && allowed && (restricted || allowed.length) && !allowed.includes(config.collaborators[credentials.user]?.email ?? "")) return restricted && !entry?.confidental ? { status: 404, message: "Unknown repository" } : { status: 403, message: "This token is not a collaborator of this project" }
     if (!can(role, action)) return { status: 403, message: "This token cannot write" }
     if (action === "write" && !is_active(config, id)) return { status: 403, message: `${id} is archived and no longer accepts pushes` }
     return { status: 200, user: credentials.user, role }

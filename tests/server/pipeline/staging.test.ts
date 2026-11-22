@@ -5,17 +5,17 @@ import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { load_server_config, project_view, repository_path } from "../server/config/repositories.ts"
-import { check_push, jobs_for_push, sync_repositories } from "../server/repo/git/hooks.ts"
-import { poll_project, read_sync_state } from "../server/pipeline/sync.ts"
-import { claim, enqueue, finish, pending } from "../server/pipeline/queue.ts"
-import type { Job } from "../server/pipeline/queue.ts"
-import { run_pipeline } from "../server/pipeline/pipeline.ts"
-import type { Run_Record } from "../server/pipeline/pipeline.ts"
-import { plan_batch } from "../server/pipeline/runner.ts"
-import { parse_xml } from "../shared/content/xml.ts"
-import { validate_roots } from "../shared/content/schema.ts"
-import { new_diagnostics } from "../shared/diag.ts"
+import { load_server_config, project_view, repository_path } from "../../../server/config/repositories.ts"
+import { check_push, jobs_for_push, sync_repositories } from "../../../server/repo/git/hooks.ts"
+import { sync_project, read_sync_state } from "../../../server/pipeline/sync.ts"
+import { claim, enqueue, finish, pending } from "../../../server/pipeline/queue.ts"
+import type { Job } from "../../../server/pipeline/queue.ts"
+import { run_pipeline } from "../../../server/pipeline/pipeline.ts"
+import type { Run_Record } from "../../../server/pipeline/pipeline.ts"
+import { plan_batch } from "../../../server/pipeline/runner.ts"
+import { parse_xml } from "../../../shared/content/xml.ts"
+import { validate_roots } from "../../../shared/content/schema.ts"
+import { new_diagnostics } from "../../../shared/diag.ts"
 
 function git(dir: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -25,7 +25,7 @@ function fixture() {
     const root = mkdtempSync(join(tmpdir(), "jazu_staging_"))
     const engine = join(root, "engine")
     mkdirSync(join(engine, "content"), { recursive: true })
-    const pipeline = (branch: string) => `<pipeline branch="${branch}" poll_seconds="10">${["ci", "build", "deploy"].map(phase => `<step name="${branch} ${phase}" phase="${phase}" command="node" args='["phase.mjs","${phase}","\${branch}","\${commit}"]'${phase === "deploy" ? ' credentials="DEPLOY_TOKEN"' : ""}/>`).join("")}</pipeline>`
+    const pipeline = (branch: string) => `<pipeline branch="${branch}">${["ci", "build", "deploy"].map(phase => `<step name="${branch} ${phase}" phase="${phase}" command="node" args='["phase.mjs","${phase}","\${branch}","\${commit}"]'${phase === "deploy" ? ' credentials="DEPLOY_TOKEN"' : ""}/>`).join("")}</pipeline>`
     writeFileSync(join(engine, "content/projects.xml"), `<project id="sample" name="Sample" date="2026" repo="git.example/sample">${pipeline("master")}${pipeline("staging")}</project>`)
     git(engine, "init", "-qb", "master")
     git(engine, "add", ".")
@@ -65,7 +65,7 @@ function fixture() {
         return record
     }
     const run = async (branch: string) => {
-        await poll_project(view(branch))
+        await sync_project(view(branch))
         const job = pending(config.state_dir).find(item => item.job.project === "sample" && item.job.ref === `refs/heads/${branch}`)!.job
         return execute(job)
     }
@@ -92,8 +92,8 @@ test("distinct pipeline branches validate and every declared deployment ref is o
 test("the same SHA on master and staging queues both pipelines and switches one shared deployment checkout", { timeout: 180000 }, async () => {
     const f = fixture()
     try {
-        await poll_project(f.view("master"))
-        await poll_project(f.view("staging"))
+        await sync_project(f.view("master"))
+        await sync_project(f.view("staging"))
         const jobs = pending(f.config.state_dir).filter(item => item.job.project === "sample")
         assert.equal(jobs.length, 2)
         assert.equal(jobs[0].job.commit, jobs[1].job.commit)
@@ -109,8 +109,8 @@ test("the same SHA on master and staging queues both pipelines and switches one 
         assert(existsSync(join(master.state_dir, "last_green.json")))
         assert(existsSync(join(staging.state_dir, "last_green.json")))
         assert.equal(read_sync_state(master)?.commit, read_sync_state(staging)?.commit)
-        await poll_project(master)
-        await poll_project(staging)
+        await sync_project(master)
+        await sync_project(staging)
         assert(!pending(f.config.state_dir).some(item => item.job.project === "sample"))
         const mirror = readFileSync(join(f.config.state_dir, "mirror/projects/sample.git/info/refs"), "utf8")
         assert(mirror.includes("refs/heads/master"))
@@ -137,7 +137,7 @@ test("staging updates never republish production refs; master switches back only
         assert.equal((await f.run("staging")).state, "passed")
         assert.equal(git(f.remote, "rev-parse", "staging"), local_stage)
         assert.equal(readFileSync(mirror, "utf8"), production)
-        await poll_project(f.view("master"))
+        await sync_project(f.view("master"))
         assert(!pending(f.config.state_dir).some(item => item.job.project === "sample"))
         const deferred = enqueue(f.config.state_dir, { kind: "site_changed", project: "sample", ref: "refs/heads/master" })
         assert.equal((await f.execute(deferred)).state, "superseded")
@@ -177,10 +177,10 @@ test("a declared upstream branch may be absent until created without producing a
     const f = fixture()
     try {
         git(f.remote, "branch", "-D", "staging")
-        const missing = await poll_project(f.view("staging"))
+        const missing = await sync_project(f.view("staging"))
         assert.equal(missing?.status, "unchanged")
         assert(!pending(f.config.state_dir).some(item => item.job.project === "sample"))
         git(f.source, "push", "-q", f.remote, "staging")
-        assert.equal((await poll_project(f.view("staging")))?.status, "imported")
+        assert.equal((await sync_project(f.view("staging")))?.status, "imported")
     } finally { f.cleanup() }
 })

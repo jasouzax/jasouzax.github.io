@@ -4,8 +4,8 @@ import assert from "node:assert/strict"
 import { readFileSync, readdirSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
-import { auth_hash } from "../cloud/api/auth.ts"
-import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../shared/work/crypto.ts"
+import { auth_hash } from "../../../cloud/api/auth.ts"
+import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../../../shared/work/crypto.ts"
 
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 function stream(ws: any) {
@@ -28,7 +28,7 @@ async function fixture() {
     const bundle = await build({ entryPoints: ["cloud/router/index.ts"], bundle: true, write: false, format: "esm", platform: "browser", target: "es2022" })
     const runtime = new Miniflare(convertV4MiniflareOptions({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: "2026-11-04", bindings: { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.net", GOOGLE_CLIENT_ID: "synthetic" }, d1Databases: ["DB"], durableObjects: { REALTIME: { className: "Realtime_Hub", useSQLite: true } } }))
     const db = await runtime.getD1Database("DB")
-    for (const name of readdirSync("migrations").filter(name => name.endsWith(".sql")).sort()) await db.exec(readFileSync(`migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
+    for (const name of readdirSync("cloud/db/migrations").filter(name => name.endsWith(".sql")).sort()) await db.exec(readFileSync(`cloud/db/migrations/${name}`, "utf8").replace(/--[^\n]*/g, "").split(";").map(sql => sql.trim().replace(/\s+/g, " ")).filter(Boolean).join(";\n"))
     const session = async (subject: string) => {
         const token = random(), now = Date.now()
         await db.prepare("INSERT OR IGNORE INTO auth_users VALUES (?, ?, 'Test', ?)").bind(subject, `${subject}@example.com`, now).run()

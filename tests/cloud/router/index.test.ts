@@ -5,11 +5,11 @@ import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
-import worker, { route, type worker_env } from "../cloud/router/index.ts"
-import { sign_origin, verify_origin, secure_response, is_work_path } from "../cloud/security/headers.ts"
-import { git_read } from "../server/repo/index.ts"
-import { prepare_deploy } from "../src/step/cloud_deploy.ts"
-import type { build_result } from "../engine/build/build.ts"
+import worker, { route, type worker_env } from "../../../cloud/router/index.ts"
+import { sign_origin, verify_origin, secure_response, is_work_path } from "../../../cloud/security/headers.ts"
+import { git_read } from "../../../server/repo/index.ts"
+import { prepare_deploy } from "../../../src/step/cloud_deploy.ts"
+import type { build_result } from "../../../engine/build/build.ts"
 
 const env: worker_env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://example.pages.dev", PUBLIC_PROJECTS: '["calculator"]' }
 
@@ -22,7 +22,7 @@ test("Worker routes only published project subdomains and rejects unknown hosts/
     const api = await route(new Request("https://example.com/api/_/messages", { method: "POST", body: "private" }), env)
     assert.equal(api.status, 501)
     assert.equal(api.headers.get("cache-control"), "no-store")
-    assert.equal((await route(new Request("https://example.com/api/_/git/calculator/refs"), env)).status, 503)
+    assert.equal((await route(new Request("https://repo.example.com/calculator/_/refs"), env)).status, 503)
 })
 
 test("Worker strips private request data from Pages and applies work security headers", async () => {
@@ -120,4 +120,15 @@ test("deployment staging separates oversized R2 assets from the Pages upload", a
         const vars = JSON.parse(readFileSync(stage.var_file, "utf8"))
         assert.deepEqual(JSON.parse(vars.project_clone_origins), { demo: "https://github.com/team/demo.git" })
     } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+test("local emulation serves a distinct loopback asset port and refuses self-forwarding", async () => {
+    const local = { ...env, DOMAIN: "localhost", PAGES_ORIGIN: "http://127.0.0.1:19001" }
+    const request = new Request("http://127.0.0.1:19002/")
+    const response = await route(request, local, async forwarded => {
+        assert.equal(forwarded.url, "http://127.0.0.1:19001/")
+        return new Response("local page")
+    })
+    assert.equal(await response.text(), "local page")
+    assert.equal((await route(request, { ...local, PAGES_ORIGIN: "http://127.0.0.1:19002" }, async () => assert.fail())).status, 503)
 })

@@ -1,6 +1,6 @@
 /*
  * Bidirectional synchronization of the public deploy branch with an operator-configured upstream repository.
- *   poll_upstream: fetch into a private ref, fast-forward the hub atomically, and enqueue ordinary CI/CD.
+ *   sync_upstream: fetch into a private ref, fast-forward the hub atomically, and enqueue ordinary CI/CD.
  *   push_upstream: publish only the exact commit whose CI passed; ordinary Git push protects concurrent writers.
  *   read_sync_state: private operator status, including errors and a durable import intent for restart recovery.
  * Each branch view synchronizes only its configured ref, with separate state/tracking and a shared deployment checkout.
@@ -98,7 +98,7 @@ function queue_import(config: Server_Config, commit: string, old?: string, sourc
     if (!already_queued(config, commit)) enqueue(queue_root(config), { kind: source === "checkout" ? "push" : "upstream", project: config.site.project, ref: `refs/heads/${config.site.branch}`, commit, old, pusher: source })
 }
 
-export async function poll_project(config: Server_Config): Promise<Sync_State | undefined> {
+export async function sync_project(config: Server_Config): Promise<Sync_State | undefined> {
     let local: Sync_State | undefined
     try {
         const current = await hub_tip(config)
@@ -126,11 +126,11 @@ export async function poll_project(config: Server_Config): Promise<Sync_State | 
         save_state(config, failed)
         return failed
     }
-    const upstream = await poll_upstream(config)
+    const upstream = await sync_upstream(config)
     return upstream?.status === "error" ? upstream : local ?? upstream
 }
 
-export async function poll_upstream(config: Server_Config): Promise<Sync_State | undefined> {
+export async function sync_upstream(config: Server_Config): Promise<Sync_State | undefined> {
     if (!config.upstream) return undefined
     let state = read_sync_state(config)
     try {
@@ -148,7 +148,7 @@ export async function poll_upstream(config: Server_Config): Promise<Sync_State |
         if (current !== remote && await ancestor(config, current, remote)) {
             state.pending_commit = remote
             save_state(config, state)
-            await must_git(config, ["update-ref", ref, remote, current], "Hub changed during upstream fetch; retrying on the next poll")
+            await must_git(config, ["update-ref", ref, remote, current], "Hub changed during upstream fetch; retry with explicit sync")
             queue_import(config, remote, current)
             state.status = "imported"
             delete state.pending_commit

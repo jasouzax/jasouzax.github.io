@@ -3,18 +3,18 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
 import { readFileSync } from "node:fs"
-import { work_route, type Work_Env, type Work_Statement } from "../cloud/api/work.ts"
-import { work_outbox } from "../cloud/room/work.ts"
-import { Realtime_Hub } from "../cloud/room/room.ts"
-import { auth_hash, auth_route } from "../cloud/api/auth.ts"
-import { save_google_grant } from "../cloud/api/auth/google.ts"
-import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../shared/work/crypto.ts"
+import { work_route, type Work_Env, type Work_Statement } from "../../../cloud/api/work.ts"
+import { work_outbox } from "../../../cloud/room/work.ts"
+import { Realtime_Hub } from "../../../cloud/room/room.ts"
+import { auth_hash, auth_route } from "../../../cloud/api/auth.ts"
+import { save_google_grant } from "../../../cloud/api/auth/google.ts"
+import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../../../shared/work/crypto.ts"
 const origin = "https://example.com", base = "/api/_/work/rooms"
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 type Identity = { cookie: string, csrf: string }
 async function fixture() {
     const db = new DatabaseSync(":memory:")
-    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) db.exec(readFileSync(`migrations/${file}`, "utf8"))
+    for (const file of ["0002_work_chat.sql", "0003_google_auth.sql", "0004_guest_messaging.sql", "0005_profile_images.sql", "0006_unstored_keys.sql", "0007_realtime.sql", "0008_push.sql"]) db.exec(readFileSync(`cloud/db/migrations/${file}`, "utf8"))
     const env: Work_Env = { WORK_FALLBACK_KEY: random(), GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", DB: { prepare(sql) {
         let values: any[] = []
         const statement: Work_Statement = { bind(...args) { values = args; return statement }, async first<T>() { return db.prepare(sql).get(...values) as T ?? null }, async all<T>() { return { results: db.prepare(sql).all(...values) as T[] } }, async run() { return db.prepare(sql).run(...values) } }

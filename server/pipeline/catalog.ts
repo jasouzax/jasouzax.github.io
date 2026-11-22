@@ -10,9 +10,9 @@ export function apply_project_catalog(config: Server_Config, catalog_dir = confi
     for (const [id, declaration] of declarations) {
         const local = config.projects[id]
         const branch = declaration.pipeline?.branch ?? local?.branch ?? (id === config.site.project ? config.site.branch : "master")
-        const upstream = declaration.remote ? { remote: declaration.remote, branch, poll_seconds: declaration.pipeline?.poll_seconds ?? 60 } : undefined
+        const upstream = declaration.remote ? { remote: declaration.remote, branch } : undefined
         config.projects[id] = {
-            ...local, path: local?.path ?? join(config.repos_dir, `${id}.git`),
+            ...local, confidental: declaration.confidental, collaborators: declaration.collaborators, path: local?.path ?? join(config.repos_dir, `${id}.git`),
             visibility: declaration.private || local?.visibility === "private" ? "private" : "public",
             active: local?.active !== false, branch, pipeline: declaration.pipeline, pipelines: declaration.pipelines, upstream,
         }

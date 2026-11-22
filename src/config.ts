@@ -13,7 +13,7 @@ export function parse_args(args: string[]): { words: string[], flags: flags } {
         }
         const name = arg.slice(2)
         const next = args[index + 1]
-        if (next && !next.startsWith("--") && ["out", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role", "project", "branch", "base_url", "pages_project", "assets_bucket"].includes(name)) {
+        if (next && !next.startsWith("--") && ["out", "host", "port", "root", "date", "out_file", "target", "overlay", "state_file", "commit", "message", "config", "role", "project", "branch", "base_url", "pages_project", "assets_bucket"].includes(name)) {
             flags[name] = next
             index++
         } else flags[name] = true

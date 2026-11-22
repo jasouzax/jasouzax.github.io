@@ -1,3 +1,4 @@
+import { restore_inputs } from "../../server/container.ts"
 /* Container-facing contracts: runtime roles and large static asset streaming/range handling. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
@@ -5,8 +6,8 @@ import { once } from "node:events"
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync, symlinkSync, lstatSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { docker_options, refresh_content, restore_inputs } from "../ops/docker/entry.ts"
-import { serve } from "../src/step/serve_http.ts"
+import { docker_options, refresh_content } from "../../ops/docker/entry.ts"
+import { serve } from "../../src/step/serve_http.ts"
 
 test("Docker defaults serve the website and personal mode selects its own port and persistent directory", () => {
     assert.equal(docker_options([]).port, 8080)

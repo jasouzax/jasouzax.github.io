@@ -5,9 +5,9 @@ import { spawn } from "node:child_process"
 import type { ChildProcess } from "node:child_process"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { Frame_Reader, encode_frame, max_from_chrome } from "../extension/host/frame.ts"
-import { parse_request, Protocol_Error } from "../extension/host/protocol.ts"
-import { extension_id, native_manifest } from "../extension/host/install.ts"
+import { Frame_Reader, encode_frame, max_from_chrome } from "../../../extension/host/frame.ts"
+import { parse_request, Protocol_Error } from "../../../extension/host/protocol.ts"
+import { extension_id, native_manifest } from "../../../extension/host/install.ts"
 
 type Reply = Record<string, unknown> & { type: string }
 
@@ -34,7 +34,7 @@ test("host requests are validated strictly", () => {
 })
 
 test("extension id and native manifest are derived from the manifest key and allow only that extension", () => {
-    const manifest = JSON.parse(readFileSync(new URL("../extension/manifest.json", import.meta.url), "utf8"))
+    const manifest = JSON.parse(readFileSync(new URL("../../../extension/manifest.json", import.meta.url), "utf8"))
     const id = extension_id(manifest.key)
     assert.match(id, /^[a-p]{32}$/)
     assert.equal(id, [...createHash("sha256").update(Buffer.from(manifest.key, "base64")).digest("hex").slice(0, 32)].map(char => String.fromCharCode(97 + parseInt(char, 16))).join(""))
@@ -45,7 +45,7 @@ test("extension id and native manifest are derived from the manifest key and all
 })
 
 function start_host(backend: "python" | "script"): { child: ChildProcess, replies: Reply[], send: (message: unknown) => void, wait_for: (test: (reply: Reply) => boolean) => Promise<Reply>, stop: () => void } {
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("../extension/host/host.ts", import.meta.url))], { env: { ...process.env, JAZU_HOST_SHELL: "/bin/sh", JAZU_HOST_PTY: backend }, stdio: ["pipe", "pipe", "inherit"] })
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", fileURLToPath(new URL("../../../extension/host/host.ts", import.meta.url))], { env: { ...process.env, JAZU_HOST_SHELL: "/bin/sh", JAZU_HOST_PTY: backend }, stdio: ["pipe", "pipe", "inherit"] })
     const reader = new Frame_Reader()
     const replies: Reply[] = []
     const watchers: (() => void)[] = []

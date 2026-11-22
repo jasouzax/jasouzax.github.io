@@ -9,7 +9,7 @@ npm run types     # tsc --noEmit over src and tests
 npm test          # node --import tsx --test tests/*.test.ts
 ```
 
-Node 22.18+ is required (`tests/nodes.test.ts` uses `node:sqlite`). Tests build temporary sites in OS temp folders; nothing touches `dist/`.
+Node 22.18+ is required (`tests/cloud/router/index.test.ts` uses `node:sqlite`). Tests build temporary sites in OS temp folders; nothing touches `dist/`.
 
 | File | Covers |
 |---|---|

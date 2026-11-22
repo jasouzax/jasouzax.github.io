@@ -1,12 +1,12 @@
 /* OCI pull contracts: mutable tags, immutable digests, repository isolation and anonymous write rejection. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { registry_route, type Registry_Env } from "../cloud/repo/docker.ts"
+import { registry_route, type Registry_Env } from "../../../cloud/repo/docker.ts"
 
 const digest = `sha256:${"a".repeat(64)}`
 const index = JSON.stringify({ schema: 1, tags: { latest: digest }, manifests: { [digest]: "application/vnd.oci.image.index.v1+json" }, blobs: [digest] })
 const values: Record<string, string> = { "repos/jazu/index.json": index, [`blobs/sha256/${digest.slice(7)}`]: "{}" }
-const env: Registry_Env = { DOMAIN: "registry.jasouza.com", BLOBS: {
+const env: Registry_Env = { DOMAIN: "repo.jasouza.com", BLOBS: {
     async get(key, options) {
         const text = values[key]
         if (text === undefined) return null
@@ -43,7 +43,7 @@ import { createHash } from "node:crypto"
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { registry_indexes } from "../ops/docker/publish_registry.ts"
+import { registry_indexes } from "../../../ops/docker/publish_registry.ts"
 
 test("release indexes retain platform manifests and reject references to absent blobs", () => {
     const storage = mkdtempSync(join(tmpdir(), "jazu_registry_"))
