@@ -23,7 +23,7 @@ npm run node -- --port 8788  # personal node (needs .env)
 npm run test:{desk,loading,expertise}:browser   # Playwright (Chromium)
 ```
 
-CLI entry is `node src/main.ts <cmd>` (tsx is registered inside `main.ts`; no compile step). Commands: `build check serve watch clean icons graph pack deploy node`.
+CLI entry is `node src/main.ts <cmd>` (tsx is registered after a dependency-free `inst` bootstrap). Pipeline steps: `inst test make watch serve host cloud server ext app`; aliases and legacy utility commands remain. App dependencies are installed independently with `npm --prefix app ci`.
 
 Shared contracts live under `shared/`; import them directly rather than restoring compatibility files in `src/` or `server/src/shared/`. Build and listener fingerprints include `shared/`; synthetic engine fixtures and Docker must copy it alongside `src/`. The server compiler emits to `server/dist/server/` and `server/dist/shared/`.
 
@@ -46,7 +46,8 @@ engine/                load/, tags/, routes/, style/, seo/, build/, check/
 desk/                  browser window/, action/, kernel/, program/, fs/, site/, server/, work/
 server/                Node repo/, pipeline/, link/, terminal/, api/ prototype, automation browser/
                        build.cjs emits CommonJS dist/ for Electron; source modules are ESM
-extension/             Chromium MV3 extension + native messaging host in host/
+extension/             Chromium MV3 extension + native messaging host entries in host/
+app/                   independent sandboxed Electron desktop; shared/host owns reusable native framing/PTY code
 cloud/infra/           Terraform and wrangler/{local,staging,production}.jsonc
 cloud/db/migrations/   D1 SQL; cloud/db/migrate.ts owns migration execution
 ops/                   container distribution, service and recovery files
@@ -99,7 +100,7 @@ dist/ .cache/ .wrangler/ generated, ignored
 
 ## Notes & tips (read, and extend)
 
-- **Root migration (2026-11-22):** runtime code now lives in `engine/`, `desk/`, `cloud/`, `server/` and `shared/`. Follow imports for the exact path; the old `src/web`, `src/node`, `src/desk` and `server/src` locations are gone. Program port sources and manifests live in `desk/program/`; the generic worker dispatches GCC/Python runtime adapters without duplicating worker entries. Wrangler configs are `cloud/infra/wrangler/{local,staging,production}.jsonc`; D1 SQL is `cloud/db/migrations`. Existing local Terraform state/variables moved alongside configs. CLI helpers and handlers now live under `src/tools` and `src/step`. Unit tests are beginning to mirror component paths. Missing capabilities in COMPONENTS.md must be `[ ]`, not falsely accepted as refactors.
+- **Root migration (2026-11-22):** runtime code now lives in `engine/`, `desk/`, `cloud/`, `server/` and `shared/`. Follow imports for the exact path; the old `src/web`, `src/node`, `src/desk` and `server/src` locations are gone. Program port sources and manifests live in `desk/program/`; the generic worker dispatches GCC/Python runtime adapters without duplicating worker entries. Wrangler configs are `cloud/infra/wrangler/{local,staging,production}.jsonc`; D1 SQL is `cloud/db/migrations`. Existing local Terraform state/variables moved alongside configs. CLI helpers and handlers now live under `src/tools` and `src/step`. Unit tests are beginning to mirror component paths. Remaining attempted capabilities in COMPONENTS.md use `[!]` with a concrete gap under the current owner request; never use `[?]` for absent implementations.
 
 - **Realtime upgrades:** `node/realtime.ts` exports a legacy-compatible Durable Object class (no runtime `cloudflare:workers` import, so Node contract tests can still import the router). Return status 101 directly: rebuilding it in `secure_response` loses its WebSocket. Use hibernation auto-response timestamps for heartbeat leases and alarms, not JS intervals or a D1 write for every ping. Serialize per-socket commands: concurrent watches otherwise overwrite attachments. Version presence snapshots and retain failed fanout in object storage; keep remote fanout outside the projection lock and reschedule alarms using fresh sockets after awaits. New channels belong in `realtime_channels.ts` adapters, not Work-specific branches in the hub. Reconcile presence across all account sockets; a guest replacement closes the old socket.
 
@@ -137,7 +138,7 @@ dist/ .cache/ .wrangler/ generated, ignored
 - **Legacy residue:** `schema.ts` still accepts `landing`, `contact`, `error`, `resume` tags and `seo_text.tsx` handles them; no content uses them (migration to `hero`/`item` is done). Safe to remove when touching those files.
 - **Stale comments:** some file headers mention `client_*.ts` names, `jazu.config.ts`, `<resume format=…>`, `home_jason` — gen-11 names. Trust the code, fix the comment when you are there.
 - `README`/docs once claimed "22 regression tests / 68 routes"; the suite has grown. Re-measure before quoting numbers.
-- `COMPONENTS.md`, `TASKS.md`, `PLACEHOLDER.md` **no longer exist**. Their content moved: contracts → `docs/feat/{name}.md` (component ids like `1.4` kept; index in `docs/feat/README.md`), checklists → same files + mirrored in `docs/feat/README.md`, placeholders → `docs/README.md`.
+- `COMPONENTS.md` is the current owner contract. Preserve descriptions and human decisions; update statuses with evidence. The requested implementation pass uses `[!]` for remaining gaps and `[?]` for review-ready implementations; see `docs/feat/implementation-audit.md`. `TASKS.md` and `PLACEHOLDER.md` remain absent; legacy feature guides and placeholders are under `docs/`.
 - `gen-11/` is mentioned in old docs as an ignored reference checkout; never import from it (not in this repo).
 - `.cache/hashes.json` is a flat hash map, not the timestamp/manifest/`HEAD` design the docs describe as the target.
 - `schema.ts` `event` rule is defined twice (the second via `Object.assign` wins).
@@ -179,3 +180,5 @@ dist/ .cache/ .wrangler/ generated, ignored
 - Container CI requires both Python command names: ZIP verification invokes `python`, while the Debian image installs `python3`. `ops/docker/python` provides the alias in full and runtime-patch releases. Final public image `docker-cd8323c` passed the Pi's complete 185-test production pipeline and deployment; keep the stopped previous controller and native installation as rollback options, never concurrent controllers.
 
 Component alignment verification (2026-11-22, Windows): the main suite has four pre-existing failures in `tests/desk/server/fs.test.ts`, and the agent suite has seven in `server/test/{agent,fs_channel}.test.ts` because native Windows temp paths violate the Pi channel's POSIX-only absolute-path contract. Both were reproduced with original revision files; do not treat these as shared/cloud migration regressions or silently skip them. Google sign-in Playwright verification passed against local Wrangler/D1. Before deploying the new API paths, register `/api/_/auth/google/callback` with Google and deploy the site, Worker and agent together.
+
+- **Desktop/host validation (2026-11-22):** `app/` is independent of `server/`; reusable native framing/protocol/PTY code is `shared/host/`. Compiled Python and script PTYs passed on the ARM64 server. Its host Node is v20, so source TypeScript needs Node >=22.18 or the compiled host. Electron launch must remove `ELECTRON_RUN_AS_NODE` from its child environment entirely; even an empty value enables Node mode. Root/app typechecks and the real Electron smoke pass. Two final Electron launch retries timed out before debugger attachment; app acceptance remains an issue. The installed Chrome channel works for desk regressions; the bundled headless shell stalled in this environment.

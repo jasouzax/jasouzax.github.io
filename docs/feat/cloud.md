@@ -8,6 +8,9 @@
 
 ## Status
 
+- [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
+- [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Terraform infrastructure (Pages, Worker, R2, KV, D1, routes) replacing Wrangler provisioning, plus dry-run staging (4.1–4.2)

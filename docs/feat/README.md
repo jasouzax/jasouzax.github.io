@@ -1,5 +1,16 @@
 # Feature status
 
+The [2026-11-22 implementation audit](implementation-audit.md) records this pass, validation evidence and every remaining component gap. In the new entries, `[?]` means implemented and awaiting human acceptance; `[!]` means incomplete or an operator notice. Historical `[x]` marks below are preserved.
+
+- [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
+- [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+- [?] RSS 2.0 and Atom feeds with per-language autodiscovery and private-page exclusion.
+- [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
+- [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
+- [?] Print SCSS, fonts and assets compile behind print-only media.
+- [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
+- [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+
 Every feature of JAZU, ordered roughly by dependency. This is the single place to see **what is done, what is ongoing and what is next**.
 
 - `[x]` implemented and verified · `[ ]` not done · ~~struck~~ cancelled/superseded

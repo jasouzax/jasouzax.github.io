@@ -1,5 +1,7 @@
 # JAZU development guide
 
+Current implementation evidence and remaining component issues: [2026-11-22 audit](feat/implementation-audit.md). The separate [Electron desktop](../app/README.md) now builds and runs locally; its native compositor/filesystem work remains incomplete.
+
 The technical documentation of JAZU. If you only want to run or deploy it, start with the root [README](../README.md); this directory is for people changing it.
 
 ## Who reads what

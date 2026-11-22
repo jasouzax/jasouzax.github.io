@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Provider-independent per-project `repo` synchronization and XML `<pipeline>` commands, isolated branches/state, loop prevention and CI-gated export (real Git integration tests)

@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] RSS 2.0 and Atom feeds with per-language autodiscovery and private-page exclusion.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Generate project, event and blog pages plus `/projects`, `/blogs` listings from roots (1.5–1.7)

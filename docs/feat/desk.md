@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Preserve static menu entries/windows and pre-render Markdown and code (1.4)

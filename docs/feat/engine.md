@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Incremental output hashing, generated assets and dependency graph
