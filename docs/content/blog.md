@@ -22,4 +22,6 @@ Required: `id`, `name`. Optional: `date`, `icon`, `info`, `lang`. Children: `<me
 
 ## Related
 
+RSS 2.0 and Atom subscriptions are generated at `/blogs/rss.xml` and `/blogs/atom.xml` (prefix with `/ja`, etc. for other configured languages). HTML includes feed autodiscovery links. Only public, indexable blogs in that language appear. Entries contain the title, summary, canonical URL and an ISO publication date when authored; otherwise the build date is used. No private content or script is included in feed bodies.
+
 [desk](desk.md) · [contract](../feat/objects.md)
