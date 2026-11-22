@@ -14,7 +14,7 @@ export async function issue_access(request: Request, env: Work_Env, session: Aut
     const secret = key(env)
     if (!secret) return null
     const origin = new URL(request.url).origin
-    const token = await new SignJWT({ email: session.email, name: session.name, picture: session.picture, role: session.role, sid: await auth_hash(refresh) }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setSubject(session.subject).setIssuer(origin).setAudience("jazu-session").setIssuedAt().setExpirationTime(`${access_lifetime}s`).sign(secret)
+    const token = await new SignJWT({ email: session.email, name: session.name, picture: session.picture, role: session.role, sid: await auth_hash(refresh) }).setProtectedHeader({ alg: "HS256", typ: "JWT", kid: (await auth_hash(env.AUTH_JWT_SECRET!)).slice(0, 16) }).setSubject(session.subject).setIssuer(origin).setAudience("jazu-session").setIssuedAt().setExpirationTime(`${access_lifetime}s`).sign(secret)
     return cookie(access_cookie, token, access_lifetime)
 }
 

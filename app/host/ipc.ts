@@ -19,7 +19,7 @@ export function attach_host(window: BrowserWindow, origin: string, directory: st
                 const child = host = spawn(process.execPath, [join(directory, "host.cjs")], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" }, stdio: "pipe", windowsHide: true })
                 const reader = new Frame_Reader()
                 child.stdin.on("error", () => { if (host === child) close() })
-                child.stdout.on("data", bytes => { try { for (const reply of reader.push(bytes)) send(reply) } catch { close(); send({ type: "host_error", message: "Invalid native host frame" }) } })
+                child.stdout.on("data", bytes => { if (host !== child) return; try { for (const reply of reader.push(bytes)) send(reply) } catch { close(); send({ type: "host_error", message: "Invalid native host frame" }) } })
                 child.stderr.on("data", bytes => process.stderr.write(bytes))
                 child.once("error", () => { if (host === child) host = null; send({ type: "host_error", message: "Native host could not start" }) })
                 child.once("exit", () => { if (host === child) { host = null; send({ type: "host_closed" }) } })
