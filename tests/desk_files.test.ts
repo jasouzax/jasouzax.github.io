@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { rename_pattern, available_name, zip_blob } from "../src/web/client/desk_files_util.ts"
+import { rename_pattern, available_name, zip_blob } from "../desk/window/folder/files.ts"
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"

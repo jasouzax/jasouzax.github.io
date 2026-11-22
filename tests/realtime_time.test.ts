@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { relative_presence } from "../src/web/client/realtime_time.ts"
+import { relative_presence } from "../desk/work/time.ts"
 test("last-online text advances locally and handles recent, future and long-absent timestamps", () => {
     const last = 1000000
     assert.equal(relative_presence(last, "en", last + 180000), "3 minutes ago")

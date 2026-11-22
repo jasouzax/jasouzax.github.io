@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { get_auth } from "../src/web/client/sign.ts"
+import { get_auth } from "../desk/work/sign.ts"
 test("an older session request cannot restore an identity after a newer sign-out/refresh result", async () => {
     const original = globalThis.fetch
     let release!: (response: Response) => void, calls = 0

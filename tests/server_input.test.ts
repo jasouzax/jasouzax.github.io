@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { page_point, modifiers, mouse_button, Click_Counter, wheel_pixels, copy_shortcut, key_events, key_name } from "../src/web/client/server_input.ts"
+import { page_point, modifiers, mouse_button, Click_Counter, wheel_pixels, copy_shortcut, key_events, key_name } from "../desk/server/input.ts"
 
 const plain = { ctrlKey: false, metaKey: false, altKey: false, shiftKey: false }
 

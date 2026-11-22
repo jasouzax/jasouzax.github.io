@@ -1,0 +1,16 @@
+{
+    "name": "json_flatten",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "json-flatten"
+    ],
+    "files": {
+        "wasm": "build/json_flatten/json_flatten.wasm",
+        "loader": "build/json_flatten/json_flatten.js"
+    },
+    "sha256": "e7292342775cf42a8e0b8b32da6ee8d324f264386a124bc55a21520a1b4c2c9a",
+    "flags": {
+        "applet": false
+    }
+}

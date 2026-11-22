@@ -1,0 +1,19 @@
+{
+    "name": "csv_json",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "csv2json",
+        "json2csv",
+        "tsv2json",
+        "json2tsv"
+    ],
+    "files": {
+        "wasm": "build/csv_json/csv_json.wasm",
+        "loader": "build/csv_json/csv_json.js"
+    },
+    "sha256": "27969416cdbc919aa906065df6cbb79f379076ed6a193eecb342ae4f3396e475",
+    "flags": {
+        "applet": false
+    }
+}

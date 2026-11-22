@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { Drive_Vault, type Key_Vault } from "../src/web/client/work_drive.ts"
+import { Drive_Vault, type Key_Vault } from "../desk/work/drive.ts"
 import { encode_key, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
 
 test("Drive key creation recovers after a lost acknowledgement and never overwrites a different device's key", async () => {

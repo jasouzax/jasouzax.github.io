@@ -1,0 +1,16 @@
+{
+    "name": "pwgen",
+    "version": "2.08-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "pwgen"
+    ],
+    "files": {
+        "wasm": "build/pwgen/pwgen.wasm",
+        "loader": "build/pwgen/pwgen.js"
+    },
+    "sha256": "afd9ae0943f5472360bdbf4a165ca74ca995beb64ee7f4ad2a9b633bd8f8d48c",
+    "flags": {
+        "applet": false
+    }
+}

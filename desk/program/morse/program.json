@@ -1,0 +1,16 @@
+{
+    "name": "morse",
+    "version": "1.0.0-bsd-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "morse"
+    ],
+    "files": {
+        "wasm": "build/morse/morse.wasm",
+        "loader": "build/morse/morse.js"
+    },
+    "sha256": "af6a89f3f08379548f9fbb992c698de6fa4e327343d13dd21aefc23fe202efb3",
+    "flags": {
+        "applet": false
+    }
+}

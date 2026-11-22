@@ -1,0 +1,17 @@
+{
+    "name": "banner",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "banner",
+        "banner-js"
+    ],
+    "files": {
+        "wasm": "build/banner/banner.wasm",
+        "loader": "build/banner/banner.js"
+    },
+    "sha256": "2479b2aed1da3317d84c831479481a1a734ac05e2ea73cc6d9cbb509368b7ff3",
+    "flags": {
+        "applet": false
+    }
+}

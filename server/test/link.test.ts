@@ -1,8 +1,8 @@
 /* Hub_Link with a fake socket and mocked timers: hello, viewer gating, heartbeat, silence detection, backoff and auth rejection. */
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { Hub_Link } from '../src/link.ts';
-import type { Socket_Like } from '../src/link.ts';
+import { Hub_Link } from '../link/hub.ts';
+import type { Socket_Like } from '../link/hub.ts';
 
 class Fake implements Socket_Like {
     sent: (string | Uint8Array)[] = [];

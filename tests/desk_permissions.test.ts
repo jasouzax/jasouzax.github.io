@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import type { fs_node } from "../src/web/client/desk_fs.ts"
-import { can_read, can_create, can_move, check_permissions } from "../src/web/client/desk_fs_permissions.ts"
+import type { fs_node } from "../desk/fs/opfs.ts"
+import { can_read, can_create, can_move, check_permissions } from "../desk/fs/permissions.ts"
 
 function folder(parent: fs_node | null, writable = false): fs_node {
     return { name: "folder", path: parent ? `${parent.path}/folder` : "/", kind: "dir", parent, writable, children: [], info: "", handle: null }

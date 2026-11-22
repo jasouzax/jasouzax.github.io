@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mode_of, snapshot_text, format_time } from "../src/web/client/server_text.ts"
+import { mode_of, snapshot_text, format_time } from "../desk/server/text.ts"
 
 const strings: Record<string, string> = { server_offline: "Offline.", server_unreachable: "No status.", server_last_snapshot: "Last: {time}" }
 const label = (key: string): string => strings[key] ?? key
@@ -25,7 +25,7 @@ test("a failed request without any earlier status says the status could not be l
     assert.equal(format_time(0), "1970-01-01 00:00:00 UTC")
 })
 
-import { is_server_page } from "../src/web/client/server_text.ts"
+import { is_server_page } from "../desk/server/text.ts"
 test("only /server and its language form count as the server page", () => {
     for (const path of ["/server", "/server/", "/ja/server"]) assert.equal(is_server_page(path), true, path)
     for (const path of ["/desk", "/servers", "/server/x", "/jap/server", "/api/_/server", "/"]) assert.equal(is_server_page(path), false, path)

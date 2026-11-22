@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { folder_cover_plan, folder_change } from "../src/web/client/desk_folder_cover.ts"
+import { folder_cover_plan, folder_change } from "../desk/window/folder/cover.ts"
 
 test("folder covers use direct files only and mark immediate subfolders separately", () => {
     const nested = { kind: "dir" as const, name: "nested", children: [{ kind: "file", name: "hidden.png" }] }

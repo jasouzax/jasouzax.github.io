@@ -31,7 +31,7 @@ test("signed-in menu replaces sign-in, cancellation preserves the account, confi
     const hash = createHash("sha256").update(token).digest("hex")
     const now = Date.now()
     const sql = `INSERT INTO auth_users VALUES ('${subject}', '${subject}@example.com', 'Delete Test', ${now}); INSERT INTO auth_sessions VALUES ('${hash}','${subject}',${now},${now});`
-    execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "wrangler.local.jsonc", "--persist-to", ".cache/work-browser-guest-state", "--command", sql], { windowsHide: true, stdio: "pipe" })
+    execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "cloud/infra/wrangler/local.jsonc", "--persist-to", ".cache/work-browser-guest-state", "--command", sql], { windowsHide: true, stdio: "pipe" })
     await page.context().addCookies([{ name: "__Host-jazu_session", value: token, url: "https://localhost:8787/", secure: true, httpOnly: true, sameSite: "Lax" }])
     await page.goto("/work")
     await expect(page.locator('.desk_messages_account > summary')).toBeVisible()

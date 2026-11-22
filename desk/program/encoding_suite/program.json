@@ -1,0 +1,17 @@
+{
+    "name": "encoding_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "iconv",
+        "recode"
+    ],
+    "files": {
+        "wasm": "build/encoding_suite/encoding_suite.wasm",
+        "loader": "build/encoding_suite/encoding_suite.js"
+    },
+    "sha256": "b3a4548a2623b630b6e151f32ce9d2d0ff056a4ee03933470cd3938db6448513",
+    "flags": {
+        "applet": false
+    }
+}

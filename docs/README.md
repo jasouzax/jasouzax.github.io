@@ -63,11 +63,11 @@ The inherited sample birth date, phone numbers, postal code, family/commute fiel
 | Deployment input | Replace before cloud use |
 |---|---|
 | `.env` `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TF_VAR_*` | Deployment credentials and Terraform inputs; loaded by `deploy`; never commit |
-| `terraform/terraform.tfvars` | Optional alternative to `TF_VAR_*` in `.env` (git-ignored) |
+| `cloud/infra/terraform.tfvars` | Optional alternative to `TF_VAR_*` in `.env` (git-ignored) |
 | `.env.example` | Copy to ignored `.env`, generate an HMAC key, explicitly map only public repositories |
 | Worker secrets | HMAC key and Access service-token id/secret as Terraform variables; never commit actual values |
 | KV registry | Explicit external HTTPS origins for each approved demo/work subdomain |
-| `wrangler.local.jsonc` | Local-only synthetic binding identifiers; never deploy this config |
+| `cloud/infra/wrangler/local.jsonc` | Local-only synthetic binding identifiers; never deploy this config |
 
 Large local videos are staged for R2 automatically. The dry run lists upload keys without uploading bytes. The owner must confirm media rights and retention. The API health response explicitly reports Work as not implemented; this is intentional product status, not a fake client session.
 

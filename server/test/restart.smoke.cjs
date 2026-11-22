@@ -5,9 +5,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { fork } = require('node:child_process');
 const { once, EventEmitter } = require('node:events');
-const { Script_Runner } = require('../dist/server/src/runner');
-const { Auto_Start } = require('../dist/server/src/autostart');
-const { Api_Registry } = require('../dist/server/src/api');
+const { Script_Runner } = require('../dist/server/browser/runner');
+const { Auto_Start } = require('../dist/server/browser/autostart');
+const { Api_Registry } = require('../dist/server/api/prototype');
 
 async function child(folder) {
     const script = path.join(folder, 'service.auto.js');

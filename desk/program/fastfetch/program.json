@@ -1,0 +1,16 @@
+{
+    "name": "fastfetch",
+    "version": "2.40.4-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "fastfetch"
+    ],
+    "files": {
+        "wasm": "build/fastfetch/fastfetch.wasm",
+        "loader": "build/fastfetch/fastfetch.js"
+    },
+    "sha256": "63aacc8755ca802d4c09b1ef8a95254be5474dd6a7e3d5ec430f8f644df91edf",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "name": "file_analysis",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "entropy",
+        "detect-encoding",
+        "file-info"
+    ],
+    "files": {
+        "wasm": "build/file_analysis/file_analysis.wasm",
+        "loader": "build/file_analysis/file_analysis.js"
+    },
+    "sha256": "e55abade39193df1ade80e29814a08142cbe88f49ef673e8f1b2eea02e18f1d4",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "yq",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "yq"
+    ],
+    "files": {
+        "wasm": "build/yq/yq.wasm",
+        "loader": "build/yq/yq.js"
+    },
+    "sha256": "ff7c106877bc5a1457d3d88908bb0d2f7594d943542423dc3e47bdf58ac0a2b9",
+    "flags": {
+        "applet": false
+    }
+}

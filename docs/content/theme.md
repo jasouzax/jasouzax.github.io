@@ -19,7 +19,7 @@ A theme is CSS, generated fonts and an optional script that change the whole loo
 | `icon` | Icon in the switcher |
 | `color` | Browser-chrome colour; a `light/dark` pair is allowed (`#eaf6fb/#05121b`) |
 | `js` | Module path; exports `mount(root, options)` returning `fade_in`, `fade_out`, `pause`, `resume`, `dispose`. Draws on the shared canvas; never creates DOM |
-| `background` | Selects the decorative background markup: `default` uses `src/web/partials/background_default.tsx`, **any other value uses `background_memory.tsx`** (hard-coded in `background_html()` in `src/web/html_page.tsx`; a genuinely new background needs a small code change) |
+| `background` | Selects the decorative background markup: `default` uses `engine/tags/theme/background_default.tsx`, **any other value uses `background_memory.tsx`** (hard-coded in `background_html()` in `engine/tags/page.tsx`; a genuinely new background needs a small code change) |
 | `preload` | Font family to preload |
 
 Children: `<font>`, `<style>`.

@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/plugins/`, `src/plugins.ts`, `shared/content/plugin.ts`, `src/web/client/desk_plugins.ts`, `src/web/client/wasm_host.ts`
+- **Code:** `content/plugins/`, `engine/tags/plugin.ts`, `shared/content/plugin.ts`, `desk/plugin/loader.ts`, `desk/kernel/wasm_host.ts`
 - **Related guides:** [docs/content/plugin.md](../content/plugin.md), [content/plugins/README.md](../../content/plugins/README.md), [src/desk/README.md](../../src/desk/README.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

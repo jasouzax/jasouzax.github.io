@@ -1,0 +1,21 @@
+{
+    "name": "exec_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "box86",
+        "linux-exec",
+        "box64",
+        "linux64-exec",
+        "wine",
+        "win-exec"
+    ],
+    "files": {
+        "wasm": "build/exec_suite/exec_suite.wasm",
+        "loader": "build/exec_suite/exec_suite.js"
+    },
+    "sha256": "4c4f7e75ac629ef658f6decea7bdec77fd06876d0901047b52b3869f4d95b1f2",
+    "flags": {
+        "applet": false
+    }
+}

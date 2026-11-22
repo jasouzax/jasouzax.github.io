@@ -1,0 +1,17 @@
+{
+    "name": "linux_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "file",
+        "readelf"
+    ],
+    "files": {
+        "wasm": "build/linux_suite/linux_suite.wasm",
+        "loader": "build/linux_suite/linux_suite.js"
+    },
+    "sha256": "255a249dcf5b3fea9080ed9c3216b5c11c2138345fad83b07ea7037db8f6ed94",
+    "flags": {
+        "applet": false
+    }
+}

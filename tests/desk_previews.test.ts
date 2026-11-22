@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { preview_key, text_excerpt, is_text_preview } from "../src/web/client/desk_previews.ts"
-import { memory_directory } from "../src/web/client/memory_fs.ts"
+import { preview_key, text_excerpt, is_text_preview } from "../desk/window/previews.ts"
+import { memory_directory } from "../desk/fs/memory.ts"
 
 test("text preview excerpts retain at most 39 Unicode characters by 10 lines, without headers", async () => {
     const excerpt = await text_excerpt(new Blob([Array.from({ length: 12 }, (_, i) => `${i}\t${"😀".repeat(60)}`).join("\r\n")]))

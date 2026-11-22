@@ -1,0 +1,21 @@
+{
+    "name": "audio_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "sox",
+        "soxi",
+        "oggdec",
+        "oggenc",
+        "opusdec",
+        "opusenc"
+    ],
+    "files": {
+        "wasm": "build/audio_suite/audio_suite.wasm",
+        "loader": "build/audio_suite/audio_suite.js"
+    },
+    "sha256": "803e638987b2522d5c76ec196de21dc7f704c11810409472e8fc5840cc156492",
+    "flags": {
+        "applet": false
+    }
+}

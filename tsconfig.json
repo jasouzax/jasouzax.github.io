@@ -24,6 +24,8 @@
     "tests",
     "extension",
     "shared",
-    "cloud"
+    "cloud",
+    "engine",
+    "desk"
   ]
 }

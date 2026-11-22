@@ -25,7 +25,7 @@ Not yet implemented (listed in the original spec): `new`, `theme build`, `font b
 
 Exit codes: `jazu_error` carries a code; other failures exit 1.
 
-## `build_site()` (src/build.ts)
+## `build_site()` (engine/build/build.ts)
 
 1. `output_directory()` validates the output folder (inside the project, not `src/content/tests/node_modules/.hidden`, no junction escape).
 2. `load_config()` (merge defaults, validate) → `load_site()` builds the `site_model`.
@@ -43,15 +43,15 @@ Exit codes: `jazu_error` carries a code; other failures exit 1.
 
 Result: `{ model, diag, written, skipped, pages }`.
 
-## Content model (src/model.ts, objects.ts, schema.ts, xml.ts)
+## Content model (engine/load/model.ts, objects.ts, schema.ts, xml.ts)
 
 - `xml.ts` — Saxes-based strict parser, line numbers in every node (`where_of(node)` → `file:line`). Valueless boolean attributes are expanded in start tags only (`boolean_attributes`).
 - `schema.ts` — `rules[tag] = { attrs, required, children, bools }`, `root_tags`, and checks in `check_node` (unsafe URIs, page path shape, window mode, plugin SHA, case host, research structure). **Add a new tag or attribute here first**, then implement rendering.
 - `model.ts` — `load_site()` scans `content/`, wraps multi-root files in `<jazu>`, validates, separates roots into `pages`, `themes`, `objects` (project/event/blog), `prints`, `plugins`, and builds `resources` (url → file) via `objects.ts::collect_resources`. Helpers: `page_url`, `find_page`, `crumb_chain`, `menu_pages`, `order_pages`, `ui_text`, `icon_of`, `localize`.
 - `objects.ts` — `expand_objects()` turns each project/event/blog into a `page` (path `/projects/{id}` etc.) plus listing pages; excludes `private`; derives summaries (`object_info`).
-- `expertise.ts` — pure build-time computation: skills, stacks, bars (timeline rectangles/dots with lanes), entries, per-scenario geometry. Output is the `expertise_model` consumed by `src/web/html_expertise.tsx` and `scss_data()` (state data injected into SCSS as `jazu:api`).
+- `expertise.ts` — pure build-time computation: skills, stacks, bars (timeline rectangles/dots with lanes), entries, per-scenario geometry. Output is the `expertise_model` consumed by `engine/tags/expertise.tsx` and `scss_data()` (state data injected into SCSS as `jazu:api`).
 
-## Incremental regeneration (src/cache.ts, graph.ts)
+## Incremental regeneration (engine/build/cache.ts, graph.ts)
 
 `.cache/hashes.json` is a flat `Record<string,string>`:
 
@@ -62,17 +62,17 @@ Result: `{ model, diag, written, skipped, pages }`.
 
 Verified property: an unchanged, pinned-date build (`--date`) writes zero files.
 
-## Checks (src/check.ts)
+## Checks (engine/check/check.ts)
 
 `check_links`, `check_media`, `check_page_rules`, `check_seo`, and `tier_report()` (`--report tiers`) which scans emitted CSS/JS against `tier_features` (browser versions, tier, fallback). Warnings never fail a command unless `--strict`.
 
-## Plugins at build time (src/plugins.ts, plugin_types.ts)
+## Plugins at build time (engine/tags/plugin.ts, plugin_types.ts)
 
 `compile_plugins()` produces the plugin manifest embedded for the browser; `plugin_types.ts` (`select_case`, `trigger_matches`, `plugin_matches`) is shared by the engine tests and the browser `desk_plugins.ts`, so matching semantics are identical in both. Rules: [../content/plugin.md](../content/plugin.md).
 
 ## Adding things
 
-- **A new XML attribute:** `schema.ts` → consume it in the generator/model → document in `docs/content/{tag}.md` → add a test in `tests/migration.test.ts`.
+- **A new XML attribute:** `schema.ts` → consume it in the generator/model → document in `docs/content/{tag}.md` → add a test in `tests/content/migration.test.ts`.
 - **A new XML tag:** `schema.ts` (`rules`, and `root_tags` if it can be a root) → generator in `objects.ts` or a `render_*` in `src/web` → docs.
 - **A new CLI command:** add a branch in `commands.ts::main` (and, if it takes a value flag, add the name to the list in `parse_args`).
 - **A new output file:** `files.set("name", content)` in `build_site`; it is hashed, written and pruned automatically.

@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import postcss from "postcss"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
-import { split_layout_css } from "../src/layout_css.ts"
-import { headers_file, inline_script_hash } from "../src/web/seo.tsx"
+import { split_layout_css } from "../engine/style/layout.ts"
+import { headers_file, inline_script_hash } from "../engine/seo/head.tsx"
 
 test("component roots import only themselves and shared contracts", () => {
     const root = process.cwd()

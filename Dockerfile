@@ -9,6 +9,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY config.json tsconfig.json .gitignore ./
 COPY src/ ./src/
+COPY engine/ ./engine/
+COPY desk/ ./desk/
+COPY server/ ./server/
 COPY shared/ ./shared/
 COPY cloud/ ./cloud/
 COPY content/ ./content/

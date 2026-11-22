@@ -1,0 +1,18 @@
+{
+    "name": "lang_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "lua",
+        "lisp",
+        "basic"
+    ],
+    "files": {
+        "wasm": "build/lang_suite/lang_suite.wasm",
+        "loader": "build/lang_suite/lang_suite.js"
+    },
+    "sha256": "c472b7175df637cff298133470ce9bbc99d8da586cd8d607adb7d94502f4661d",
+    "flags": {
+        "applet": false
+    }
+}

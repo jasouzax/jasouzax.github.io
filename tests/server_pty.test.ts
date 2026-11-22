@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { open_pty_session, type Pty_Link } from "../src/web/client/server_pty.ts"
+import { open_pty_session, type Pty_Link } from "../desk/server/pty.ts"
 import { to_base64 } from "../shared/protocol/codec.ts"
 import type { Client_Message } from "../shared/protocol/wire.ts"
 

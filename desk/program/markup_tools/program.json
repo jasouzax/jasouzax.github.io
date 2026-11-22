@@ -1,0 +1,17 @@
+{
+    "name": "markup_tools",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "md2html",
+        "html2text"
+    ],
+    "files": {
+        "wasm": "build/markup_tools/markup_tools.wasm",
+        "loader": "build/markup_tools/markup_tools.js"
+    },
+    "sha256": "84f03d7106646abf49587a845bea0c7bb03c07fd2dbc212861bc96c75a64a24a",
+    "flags": {
+        "applet": false
+    }
+}

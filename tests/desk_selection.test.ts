@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { selection_click, type file_selection } from "../src/web/client/desk_selection.ts"
+import { selection_click, type file_selection } from "../desk/window/folder/selection.ts"
 
 test("Ctrl toggles entries and Shift replaces only the current anchored range", () => {
     const visible = ["a", "b", "c", "d", "e", "f", "g", "h"]

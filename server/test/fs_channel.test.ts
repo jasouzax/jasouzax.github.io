@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
-import { Fs_Error, confine, handle_fs, read_text } from "../src/fs_channel.ts"
+import { Fs_Error, confine, handle_fs, read_text } from "../terminal/fs_channel.ts"
 import { from_base64, to_base64 } from "../../shared/protocol/codec.ts"
 
 async function sandbox(): Promise<string> {

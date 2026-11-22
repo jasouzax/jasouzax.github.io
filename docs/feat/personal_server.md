@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/node/personal.ts`, `cloud/security/headers.ts`
+- **Code:** `server/repo/index.ts`, `cloud/security/headers.ts`
 - **Related guides:** [docs/src/node.md](../src/node.md), [README → Server Use](../../README.md#server-use)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -60,4 +60,4 @@ A fresh, unauthenticated clone from the extensionless production URL checked out
 
 The node stayed running during the production clone: automatic approval review rejected the proposed service-stop test with `blocked by policy`. Node-independent clone routing is verified by tests that omit the personal origin, including R2 range requests. Do not describe a real shutdown test as completed.
 
-The server checkout remains on `feature/personal-server`; the public bare repository deploys `master`. The owner uses `git push personal HEAD:master` from the development checkout, or `git push origin master` from a fresh website clone. Operator state is outside Git; collaborator changes require restarting the node. Worker updates use `wrangler.production.jsonc`, independently of the Pages-only push pipeline.
+The server checkout remains on `feature/personal-server`; the public bare repository deploys `master`. The owner uses `git push personal HEAD:master` from the development checkout, or `git push origin master` from a fresh website clone. Operator state is outside Git; collaborator changes require restarting the node. Worker updates use `cloud/infra/wrangler/production.jsonc`, independently of the Pages-only push pipeline.

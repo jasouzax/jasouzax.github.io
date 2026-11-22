@@ -11,7 +11,7 @@ For people (and AI agents) changing how the website is **built, rendered, run or
 | Nodes: Worker, personal server, local server, deploy | [node.md](node.md) | `src/node/` |
 | Google sign-in and encrypted Work chat | [Work contract and setup](../feat/work.md#encrypted-messaging-implementation) | `shared/work/crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_messages,sign}.ts` |
 | Helpers: paths, util, dates, icons, mime, fonts, theme CSS | [helper.md](helper.md) | `shared/util.ts`, `paths.ts`, `diag.ts`, `dates.ts`, `era.ts`, `icons.ts`, `mime.ts`, `gitignore.ts`, `raster.ts`, `font_build.ts`, `font/`, `theme_css.ts`, `layout_css.ts` |
-| Infrastructure as code | [../infra.md](../infra.md) | `terraform/`, `migrations/`, `wrangler.local.jsonc` |
+| Infrastructure as code | [../infra.md](../infra.md) | `cloud/infra/`, `migrations/`, `cloud/infra/wrangler/local.jsonc` |
 | Tests | [tests.md](tests.md) | `tests/` |
 
 ## Layout of the repository
@@ -41,7 +41,7 @@ src/
   node/                  Worker, personal node, local static server, deploy, D1 migrate
   desk/                  WASM toolchains (busybox, programs) — the only non-TypeScript code
 migrations/              D1 SQL
-terraform/               Cloudflare infrastructure
+cloud/infra/               Cloudflare infrastructure
 tests/                   node:test unit/contract tests + Playwright browser specs
 docs/                    this documentation
 dist/, .cache/ (ignored) generated output and incremental state
@@ -68,3 +68,9 @@ Cross-runtime modules live in `shared/`: `content/{schema,xml,pipeline,plugin}.t
 Content vocabulary is owned per tag by `shared/content/tags/{tag}.ts`, aggregated by `shared/content/schema.ts`. Edit the matching tag file when changing accepted attributes or children. Tests live under `tests/content/`; `npm test` includes nested test files.
 
 The Worker entry is `cloud/router/index.ts`; fixed APIs are `cloud/api/{id}.ts` at `/api/_/{id}`, with `/api/_/session` for session discovery. Room/hub Durable Objects and repository fallback code are in their matching cloud folders. Infra and D1 migrations remain at their existing root paths pending a separate migration. The prototype custom gateway remains unchanged.
+
+## Component-root migration
+
+Engine code now lives in `engine/`, browser code in `desk/`, and both personal-server subsystems in `server/`. `src/` owns only CLI configuration, pipeline orchestration, step handlers and tools. CLI steps accept selectors such as `test:content make-host`; ranges follow the implemented step order `test make watch serve host cloud server`. `all` runs those implemented steps; install, extension packaging and desktop-app steps are not available. Existing `build`, `deploy`, `node`, icon, pack, publish and server-administration commands remain compatible.
+
+`desk/kernel/worker.ts` is the single worker entry. `desk/program/*/program.json` defines each existing executable; GCC/Clang and Python use specialized program runtime adapters through that worker. Port sources live beside their program; compiled release inputs remain under ignored `build/`. Infrastructure and Wrangler configurations now live under `cloud/infra/`, with D1 SQL under `cloud/db/migrations/`. Main build hashes cover engine/desk/shared sources, and listener fingerprints include the runtime roots while excluding generated state.

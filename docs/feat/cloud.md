@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `cloud/router/index.ts`, `src/node/deploy.ts`, `cloud/security/headers.ts`, `src/node/d1_migrate.ts`, `terraform/`, `migrations/`, `wrangler.local.jsonc`
+- **Code:** `cloud/router/index.ts`, `src/step/cloud_deploy.ts`, `cloud/security/headers.ts`, `cloud/db/migrate.ts`, `cloud/infra/`, `migrations/`, `cloud/infra/wrangler/local.jsonc`
 - **Related guides:** [docs/src/node.md](../src/node.md), [docs/infra.md](../infra.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

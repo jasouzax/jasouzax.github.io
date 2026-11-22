@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { local_file_path } from "../src/web/client/desk_paths.ts"
+import { local_file_path } from "../desk/fs/paths.ts"
 
 test("virtual file URIs accept both home spellings and normalize absolute paths", () => {
     for (const uri of ["file:///home/user", "file://home/user", "FILE://home/user/", " file://localhost/home/user ", "/home/./user/"]) {

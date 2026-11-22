@@ -1,0 +1,18 @@
+{
+    "name": "disk_archive_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "iat",
+        "7z",
+        "p7zip"
+    ],
+    "files": {
+        "wasm": "build/disk_archive_suite/disk_archive_suite.wasm",
+        "loader": "build/disk_archive_suite/disk_archive_suite.js"
+    },
+    "sha256": "0596870d8dd1a541dddfb02541aba41ff745b4ce17a4f97d5d970c897bec31bb",
+    "flags": {
+        "applet": false
+    }
+}

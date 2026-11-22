@@ -7,9 +7,9 @@ import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
 import worker, { route, type worker_env } from "../cloud/router/index.ts"
 import { sign_origin, verify_origin, secure_response, is_work_path } from "../cloud/security/headers.ts"
-import { git_read } from "../src/node/personal.ts"
-import { prepare_deploy } from "../src/node/deploy.ts"
-import type { build_result } from "../src/build.ts"
+import { git_read } from "../server/repo/index.ts"
+import { prepare_deploy } from "../src/step/cloud_deploy.ts"
+import type { build_result } from "../engine/build/build.ts"
 
 const env: worker_env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://example.pages.dev", PUBLIC_PROJECTS: '["calculator"]' }
 
@@ -76,7 +76,7 @@ test("HMAC binds method/path/query/body/client/time and refuses replay", async (
 test("D1 migration enforces message idempotency and pin tenant references", () => {
     const db = new DatabaseSync(":memory:")
     try {
-        db.exec(readFileSync(resolve("migrations/0001_work.sql"), "utf8"))
+        db.exec(readFileSync(resolve("cloud/db/migrations/0001_work.sql"), "utf8"))
         const client = db.prepare("INSERT INTO clients(id,name,created_at) VALUES(?,?,?)")
         client.run("a", "A", 1); client.run("b", "B", 1)
         const message = db.prepare("INSERT INTO messages(id,client_id,idempotency_id,author,kind,created_at) VALUES(?,?,?,?,?,?)")

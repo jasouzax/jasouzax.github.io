@@ -9,7 +9,7 @@ let testcase = 0
 const accounts = new WeakMap<BrowserContext, string>()
 const installed = new WeakSet<BrowserContext>()
 export function sql(command: string): void {
-    execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "wrangler.local.jsonc", "--persist-to", persist, "--command", command], { windowsHide: true, stdio: "pipe" })
+    execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "d1", "execute", "DB", "--local", "--config", "cloud/infra/wrangler/local.jsonc", "--persist-to", persist, "--command", command], { windowsHide: true, stdio: "pipe" })
 }
 export function reset(): void {
     testcase++

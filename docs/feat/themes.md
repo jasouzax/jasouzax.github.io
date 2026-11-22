@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/theme/`, `src/theme_css.ts`, `src/layout_css.ts`, `src/font_build.ts`, `src/font/`, `src/web/skeleton_css.ts`, `src/web/client/loading.ts`, `src/web/client/theme_switch.ts`
+- **Code:** `content/theme/`, `engine/style/theme.ts`, `engine/style/layout.ts`, `engine/style/font/build.ts`, `src/font/`, `engine/style/skeleton.ts`, `desk/site/loading.ts`, `desk/site/theme_switch.ts`
 - **Related guides:** [docs/content/theme.md](../content/theme.md), [docs/src/helper.md](../src/helper.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync, readFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { docker_options, refresh_content, restore_inputs } from "../ops/docker/entry.ts"
-import { serve } from "../src/node/serve.ts"
+import { serve } from "../src/step/serve_http.ts"
 
 test("Docker defaults serve the website and personal mode selects its own port and persistent directory", () => {
     assert.equal(docker_options([]).port, 8080)

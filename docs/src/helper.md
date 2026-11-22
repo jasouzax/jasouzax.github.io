@@ -33,7 +33,7 @@ Small, mostly pure modules used across the engine. Fonts are here, as are theme 
 TypeScript only (no Python). `build_font()` resolves `<sym>` glyphs (`decode_char`: single char, hex codepoint or `[token]`; duplicates and multi-character strings are errors), converts SVG paths to outlines (`outlines.ts`, using `svgpath`; y flipped, no auto-scaling), and `binary.ts::encode_font` writes the OpenType tables (`head`, `hhea`, `maxp`, `OS/2`, `hmtx`, `cmap`, `name`, `post`, outlines, plus COLR/CPAL) then WOFF/WOFF2 with Node's zlib/Brotli. `emit_font()` writes hashed files and `@font-face` CSS (`font_face_css`). Palettes: 0 = light, 1 = dark (CSS `font-palette`).
 
 - Formats today: monochrome base + COLRv0/CPAL, WOFF2, WOFF. **Not implemented:** COLRv1 gradients, OpenType-SVG/bitmap glyphs, contextual alternates (`calt`).
-- Output is **reproducible for a pinned build date** (timestamps are fixed to it); `tests/font.test.ts` decodes the output independently with `fontkit`.
+- Output is **reproducible for a pinned build date** (timestamps are fixed to it); `tests/engine/style/font/binary.test.ts` decodes the output independently with `fontkit`.
 - `config.font_formats` selects formats (default `colrv0, woff2, woff`).
 
 ### Adding or changing a glyph

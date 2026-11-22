@@ -14,7 +14,7 @@ const stubs = { "desk_view.ts": "export const terminal_hooks = { uri: 'pid:' }; 
 
 async function bundle_page_client(): Promise<string> {
     const result = await build({
-        entryPoints: [`${root}src/web/client/desk_host.ts`], bundle: true, write: false, format: "iife", globalName: "bridge",
+        entryPoints: [`${root}desk/host/host.ts`], bundle: true, write: false, format: "iife", globalName: "bridge",
         plugins: [{ name: "stubs", setup(api) { api.onResolve({ filter: /\/desk(_view)?\.ts$/ }, args => ({ path: args.path.split("/").pop()!, namespace: "stub" })); api.onLoad({ filter: /.*/, namespace: "stub" }, args => ({ contents: stubs[args.path as keyof typeof stubs], loader: "ts" })) } }],
     })
     return result.outputFiles[0].text

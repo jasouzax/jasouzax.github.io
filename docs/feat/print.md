@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/prints.ts`, `src/web/html_rirekisho.tsx`, `shared/print/form.tsx`, `src/web/client/print.ts`, `content/portfolio.print.css`
+- **Code:** `engine/tags/print/model.ts`, `engine/tags/print/rirekisho.tsx`, `shared/print/form.tsx`, `desk/site/print.ts`, `content/portfolio.print.css`
 - **Related guides:** [docs/content/print.md](../content/print.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

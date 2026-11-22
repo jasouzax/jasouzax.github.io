@@ -1,0 +1,16 @@
+{
+    "name": "tree",
+    "version": "2.1.3-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "tree"
+    ],
+    "files": {
+        "wasm": "build/tree/tree.wasm",
+        "loader": "build/tree/tree.js"
+    },
+    "sha256": "35f69c96e7e9306c7661bb245d8a28d6c21a6d9b930af34cc155268f5e79ea2d",
+    "flags": {
+        "applet": false
+    }
+}

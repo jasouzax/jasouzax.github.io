@@ -1,9 +1,9 @@
 import { join } from "node:path"
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { Pty_Channel, max_sessions } from "../src/pty_channel.ts"
-import type { Open_Pty } from "../src/pty_channel.ts"
-import { open_pty, pick_backend } from "../src/pty.ts"
+import { Pty_Channel, max_sessions } from "../terminal/pty_channel.ts"
+import type { Open_Pty } from "../terminal/pty_channel.ts"
+import { open_pty, pick_backend } from "../terminal/pty.ts"
 import { from_base64, to_base64 } from "../../shared/protocol/codec.ts"
 
 function fake() {

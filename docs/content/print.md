@@ -17,7 +17,7 @@ A page opts in with `print="resume"`. For a page in language L the engine choose
 | `name` | **Required.** The mode name (`resume`, `rirekisho`, `quotation`, `research`, …) |
 | `lang` | `list`, wildcards allowed; default `*` |
 | `size` | Paper size, e.g. `a4` |
-| `layout` | Built-in print layout (default is `name`). Currently implemented: `resume`, `rirekisho` (`src/web/html_rirekisho.tsx`, `rireki_form.tsx`) |
+| `layout` | Built-in print layout (default is `name`). Currently implemented: `resume`, `rirekisho` (`engine/tags/print/rirekisho.tsx`, `rireki_form.tsx`) |
 
 Children: `<style>`, `<font>` (same as in [themes](theme.md), but scoped to print mode).
 
@@ -34,7 +34,7 @@ Children: `<style>`, `<font>` (same as in [themes](theme.md), but scoped to prin
 
 ## Dates
 
-Dates and age in a printed form are the build date until the browser's `beforeprint` handler replaces them with the day of printing (`src/web/client/print.ts`; Japanese era + year + month + day for the 履歴書).
+Dates and age in a printed form are the build date until the browser's `beforeprint` handler replaces them with the day of printing (`desk/site/print.ts`; Japanese era + year + month + day for the 履歴書).
 
 ## Related
 

@@ -1,6 +1,6 @@
 # PWA, offline snapshot and notifications
 
-Source: `src/pwa.ts` (build), `src/web/pwa_worker.ts` (service worker), `src/web/client/{pwa,notifications,realtime}.ts` (page), `src/web/notification_{store,preview}.ts` (shared), `src/node/push{,_keys}.ts` (server), `migrations/0008_push.sql`.
+Source: `engine/routes/sw.js.ts` (build), `desk/site/service_worker.ts` (service worker), `src/web/client/{pwa,notifications,realtime}.ts` (page), `src/web/notification_{store,preview}.ts` (shared), `src/node/push{,_keys}.ts` (server), `cloud/db/migrations/0008_push.sql`.
 
 ## Status
 Implemented in code but **unverified**: no dependencies or network were available when this was finished, so no checkbox below is evidence of a passing run; tick them only after the commands in the unchecked items succeed.

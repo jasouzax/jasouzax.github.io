@@ -5,7 +5,12 @@ FROM ${JAZU_BASE_IMAGE}
 ARG JAZU_REVISION=unknown
 LABEL org.opencontainers.image.revision=$JAZU_REVISION
 COPY ops/docker/entry.ts ops/docker/health.ts ops/docker/compose.yaml /opt/jazu/ops/docker/
-COPY src/node/registry.ts /opt/jazu/src/node/registry.ts
+COPY src/ /opt/jazu/src/
+COPY engine/ /opt/jazu/engine/
+COPY desk/ /opt/jazu/desk/
+COPY cloud/ /opt/jazu/cloud/
+COPY shared/ /opt/jazu/shared/
+COPY server/ /opt/jazu/server/
 COPY --chmod=755 ops/docker/python /usr/local/bin/python
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=300s --retries=3 CMD ["node", "ops/docker/health.ts"]

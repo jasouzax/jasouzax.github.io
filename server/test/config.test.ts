@@ -1,7 +1,7 @@
 /* parse_config: defaults, https enforcement, secret length, root normalisation. Runs without Electron. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parse_config } from '../src/config.ts';
+import { parse_config } from '../config/config.ts';
 
 const secret = 's'.repeat(32);
 

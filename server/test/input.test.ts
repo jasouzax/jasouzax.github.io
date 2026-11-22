@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Remote_Input, type Input_Target } from '../src/input.ts';
+import { Remote_Input, type Input_Target } from '../browser/input.ts';
 
 function fixture() {
     const commands: { method: string; params: Record<string, unknown> }[] = [];

@@ -1,8 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { pwa_files } from "../src/pwa.ts"
+import { pwa_files } from "../engine/routes/sw.js.ts"
 import { default_config } from "../shared/config.ts"
-import { headers_file } from "../src/web/seo.tsx"
+import { headers_file } from "../engine/seo/head.tsx"
 
 const config = { ...default_config, pwa: { ...default_config.pwa, enabled: true } }
 const offline = async (files: Map<string, string | Buffer>, skipped = new Map<string, string | Uint8Array>(), media = new Set<string>()) => {

@@ -1,0 +1,16 @@
+{
+    "name": "htop",
+    "version": "3.4.1-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "htop"
+    ],
+    "files": {
+        "wasm": "build/htop/htop.wasm",
+        "loader": "build/htop/htop.js"
+    },
+    "sha256": "a41376093831d45359a7e7892d57910c7a748f52442f4c86cb6115c75f278bcb",
+    "flags": {
+        "applet": false
+    }
+}

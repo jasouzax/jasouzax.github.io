@@ -13,5 +13,5 @@
     "allowImportingTsExtensions": false,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["browser/**/*.ts", "link/**/*.ts", "terminal/**/*.ts", "api/**/*.ts", "config/config.ts"]
 }

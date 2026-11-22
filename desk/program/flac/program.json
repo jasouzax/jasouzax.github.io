@@ -1,0 +1,16 @@
+{
+    "name": "flac",
+    "version": "1.4.3-jazu.1",
+    "extension": "tar.xz",
+    "commands": [
+        "flac"
+    ],
+    "files": {
+        "wasm": "build/flac/flac.wasm",
+        "loader": "build/flac/flac.js"
+    },
+    "sha256": "517378bd302c7ec61d9e18dc0074402785d524df55863b6f7876e48eb740ffce",
+    "flags": {
+        "applet": false
+    }
+}

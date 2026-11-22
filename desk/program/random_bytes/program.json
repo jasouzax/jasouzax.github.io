@@ -1,0 +1,16 @@
+{
+    "name": "random_bytes",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "random-bytes"
+    ],
+    "files": {
+        "wasm": "build/random_bytes/random_bytes.wasm",
+        "loader": "build/random_bytes/random_bytes.js"
+    },
+    "sha256": "0fd8c3b0ab8deaa076474825129d07b476aaad745ef506259636ba63be12a72e",
+    "flags": {
+        "applet": false
+    }
+}

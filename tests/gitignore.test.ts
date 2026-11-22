@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { test } from "node:test"
-import { collect_unignored, is_ignored, parse_ignore } from "../src/gitignore.ts"
+import { collect_unignored, is_ignored, parse_ignore } from "../engine/helper/gitignore.ts"
 
 function tree(files: Record<string, string>): { root: string, listed: () => string[] } {
     const root = mkdtempSync(join(tmpdir(), "jazu_ignore_"))

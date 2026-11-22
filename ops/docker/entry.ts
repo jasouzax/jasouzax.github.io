@@ -8,8 +8,8 @@ import { randomBytes, createHash } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, lstatSync, realpathSync, readlinkSync, statSync, unlinkSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { serve } from "../../src/node/serve.ts"
-import { load_project_declarations } from "../../src/node/project_catalog.ts"
+import { serve } from "../../src/step/serve_http.ts"
+import { load_project_declarations } from "../../server/pipeline/catalog.ts"
 import { inside } from "../../shared/paths.ts"
 
 const application = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
@@ -63,7 +63,7 @@ export function custom_site(options: Docker_Options): string {
     // Copy into a writable workspace; never generate files inside the owner's read-only content mount.
     refresh_content(options.content, root)
     cpSync(options.config ?? join(application, "config.json"), join(root, "config.json"))
-    for (const name of ["src", "build", "node_modules"]) if (!existsSync(join(root, name))) symlinkSync(join(application, name), join(root, name), "dir")
+    for (const name of ["src", "engine", "desk", "cloud", "server", "shared", "build", "node_modules"]) if (!existsSync(join(root, name))) symlinkSync(join(application, name), join(root, name), "dir")
     for (const name of ["package.json", "package-lock.json", "tsconfig.json"]) cpSync(join(application, name), join(root, name))
     const args = [join(application, "src/main.ts"), "build", "--root", root, "--force"]
     if (options.base_url) args.push("--base_url", options.base_url)

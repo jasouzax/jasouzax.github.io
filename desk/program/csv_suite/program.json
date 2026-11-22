@@ -1,0 +1,20 @@
+{
+    "name": "csv_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "csvsql",
+        "csvformat",
+        "xlsx2csv",
+        "csvjson",
+        "in2csv"
+    ],
+    "files": {
+        "wasm": "build/csv_suite/csv_suite.wasm",
+        "loader": "build/csv_suite/csv_suite.js"
+    },
+    "sha256": "5d8943e369b8ac7598baf02edc78e0b913ebd99898d5271faf0f12bebb5a462a",
+    "flags": {
+        "applet": false
+    }
+}

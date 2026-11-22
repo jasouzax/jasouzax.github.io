@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `extension/` (`manifest.json`, `content.js`, `background.js`, `host/`), `src/web/client/desk_host.ts`, `src/web/client/desk_proc.ts` (`host:` windows)
+- **Code:** `extension/` (`manifest.json`, `content.js`, `background.js`, `host/`), `desk/host/host.ts`, `desk/host/proc.ts` (`host:` windows)
 - **Related guides:** [README → Desk Use](../../README.md#desk-use), [extension/README.md](../../extension/README.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

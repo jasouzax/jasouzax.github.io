@@ -4,11 +4,11 @@ import assert from "node:assert/strict"
 import { execFileSync, spawn } from "node:child_process"
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { load_server_config, repository_path } from "../src/node/server_config.ts"
-import { sync_repositories } from "../src/node/git_hooks.ts"
-import { enqueue, pending } from "../src/node/queue.ts"
-import { list_runs, start_runner } from "../src/node/runner.ts"
-import { listener_fingerprint, listener_updated } from "../src/node/job_process.ts"
+import { load_server_config, repository_path } from "../server/config/repositories.ts"
+import { sync_repositories } from "../server/repo/git/hooks.ts"
+import { enqueue, pending } from "../server/pipeline/queue.ts"
+import { list_runs, start_runner } from "../server/pipeline/runner.ts"
+import { listener_fingerprint, listener_updated } from "../server/pipeline/job_process.ts"
 import { parse_xml } from "../shared/content/xml.ts"
 import { validate_roots } from "../shared/content/schema.ts"
 import { new_diagnostics } from "../shared/diag.ts"
@@ -23,11 +23,10 @@ function fixture(catalog_failure = false, staging = false) {
     const root = mkdtempSync(join(process.cwd(), ".cache/listener_test_"))
     const engine = join(root, "engine")
     mkdirSync(join(engine, "content"), { recursive: true })
-    mkdirSync(join(engine, "src/node"), { recursive: true })
-    for (const file of [...["job_main", "pipeline", "pipeline_process", "server_config", "project_catalog", "git_mirror", "queue", "repo_sync"].map(name => `node/${name}.ts`)]) cpSync(join("src", file), join(engine, "src", file))
+    cpSync("server", join(engine, "server"), { recursive: true, filter: source => !/[\\/](node_modules|dist|test|user_data|\.env)([\\/]|$)/.test(source) })
     cpSync("shared", join(engine, "shared"), { recursive: true })
     if (catalog_failure) {
-        const worker = join(engine, "src/node/job_main.ts")
+        const worker = join(engine, "server/pipeline/job_main.ts")
         writeFileSync(worker, 'if (process.argv[2] === "catalog") { console.error("catalog unavailable"); process.exit(12) }\n' + readFileSync(worker, "utf8"))
     }
     writeFileSync(join(engine, "package.json"), '{"type":"module"}')
@@ -72,7 +71,7 @@ test("incoming engine uses its own new schema, pipeline commands and implementat
         writeFileSync(schema, readFileSync(schema, "utf8").replaceAll('"resume"', '"resume", "listener_new"'))
         writeFileSync(join(f.author, "content/projects.xml"), xml)
         writeFileSync(join(f.author, "verify.mjs"), `import fs from 'node:fs'; import assert from 'node:assert/strict'; import {parse_xml} from './shared/content/xml.ts'; import {validate_roots} from './shared/content/schema.ts'; import {new_diagnostics} from './shared/diag.ts'; const d=new_diagnostics(); validate_roots(parse_xml(fs.readFileSync('content/projects.xml','utf8'),'projects.xml'),d); assert.deepEqual(d.errors,[]); assert.equal(process.env.PRIVATE_SECRET,undefined);`)
-        const pipeline = join(f.author, "src/node/pipeline.ts")
+        const pipeline = join(f.author, "server/pipeline/pipeline.ts")
         writeFileSync(pipeline, readFileSync(pipeline, "utf8").replace('record.state = "running"', 'log("candidate implementation loaded\\n"); record.state = "running"'))
         const commit = f.publish()
         const job = enqueue(f.config.state_dir, { kind: "push", project: "engine", commit })
@@ -95,7 +94,7 @@ test("a crashing incoming worker is recorded once and a later corrective commit 
     const f = fixture()
     let runner: ReturnType<typeof start_runner> | undefined
     try {
-        const worker = join(f.author, "src/node/job_main.ts")
+        const worker = join(f.author, "server/pipeline/job_main.ts")
         const good_worker = readFileSync(worker, "utf8")
         writeFileSync(worker, 'console.error("broken worker"); process.exit(42)')
         const failed = f.publish()
@@ -126,7 +125,7 @@ test("failed catalog reload cannot block a queued corrective commit; content alo
         writeFileSync(join(f.engine, "content/projects.xml"), '<project invalid="true"/>')
         assert.equal(listener_fingerprint(f.engine), fingerprint)
         git(f.engine, "checkout", "--", "content/projects.xml")
-        const worker = join(f.author, "src/node/job_main.ts")
+        const worker = join(f.author, "server/pipeline/job_main.ts")
         writeFileSync(worker, readFileSync(worker, "utf8").split("\n").slice(1).join("\n"))
         writeFileSync(join(f.author, "old.mjs"), "process.exit(0)")
         const commit = f.publish()
@@ -134,7 +133,7 @@ test("failed catalog reload cannot block a queued corrective commit; content alo
         runner = start_runner(f.config, { poll_ms: 100000 })
         await idle(runner)
         assert.equal(list_runs(f.config.state_dir, "engine", 1)[0].state, "passed")
-        assert(existsSync(join(f.config.state_dir, "runtime/src/node/job_main.ts")))
+        assert(existsSync(join(f.config.state_dir, "runtime/server/pipeline/job_main.ts")))
     } finally { runner?.stop(); f.cleanup() }
 })
 
@@ -190,7 +189,7 @@ test("an engine staging job uses its own branch and rejects workers without bran
         assert.equal(list_runs(f.config.state_dir, "engine", 1, "staging")[0].state, "passed")
         assert.equal(git(f.engine, "branch", "--show-current"), "staging")
         assert.equal(git(f.engine, "rev-parse", "master"), f.old)
-        const worker = join(f.author, "src/node/job_main.ts")
+        const worker = join(f.author, "server/pipeline/job_main.ts")
         writeFileSync(worker, readFileSync(worker, "utf8").replace("branch_pipelines: true", "branch_pipelines: false"))
         queue()
         await runner.drain()

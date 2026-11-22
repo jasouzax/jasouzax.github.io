@@ -1,0 +1,19 @@
+{
+    "name": "date_units",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "date-diff",
+        "bytes-human",
+        "temp",
+        "unit"
+    ],
+    "files": {
+        "wasm": "build/date_units/date_units.wasm",
+        "loader": "build/date_units/date_units.js"
+    },
+    "sha256": "bd06561c10595a6b2f8b64af80c7548fddffe77a1d0226d81f1e6fa95b3792c3",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "cwebp",
+    "version": "1.4.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "cwebp"
+    ],
+    "files": {
+        "wasm": "build/cwebp/cwebp.wasm",
+        "loader": "build/cwebp/cwebp.js"
+    },
+    "sha256": "72eb3f3449a7b6e88ec1bdb3188569c14723723c3e0f86f022cd609243c7decc",
+    "flags": {
+        "applet": false
+    }
+}

@@ -87,7 +87,7 @@ async function static_object(request: Request, env: worker_env, key: string): Pr
         object.writeHttpMetadata(headers)
         if (path === "/assets/wasm/manifest.json") headers.set("cache-control", "no-cache")
         if (path.endsWith(".wasm")) headers.set("content-type", "application/wasm")
-        if (path.endsWith(".js")) headers.set("content-type", "text/javascript")
+        if ((path.endsWith(".js") || path.endsWith(".mjs"))) headers.set("content-type", "text/javascript")
         if (path.endsWith(".json")) headers.set("content-type", "application/json")
         if (path.endsWith(".zip")) headers.set("content-type", "application/zip")
         if (/\.(whl|pack|idx)$/.test(path)) headers.set("content-type", "application/octet-stream")

@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/`, `config.json`, `src/model.ts`, `src/objects.ts`, `src/resources.ts`, `src/icons.ts`
+- **Code:** `content/`, `config.json`, `engine/load/model.ts`, `engine/tags/objects.ts`, `engine/load/resources.ts`, `engine/style/icons.ts`
 - **Related guides:** [docs/content/README.md](../content/README.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

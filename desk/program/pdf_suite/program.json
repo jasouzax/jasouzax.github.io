@@ -1,0 +1,20 @@
+{
+    "name": "pdf_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "pdfinfo",
+        "pdftotext",
+        "pdfimages",
+        "img2pdf",
+        "qpdf"
+    ],
+    "files": {
+        "wasm": "build/pdf_suite/pdf_suite.wasm",
+        "loader": "build/pdf_suite/pdf_suite.js"
+    },
+    "sha256": "f982643d3009db463c3ba9589a44a549dfe99071a38c8a6ca4bc2dc62d7b2b20",
+    "flags": {
+        "applet": false
+    }
+}

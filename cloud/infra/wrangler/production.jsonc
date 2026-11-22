@@ -1,0 +1,18 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "jazu_router",
+    "main": "../../router/index.ts",
+    "compatibility_date": "2026-11-04",
+    "workers_dev": false,
+    "routes": [{ "pattern": "jasouza.com/*", "zone_name": "jasouza.com" }],
+    "vars": {
+        "DOMAIN": "jasouza.com",
+        "PAGES_ORIGIN": "https://jazu-1ws.pages.dev",
+        "PUBLIC_PROJECTS": "[\"jazu\"]",
+        "PUBLIC_PROJECTS_MANIFEST": "/projects/git.json",
+        "PERSONAL_ORIGIN": "https://personal-server.jasouza.com"
+    },
+    "r2_buckets": [{ "binding": "ASSETS", "bucket_name": "jazu-assets" }],
+    "durable_objects": { "bindings": [{ "name": "SERVER_HUB", "class_name": "Server_Hub" }] },
+    "migrations": [{ "tag": "server-v1", "new_sqlite_classes": ["Server_Hub"] }]
+}

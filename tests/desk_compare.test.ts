@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { comparison_lines } from "../src/web/client/desk_compare.ts"
+import { comparison_lines } from "../desk/plugin/compare.ts"
 
 test("comparison locates additions and deletions including EOF and empty output", () => {
     const changes = comparison_lines("same\nremoved\nend\n", "same\nadded\nend\n")

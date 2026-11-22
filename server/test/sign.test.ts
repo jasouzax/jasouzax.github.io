@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { verify_origin } from '../../shared/sign.ts';
-import { sign_upgrade } from '../src/sign.ts';
+import { sign_upgrade } from '../link/sign.ts';
 
 const secret = 'k'.repeat(40);
 const url = 'https://jasouza.com/api/_/server/agent';

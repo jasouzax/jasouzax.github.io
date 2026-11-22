@@ -1,0 +1,16 @@
+{
+    "name": "qr",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "qr"
+    ],
+    "files": {
+        "wasm": "build/qr/qr.wasm",
+        "loader": "build/qr/qr.js"
+    },
+    "sha256": "689be5b2feb1646a6210ea02c4960b82f333cef02aa4b66c81ed788b8d411d3a",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { load_site } from "../src/model.ts"
+import { load_site } from "../engine/load/model.ts"
 import { load_config } from "../shared/config.ts"
 import { new_diagnostics } from "../shared/diag.ts"
 

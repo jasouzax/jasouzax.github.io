@@ -1,8 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { Log_Store, log_stamp, count_label, max_log_entries } from "../src/web/client/server_script_model.ts"
+import { Log_Store, log_stamp, count_label, max_log_entries } from "../desk/server/script_model.ts"
 import { select_case, plugin_matches, type plugin_info, type plugin_case } from "../shared/content/plugin.ts"
-import { load_site } from "../src/model.ts"
+import { load_site } from "../engine/load/model.ts"
 import { load_config } from "../shared/config.ts"
 import { new_diagnostics } from "../shared/diag.ts"
 

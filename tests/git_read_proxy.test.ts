@@ -13,8 +13,8 @@ import type { worker_env } from "../cloud/router/index.ts"
 import { sign_origin, verify_origin } from "../cloud/security/headers.ts"
 import { clone_origins, project_declarations } from "../shared/content/pipeline.ts"
 import { parse_xml } from "../shared/content/xml.ts"
-import { personal_server } from "../src/node/personal.ts"
-import { load_server_config } from "../src/node/server_config.ts"
+import { personal_server } from "../server/repo/index.ts"
+import { load_server_config } from "../server/config/repositories.ts"
 
 const secret = "test-origin-secret-with-more-than-32-characters"
 const env: worker_env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.dev", PUBLIC_PROJECTS: '["demo"]', PROJECT_CLONE_ORIGINS: '{"demo":"https://github.com/team/demo.git"}', PERSONAL_ORIGIN: "https://node.example.net", ORIGIN_HMAC_SECRET: secret, ACCESS_CLIENT_ID: "access-test", ACCESS_CLIENT_SECRET: "access-secret-test" }

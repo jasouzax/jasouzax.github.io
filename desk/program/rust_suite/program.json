@@ -1,0 +1,18 @@
+{
+    "name": "rust_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "rustc",
+        "rust-runner",
+        "cargo"
+    ],
+    "files": {
+        "wasm": "build/rust_suite/rust_suite.wasm",
+        "loader": "build/rust_suite/rust_suite.js"
+    },
+    "sha256": "c15836bd8fed23411488683439e84c980929b7147ce8ea3fb17fb0a0a5f01196",
+    "flags": {
+        "applet": false
+    }
+}

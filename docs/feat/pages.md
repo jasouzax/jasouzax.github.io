@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/portfolio.xml`, `src/web/html_sections.tsx`, `src/web/html_head.tsx`
+- **Code:** `content/portfolio.xml`, `engine/tags/hero.tsx`, `engine/tags/page/head.tsx`
 - **Related guides:** [docs/content/page.md](../content/page.md), [docs/content/hero.md](../content/hero.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

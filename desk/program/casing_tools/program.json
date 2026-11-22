@@ -1,0 +1,24 @@
+{
+    "name": "casing_tools",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "title-case",
+        "titlecase",
+        "camel-case",
+        "camelcase",
+        "snake-case",
+        "snakecase",
+        "kebab-case",
+        "kebabcase",
+        "slugify"
+    ],
+    "files": {
+        "wasm": "build/casing_tools/casing_tools.wasm",
+        "loader": "build/casing_tools/casing_tools.js"
+    },
+    "sha256": "50805b6fad75528b0c0559a839af38020ecf40b106958a4722deaa95f390e847",
+    "flags": {
+        "applet": false
+    }
+}

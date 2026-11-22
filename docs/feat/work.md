@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/work.xml`, `cloud/router/index.ts`, `migrations/0001_work.sql`
+- **Code:** `content/work.xml`, `cloud/router/index.ts`, `cloud/db/migrations/0001_work.sql`
 - **Related guides:** [docs/src/node.md](../src/node.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
