@@ -69,3 +69,10 @@ Scripts: `npm run db:local` (apply migrations locally), `npm run cloud:dev` (`wr
 Git clone/push now use `https://repo.<domain>/<id>`; public history JSON is `<id>/_/{refs,tree,blob,log,runs}` on that host. The front attempts the signed personal-server Tunnel first. Public discovery may fall back only after timeout or 5xx, and redirects pin one backend for the full negotiation. Authentication failures never trigger fallback. Private/confidential repositories and pushes require the personal server. Retired website Git URLs and static packs fail closed, including stale R2 objects. Pipelines no longer add Git mirrors to website publication.
 
 The registry Terraform retains its bucket/resource identities and changes the hostname default to `repo.jasouza.com`. Its Worker serves existing pull-only OCI `/v2/` plus the Git front; setup supplies the public catalog and private origin bindings. Apply the reviewed registry plan and update deployed consumers together. No DNS, Terraform apply or image publication was performed during refactoring. The existing live host remains reserved until operator cutover. A personal-server OCI backend and KV multi-source fallback registry are unimplemented.
+
+
+## Production routing after the component deployment
+
+`cloud/infra/wrangler/production.jsonc` keeps existing variables, binds the production `jazu-work` D1 database, KV registry and both Durable Objects, and records the incremental `realtime-v2` migration after `server-v1`. Do not recreate the namespaces. Secret values remain outside Git.
+
+The production wildcard route requires explicit no-Worker exceptions for Tunnel/other services (`personal-server`, `jazorpi`, `jazolap`, `sulyap`, `bucket`). Create these before deploying the wildcard. More-specific staging and repository routes take precedence. Keep the same exceptions in future route maintenance. Production still uses Wrangler; staging and the repository host use their independent Terraform states.
