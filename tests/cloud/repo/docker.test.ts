@@ -82,3 +82,11 @@ test("R2 full-object metadata stays HTTP 200 while explicit byte ranges receive 
     assert.equal(partial.headers.get("content-range"), "bytes 0-0/2")
     assert.equal(await partial.text(), "{")
 })
+
+test("an explicit legacy host preserves pulls but refuses other hosts and writes", async () => {
+    const legacy = { ...env, LEGACY_DOMAIN: "registry.jasouza.com" }
+    assert.equal((await registry_route(new Request("https://registry.jasouza.com/v2/jazu/manifests/latest"), legacy)).status, 200)
+    assert.equal((await registry_route(new Request("https://registry.jasouza.com/v2/jazu/blobs/uploads/", { method: "POST" }), legacy)).status, 405)
+    assert.equal((await registry_route(new Request("https://other.jasouza.com/v2/"), legacy)).status, 404)
+    assert.equal((await registry_route(new Request("https://registry.jasouza.com/v2/"), env)).status, 404)
+})

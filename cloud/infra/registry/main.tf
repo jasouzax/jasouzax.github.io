@@ -12,13 +12,22 @@ resource "cloudflare_workers_script" "registry" {
   bindings = concat([
     { name = "DOMAIN", type = "plain_text", text = var.registry_domain },
     { name = "BLOBS", type = "r2_bucket", bucket_name = cloudflare_r2_bucket.images.name },
-  ], var.repository_bindings)
+  ], var.legacy_registry_domain == null ? [] : [{ name = "LEGACY_DOMAIN", type = "plain_text", text = var.legacy_registry_domain }], var.repository_bindings)
 }
 resource "cloudflare_workers_custom_domain" "registry" {
   account_id = var.account_id
   hostname   = var.registry_domain
   service    = cloudflare_workers_script.registry.script_name
   zone_id    = var.zone_id
+  lifecycle { create_before_destroy = true }
+}
+resource "cloudflare_workers_custom_domain" "legacy_registry" {
+  count      = var.legacy_registry_domain == null ? 0 : 1
+  account_id = var.account_id
+  hostname   = var.legacy_registry_domain
+  service    = cloudflare_workers_script.registry.script_name
+  zone_id    = var.zone_id
+  depends_on = [cloudflare_workers_custom_domain.registry]
 }
 output "registry" { value = var.registry_domain }
 
@@ -31,7 +40,7 @@ resource "cloudflare_ruleset" "registry_clients" {
   rules = [{
     ref               = "registry_oci_reads"
     description       = "Allow non-browser OCI read clients on the dedicated registry"
-    expression        = "(http.host eq ${jsonencode(var.registry_domain)} and (http.request.uri.path eq \"/v2\" or starts_with(http.request.uri.path, \"/v2/\")) and http.request.method in {\"GET\" \"HEAD\"})"
+    expression        = "(http.host in {${join(" ", [for host in compact([var.registry_domain, var.legacy_registry_domain]) : jsonencode(host)])}} and (http.request.uri.path eq \"/v2\" or starts_with(http.request.uri.path, \"/v2/\")) and http.request.method in {\"GET\" \"HEAD\"})"
     action            = "set_config"
     action_parameters = { bic = false }
     enabled           = true
@@ -41,5 +50,13 @@ resource "cloudflare_ruleset" "registry_clients" {
 resource "cloudflare_workers_route" "repository" {
   zone_id = var.zone_id
   pattern = "${var.registry_domain}/*"
-  script = cloudflare_workers_script.registry.script_name
+  script  = cloudflare_workers_script.registry.script_name
+}
+
+resource "cloudflare_workers_route" "legacy_repository" {
+  count      = var.legacy_registry_domain == null ? 0 : 1
+  zone_id    = var.zone_id
+  pattern    = "${var.legacy_registry_domain}/*"
+  script     = cloudflare_workers_script.registry.script_name
+  depends_on = [cloudflare_workers_custom_domain.legacy_registry]
 }

@@ -57,3 +57,7 @@ The running container is pinned to `docker-cd8323c`. A stopped `jazu-personal-pr
 ### Component-aligned entry points
 
 The website image accepts `serve` (default), `host` (local Wrangler/D1 plus loopback Pages assets), and `server` (persistent Node listener). Existing flags remain accepted. Personal-server bootstrap/recovery lives in `server/container.ts`; static entry/content mounting remains in `ops/docker/entry.ts`. A dedicated role-aware Node image is not implemented; the separate `server/Dockerfile` continues to package the existing automation browser.
+
+### Repository hostname cutover
+
+`legacy_registry_domain` optionally keeps an old pull hostname (such as `registry.jasouza.com`) alongside `repo.jasouza.com`. The Worker accepts only the two configured hosts; both remain pull-only. Terraform retains the existing R2 bucket and adds explicit routes for both hosts, with the machine-client configuration rule scoped to them. Persist this variable in the provisioning inputs while old clients still need it. The primary custom domain is created before its previous hostname is released.
