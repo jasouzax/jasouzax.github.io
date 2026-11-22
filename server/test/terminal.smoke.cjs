@@ -2,8 +2,8 @@
 const assert = require('node:assert/strict');
 const os = require('node:os');
 const path = require('node:path');
-const { Pty_Channel } = require('../dist/pty_channel');
-const { to_base64, from_base64 } = require('../dist/shared/codec');
+const { Pty_Channel } = require('../dist/server/terminal/pty_channel');
+const { to_base64, from_base64 } = require('../dist/shared/protocol/codec');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function main() {
     let output = '', code;

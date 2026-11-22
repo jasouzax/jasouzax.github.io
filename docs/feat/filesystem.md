@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/web/client/desk_fs.ts`, `desk_vfs.ts`, `home_directory.ts`, `memory_fs.ts`, `connect_folder.ts`, `sign.ts`
+- **Code:** `desk/fs/opfs.ts`, `desk_vfs.ts`, `home_directory.ts`, `memory_fs.ts`, `connect_folder.ts`, `sign.ts`
 - **Related guides:** [docs/src/client.md](../src/client.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

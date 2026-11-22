@@ -10,7 +10,7 @@ server.json
 repos
 node_modules
 dist
-terraform
+cloud/infra
 tests
 extension
 build/build.zip

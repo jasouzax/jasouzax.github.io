@@ -44,7 +44,7 @@ npm run tf:staging -- plan
 npm run tf:staging -- apply
 ```
 
-The setup command bundles `src/node/worker.ts` into `.cache/staging-infra/worker.js`, initializes the standalone root at `terraform/staging/`, and runs Terraform. Review the plan and approve the apply. It provisions:
+The setup command bundles `cloud/router/index.ts` into `.cache/staging-infra/worker.js`, initializes the standalone root at `cloud/infra/staging/`, and runs Terraform. Review the plan and approve the apply. It provisions:
 
 - Pages project `jazu-staging`, with production branch `staging`.
 - R2 bucket `jazu-staging-assets`.
@@ -69,11 +69,11 @@ The command loads the existing private `.env`. `TF_VAR_*` inputs take precedence
 
 `CLOUDFLARE_API_TOKEN` authenticates the provider. It needs account Pages/R2/Workers Scripts edit access and zone DNS/Workers Routes edit access. The account/zone ids and all three origin secrets are required; Terraform reports missing fields instead of generating mismatched credentials. The secrets must match the existing Pi and Access service token. R2 S3 access keys are unnecessary for this root: CI continues to upload objects with Wrangler and the existing API token.
 
-Staging has its own local state at `terraform/staging/terraform.tfstate`; production's Terraform state is never loaded. Keep this state private and backed up on one provisioning machine; it contains Worker secrets. Secrets are passed through the child environment, not command arguments or generated var-files. State, local tfvars and saved plans are git-ignored. Commit the provider lock file. Optional resource overrides belong in `terraform/staging/terraform.tfvars` (see its example); update the XML publish targets too if changing project/bucket/branch names.
+Staging has its own local state at `cloud/infra/staging/terraform.tfstate`; production's Terraform state is never loaded. Keep this state private and backed up on one provisioning machine; it contains Worker secrets. Secrets are passed through the child environment, not command arguments or generated var-files. State, local tfvars and saved plans are git-ignored. Commit the provider lock file. Optional resource overrides belong in `cloud/infra/staging/terraform.tfvars` (see its example); update the XML publish targets too if changing project/bucket/branch names.
 
-For details, local validation, existing-resource imports and state ownership, see [terraform/staging/README.md](../terraform/staging/README.md). If the earlier manual commands already created staging resources, import them before applying. The standalone root has no production imports and no production resource dependencies.
+For details, local validation, existing-resource imports and state ownership, see [cloud/infra/staging/README.md](../cloud/infra/staging/README.md). If the earlier manual commands already created staging resources, import them before applying. The standalone root has no production imports and no production resource dependencies.
 
-Terraform owns the staging Worker after setup. To publish routing code/binding/secret changes, run the same plan/apply commands again. `wrangler.staging.jsonc` remains a dry-run/reference configuration; avoid deploying over the Terraform-managed Worker with Wrangler. The XML pipeline still publishes static Pages/R2 output independently of infrastructure.
+Terraform owns the staging Worker after setup. To publish routing code/binding/secret changes, run the same plan/apply commands again. `cloud/infra/wrangler/staging.jsonc` remains a dry-run/reference configuration; avoid deploying over the Terraform-managed Worker with Wrangler. The XML pipeline still publishes static Pages/R2 output independently of infrastructure.
 
 ## 4. Start the listener
 
@@ -115,7 +115,7 @@ export PATH="$HOME/.local/bin:$PATH"
 node --env-file=.env src/main.ts server status --project jazu --branch staging
 git branch --show-current
 curl -I https://staging.jasouza.com
-curl 'https://jasouza.com/api/v1/ci/jazu/runs?branch=staging'
+curl 'https://jasouza.com/api/_/ci/jazu/runs?branch=staging'
 ```
 
 The successful job lists `refs/heads/staging`; the checkout remains on `staging`. The pipeline builds canonical URLs for `https://staging.jasouza.com`, publishes to Pages project `jazu-staging` with branch `staging`, and uploads large assets to bucket `jazu-staging-assets`. It does not publish the primary clone mirror or deploy the production Pages project. The staging site is public; protect the hostname with Cloudflare Access if experiments must be private.

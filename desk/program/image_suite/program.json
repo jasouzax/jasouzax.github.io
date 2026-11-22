@@ -1,0 +1,20 @@
+{
+    "name": "image_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "pngtopnm",
+        "pnmtopng",
+        "jpegtopnm",
+        "pnmtojpeg",
+        "jpegoptim"
+    ],
+    "files": {
+        "wasm": "build/image_suite/image_suite.wasm",
+        "loader": "build/image_suite/image_suite.js"
+    },
+    "sha256": "0d1b34b8741757b16d109f0705cfc1f8c0874bc29f7fd4d81fb537df5c617d33",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "name": "word_games",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "pig-latin",
+        "anagram",
+        "palindrome"
+    ],
+    "files": {
+        "wasm": "build/word_games/word_games.wasm",
+        "loader": "build/word_games/word_games.js"
+    },
+    "sha256": "4c22688fa2137c1e521e9eeeee33ad43d43b8965d88556a789d397ba7a1c24c0",
+    "flags": {
+        "applet": false
+    }
+}

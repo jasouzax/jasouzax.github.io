@@ -1,0 +1,17 @@
+{
+    "name": "htmlencode",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "htmlencode",
+        "htmldecode"
+    ],
+    "files": {
+        "wasm": "build/htmlencode/htmlencode.wasm",
+        "loader": "build/htmlencode/htmlencode.js"
+    },
+    "sha256": "da8cd62644a7b3dbc779d1ee26d606c858914be11eb3d9708fb173f689d7f3ad",
+    "flags": {
+        "applet": false
+    }
+}

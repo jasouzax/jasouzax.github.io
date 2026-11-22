@@ -1,0 +1,17 @@
+{
+    "name": "urlencode",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "urlencode",
+        "urldecode"
+    ],
+    "files": {
+        "wasm": "build/urlencode/urlencode.wasm",
+        "loader": "build/urlencode/urlencode.js"
+    },
+    "sha256": "cad1d94757c9763329b4aace7367f6fd9e1ac3676f6a6c406ca3a9b6ebcf9ce1",
+    "flags": {
+        "applet": false
+    }
+}

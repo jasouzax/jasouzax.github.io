@@ -58,7 +58,7 @@ test("only message history displays a scrollbar in both themes and viewport size
 
 test("guest and owner exchange encrypted messages, recover after reload and safely retry a lost acknowledgement", async ({ page, browser }) => {
     let dropped = false, send_request = ""
-    await page.routeWebSocket("**/api/v1/realtime", socket => {
+    await page.routeWebSocket("**/api/_/realtime", socket => {
         const server = socket.connectToServer()
         socket.onMessage(message => { try { const frame = JSON.parse(String(message)); if (frame.type === "send" && !dropped) send_request = frame.request_id } catch {}; server.send(message) })
         server.onMessage(message => {
@@ -75,7 +75,7 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         const message = "Guest hello 👋 <script>window.compromised=true</script>"
         await send(guest, message)
         const key = await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!))
-        const info = await guest.evaluate(async () => (await fetch("/api/v1/work/session", { method: "POST", headers: { "x-jazu-work": "1" } })).json())
+        const info = await guest.evaluate(async () => (await fetch("/api/_/work/session", { method: "POST", headers: { "x-jazu-work": "1" } })).json())
         const address = `guest/${info.guest_room.guest_id}`
         await expect(guest.locator(".desk_wbox_head_path")).toHaveValue("im:jason@jasouza.com")
         await page.locator("[data-work-guests] > summary").click()
@@ -101,7 +101,7 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("jazu_work_guest_v2")!).key)).toBe(key.key)
         expect(await guest.evaluate(() => (window as any).compromised)).toBeUndefined()
         expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-        const stored = await guest.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).text(), key.room)
+        const stored = await guest.evaluate(async id => (await fetch(`/api/_/work/rooms/${id}/messages`)).text(), key.room)
         expect(stored).not.toContain("Guest hello"); expect(stored).not.toContain(key.key)
         await guest.screenshot({ path: ".cache/work-guest-mobile.png", fullPage: true })
         await page.screenshot({ path: ".cache/work-clients-desktop.png", fullPage: true })
@@ -114,7 +114,7 @@ test("guest and owner exchange encrypted messages, recover after reload and safe
         try {
             const other = await stranger.newPage(); await other.goto("http://localhost:8787/work")
             await expect(other.locator(".desk_messages_connection")).toContainText("Online")
-            expect(await other.evaluate(async id => (await fetch(`/api/v1/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
+            expect(await other.evaluate(async id => (await fetch(`/api/_/work/rooms/${id}/messages`)).status, key.room)).toBe(404)
         } finally { await stranger.close() }
     } finally { await context.close() }
 })
@@ -145,10 +145,10 @@ test("clients without Drive consent retain guest history and recover the encrypt
         try {
             await account(next, email); const recovered = await next.newPage(); await recovered.goto("/work"); await ready(recovered)
             await expect(recovered.locator(".desk_messages_log")).toContainText("Signed in without Drive")
-            const backup = await recovered.evaluate(async () => { const auth = await (await fetch("/api/v1/auth/session")).json(); return (await fetch("/api/v1/work/unstored-key", { method: "POST", headers: { "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }, body: JSON.stringify({ action: "load" }) })).json() })
+            const backup = await recovered.evaluate(async () => { const auth = await (await fetch("/api/_/session")).json(); return (await fetch("/api/_/work/unstored-key", { method: "POST", headers: { "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": auth.csrf }, body: JSON.stringify({ action: "load" }) })).json() })
             expect(backup.client.key).toBe(original.key)
             // Browser tests mock Google's APIs. The server-side verifier/deletion is exercised separately with real SQL/Web Crypto.
-            await next.route("**/api/v1/work/unstored-key", async route => {
+            await next.route("**/api/_/work/unstored-key", async route => {
                 const body = route.request().postDataJSON()
                 if (body.action !== "drive") { await route.continue(); return }
                 const saved = [...drive_files.get(email)!.values()][0].client
@@ -172,9 +172,9 @@ test("Drive upload failures use fallback storage and a consent button opens the 
         await expect(client.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true })).toBeVisible()
         await client.reload(); await ready(client)
         await expect(client.locator(".desk_messages_log")).toContainText("Recover after failed upload")
-        await client.route("**/api/v1/auth/google/start?drive=1", route => route.fulfill({ contentType: "text/html", body: "Google Drive consent requested" }))
+        await client.route("**/api/_/auth/google/start?drive=1", route => route.fulfill({ contentType: "text/html", body: "Google Drive consent requested" }))
         await client.getByRole("button", { name: "Provide Drive access for E2E encryption", exact: true }).click()
-        await expect(client).toHaveURL(/\/api\/v1\/auth\/google\/start\?drive=1$/)
+        await expect(client).toHaveURL(/\/api\/_\/auth\/google\/start\?drive=1$/)
     } finally { await context.close() }
 })
 

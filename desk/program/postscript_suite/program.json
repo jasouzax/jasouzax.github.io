@@ -1,0 +1,17 @@
+{
+    "name": "postscript_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "enscript",
+        "a2ps"
+    ],
+    "files": {
+        "wasm": "build/postscript_suite/postscript_suite.wasm",
+        "loader": "build/postscript_suite/postscript_suite.js"
+    },
+    "sha256": "9b8499cc0011496d5c12a22ee3be6cb74041405266fa10759cf7de36827c3ac3",
+    "flags": {
+        "applet": false
+    }
+}

@@ -29,12 +29,12 @@ repos/
 .dev.vars*
 
 # Terraform (state contains secrets; commit .terraform.lock.hcl)
-.terraform/
+.cloud/infra/
 *.tfstate
 *.tfstate.*
-terraform/terraform.tfvars
-terraform/**/terraform.tfvars
-terraform/**/*.auto.tfvars*
+cloud/infra/terraform.tfvars
+cloud/infra/**/terraform.tfvars
+cloud/infra/**/*.auto.tfvars*
 *.tfplan
 crash.log
 
@@ -50,3 +50,7 @@ coverage
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local program builds
+desk/program/**/artifacts/
+desk/program/**/.build/

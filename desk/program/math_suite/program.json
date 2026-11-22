@@ -1,0 +1,21 @@
+{
+    "name": "math_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "fib",
+        "fibonacci",
+        "gcd",
+        "lcm",
+        "stats",
+        "matrix"
+    ],
+    "files": {
+        "wasm": "build/math_suite/math_suite.wasm",
+        "loader": "build/math_suite/math_suite.js"
+    },
+    "sha256": "0ce280882e63efddb68d259a04fd637d6bc68f71df48a677ef35391ff5b92bd6",
+    "flags": {
+        "applet": false
+    }
+}

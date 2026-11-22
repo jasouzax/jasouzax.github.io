@@ -1,0 +1,16 @@
+{
+    "name": "potrace",
+    "version": "1.16-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "potrace"
+    ],
+    "files": {
+        "wasm": "build/potrace/potrace.wasm",
+        "loader": "build/potrace/potrace.js"
+    },
+    "sha256": "e203dac488d5b63f2421de33247d6c77c0e7362e097d923e6c936dba3743c1fa",
+    "flags": {
+        "applet": false
+    }
+}

@@ -74,25 +74,25 @@ Useful URLs: `/` (portfolio), `/desk` (desktop; enter `pid:` in a window's sourc
 To exercise the Worker, R2 range requests, KV and D1 locally with synthetic bindings (no credentials, no production effect):
 
 ```sh
-npm run db:local        # apply migrations/*.sql to the local D1 (stored in ignored .wrangler/)
+npm run db:local        # apply cloud/db/migrations/*.sql to the local D1 (stored in ignored .wrangler/)
 npm run serve           # terminal 1: static site on http://127.0.0.1:8080
-npm run cloud:dev       # terminal 2: wrangler dev --config wrangler.local.jsonc
+npm run cloud:dev       # terminal 2: wrangler dev --config cloud/infra/wrangler/local.jsonc
 ```
 
 Wrangler serves the Worker on <http://localhost:8787> and proxies public HTML to `http://127.0.0.1:8080`. Try:
 
-- <http://localhost:8787/api/v1/health> → Work reports `not_configured` until its D1 binding and owner secret are configured, then `encrypted_chat`.
+- <http://localhost:8787/api/_/health> → Work reports `not_configured` until its D1 binding and owner secret are configured, then `encrypted_chat`.
 - <http://localhost:8787/work> → the Work shell with `no-referrer`/`no-store`
-- unfinished `/api/…` → `501` (no data accepted); encrypted messaging uses `/api/v1/work/rooms` after [Work setup](docs/feat/work.md#staging-setup).
+- unfinished `/api/…` → `501` (no data accepted); encrypted messaging uses `/api/_/work/rooms` after [Work setup](docs/feat/work.md#staging-setup).
 
 Optionally emulate the personal node's Git read API (**not verified in this environment**):
 
 1. Copy `.env.example` to `.env`; set `ORIGIN_HMAC_SECRET` (≥ 32 random chars) and `JAZU_REPOSITORIES_JSON` to e.g. `{"stesis":"/path/to/a/public/clone"}`.
 2. `npm run node -- --port 8788` in a third terminal.
-3. Create `.dev.vars` (ignored) with `ORIGIN_HMAC_SECRET=<same value>` and `PERSONAL_ORIGIN=http://127.0.0.1:8788`, and set `PUBLIC_PROJECTS` in `wrangler.local.jsonc` to `"[\"stesis\"]"`.
-4. Restart `cloud:dev`, then request <http://localhost:8787/api/v1/git/stesis/refs>.
+3. Create `.dev.vars` (ignored) with `ORIGIN_HMAC_SECRET=<same value>` and `PERSONAL_ORIGIN=http://127.0.0.1:8788`, and set `PUBLIC_PROJECTS` in `cloud/infra/wrangler/local.jsonc` to `"[\"stesis\"]"`.
+4. Restart `cloud:dev`, then request <http://localhost:8787/api/_/git/stesis/refs>.
 
-`wrangler.local.jsonc` holds synthetic identifiers; **never deploy it**.
+`cloud/infra/wrangler/local.jsonc` holds synthetic identifiers; **never deploy it**.
 
 ---
 
@@ -107,17 +107,17 @@ Build the resources and infrastructure and deploy the whole system to Cloudflare
 1. **Make it yours.** Edit `config.json`: `base_url`, `site_name`, `owner`, `deploy.pages_project`, `deploy.worker_name`, languages, `seo`. Replace the inherited identity/content listed in the placeholders table.
 2. **API token.** Cloudflare dashboard → API tokens → create a token with *edit* on Workers Scripts, Workers Routes, Workers KV Storage, D1, R2 Storage and Cloudflare Pages, and *read* on Zone. Put it in `.env` as `CLOUDFLARE_API_TOKEN` (and the account id as `CLOUDFLARE_ACCOUNT_ID`).
 3. **R2 S3 token.** R2 → Manage API tokens → create an access key (used only to upload large media).
-4. **Inputs.** Copy `.env.example` to `.env` and fill `TF_VAR_account_id`, `TF_VAR_zone_id`, `TF_VAR_r2_access_key_id`, `TF_VAR_r2_secret_access_key` — or copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars`. `deploy` loads `.env` itself; a variable already exported in your shell wins. **Never commit `.env`, tfvars or state.**
+4. **Inputs.** Copy `.env.example` to `.env` and fill `TF_VAR_account_id`, `TF_VAR_zone_id`, `TF_VAR_r2_access_key_id`, `TF_VAR_r2_secret_access_key` — or copy `cloud/infra/terraform.tfvars.example` to `cloud/infra/terraform.tfvars`. `deploy` loads `.env` itself; a variable already exported in your shell wins. **Never commit `.env`, tfvars or state.**
 5. **DNS.** Terraform creates the Worker routes `example.com/*` and `*.example.com/*` but **not DNS records**. Add proxied (orange-cloud) records for the apex and `*` in the dashboard (a dummy A record such as `192.0.2.1` is the usual placeholder, since the Worker answers the request). Check in the dashboard that both names resolve through Cloudflare.
-6. **Existing account?** If resources already exist, import them before the first apply so Terraform adopts them instead of duplicating, e.g. `terraform -chdir=terraform import cloudflare_pages_project.site <account_id>/jazu`. Download an existing Pages project's real settings first.
-7. **Deploying from more than one machine?** Configure a remote backend in `terraform/versions.tf` first; state is local by default and contains secrets.
+6. **Existing account?** If resources already exist, import them before the first apply so Terraform adopts them instead of duplicating, e.g. `terraform -chdir=cloud/infra import cloudflare_pages_project.site <account_id>/jazu`. Download an existing Pages project's real settings first.
+7. **Deploying from more than one machine?** Configure a remote backend in `cloud/infra/versions.tf` first; state is local by default and contains secrets.
 
 ### Deploy
 
 ```sh
 npm run deploy:dry -- --date 2026-11-04               # build, stage Pages files, bundle the Worker; applies nothing
-terraform -chdir=terraform init
-terraform -chdir=terraform plan -var-file=<var_file printed in .cache/deploy/latest.json>
+terraform -chdir=cloud/infra init
+terraform -chdir=cloud/infra plan -var-file=<var_file printed in .cache/deploy/latest.json>
 npm run deploy -- --target all                        # apply Terraform, then upload the Pages content
 ```
 
@@ -133,7 +133,7 @@ Do not set `PAGES_ORIGIN` by hand: Terraform derives it from the Pages project (
 
 ### Verify
 
-- `https://<your-domain>/` loads; `https://<your-domain>/api/v1/health` returns `status: ok`.
+- `https://<your-domain>/` loads; `https://<your-domain>/api/_/health` returns `status: ok`.
 - `https://<your-domain>/assets/media/<a large file>` supports range requests (`206`).
 - `https://<project>.<your-domain>` redirects (301) to `/projects/<project>` for each project id.
 
@@ -148,7 +148,7 @@ Re-run `npm run deploy -- --target pages` for content-only changes. The "present
 ## Docker use
 
 ```sh
-docker run --rm --init -p 8080:8080 registry.jasouza.com/jazu:latest
+docker run --rm --init -p 8080:8080 repo.jasouza.com/jazu:latest
 ```
 
 The image serves its prebuilt website at `http://localhost:8080`, including prepared WASM packages and public assets. Custom content uses a read-only host mount and `--content=/content`. Personal-server mode uses `--personal-server`, external credentials and a persistent `/data` volume. See [Docker installation, custom content, registry releases and recovery](docs/feat/docker.md) for commands, Compose profiles, migration and rollback. Back up the data volume separately from the image.
@@ -180,7 +180,7 @@ Set up the **personal server**: your own machine running an instance of this rep
    2. *Access → Applications:* protect that hostname with a **Service Auth** policy.
    3. *Access → Service Auth:* create a **service token**; keep its Client ID and Secret.
 5. **Tell the Worker.** In `.env` set `ACCESS_CLIENT_ID` and `ACCESS_CLIENT_SECRET` (same `ORIGIN_HMAC_SECRET` as the node); in `config.json` set `"personal_server": "https://node.example.net"`. Then `npm run deploy -- --target worker`.
-6. **Verify:** `https://<your-domain>/api/v1/git/<public_project_id>/refs` returns refs. With the node stopped it returns `503` — the rest of the site keeps working. Browser cookies/tokens are never forwarded to the node.
+6. **Verify:** `https://<your-domain>/api/_/git/<public_project_id>/refs` returns refs. With the node stopped it returns `503` — the rest of the site keeps working. Browser cookies/tokens are never forwarded to the node.
 
    Query parameters: `?ref=HEAD&path=readme.md`. Limits: 100 log entries; blobs ≤ 16 MiB; refs/paths cannot run arbitrary Git commands.
 
@@ -229,15 +229,15 @@ cp extension/xinitrc.example ~/.xinitrc     # edit JAZU_DIR / PORT
 startx                                      # or: xinit ~/.xinitrc -- :0 vt1
 ```
 
-Use **Chromium** (or Chrome for Testing): branded Google Chrome removed `--load-extension` in version 137. Full guide, protocol, threat model and troubleshooting: [extension/README.md](extension/README.md). Status: [docs/feat/desk_env.md](docs/feat/desk_env.md). The host and the page-to-host chain are covered by `tests/host.test.ts` and `tests/host_bridge.test.ts`; running it inside a real Chromium/X session has **not** been verified yet.
+Use **Chromium** (or Chrome for Testing): branded Google Chrome removed `--load-extension` in version 137. Full guide, protocol, threat model and troubleshooting: [extension/README.md](extension/README.md). Status: [docs/feat/desk_env.md](docs/feat/desk_env.md). The host and the page-to-host chain are covered by `tests/extension/host/host.test.ts` and `tests/desk/host/host.test.ts`; running it inside a real Chromium/X session has **not** been verified yet.
 
 ---
 
 ## Repository at a glance
 
 ```
-config.json   content/   src/   extension/   docs/   migrations/   terraform/   tests/
-.env.example  wrangler.local.jsonc  CLAUDE.md
+config.json   content/   src/   extension/   docs/   cloud/db/migrations/   cloud/infra/   tests/
+.env.example  cloud/infra/wrangler/local.jsonc  CLAUDE.md
 ```
 
 Generated, never commit: `dist/`, `.cache/`, `.wrangler/`, `.env`, Terraform state/tfvars. Details: [docs/src/README.md](docs/src/README.md).
@@ -245,12 +245,12 @@ Generated, never commit: `dist/`, `.cache/`, `.wrangler/`, `.env`, Terraform sta
 
 ### Personal-server production configuration
 
-The checked-in `wrangler.production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu-1ws.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/v1/ci/jazu/runs` reports deployment status.
+The checked-in `cloud/infra/wrangler/production.jsonc` routes `jasouza.com/*` to `jazu_router`, serves static output from `jazu-1ws.pages.dev`, and uses `personal-server.jasouza.com` for signed origin requests. It deliberately leaves existing unrelated subdomain services intact. The origin hostname must have a Tunnel ingress to `http://127.0.0.1:8788` and an Access Service Auth policy allowing only the Worker's service token. `/api` returns discovery JSON; `/api/_/ci/jazu/runs` reports deployment status.
 
 Worker updates are an operator action (CI deploys Pages only):
 
 ```sh
-node --env-file=.env node_modules/wrangler/bin/wrangler.js deploy --config wrangler.production.jsonc
+node --env-file=.env node_modules/wrangler/bin/wrangler.js deploy --config cloud/infra/wrangler/production.jsonc
 # Upload ORIGIN_HMAC_SECRET, ACCESS_CLIENT_ID and ACCESS_CLIENT_SECRET using wrangler secret bulk.
 # Never pass the entire .env: the Worker does not need the Cloudflare API token.
 ```
@@ -259,7 +259,7 @@ Use `ops/jazu-node.service.example` as the systemd service, adjusting the user, 
 
 The node listens and orchestrates jobs in one persistent process; catalogs and pipelines execute in fresh child processes. Engine pushes stage their exact commit and use its own schema, dependencies and pipeline implementation before promoting the checkout. A failed catalog reload keeps repository polling alive with the last valid catalog. Runtime changes request exit `75` after the job finishes so systemd loads the updated listener; keep `Restart=on-failure` or `always` enabled. Installing this mechanism initially requires one service restart. See [runtime isolation](docs/src/node.md#per-project-repositories-and-xml-pipelines) for the worker protocol and upgrade limits.
 
-**Staging:** a project may declare several `<pipeline>` entries with unique branches. The first is primary; Jazu declares `master` and `staging`. Jobs share one deployment checkout, switch branches only after CI passes, and leave the selected branch checked out. Sync/approval/publication state is isolated by branch; staging does not replace the primary Git clone mirror. Use `server run --project jazu --branch staging` or `server status --project jazu --branch staging`. Follow the [post-merge Pi and Cloudflare setup](docs/infra-staging.md) before the first staging push. `npm run tf:staging -- plan` / `apply` automate the separate Pages project, Worker, R2 bucket, DNS, domain association and secrets through [terraform/staging](terraform/staging/README.md), using the existing private `.env` inputs.
+**Staging:** a project may declare several `<pipeline>` entries with unique branches. The first is primary; Jazu declares `master` and `staging`. Jobs share one deployment checkout, switch branches only after CI passes, and leave the selected branch checked out. Sync/approval/publication state is isolated by branch; staging does not replace the primary Git clone mirror. Use `server run --project jazu --branch staging` or `server status --project jazu --branch staging`. Follow the [post-merge Pi and Cloudflare setup](docs/infra-staging.md) before the first staging push. `npm run tf:staging -- plan` / `apply` automate the separate Pages project, Worker, R2 bucket, DNS, domain association and secrets through [cloud/infra/staging](cloud/infra/staging/README.md), using the existing private `.env` inputs.
 
 **Provider-first clones:** newly deployed Workers receive `PROJECT_CLONE_ORIGINS`, derived from public `<project repo="...">` declarations. Public Git clone/fetch requests use that HTTPS provider (including GitHub) first. Missing repositories, unavailable providers and invalid Git responses fall back to the Pi's Smart HTTP backend. Discovery fallback redirects to a Pi-specific path on the same website so the clone stays on that backend; pack responses stream. Pushes and private reads always use the Pi. Reapply the Worker infrastructure after changing `repo`; the mapping remains in Worker configuration, outside public page payloads. Existing Workers without this binding retain static-mirror reads. See [Git read routing](docs/src/node.md#provider-first-git-reads).
 
@@ -315,3 +315,5 @@ journalctl -u jazu-node -f
 ```
 
 Detailed logs remain in `<state_dir>/runs/`. Non-engine project sync/approval/publication state is under `<state_dir>/projects/<id>/`. Production activation was verified on 2026-11-12 at `8d39520`: the Pi checkout, personal Git hub, and GitHub `master` agree; all 157 tests passed and Pages/R2 publication succeeded. The node is enabled at boot.
+
+API migration: fixed endpoints now use `/api/_/{id}` and session discovery is `/api/_/session`. Before deploying this revision, register `https://<domain>/api/_/auth/google/callback` in the Google OAuth client (including staging if used) and update external system-API callers. Deploy the rebuilt site, Worker and agent together; legacy API URLs have no aliases.

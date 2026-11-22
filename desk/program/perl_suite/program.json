@@ -1,0 +1,16 @@
+{
+    "name": "perl_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "perl"
+    ],
+    "files": {
+        "wasm": "build/perl_suite/perl_suite.wasm",
+        "loader": "build/perl_suite/perl_suite.js"
+    },
+    "sha256": "d4023f7a6b3b49b01dc65bd1fb4215be96cebfe104e7ffc8aa8c20a75cab2ae4",
+    "flags": {
+        "applet": false
+    }
+}

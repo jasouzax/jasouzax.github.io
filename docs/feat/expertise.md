@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/expertise.ts`, `src/web/html_expertise.tsx`, `src/web/client/expertise.ts`, `src/web/client/search.ts`, `src/web/client/pager.ts`
+- **Code:** `engine/tags/expertise/model.ts`, `engine/tags/expertise.tsx`, `desk/site/expertise.ts`, `desk/site/search.ts`, `desk/site/pager.ts`
 - **Related guides:** [docs/content/expertise.md](../content/expertise.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

@@ -56,7 +56,7 @@ Prerequisites: Bash, git, curl, Python 3, make, gcc, tar, bzip2, Node 22.18+, **
 
 1. Add its recipe and prepared artifacts under `src/desk/<program>/` (or `programs/`).
 2. Add a Worker adapter `src/web/client/wasm_worker_<name>.ts` (copy `wasm_worker_htop.ts`; it calls `run_worker_runtime`).
-3. Register it in `bundle_runtime()` (`src/build.ts`): the list of programs with version and archive extension.
+3. Register it in `bundle_runtime()` (`engine/build/build.ts`): the list of programs with version and archive extension.
 4. The image entry in `assets/wasm/manifest.json` needs `id`, `version`, `commands`, `worker`, `wasm`, `sha256`; `register_wasm()` can also register at runtime.
 5. Files the program creates follow the existing `/tmp` and `/home/user` privacy rules.
 
@@ -72,7 +72,7 @@ Browser userland, not a Linux kernel ABI: no arbitrary native binaries, no gener
 
 ```sh
 npm run types
-npm test                      # includes tests/desk_wasm.test.ts: real WASM in worker_threads
+npm test                      # includes tests/desk/kernel/worker.test.ts: real WASM in worker_threads
 npx playwright install chromium
 npm run test:desk:browser     # isolation, lazy loading, terminal, shared FS, cancellation, OPFS, programs
 ```
@@ -83,4 +83,4 @@ npm run test:desk:browser     # isolation, lazy loading, terminal, shared FS, ca
 
 `desk_view.ts` publishes text/hex edits and subscribes editors to shared bytes while retaining selection and scroll. Saves capture their source and write callback and clear dirty state only for the saved revision. `desk_compare.ts` uses bounded jsdiff line comparison. `desk_preview.ts` provides sandboxed HTML and cancellable image conversion through the page's existing kernel and binary VFS. `desk_pdf.ts` dynamically imports the locally published PDF.js runtime, owns its worker/document/render lifecycle, and releases it on window replacement. `build.ts` publishes versioned PDF.js assets plus a revalidated manifest; no PDF code is bundled into the normal page runtime.
 
-Checks: `tests/desk_flow.test.ts`, `tests/desk_compare.test.ts`, `tests/plugins.test.ts` and `tests/desk_split.spec.ts` cover shared drafts, save races, detach/close, flow selection, line changes, empty children, mode rules, sandboxed live HTML, actual img2pdf output and PDF canvas pixels.
+Checks: `tests/desk/plugin/flow.test.ts`, `tests/desk/plugin/compare.test.ts`, `tests/engine/tags/plugin.test.ts` and `tests/desk_split.spec.ts` cover shared drafts, save races, detach/close, flow selection, line changes, empty children, mode rules, sandboxed live HTML, actual img2pdf output and PDF canvas pixels.

@@ -19,7 +19,7 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 | `publish.ts` | Deploy machine / personal server | Pages staging with overlay, content fingerprint, wrangler call; shared by `deploy` and `publish` |
 | `server_cli.ts` | Operator | `node src/main.ts server …`: init, repo init, user add/remove, run, status, sync |
 | `deploy.ts` | Deploy machine | Stage `dist`, bundle Worker, run Terraform and the Pages upload |
-| `d1_migrate.ts` | Deploy machine (called by Terraform) | Apply `migrations/*.sql` through the D1 HTTP API |
+| `d1_migrate.ts` | Deploy machine (called by Terraform) | Apply `cloud/db/migrations/*.sql` through the D1 HTTP API |
 
 ## Local server (`serve.ts`)
 
@@ -35,8 +35,8 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
    - `{name}-demo.{domain}` / `{name}-work.{domain}` → proxy to the **explicit HTTPS origin** stored in KV key `host:{name}-demo|work`. Origins on the same domain are refused (would loop); cookies/auth are never forwarded.
    - anything else → 404.
 3. `/api/*`:
-   - `GET /api/v1/health` → `{ status: "ok", generation: 12, services: { work: "not_implemented" } }`.
-   - `GET /api/v1/git/{public_id}/{refs|tree|blob|log}` for ids in `PUBLIC_PROJECTS` → signed request to `PERSONAL_ORIGIN` (HMAC headers + optional `CF-Access-Client-Id/Secret`), 10 s timeout, redirects refused. Failures → `503` (`origin_offline`).
+   - `GET /api/_/health` → `{ status: "ok", generation: 12, services: { work: "not_implemented" } }`.
+   - `GET /api/_/git/{public_id}/{refs|tree|blob|log}` for ids in `PUBLIC_PROJECTS` → signed request to `PERSONAL_ORIGIN` (HMAC headers + optional `CF-Access-Client-Id/Secret`), 10 s timeout, redirects refused. Failures → `503` (`origin_offline`).
    - everything else → `501 not_implemented` (fail closed; no client data accepted).
 4. Non-GET/HEAD → `405`.
 5. `/assets/media/*`, `/assets/wasm/*` → R2 (`ASSETS`) with range/conditional support, long immutable caching, `application/wasm` type, CORS for the site origin; fall through to Pages if the object is missing.
@@ -46,7 +46,7 @@ Code that runs on a *node* of the system: your machine's local server, the Cloud
 
 Bindings/vars (`worker_env`): `DOMAIN`, `PAGES_ORIGIN`, `PUBLIC_PROJECTS` (JSON array of ids), `PERSONAL_ORIGIN`, secrets `ORIGIN_HMAC_SECRET`, `ACCESS_CLIENT_ID`, `ACCESS_CLIENT_SECRET`; `ASSETS` (R2), `REGISTRY` (KV), `DB` (D1, schema only for now).
 
-**Adding an API:** add a branch before the `501` fallback in `route()`, keep errors in the `{ error: { code, message } }` shape via `api_error`, validate method and input, and add a test in `tests/nodes.test.ts`.
+**Adding an API:** add a branch before the `501` fallback in `route()`, keep errors in the `{ error: { code, message } }` shape via `api_error`, validate method and input, and add a test in `tests/cloud/router/index.test.ts`.
 
 ## <a id="personal-node"></a>Personal node (`personal.ts`, `security.ts`)
 
@@ -93,7 +93,7 @@ git push  https://{user}:{token}@{domain}/projects/jazu.git
 
 **File changes.** A watcher on `<site.dir>/content`, `src` and `config.json` queues a CD-only job after 5 s of quiet (no tests: there is no commit to vet). Large (> 25 MiB) website assets and Git packs are uploaded to R2 before Pages; unchanged large objects are skipped using recorded content hashes.
 
-**Environment of commands.** Pipeline steps run with a scrubbed `PATH`, `HOME=<project-state>/home` and `CI=true` environment. Each deploy step receives its explicitly requested credential names. Network Git/SSH separately uses the service user’s credential setup. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/v1/ci/jazu/runs` shows a public summary (no pusher, message or paths).
+**Environment of commands.** Pipeline steps run with a scrubbed `PATH`, `HOME=<project-state>/home` and `CI=true` environment. Each deploy step receives its explicitly requested credential names. Network Git/SSH separately uses the service user’s credential setup. Logs: `<state>/runs/<id>.log` (2 MiB cap); `GET /api/_/ci/jazu/runs` shows a public summary (no pusher, message or paths).
 
 **Wire details.** The Worker signs git requests with `x-jazu-body: stream`, which leaves the (huge, binary) body out of the HMAC; the node accepts that mode only on `/git-http/*`. Request bodies are capped at 512 MiB by the node, and Cloudflare's own request-size limit for your plan applies first.
 
@@ -112,11 +112,11 @@ Terraform targets: `pages` → `cloudflare_pages_project.site`, `aws_s3_object.l
 
 ## D1 migrations (`d1_migrate.ts`)
 
-Runs as a script (`node src/node/d1_migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
+Runs as a script (`node cloud/db/migrate.ts`, invoked by Terraform's `local-exec`). Creates the `d1_migrations` table in wrangler's layout, applies unseen `cloud/db/migrations/*.sql` in name order, records them. Needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`. Add migrations as new numbered files; never edit an applied one.
 
 ### Personal-server deployment
 
-`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/v1/health` works while the Pi is offline.
+`/projects/jazu` and `/projects/jazu.git` are equivalent Git remotes. Git metadata and pack reads are rewritten to the `.git` mirror on Pages; mutable refs use `no-cache`, immutable packs use a year-long cache. The HTML project page remains at `/projects/jazu`. `/api` returns JSON discovery links; `/api/_/health` works while the Pi is offline.
 
 Set `site.branch` to `master` for the hub's public deploy branch. Set optional `site.checkout_branch` to `feature/personal-server` to keep the server checkout on the development branch while fast-forwarding commits accepted on the hub's master. It defaults to `site.branch`. CI restores the ignored `build/` artifacts and `content/media/` from the deployment checkout after cleaning its isolated checkout. Mirror failures block publication.
 
@@ -128,7 +128,7 @@ Oversized Git packs (a historical blob cannot be split across packs) are staged 
 
 ### Provider-first Git reads
 
-`PROJECT_CLONE_ORIGINS` is a Worker JSON binding mapping public project ids to HTTPS Git repository URLs. `pipeline_types.clone_origins()` derives it from reviewed `<project repo>` declarations, excludes private projects, normalizes `.git`, and maps GitHub SSH forms to their HTTPS equivalent. Other SSH-only origins use the Pi fallback. `prepare_deploy()` emits the binding input for production Terraform; `terraform/staging/setup.ts` generates it for standalone staging Terraform. Repository URLs are not added to static pages or public manifests. Update the Worker infrastructure when declarations change; public projects added later without a map entry still use the Pi.
+`PROJECT_CLONE_ORIGINS` is a Worker JSON binding mapping public project ids to HTTPS Git repository URLs. `pipeline_types.clone_origins()` derives it from reviewed `<project repo>` declarations, excludes private projects, normalizes `.git`, and maps GitHub SSH forms to their HTTPS equivalent. Other SSH-only origins use the Pi fallback. `prepare_deploy()` emits the binding input for production Terraform; `cloud/infra/staging/setup.ts` generates it for standalone staging Terraform. Repository URLs are not added to static pages or public manifests. Update the Worker infrastructure when declarations change; public projects added later without a map entry still use the Pi.
 
 For configured public repositories, `GET /projects/{id}/info/refs?service=git-upload-pack` and `POST /projects/{id}/git-upload-pack` use `git_read_proxy.ts`. The provider gets only Git content/protocol/accept headers, never personal tokens, cookies, origin signatures or Access credentials. Provider redirects are limited to three on the same HTTPS origin, supporting renamed repositories. Only valid Git content types with status 200 are accepted. Connection failures, a 15-second response-header timeout, authentication/rate-limit/server errors and HTML responses trigger fallback before streaming begins. Dynamic negotiation responses use `no-store`.
 
@@ -160,7 +160,7 @@ For an engine commit, `job_process.ts` first stages the exact SHA in `<state>/ru
 
 The listener fingerprints `src/`, `package.json`, `package-lock.json` and `tsconfig.json`. After a job finishes and its durable queue entry is completed, changed runtime files in a clean working copy stop further queue draining and request a listener restart. Uncommitted tracked edits defer restart. Pending jobs remain queued. The listener closes its HTTP server (up to ten minutes for in-flight Git requests), exits **75**, and the supervisor starts it from the updated checkout. Keep systemd `Restart=on-failure` (or `always`) enabled; a bare terminal invocation exits and must be started again. Content-only edits do not request a runtime restart. The initial installation of this isolation mechanism requires one service restart; an already-running older listener cannot acquire it from memory.
 
-The worker stdin protocol (`catalog`/`run`), durable queue/run formats and `src/node/job_main.ts` entry are the compatibility boundary. Removing these, requiring a newer Node runtime or changing the service entry still requires an operator migration. Catalog workers have a 30-second bound; pipeline workers have a six-hour outer bound in addition to individual step timeouts. On Unix, each worker owns a process group so timed-out/crashed worker descendants are terminated before the next job. This is process isolation, not a sandbox: engine commits and owner-approved pipeline commands remain trusted code.
+The worker stdin protocol (`catalog`/`run`), durable queue/run formats and `server/pipeline/job_main.ts` entry are the compatibility boundary. Removing these, requiring a newer Node runtime or changing the service entry still requires an operator migration. Catalog workers have a 30-second bound; pipeline workers have a six-hour outer bound in addition to individual step timeouts. On Unix, each worker owns a process group so timed-out/crashed worker descendants are terminated before the next job. This is process isolation, not a sandbox: engine commits and owner-approved pipeline commands remain trusted code.
 
 `pipeline.ts` executes the XML steps. `ci` uses a clean exact-commit clone; failures stop before working-copy advancement, upstream export, mirror update, build or deploy. After success the working copy advances and the same tested SHA is pushed upstream with a non-force refspec. An independently advanced working copy is rejected. `build` runs without server credentials; `deploy` receives only the environment names explicitly requested by each step. Commands and JSON argument arrays run without an implicit shell. Only trusted engine-catalog changes can change pipeline policy. The legacy `ci_jazu.ts` path re-exports the generic executor and contains no Jazu command list.
 

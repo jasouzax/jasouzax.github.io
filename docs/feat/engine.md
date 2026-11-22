@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/main.ts`, `src/commands.ts`, `src/build.ts`, `src/cache.ts`, `src/graph.ts`, `src/check.ts`
+- **Code:** `src/main.ts`, `src/commands.ts`, `engine/build/build.ts`, `engine/build/cache.ts`, `engine/build/graph.ts`, `engine/check/check.ts`
 - **Related guides:** [docs/src/engine.md](../src/engine.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

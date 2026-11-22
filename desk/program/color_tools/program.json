@@ -1,0 +1,18 @@
+{
+    "name": "color_tools",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "hex2rgb",
+        "rgb2hex",
+        "color-mix"
+    ],
+    "files": {
+        "wasm": "build/color_tools/color_tools.wasm",
+        "loader": "build/color_tools/color_tools.js"
+    },
+    "sha256": "8624fdcfddcd5a4c21a21fb53c458ee07cd119ae0417af9a67cc1b24fe3b929e",
+    "flags": {
+        "applet": false
+    }
+}

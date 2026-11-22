@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "The Pi agent of jasouza.com/server: dials out to the Worker and serves the file system, terminals, scripts and live browser windows",
-  "main": "dist/main.js",
+  "main": "dist/server/browser/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node build.cjs",
     "start": "npm run build && electron .",
     "start:headless": "npm run build && xvfb-run -a electron . --no-sandbox --disable-gpu",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -23,5 +23,6 @@
     "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^5.8.0"
-  }
+  },
+  "type": "module"
 }

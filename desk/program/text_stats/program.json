@@ -1,0 +1,17 @@
+{
+    "name": "text_stats",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "count-chars",
+        "charfreq"
+    ],
+    "files": {
+        "wasm": "build/text_stats/text_stats.wasm",
+        "loader": "build/text_stats/text_stats.js"
+    },
+    "sha256": "5761ccfe1839ce457d2544f9256176a88333ae86c4c8491ef3dc07814edef7e0",
+    "flags": {
+        "applet": false
+    }
+}

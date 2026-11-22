@@ -1,0 +1,16 @@
+{
+    "name": "make",
+    "version": "4.4.1-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "make"
+    ],
+    "files": {
+        "wasm": "build/make/make.wasm",
+        "loader": "build/make/make.js"
+    },
+    "sha256": "f86ac328935cc7a6d9e41fd2409b35f0fe0362f1406036e31f20f77032b49bac",
+    "flags": {
+        "applet": false
+    }
+}

@@ -37,7 +37,7 @@ These are the features being worked on **right now**. Click one for its status l
 1. `docs/feat/README.md` is the single source of "what is done / ongoing / todo". Every statement there is a checkbox.
 2. A feature with sub-tasks has a page `docs/feat/{name}.md` with the full list and the technical contract. The index mirrors its top-level lines.
 3. This file lists only features currently in progress; finished ones leave this list.
-4. `docs/content/*` describes **what the validator accepts** (`src/schema.ts` is the truth). `docs/src/*` describes **how the code works**.
+4. `docs/content/*` describes **what the validator accepts** (`shared/content/schema.ts` is the truth). `docs/src/*` describes **how the code works**.
 5. Never claim something works unless a test, a command or a browser check showed it. Unverified plans stay unchecked.
 
 ## Placeholders the owner must replace
@@ -63,11 +63,11 @@ The inherited sample birth date, phone numbers, postal code, family/commute fiel
 | Deployment input | Replace before cloud use |
 |---|---|
 | `.env` `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `TF_VAR_*` | Deployment credentials and Terraform inputs; loaded by `deploy`; never commit |
-| `terraform/terraform.tfvars` | Optional alternative to `TF_VAR_*` in `.env` (git-ignored) |
+| `cloud/infra/terraform.tfvars` | Optional alternative to `TF_VAR_*` in `.env` (git-ignored) |
 | `.env.example` | Copy to ignored `.env`, generate an HMAC key, explicitly map only public repositories |
 | Worker secrets | HMAC key and Access service-token id/secret as Terraform variables; never commit actual values |
 | KV registry | Explicit external HTTPS origins for each approved demo/work subdomain |
-| `wrangler.local.jsonc` | Local-only synthetic binding identifiers; never deploy this config |
+| `cloud/infra/wrangler/local.jsonc` | Local-only synthetic binding identifiers; never deploy this config |
 
 Large local videos are staged for R2 automatically. The dry run lists upload keys without uploading bytes. The owner must confirm media rights and retention. The API health response explicitly reports Work as not implemented; this is intentional product status, not a fake client session.
 

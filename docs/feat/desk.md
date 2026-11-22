@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/web/html_desk.tsx`, `src/web/client/desk*.ts`, `src/web/client/kernel.ts`, `src/web/client/wasm_*.ts`, `src/desk/`
+- **Code:** `engine/tags/desk.tsx`, `src/web/client/desk*.ts`, `desk/kernel/process.ts`, `src/web/client/wasm_*.ts`, `src/desk/`
 - **Related guides:** [docs/content/desk.md](../content/desk.md), [docs/src/desk.md](../src/desk.md), [docs/src/client.md](../src/client.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 

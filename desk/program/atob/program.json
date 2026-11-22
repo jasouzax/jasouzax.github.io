@@ -1,0 +1,16 @@
+{
+    "name": "atob",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "atob"
+    ],
+    "files": {
+        "wasm": "build/atob/atob.wasm",
+        "loader": "build/atob/atob.js"
+    },
+    "sha256": "0206008e959e1559b84eaf28429cecb9f80c5e3b332d268b26a02452bd7c80d8",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "dwebp",
+    "version": "1.4.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "dwebp"
+    ],
+    "files": {
+        "wasm": "build/dwebp/dwebp.wasm",
+        "loader": "build/dwebp/dwebp.js"
+    },
+    "sha256": "af103d36e4b3bfa5bffdd7664b3901ba335e5e616315c43aebbd3704968bac04",
+    "flags": {
+        "applet": false
+    }
+}

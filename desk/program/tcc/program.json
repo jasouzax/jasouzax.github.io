@@ -1,0 +1,17 @@
+{
+    "name": "tcc",
+    "version": "0.9.27-jazu.1",
+    "extension": "tar.bz2",
+    "commands": [
+        "tcc",
+        "cc"
+    ],
+    "files": {
+        "wasm": "build/tcc/tcc.wasm",
+        "loader": "build/tcc/tcc.js"
+    },
+    "sha256": "8211de10cbbe6d8cf93accdb4062138236044b1249294ea0d506a0ff060089f3",
+    "flags": {
+        "applet": false
+    }
+}

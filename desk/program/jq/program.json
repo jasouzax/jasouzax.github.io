@@ -1,0 +1,16 @@
+{
+    "name": "jq",
+    "version": "1.7.1-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "jq"
+    ],
+    "files": {
+        "wasm": "build/jq/jq.wasm",
+        "loader": "build/jq/jq.js"
+    },
+    "sha256": "8d217f22227605abf721b8b102f6df8ce1d9f742dd57f0d3306c02f299bfd48b",
+    "flags": {
+        "applet": false
+    }
+}

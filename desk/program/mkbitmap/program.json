@@ -1,0 +1,16 @@
+{
+    "name": "mkbitmap",
+    "version": "1.16-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "mkbitmap"
+    ],
+    "files": {
+        "wasm": "build/mkbitmap/mkbitmap.wasm",
+        "loader": "build/mkbitmap/mkbitmap.js"
+    },
+    "sha256": "ae183db1cc210321ab31519df619325e28de71ac8d2b292670135b1f1d57f998",
+    "flags": {
+        "applet": false
+    }
+}

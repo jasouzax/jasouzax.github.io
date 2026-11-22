@@ -1,0 +1,16 @@
+{
+    "name": "tools_catalog",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "tools"
+    ],
+    "files": {
+        "wasm": "build/tools_catalog/tools_catalog.wasm",
+        "loader": "build/tools_catalog/tools_catalog.js"
+    },
+    "sha256": "efed5e9256332178e258a268bf8561bc3aa4726459c7c7ddb59055db0d65f491",
+    "flags": {
+        "applet": false
+    }
+}

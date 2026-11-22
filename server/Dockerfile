@@ -3,10 +3,14 @@ FROM node:24-bookworm-slim AS build
 WORKDIR /repo/server
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --no-audit --no-fund && npm cache clean --force
-COPY server/tsconfig.json ./
-COPY server/src ./src
+COPY server/tsconfig.json server/build.cjs ./
+COPY server/browser ./browser
+COPY server/link ./link
+COPY server/terminal ./terminal
+COPY server/api ./api
+COPY server/config ./config
 COPY server/test ./test
-COPY src/node/security.ts /repo/src/node/security.ts
+COPY shared /repo/shared
 RUN npm test && npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim

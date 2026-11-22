@@ -1,0 +1,16 @@
+{
+    "name": "x86_64-tcc",
+    "version": "0.9.27-jazu.1",
+    "extension": "tar.bz2",
+    "commands": [
+        "x86_64-tcc"
+    ],
+    "files": {
+        "wasm": "build/x86_64-tcc/x86_64-tcc.wasm",
+        "loader": "build/x86_64-tcc/x86_64-tcc.js"
+    },
+    "sha256": "e1794442fa5bcc7d3a205b3c17d04745f12b20d2bd336836823b1b577e3a5b56",
+    "flags": {
+        "applet": false
+    }
+}

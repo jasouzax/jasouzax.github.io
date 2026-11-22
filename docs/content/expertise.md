@@ -5,11 +5,10 @@ Lets visitors browse experience, education, projects, certifications and competi
 ```xml
 <page path="/" name="Home">
     <expertise>
-        <skill name="web-app" icon="[web]" group="software" info="Websites and apps">
-            <stack name="vue" tag="Vue"/>
-        </skill>
+        <skill name="web-app" icon="[web]" group="software"/>
+        <stack name="vue"/>
         <skill name="cloud" icon="[cloud]" group="software"/>
-        <stack name="git" tag="Git"/>
+        <stack name="git"/>
     </expertise>
 </page>
 ```
@@ -30,21 +29,19 @@ Attributes (legacy, optional): `tab`, `icon`, `name`, `info`, `featured_chips`. 
 | Attribute | Meaning |
 |---|---|
 | `name` | **Required.** Identity; its slug is used in classes and URL fragments (`#web-app/gdsc`) |
-| `id`, `icon`, `info` | Optional id override, icon, description |
+| `id`, `icon` | Optional id override and icon |
 | `group` | Tabs are grouped by this value |
-| `stack` | Legacy list form; prefer nested `<stack>` |
 
-May contain `<stack>`; those stacks show when this skill is focused.
+Skills have no children. Declare reusable stacks as siblings under `<expertise>`.
 
 ## `<stack>`
 
 | Attribute | Meaning |
 |---|---|
 | `name` | **Required.** Tool or technology |
-| `id`, `icon`, `link` | Optional id, icon, homepage |
-| `tag` | Short chip label |
+| `id` | Optional id override |
 
-Directly inside `<expertise>` it is shown when no skill is focused.
+Stacks have no children. Their names supply chip and hashtag labels; they do not carry icons or links.
 
 ## How a slide is chosen
 

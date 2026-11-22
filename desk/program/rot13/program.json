@@ -1,0 +1,16 @@
+{
+    "name": "rot13",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "rot13"
+    ],
+    "files": {
+        "wasm": "build/rot13/rot13.wasm",
+        "loader": "build/rot13/rot13.js"
+    },
+    "sha256": "dd948a8ded38cd4a7865ecfaa1d8f96b0d1cd853321ac02207a1725c1ef10d44",
+    "flags": {
+        "applet": false
+    }
+}

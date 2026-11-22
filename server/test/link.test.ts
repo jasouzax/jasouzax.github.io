@@ -1,8 +1,8 @@
 /* Hub_Link with a fake socket and mocked timers: hello, viewer gating, heartbeat, silence detection, backoff and auth rejection. */
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { Hub_Link } from '../src/link.ts';
-import type { Socket_Like } from '../src/link.ts';
+import { Hub_Link } from '../link/hub.ts';
+import type { Socket_Like } from '../link/hub.ts';
 
 class Fake implements Socket_Like {
     sent: (string | Uint8Array)[] = [];
@@ -23,7 +23,7 @@ function setup() {
     const sockets: Fake[] = [];
     const headers: Record<string, string>[] = [];
     const link = new Hub_Link({
-        url: 'wss://example.test/api/server/agent', app: 'test', platform: 'linux',
+        url: 'wss://example.test/api/_/server/agent', app: 'test', platform: 'linux',
         sign: () => { const value = { 'x-jazu-nonce': String(headers.length) }; headers.push(value); return value; },
         open: () => { const socket = new Fake(); sockets.push(socket); return socket; },
         backoff_min_ms: 1000, backoff_max_ms: 8000,
@@ -100,7 +100,7 @@ test('a refused upgrade is logged with the likely cause and retried slowly; stop
     const { sockets } = setup();
     const lines: string[] = [];
     try {
-        const logged = new Hub_Link({ url: 'wss://x/api/server/agent', app: 't', platform: 'l', sign: () => ({}), open: () => { const socket = new Fake(); sockets.push(socket); return socket; }, log: (line) => lines.push(line), backoff_min_ms: 1000, backoff_max_ms: 8000 });
+        const logged = new Hub_Link({ url: 'wss://x/api/_/server/agent', app: 't', platform: 'l', sign: () => ({}), open: () => { const socket = new Fake(); sockets.push(socket); return socket; }, log: (line) => lines.push(line), backoff_min_ms: 1000, backoff_max_ms: 8000 });
         logged.start();
         const socket = sockets.at(-1)!;
         socket.emit('rejected', 401);

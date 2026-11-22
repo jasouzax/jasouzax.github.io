@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/work.xml`, `src/node/worker.ts`, `migrations/0001_work.sql`
+- **Code:** `content/work.xml`, `cloud/router/index.ts`, `cloud/db/cloud/db/migrations/0001_work.sql`
 - **Related guides:** [docs/src/node.md](../src/node.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -53,7 +53,7 @@ The owner signs in once with the configured admin Google account to initialize e
 
 ### Live delivery and presence
 
-`GET /api/v1/realtime` upgrades an authenticated, same-origin cookie request to one hibernating Durable Object socket per browser tab. Google accounts connect across the entire website; guest connections are acquired only by mounted Work views. A principal is the stable Google subject or existing guest-cookie identity, never a client-supplied email. Guests may have one active socket (a newer tab replaces the old one); accounts may have eight. Upgrades are limited to 40 per IP/minute, real commands to 60 guest / 120 account per minute, queued commands to 64 and payloads to 12 KB. At most 32 conversations may be watched per socket, with 512 watchers per peer. Existing room send limits remain in force. Heartbeat auto-responses are not counted as commands.
+`GET /api/_/realtime` upgrades an authenticated, same-origin cookie request to one hibernating Durable Object socket per browser tab. Google accounts connect across the entire website; guest connections are acquired only by mounted Work views. A principal is the stable Google subject or existing guest-cookie identity, never a client-supplied email. Guests may have one active socket (a newer tab replaces the old one); accounts may have eight. Upgrades are limited to 40 per IP/minute, real commands to 60 guest / 120 account per minute, queued commands to 64 and payloads to 12 KB. At most 32 conversations may be watched per socket, with 512 watchers per peer. Existing room send limits remain in force. Heartbeat auto-responses are not counted as commands.
 
 The browser sends the literal `ping` every 30 seconds; Cloudflare's hibernation API returns `pong` without waking application handlers. Durable alarms examine automatic-response timestamps and expire leases at roughly 90 seconds without activity. A dead socket cannot keep an account online when no other live device remains. `last_signed_in.last_online` is NULL while connected; graceful closes store the disconnect time and stale expiry stores the last confirmed activity. The Durable Object reconciles the D1 projection before serving presence snapshots, so clients do not infer presence from NULL alone. No D1 write is made for every ping. Presence snapshots include a monotonic version and opaque peer ID; outdated updates cannot overwrite a newer state. Failed presence fanout is retained in object storage and retried by alarms.
 
@@ -97,7 +97,7 @@ Account deletion requires native confirmation and a CSRF/intent-protected transa
 
 ### Code, tests and staging setup
 
-Code: `src/work_crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0007. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
+Code: `shared/work/crypto.ts`, `src/node/{work,auth,google_grant}.ts`, `src/web/client/{desk_messages,work_session,work_drive,sign}.ts`, migrations 0002–0007. Old encrypted records are retained by the additive migration; invitation authentication is no longer accepted. Configure the existing Google client values and `GOOGLE_ADMIN_EMAIL` (default `jason@jasouza.com`) in private `.env`. `WORK_OWNER_EMAIL` controls the displayed owner address. Apply the standalone staging Terraform root using its existing state, then publish the static shell through staging CI. No owner token is configured or required. Never deploy the local Wrangler config.
 
 Tests use real SQLite, AES-GCM/ECDH, RSA verification and workerd. Browser tests exercise a local Worker/D1, real browser crypto, synthetic Google sessions and mocked Drive storage: guest/owner chat, browser reload, Drive recovery on a new device, first-time account linking, existing-key warning, no cross-guest access, account menu/deletion, and safe retries. Real Google consent/Drive access requires the user's configured Cloud project and account interaction; mocked tests do not claim to have performed that consent.
 

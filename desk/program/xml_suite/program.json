@@ -1,0 +1,17 @@
+{
+    "name": "xml_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "xmlstarlet",
+        "xq"
+    ],
+    "files": {
+        "wasm": "build/xml_suite/xml_suite.wasm",
+        "loader": "build/xml_suite/xml_suite.js"
+    },
+    "sha256": "f44ab05f681b8feb2744ccebcabf2fb0831b76551270b701f8a993d8c9ddc53e",
+    "flags": {
+        "applet": false
+    }
+}

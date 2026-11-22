@@ -1,0 +1,16 @@
+{
+    "name": "btoa",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "btoa"
+    ],
+    "files": {
+        "wasm": "build/btoa/btoa.wasm",
+        "loader": "build/btoa/btoa.js"
+    },
+    "sha256": "0206008e959e1559b84eaf28429cecb9f80c5e3b332d268b26a02452bd7c80d8",
+    "flags": {
+        "applet": false
+    }
+}

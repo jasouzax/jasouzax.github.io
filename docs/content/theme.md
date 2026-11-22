@@ -19,7 +19,7 @@ A theme is CSS, generated fonts and an optional script that change the whole loo
 | `icon` | Icon in the switcher |
 | `color` | Browser-chrome colour; a `light/dark` pair is allowed (`#eaf6fb/#05121b`) |
 | `js` | Module path; exports `mount(root, options)` returning `fade_in`, `fade_out`, `pause`, `resume`, `dispose`. Draws on the shared canvas; never creates DOM |
-| `background` | Selects the decorative background markup: `default` uses `src/web/partials/background_default.tsx`, **any other value uses `background_memory.tsx`** (hard-coded in `background_html()` in `src/web/html_page.tsx`; a genuinely new background needs a small code change) |
+| `background` | Selects the decorative background markup: `default` uses `engine/tags/theme/background_default.tsx`, **any other value uses `background_memory.tsx`** (hard-coded in `background_html()` in `engine/tags/page.tsx`; a genuinely new background needs a small code change) |
 | `preload` | Font family to preload |
 
 Children: `<font>`, `<style>`.
@@ -52,8 +52,10 @@ Generated at build time to WOFF2/WOFF/COLRv0.
 Children: `<palette>`, `<sym>`.
 
 - `<palette mode="light|dark" colors="#hex, #hex…">` — both attributes required. Palette 0 = light, 1 = dark.
-- `<sym char="…" path="…">` — **`char` required**: one character, a 4–6 digit hex codepoint, or a `[token]`. `path` is SVG path data (y flipped, no auto-scaling); `img` is a bitmap glyph; `width` overrides the advance; `name`; `variant` for alternates (repeat `char` with different `variant`). Multi-character strings are rejected so no accidental ligatures occur. Duplicate codepoints are errors.
+- `<sym char="…" path="…">` — **`char` required**: a registered `[token]` for icons (resolved through `config.json.icons`), one literal character, or a 4–6 digit hex codepoint. Prefer tokens for PUA glyphs so codepoint changes do not require editing theme XML. `path` is SVG path data (y flipped, no auto-scaling); `img` is a bitmap glyph; `width` overrides the advance; `name` is optional and unnecessary when `char` names a token; `variant` for alternates (repeat `char` with different `variant`). Multi-character strings are rejected so no accidental ligatures occur. Duplicate codepoints are errors.
 - `<layer path="…" color="palette-index | #rrggbb" paint="…">` (child of `<sym>`; `path` required) — one colour layer of a multi-colour glyph.
+
+For example, write `<sym char="[home]" width="120" path="…"/>` instead of repeating the numeric codepoint and `name="home"`. Tokens sharing a codepoint are aliases: define that glyph once using one token, and all aliases resolve to it.
 
 Every icon registered in `config.json.icons` must exist in the default theme's icon font; other themes fall back to it through font fallback. `check` verifies glyph coverage.
 
@@ -70,3 +72,9 @@ Role-label behaviour shared between themes lives in `content/theme/roles.scss`; 
 ## Related
 
 [Contract and status](../feat/themes.md) · [compiler internals](../src/helper.md#themes-and-fonts)
+
+## Icon registry alignment
+
+Tokens retain their existing names. `engine/style/icons.ts` owns the canonical token map from the pinned Material Design subset in `engine/style/icons/material.json`; `config.json.icons` is the public projection. The subset records the upstream revision and SVG paths, with its license beside it. Both authored theme fonts contain the same glyph codepoints. A new glyph requires updating the subset, public projection and both fonts together; arbitrary sequential private-use assignments are rejected. Supplementary-plane icons must round-trip through JSON as complete surrogate pairs.
+
+The fixed shared canvas/empty-slot renderer is still absent. The current background adapters remain until that capability is implemented; their relocation does not constitute completion of the canvas contract.

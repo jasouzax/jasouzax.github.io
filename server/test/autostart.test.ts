@@ -4,9 +4,9 @@ import { EventEmitter } from "node:events"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { Auto_Start } from "../src/autostart.ts"
-import { Script_Runner } from "../src/runner.ts"
-import { Api_Registry } from "../src/api.ts"
+import { Auto_Start } from "../browser/autostart.ts"
+import { Script_Runner } from "../browser/runner.ts"
+import { Api_Registry } from "../api/prototype.ts"
 
 class Fake_Web extends EventEmitter {
     async close() { this.emit("close"); return true }

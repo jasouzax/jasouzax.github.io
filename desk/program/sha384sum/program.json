@@ -1,0 +1,16 @@
+{
+    "name": "sha384sum",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "sha384sum"
+    ],
+    "files": {
+        "wasm": "build/sha384sum/sha384sum.wasm",
+        "loader": "build/sha384sum/sha384sum.js"
+    },
+    "sha256": "29d3aaab4d9d51ce191faa7afe1871f551be41a63440ef79c81dfb484f2fb3c9",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "name": "doc_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "antiword",
+        "docx2txt",
+        "odt2txt"
+    ],
+    "files": {
+        "wasm": "build/doc_suite/doc_suite.wasm",
+        "loader": "build/doc_suite/doc_suite.js"
+    },
+    "sha256": "e50d4a60feb14ec6dc1bf2d0fffeaef377d9461e74299634cc7566511f3b1cb1",
+    "flags": {
+        "applet": false
+    }
+}

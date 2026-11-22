@@ -1,0 +1,17 @@
+{
+    "name": "jvm_suite",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "java",
+        "javac"
+    ],
+    "files": {
+        "wasm": "build/jvm_suite/jvm_suite.wasm",
+        "loader": "build/jvm_suite/jvm_suite.js"
+    },
+    "sha256": "d948e24ccbbd2ba19fd5deba9d34407a33eeaffcc34149405c04dba67d7e105c",
+    "flags": {
+        "applet": false
+    }
+}

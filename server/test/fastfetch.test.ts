@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { clean_text, fallback_text, max_snapshot_chars, public_structure, take_snapshot } from "../src/fastfetch.ts"
+import { clean_text, fallback_text, max_snapshot_chars, public_structure, take_snapshot } from "../terminal/fastfetch.ts"
 
 test("the public structure never contains a module that identifies the account or network", () => {
     const modules = public_structure.split(":")

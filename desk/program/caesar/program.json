@@ -1,0 +1,16 @@
+{
+    "name": "caesar",
+    "version": "1.0.0-bsd-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "caesar"
+    ],
+    "files": {
+        "wasm": "build/caesar/caesar.wasm",
+        "loader": "build/caesar/caesar.js"
+    },
+    "sha256": "cbf21dd95738c32fe052cc7251c55df0624758ee571d1c2d82fbd1bb923cb216",
+    "flags": {
+        "applet": false
+    }
+}

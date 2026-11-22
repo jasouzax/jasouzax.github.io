@@ -1,0 +1,16 @@
+{
+    "name": "optipng",
+    "version": "0.7.8-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "optipng"
+    ],
+    "files": {
+        "wasm": "build/optipng/optipng.wasm",
+        "loader": "build/optipng/optipng.js"
+    },
+    "sha256": "b82eb69d2a5fd3f0e4bd6ca63ab24d4a7a9de5019f8516f2b8eebb2f9b964667",
+    "flags": {
+        "applet": false
+    }
+}

@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `content/`, `config.json`, `src/model.ts`, `src/objects.ts`, `src/resources.ts`, `src/icons.ts`
+- **Code:** `content/`, `config.json`, `engine/load/model.ts`, `engine/tags/objects.ts`, `engine/load/resources.ts`, `engine/style/icons.ts`
 - **Related guides:** [docs/content/README.md](../content/README.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -18,7 +18,7 @@
 - [x] Resolve relative resources from the declaring XML file and `/…` from the content root
 - [x] Preserve translations, SEO, SPA payloads and no-JavaScript HTML
 - [ ] Complete transitive Markdown/HTML resource discovery and collision-safe nested relative publication
-- [ ] Retire legacy tags still tolerated by `src/schema.ts` and `src/web/seo_text.tsx` (`landing`, `contact`, `error`, `resume`); no content uses them any more
+- [x] Retire legacy tags from shared schemas and SEO text (`landing`, `contact`, `error`, `resume`); contract tests reject them and page text uses `<hero>`/`<item>`.
 - [ ] Owner: restore the ignored `content/media/` archive and supply the missing Hypro image (see [placeholders](../README.md#placeholders-the-owner-must-replace))
 
 ## Contract

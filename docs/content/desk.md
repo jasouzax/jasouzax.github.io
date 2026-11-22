@@ -9,7 +9,7 @@ A desktop-like workspace: a side navigation panel plus tiled windows. One primit
             <entry type="Folder" id="fs_home_user" name="user"/>
         </entry>
     </menu>
-    <window path="/srv/blogs/example/intro.md" type="text/markdown" mode="view"/>
+    <window path="/srv/blogs/example/intro.md" type="text/markdown" view="true"/>
 </desk>
 ```
 
@@ -24,7 +24,6 @@ A desktop-like workspace: a side navigation panel plus tiled windows. One primit
 |---|---|
 | `icon`, `name`, `info`, `date` | Shown in the menu head |
 | `auto` | `bool`; grow with content and share the page scrollbar (blogs) instead of filling the viewport |
-| `server` | `bool`; desk state lives on the owner's backend (used by `/work`) |
 
 Children: `<menu>`, `<window>`.
 
@@ -79,7 +78,8 @@ Shows or edits one resource in a tile. Windows declared in content are the desk'
 |---|---|
 | `icon` | Window icon |
 | `type` | `mime` of the content; empty means undetermined. Change the mime to treat a file differently (an image as `text/plain` shows as text) |
-| `mode` | `view` or `edit` only (anything else is an error) |
+| `view`, `edit` | Mutually exclusive booleans; View is the default. |
+| `split` | Earlier parent window ID, starting at 1 in authored window order. |
 | `path` | `uri` of the resource. Relative paths resolve from the declaring XML. Empty shows an upload area |
 | `data` | Inline content |
 | `flow` | `bool`; show the split control |

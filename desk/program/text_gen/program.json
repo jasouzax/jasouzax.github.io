@@ -1,0 +1,17 @@
+{
+    "name": "text_gen",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "lorem",
+        "str-repeat"
+    ],
+    "files": {
+        "wasm": "build/text_gen/text_gen.wasm",
+        "loader": "build/text_gen/text_gen.js"
+    },
+    "sha256": "b44054f8ded1b13f670cb7f08fd062100404fef9fe44258eeccb1af5975faec9",
+    "flags": {
+        "applet": false
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "bin2iso",
+    "version": "1.9.b-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "bin2iso"
+    ],
+    "files": {
+        "wasm": "build/bin2iso/bin2iso.wasm",
+        "loader": "build/bin2iso/bin2iso.js"
+    },
+    "sha256": "8ba2e3429ce1770336819c264887e3119959d12a34435dc3daafc9491245e188",
+    "flags": {
+        "applet": false
+    }
+}

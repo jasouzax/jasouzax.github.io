@@ -1,0 +1,20 @@
+{
+    "name": "numbase",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "numbase",
+        "dec2bin",
+        "dec2hex",
+        "dec2oct",
+        "hex2dec"
+    ],
+    "files": {
+        "wasm": "build/numbase/numbase.wasm",
+        "loader": "build/numbase/numbase.js"
+    },
+    "sha256": "3696d56ae0eca85befa58b5483c760c1b97a79518f6a80467ad2573d1921833c",
+    "flags": {
+        "applet": false
+    }
+}

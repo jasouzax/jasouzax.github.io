@@ -25,7 +25,7 @@
                 </entry>
             </menu>
             <menu name="Sessions" icon="[window]" path="server:sessions" />
-            <window path="server:fastfetch" type="text/plain" mode="view" />
+            <window path="server:fastfetch" type="text/plain" view="true" />
         </desk>
     </page>
 
@@ -56,6 +56,6 @@
                 </entry>
             </menu>
             <menu name="セッション" icon="[window]" path="server:sessions" />
-            <window path="server:fastfetch" type="text/plain" mode="view" />
+            <window path="server:fastfetch" type="text/plain" view="true" />
         </desk>
     </page>

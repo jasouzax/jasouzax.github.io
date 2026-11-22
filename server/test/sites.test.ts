@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
-import { Site_Registry, is_site_url, max_sites, site_script } from "../src/sites.ts"
+import { Site_Registry, is_site_url, max_sites, site_script } from "../browser/sites.ts"
 
 class Fake_Web extends EventEmitter {
     closed = false

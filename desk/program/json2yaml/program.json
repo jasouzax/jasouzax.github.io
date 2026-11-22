@@ -1,0 +1,16 @@
+{
+    "name": "json2yaml",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "json2yaml"
+    ],
+    "files": {
+        "wasm": "build/json2yaml/json2yaml.wasm",
+        "loader": "build/json2yaml/json2yaml.js"
+    },
+    "sha256": "b31e1850000d5447daffd3edcb62eb4f854c111124e3055f2f280d27e7901059",
+    "flags": {
+        "applet": false
+    }
+}

@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/node/worker.ts`, `src/node/deploy.ts`, `src/node/security.ts`, `src/node/d1_migrate.ts`, `terraform/`, `migrations/`, `wrangler.local.jsonc`
+- **Code:** `cloud/router/index.ts`, `src/step/cloud_deploy.ts`, `cloud/security/headers.ts`, `cloud/db/migrate.ts`, `cloud/infra/`, `cloud/db/migrations/`, `cloud/infra/wrangler/local.jsonc`
 - **Related guides:** [docs/src/node.md](../src/node.md), [docs/infra.md](../infra.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -56,7 +56,7 @@ Subdomains are capped at two levels because free Cloudflare certificates do not 
 
 **Objective.** One uniform JSON API in front of many servers, so APIs can be added or moved without breaking clients.
 
-**Solution.** Path `/api/{version}/{resource}/{id}/{subresource}?{query}`, for example `/api/v1/clients/123/receipts?status=pending&sort=desc`. Resource names are plural; the query never identifies a resource. The Worker keeps a table from resource to backend, checks authentication and rate limits, and calls the backend adapter (database, object storage, durable object, or the personal server). Errors are `{ "error": { "code", "message" } }` with the matching HTTP status. Responses are `no-store` except versioned public reads. When the personal server is unreachable the response is `503` with the latest cached snapshot and `stale_since`. Calls to the personal server carry an HMAC-signed header (timestamp, client id, body hash) so it trusts only the Worker.
+**Solution.** Path `/api/{version}/{resource}/{id}/{subresource}?{query}`, for example `/api/_/clients/123/receipts?status=pending&sort=desc`. Resource names are plural; the query never identifies a resource. The Worker keeps a table from resource to backend, checks authentication and rate limits, and calls the backend adapter (database, object storage, durable object, or the personal server). Errors are `{ "error": { "code", "message" } }` with the matching HTTP status. Responses are `no-store` except versioned public reads. When the personal server is unreachable the response is `503` with the latest cached snapshot and `stale_since`. Calls to the personal server carry an HMAC-signed header (timestamp, client id, body hash) so it trusts only the Worker.
 
 | Resource | Backend | Access |
 |---|---|---|

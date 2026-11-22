@@ -4,7 +4,7 @@ TSX generators that turn the `site_model` into HTML and JSON. TSX is used so tem
 
 ## How TSX works here
 
-`tsconfig.json` sets `"jsx": "react"`, `"jsxFactory": "jsx"`, `"jsxFragmentFactory": "fragment"`. **There is no React.** `jsx()` in `src/web/vnode.tsx` returns small virtual nodes (`tag`, attributes, children), not strings. Two consumers:
+`tsconfig.json` sets `"jsx": "react"`, `"jsxFactory": "jsx"`, `"jsxFragmentFactory": "fragment"`. **There is no React.** `jsx()` in `shared/vnode/vnode.tsx` returns small virtual nodes (`tag`, attributes, children), not strings. Two consumers:
 
 | Function | Where | Notes |
 |---|---|---|
@@ -12,7 +12,7 @@ TSX generators that turn the `site_model` into HTML and JSON. TSX is used so tem
 | `serialize(node)` / `deserialize` | Build → JSON → browser | Compact `[tag, attributes, ...children]` tree stored in each page's `index.json` |
 | `to_dom(node)` | Browser | `createElement`/`textContent`/`setAttribute`; never `innerHTML` |
 
-So one component runs on Node (string) and in the browser (DOM) with no DOM implementation on the server. `tests/render.test.ts` covers text, attributes, SVG and `<template>` contents (uses `linkedom`).
+So one component runs on Node (string) and in the browser (DOM) with no DOM implementation on the server. `tests/engine/tags/page.test.ts` covers text, attributes, SVG and `<template>` contents (uses `linkedom`).
 
 ## File map
 
@@ -49,7 +49,7 @@ Each page emits `index.html` and `index.json` (title, head tags marked for swapp
 
 ## Skeleton / loading lifecycle
 
-`skeleton_css.ts` supplies the light/dark overlay; `src/web/client/loading.ts` coordinates initial loading, SPA wipes and theme changes. Details in [client.md](client.md#loading-lifecycle).
+`skeleton_css.ts` supplies the light/dark overlay; `desk/site/loading.ts` coordinates initial loading, SPA wipes and theme changes. Details in [client.md](client.md#loading-lifecycle).
 
 ## Recipes
 

@@ -1,0 +1,16 @@
+{
+    "name": "lame",
+    "version": "3.100-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "lame"
+    ],
+    "files": {
+        "wasm": "build/lame/lame.wasm",
+        "loader": "build/lame/lame.js"
+    },
+    "sha256": "3b616055783e5be6efc4cd532d04eb94bb8436f8a647067c2e53f7bc0021751b",
+    "flags": {
+        "applet": false
+    }
+}

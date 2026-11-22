@@ -23,7 +23,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 - [ ] **[Server desk](server.md)** — `/server` and the Pi agent (replaces Browsite)
   - [ ] Wire protocol shared by agent, Durable Object and page
   - [ ] Pi agent: outbound link, filesystem, terminal, scripts, windows, APIs, fastfetch
-  - [ ] Worker `Server_Hub` Durable Object, `/api/server/*` and the `/api/{endpoint}` gateway
+  - [ ] Worker `Server_Hub` Durable Object, `/api/_/server/*` and the `/api/{endpoint}` gateway
   - [ ] MIME types `application/auto-javascript` and `application/auto-site`
   - [ ] `/server` page: public fastfetch window, offline state, owner mode (Pi filesystem, terminal, script view, site feed)
   - [ ] Verify on the real Pi, Worker and a phone
@@ -39,7 +39,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Resolve relative resources from the declaring XML file and `/…` from the content root
   - [x] Preserve translations, SEO, SPA payloads and no-JavaScript HTML
   - [ ] Complete transitive Markdown/HTML resource discovery and collision-safe nested relative publication
-  - [ ] Retire legacy tags still tolerated by `src/schema.ts` and `src/web/seo_text.tsx` (`landing`, `contact`, `error`, `resume`); no content uses them any more
+  - [x] Retire legacy tags from shared schemas and SEO text (`landing`, `contact`, `error`, `resume`); contract tests reject them and page text uses `<hero>`/`<item>`.
   - [ ] Owner: restore the ignored `content/media/` archive and supply the missing Hypro image (see [placeholders](../README.md#placeholders-the-owner-must-replace))
 
 ## Engine
@@ -119,7 +119,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
 ## Site generation and client shell
 
 - [ ] **[Site generation and client shell](web.md)** — open items below
-  - [x] TSX page generators with a custom JSX factory returning virtual nodes (`src/web/vnode.tsx`)
+  - [x] TSX page generators with a custom JSX factory returning virtual nodes (`shared/vnode/vnode.tsx`)
   - [x] `to_html` (build) and `to_dom` (browser) renderers with regression tests
   - [x] SEO: meta, Open Graph, JSON-LD, sitemap, robots, manifest, llms.txt, security.txt, `_headers`, `_redirects`, generated icons and cover images (2.7)
   - [x] SPA navigation, search, theme switching, preferences and header menus (3.1–3.4)

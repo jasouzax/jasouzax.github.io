@@ -1,0 +1,21 @@
+{
+    "name": "gcc",
+    "version": "14.2.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "gcc",
+        "g++",
+        "cpp",
+        "clang",
+        "clang++"
+    ],
+    "files": {
+        "wasm": "build/gcc/gcc.wasm",
+        "loader": "build/gcc/gcc.js"
+    },
+    "sha256": "928879f509a519c90bfef95998911a1187f70a05fbe9a69b30db4b5052c4452d",
+    "flags": {
+        "applet": false
+    },
+    "runtime": "desk/program/gcc/runtime.ts"
+}

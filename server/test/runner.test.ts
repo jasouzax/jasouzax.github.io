@@ -1,8 +1,8 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { EventEmitter } from "node:events"
-import { Script_Runner, max_logs_per_script } from "../src/runner.ts"
-import { Api_Registry } from "../src/api.ts"
+import { Script_Runner, max_logs_per_script } from "../browser/runner.ts"
+import { Api_Registry } from "../api/prototype.ts"
 
 class Fake_Web extends EventEmitter {
     static keep_alive = false
