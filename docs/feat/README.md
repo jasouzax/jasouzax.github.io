@@ -11,6 +11,7 @@ The [2026-11-22 implementation audit](implementation-audit.md) records this pass
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
+- [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
 - [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
 - [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
 
@@ -84,6 +85,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Generate project, event and blog pages plus `/projects`, `/blogs` listings from roots (1.5–1.7)
   - [x] Exclude private projects and slides from generated public resources and pages
   - [x] Project `<research>` block renders an Overview menu (terminology … results)
+  - [?] A project's named research print layout reveals authored public research, with matching-language isolation and nested points.
   - [x] Slides act as skill variations inside one carousel position; the footer switches skill in place
   - [ ] Load repository Files/Version snapshots from the personal server (1.5)
   - [ ] Contributor-only Agent menu (1.5)

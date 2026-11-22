@@ -9,6 +9,7 @@
 ## Status
 
 - [?] Print SCSS, fonts and assets compile behind print-only media.
+- [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 

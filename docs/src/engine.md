@@ -2,6 +2,8 @@
 
 Back to [site developer guide](README.md). Status: [../feat/engine.md](../feat/engine.md).
 
+Project research printing is owned by `engine/tags/print/research.tsx` (public language-matched content) and `engine/style/print/research.ts` (print-only paper geometry/typography). `engine/style/print.ts` includes the built-in CSS before author styles/fonts when the selected layout is `research`. `engine/tags/page.tsx` places the paper in both HTML and SPA payloads. The project `print` attribute selects the existing named/language-matched template; it does not implicitly publish private projects or another translation's research.
+
 ## CLI (`src/commands.ts`, launched by `src/main.ts`)
 
 `main.ts` registers `tsx` (so `.ts`/`.tsx` run directly, with `tsconfig.json` using `jsxFactory: jsx`) and imports `commands.ts`. Run `node src/main.ts <command>` or the npm scripts.

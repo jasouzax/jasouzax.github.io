@@ -30,7 +30,7 @@
         <slide media="/media/hypro_editor.png" alt="Hypro code editor on a phone" stack="vanilla, indexeddb, jszip, ide, compiler" skill="web-app, systems" info="Mobile-first IDE written from scratch in vanilla HTML, CSS and JS during the 2020 pandemic. Includes its own compiler/interpreter, IndexedDB file storage, offline zip export with JSZip and Pako, syntax highlighting, undo/redo and an integrated browser." />
     </project>
 
-<project name="World Navigation Hat: Wearable AIoT Aid" rank="100" short="Thesis Stesis" date="Apr 2026" note="Thesis" icon="[project]" featured="true" role="Thesis" sub="Leader, developer and researcher" id="stesis" paper="https://www.researchgate.net/publication/404788658_World_Navigation_Hat_Development_of_a_Wearable_Navigation_Aid_Using_Aiot_for_the_Visually_Impaired">
+<project name="World Navigation Hat: Wearable AIoT Aid" rank="100" short="Thesis Stesis" date="Apr 2026" note="Thesis" icon="[project]" featured="true" role="Thesis" sub="Leader, developer and researcher" id="stesis" print="research" paper="https://www.researchgate.net/publication/404788658_World_Navigation_Hat_Development_of_a_Wearable_Navigation_Aid_Using_Aiot_for_the_Visually_Impaired">
         <!-- Reference authoring example. All research below is placeholder content, not verified study findings. -->
         <research>
             <terminology>

@@ -12,6 +12,12 @@ Continue from the component statuses, preserving `[?]` for human review. The des
 
 ## Delivered changes
 
+### Additional continuation — research printing
+
+Project `print="research"` now selects a built-in research paper layout through the existing named/language-aware print system. The paper uses only matching-language public research, preserves nested points and placeholder wording, and excludes private projects and repository/collaborator data. Title/date, safe source links, configurable fonts/paper size and page numbers are provided. Screen mode retains the desktop; print mode replaces it with the paper. The English Stesis reference opts in explicitly.
+
+Root typechecking, focused print/page/layout/privacy tests and content validation pass (71 pages, 39 existing warnings). Real Chrome print tests pass for Default and Memory; exported three-page A4 PDFs were rendered with Poppler and inspected, including page breaks and nested headings. Full main/server suite results above remain from the earlier pass; this continuation uses focused regressions for the changed print path. No live deployment occurred.
+
 | Area | Implementation and evidence |
 |---|---|
 | CLI | `inst` bootstraps npm before dependency imports; `ext` produces a self-contained unpacked extension; forward-range composition tests pass. |
@@ -87,7 +93,7 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | `<menu>`, `<window>`, `<action>` | Pipeline schema accepts only steps; menu/window/action children and their runtime bindings are absent. |
 | [!] | **Blog** `<blog>` `cmp:/content/blog` | Only Markdown/menu/window blog expansion exists. Scene schema, Canvas timeline, audio and encoding are absent. |
 | [?] | **Theme** `<theme>` `cmp:/content/theme` | Existing themes, font generation and Material Design icon token mapping are implemented and tested; remaining artistic/device review is manual. |
-| [!] | **Print** `<print>` `cmp:/content/print` | Selected print SCSS/fonts now compile behind print media; arbitrary layouts, blog books and research-paper layouts remain incomplete. |
+| [!] | **Print** `<print>` `cmp:/content/print` | Selected print SCSS/fonts and the research layout work; arbitrary layouts, blog books and quotations remain incomplete. |
 | [!] | Only published information is used: personal details come from the landing page's first `<hero>` (`name`, `profile`, `<item print="label">`), history from the expertise. Missing values print as empty boxes which can be editted (the user toggle print mode in dev tools, add the content, and then print), nothing is invented/placeholder. Dates/age are refreshed on `beforeprint`. | Published-data filtering exists, but structured profile/photo fields and every beforeprint/form variant still need acceptance against the current hero contract. |
 | [!] | **Plugin** `<plugin>` `cmp:/content/plugin` | Existing plugin loading and split/edit/compare flows work; complete trigger/conversion graph, blog render plugins and map/resource integration are incomplete. |
 | [!] | **Pipeline Script** `cmp:/src/pipeline` | All named stages now have entry points, including inst/ext/app; full cloud/server stage semantics depend on missing provisioning and roles. |
@@ -118,9 +124,9 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | **Fullscreen** | Maximizing exists; full media-specific hover/touch header and fullscreen presentation behavior are not fully verified. |
 | [!] | **Split** | Split editors/compare/image-to-PDF work; arbitrary MIME convert/compare/mirror graph search is incomplete. |
 | [!] | **Drag/Move** | Existing drag/dock and fixed/auto movement guards work; every portrait/touch/menu interaction still needs acceptance. |
-| [!] | **Projects** `cmp:/projects` | Project rendering and Git access exist; authenticated editing, repository filesystem and research print are incomplete. |
+| [!] | **Projects** `cmp:/projects` | Project rendering, research printing and Git access exist; authenticated editing and repository filesystem remain incomplete. |
 | [!] | **Git Repo** `cmp:/projects/git` | Smart HTTP and collaborator tokens pass regressions; authenticated desktop editing and live project snapshots remain incomplete. |
-| [!] | **Research Paper** `cmp:/projects/paper` | No research-paper print layout or page opt-in implementation exists. |
+| [?] | **Research Paper** `cmp:/projects/paper` | Named research layout and project opt-in render ordered public research with nested points, print geometry and language/privacy isolation; Chrome/PDF and focused contracts pass. |
 | [!] | **Blogs** `cmp:/blogs` | Blog pages and subscriptions work; scenes, owner management, video render and book print remain absent. |
 | [!] | **Media Generation** `cmp:/blogs/gen` | No pure-time Canvas scene renderer, deterministic assets/audio mix, offline WebCodecs encoding or export UI exists. |
 | [!] | **Book** `cmp:/blogs/book` | No book pagination, layout template or blog print integration exists. |

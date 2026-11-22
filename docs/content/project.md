@@ -30,6 +30,7 @@ Required: `id`, `name`, `date`. IDs are unreserved lowercase DNS labels of 1–6
 | `repo` | Ordered `type:value` sources (`git`, `npm`, `pypi`, `docker`, `deb`, `rpm`); a bare URL remains Git. The first Git source is synchronized by the personal server: `github.com/org/repo`, `https://host/org/repo.git`, `ssh://git@host/org/repo.git`, or `git@host:org/repo.git`. Hostname/path expands to HTTPS. Credentials and local paths belong in the server’s private Git/server configuration. The attribute and pipeline commands are excluded from generated page payloads |
 | `website`, `source`, `paper`, `event` | Action buttons: *View Website / Source Code / Paper / Event*. They stay visible while slide content crossfades |
 | `lang` | Language of this root; keep translations in the same file |
+| `print` | Optional named print mode, e.g. `research`. A selected research layout prints the authored research instead of the desktop. See [print layouts](print.md). |
 | `media`, `poster`, `alt`, `tags`, `menu`, `image`, `keywords`, `canonical`, `robots`, `lastmod`, `cover`, `print`, `noindex`, `path` | Shared attribute pool; rarely needed here |
 
 **Not allowed on `<project>`:** `skill`, `info`, `stack` and `featured_stack` (put them on slides). Unknown attributes are errors.

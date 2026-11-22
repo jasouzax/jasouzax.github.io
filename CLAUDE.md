@@ -100,6 +100,8 @@ dist/ .cache/ .wrangler/ generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Research printing:** `engine/tags/print/research.tsx` reads the matching public project's authored research, never the repository/collaborator attributes. The layout CSS is included through the selected print template. Keep the paper hidden with a screen-only layout rule; adding `[hidden]` without a print exemption would trigger the layered hidden-rule trap. The Stesis research example is explicitly placeholder text and must stay labeled as such in print.
+
 - **Desk maps/saving (2026-11-23):** `desk/menu/map.ts` owns map mode; file-tree redraws must preserve `.desk_map` and `.desk_menu_foot`. Plugins use injected `register_map_resources` to avoid duplicated bundle singletons. Save destination cancellation must never clear edits. `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome` selects installed Chrome for Windows desk regressions.
 - **Window controls (2026-11-23):** Remote browser bodies append asynchronously inside `.server_site`; volume availability needs nested body observation plus `jazu:window-state` for cached viewer changes. Controller cleanup runs through `window_hooks.closed`. Fullscreen decoration rules override skin paint; idle controls stay visible for keyboard focus/open menus. Tests must assert custom audio controls, since the underlying audio element intentionally has no native controls.
 - **Browser build freshness:** `serve` builds only when `dist/.jazu_output.json` is absent; it otherwise serves existing output. The desk Playwright server explicitly runs `make serve`. Stop an already-running reused server or rebuild it before testing changed browser code.

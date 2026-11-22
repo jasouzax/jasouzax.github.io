@@ -19,6 +19,16 @@
   },
   "languages": {
     "en": {
+      "research_terminology": "Terminology",
+      "research_paper_source": "Paper source",
+      "research_problem": "Problem",
+      "research_solution": "Solution",
+      "research_significance": "Significance",
+      "research_objectives": "Objectives",
+      "research_similar": "Related studies",
+      "research_frameworks": "Frameworks",
+      "research_methodology": "Methodology",
+      "research_results": "Results",
       "desk_map": "Map",
       "save_destination": "Save to folder",
       "save_overwrite": "Replace the existing file",
@@ -304,6 +314,16 @@
       "pwa_offline": "Offline · Public pages and themes are available. Desk and messaging require a connection."
     },
     "ja": {
+      "research_terminology": "用語",
+      "research_paper_source": "論文の出典",
+      "research_problem": "課題",
+      "research_solution": "解決策",
+      "research_significance": "研究の意義",
+      "research_objectives": "研究目的",
+      "research_similar": "関連研究",
+      "research_frameworks": "理論的枠組み",
+      "research_methodology": "研究方法",
+      "research_results": "結果",
       "desk_map": "マップ",
       "save_destination": "保存先フォルダー",
       "save_overwrite": "既存のファイルを置き換える",

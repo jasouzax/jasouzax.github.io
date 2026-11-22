@@ -5,9 +5,11 @@ import { child_nodes } from "../../shared/content/xml.ts"
 import { compile_scss, emit_font_to_map, rewrite_urls, type output_files } from "./theme.ts"
 import { short_hash } from "../../shared/util.ts"
 import type { page_style } from "./page.tsx"
+import { research_print_css } from "./print/research.ts"
 
 export function compile_print(model: site_model, node: xml_node, files: output_files, data_scss = ""): page_style {
     const name = `print-${short_hash(JSON.stringify([node.attrs, node.file]))}`, parts: string[] = []
+    if ((node.attrs.layout ?? node.attrs.name) === "research") parts.push(research_print_css(node.attrs.size))
     for (const style of child_nodes(node, "style")) {
         const { css, base_dir } = compile_scss(model, node, style, data_scss)
         parts.push(rewrite_urls(css, base_dir, name, files, model))

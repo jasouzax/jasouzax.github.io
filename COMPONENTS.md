@@ -567,10 +567,11 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
                 > **Token-based glyph authoring (human request, implemented in `26d0061`):** author PUA symbols with `char="[home]"` (or another registered token), resolved through `config.json.icons`, instead of copying the numeric Unicode codepoint. `name` is optional and should be omitted when it merely repeats that token. SVG path and width stay on the symbol; literal characters and numeric codepoints remain supported. Aliases sharing one codepoint need only one glyph definition. Both themes now follow this convention (92 unique PUA glyphs covering 95 tokens each). Font regressions verify byte-identical WOFF2 output against numeric definitions; types and content checks pass (71 pages, 39 existing warnings).
             - [?] **Layer** `<layer>` -
     - [!] **Print** `<print>` `cmp:/content/print` - Turns a page into paper/PDF without printing personal data the owner never published. A page opts in with `print="name"`, and for language L the engine picks the `<print>` with that name whose `lang` matches best: exact, prefix wildcard (`en*`), then `*`.
+        > **Continuation (AI, 2026-11-23):** The research layout is implemented and verified below; arbitrary layouts, blog books and quotations remain unfinished. This supersedes the older research-layout gap note.
         > **Implementation audit (AI, 2026-11-22):** Selected print SCSS/fonts now compile behind print media; arbitrary layouts, blog books and research-paper layouts remain incomplete.
         - [?] `name` - Required, the mode (`resume`, `rirekisho`, `quotation`, `research`, â€¦)
         - [?] `lang` - List with wildcards, default `*`
-        - [?] `size`, `layout` - Paper size (`a4`), built-in layout (default is `name`, implemented: `resume`, `rirekisho`)
+        - [?] `size`, `layout` - Paper size (`a4`), built-in layout (default is `name`, implemented: `resume`, `rirekisho`, `research`)
         - [?] `<style>`, `<font>` children - As in themes but scoped to print mode
         - [!] Only published information is used: personal details come from the landing page's first `<hero>` (`name`, `profile`, `<item print="label">`), history from the expertise. Missing values print as empty boxes which can be editted (the user toggle print mode in dev tools, add the content, and then print), nothing is invented/placeholder. Dates/age are refreshed on `beforeprint`.
             > **Implementation audit (AI, 2026-11-22):** Published-data filtering exists, but structured profile/photo fields and every beforeprint/form variant still need acceptance against the current hero contract.
@@ -763,7 +764,8 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
         > **Alignment review (AI, 2026-11-22):** Clone/push use repo.<domain>/<id>, with signed origin forwarding and collaborator checks. Website history JSON moved onto the repository host. Shared authenticated collaborator VFS and commit-management UI are absent.
         > Refactor: the clone URL becomes `repo.{domain}/{id}`, see `cmp:/server/repo`. Collaborator writes to `{vfs}/srv/projects/{id}` are open.
         >TODO
-    - [!] **Research Paper** `cmp:/projects/paper` - When printed it reveals the research paper
+    - [?] **Research Paper** `cmp:/projects/paper` - When printed it reveals the research paper
+        > **Implementation (AI, 2026-11-23):** Projects opt into the research print layout. Only the matching public language variant's authored research is printed, with ordered sections/nested points. Desktop/navigation disappear; title/date/source link, page numbers and paper geometry remain. The Stesis reference retains its explicit placeholder wording. Unit/privacy and Chrome/PDF checks cover the layout. Arbitrary print layouts, quotations and blog books remain unfinished.
         > **Implementation audit (AI, 2026-11-22):** No research-paper print layout or page opt-in implementation exists.
         > TODO
 - [!] **Blogs** `cmp:/blogs` - Blogs represent ideas/thoughts/expression to be shared, although its labled as a blog, its actually also includes any sharable idea like the website can have a tutorial on Electrons like `{domain}/blogs/electronics/ch06-delta-and-start-connection` or any levels from 0 `{domain}/blogs/how-to-setup-docker` to any level `{domain}/blogs/dsa/data/array/stack/c-implementation`.
