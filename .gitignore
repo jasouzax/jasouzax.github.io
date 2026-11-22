@@ -4,6 +4,7 @@ codebase*.zip
 .wasmer/
 dist/*
 server/dist/
+app/dist/
 server/user_data/
 server/workspace/
 server/home/
