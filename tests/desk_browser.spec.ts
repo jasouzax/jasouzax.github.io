@@ -1,6 +1,30 @@
 import { test, expect } from "./desk_fixture.ts"
 import { execFileSync } from "node:child_process"
 
+test("fixed desks retain their windows and navigation history", async ({ page }) => {
+    await page.route(/\/desk\/?$/, async route => {
+        const response = await route.fetch()
+        await route.fulfill({ response, body: (await response.text()).replace('id="desk"', 'id="desk" data-fixed=""') })
+    })
+    await page.goto("/desk")
+    await page.waitForFunction(() => !document.querySelector("#main-content")?.hasAttribute("inert"))
+    const windows = page.locator(".desk > .desk_wbox")
+    const count = await windows.count()
+    await expect(page.locator("#head_new")).toBeDisabled()
+    await page.keyboard.press("Control+Enter")
+    await expect(windows).toHaveCount(count)
+    await page.keyboard.press("Control+Shift+Enter")
+    await expect(windows).toHaveCount(count)
+    const source = windows.first().locator(".desk_wbox_head_path")
+    await source.fill("file:///home/user"); await source.press("Enter")
+    await expect(windows.first().locator(".desk_folder_status")).not.toHaveText("Loading folder…")
+    await source.fill("file:///tmp"); await source.press("Enter")
+    await expect(source).toHaveValue("file:///tmp")
+    await windows.first().locator('[data-navigation="previous"]').click()
+    await expect(source).toHaveValue("file:///home/user")
+    await expect(windows).toHaveCount(count)
+})
+
 test("project research Overview expands explanations without opening windows or file actions", async ({ page }) => {
     await page.goto("/projects/stesis")
     await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "")
