@@ -30,8 +30,12 @@ test("a configured structure replaces the default", async () => {
 
 test("without fastfetch the snapshot falls back to Node's os module", async () => {
     const snapshot = await take_snapshot("", async () => { throw new Error("ENOENT") })
-    assert.equal(snapshot.text, fallback_text())
+    const stable = (value: string) => value.split("\n").filter(line => /^(OS|Kernel|CPU):/.test(line))
+    // Memory and uptime can change between snapshots, even within the same test.
+    assert.deepEqual(stable(snapshot.text), stable(fallback_text()))
     assert.match(snapshot.text, /^OS: .+\nKernel: .+\nUptime: .+\nCPU: .+\nMemory: .+$/)
     // A fastfetch that prints nothing is treated the same way
-    assert.equal((await take_snapshot("", async () => "  \n")).text, fallback_text())
+    const blank = await take_snapshot("", async () => "  \n")
+    assert.deepEqual(stable(blank.text), stable(fallback_text()))
+    assert.match(blank.text, /^OS: .+\nKernel: .+\nUptime: .+\nCPU: .+\nMemory: .+$/)
 })
