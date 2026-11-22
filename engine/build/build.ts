@@ -120,7 +120,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     }
     if (!themes[config.default_theme]) throw new jazu_error(`default theme "${config.default_theme}" is not built`, 2)
     files.set("assets/themes/manifest.json", JSON.stringify(manifest))
-    const page_styles = emit_page_styles(model, files)
+    const page_styles = emit_page_styles(model, files, data_scss)
     fail_on_errors(diag)
     const runtime = await bundle_runtime(options.root, files, options.mode)
     const nav = JSON.stringify(nav_index(model))
