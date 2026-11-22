@@ -1,0 +1,10 @@
+{
+    "name": "jazu-desktop",
+    "version": "0.12.0",
+    "private": true,
+    "type": "module",
+    "main": "dist/main.cjs",
+    "scripts": { "build": "node build.mjs", "start": "npm run build && electron ." },
+    "dependencies": { "electron": "^45.3.3" },
+    "devDependencies": { "esbuild": "^0.28.2" }
+}

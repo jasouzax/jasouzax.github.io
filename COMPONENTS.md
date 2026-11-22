@@ -35,7 +35,7 @@
 - [/] `{codebase}/cloud` `cmp:/cloud` - Cloudflare: Worker, Durable Objects, D1, Terraform.
 - [?] `{codebase}/server` `cmp:/server` - personal server (Node service + automation browser).
     > **Alignment review (AI, 2026-11-22):** Node repository, pipelines, link and automation browser now live under server; Electron remains the automation-browser runtime. Multi-server roles and a separate desktop App are absent capabilities, tracked independently.
-- [ ] `{codebase}/app` `cmp:/app` - Electron desktop environment, independent of the server.
+- [?] `{codebase}/app` `cmp:/app` - Electron desktop environment, independent of the server.
 - [/] `{codebase}/extension` `cmp:/extension` - Chromium extension and native host.
 - [/] `{codebase}/shared` `cmp:/shared` - code used by two or more roots. Every root may import `shared/`, roots never import each other (enforced by `tests/layout.test.ts`, which scans imports).
 - [?] `{codebase}/content`, `{codebase}/config.json`, `{codebase}/.env`, `{codebase}/tests`, `{codebase}/docs`, `{codebase}/ops` (Docker, service files), `{codebase}/dist` (generated).
@@ -721,7 +721,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
 - [ ] **App** `cmp:/app` - The separate Electron application in `{codebase}/app` that opens a graphical window with the website and is the desktop environment (alternative to chromium kiosk plus `cmp:/extension`). It manages the positions of graphical windows through X11, i3, Sway and Hyprland, and gives `{vfs}` real filesystem, terminal, input, audio and clipboard access. It never connects to `cmp:/server`.
     > AI correction: I first assumed the window/input/audio code in `server/src` was this. It is not: it streams automation-browser windows. No i3, Sway, Hyprland, xdotool or wmctrl code exists anywhere in the codebase, so `cmp:/app` is new. The only related code is `extension/host/*` (native-messaging host with real ptys, `pty_shim.py`) and `extension/xinitrc.example`; `app/host` should reuse the same protocol (`shared/`).
     - [ ] **Window Manager** `cmp:/app/wm` - Positions native windows; one backend per window manager.
-    - [ ] **Host Bridge** `cmp:/app/host` - IPC offering the same capabilities as `cmp:/extension` host so `cmp:/desk/host` uses one interface.
+    - [?] **Host Bridge** `cmp:/app/host` - IPC offering the same capabilities as `cmp:/extension` host so `cmp:/desk/host` uses one interface.
     - [ ] **Input / Audio / Clipboard / Terminal** `cmp:/app/io` - Native access.
 - [/] **Work** `cmp:/work` - My clients could message me, through `{server}/work` here we have a shared directory `{vfs}/srv/work/{client username}` where my client's project exists in, similar to Projects collaborators could git clone/push, etc. It also handles quotations and payments.
     > AI: chat, encrypted history, Google sign-in, presence, push and account deletion exist (`src/node/work*.ts`, `realtime*.ts`, `auth.ts`, migrations 0001 to 0008, docs/feat/work.md). Not done: shared client directory `{vfs}/home/{client}`, git per client, quotations, payments, per-client durable chat/database adapters, owner audit.

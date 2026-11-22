@@ -1,5 +1,7 @@
 # JAZU device bridge (`extension/`)
 
+The reusable native runtime now lives in `shared/host/{main,frame,protocol,pty}.ts` with `pty_shim.py`. The entry points in `extension/host/` retain the installer and test interface. `node src/main.ts ext` packages that runtime inside `.cache/extension/host/shared`, so the unpacked output is self-contained. The Electron desktop uses the same validated protocol and PTY code. Both compiled PTY backends (Python and `script`) were exercised on the ARM64 personal server; a real Chromium kiosk still needs acceptance testing.
+
 Lets the desk at `http://localhost:<port>/desk` open a **real shell on this machine** (a pty running your login shell), instead of the WebAssembly BusyBox. Meant for the kiosk setup: a Debian box with only an X server, `xinit`, and Chromium showing the desk full screen.
 
 ```
