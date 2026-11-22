@@ -503,6 +503,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] `weight` -
             - [?] **Pallet** `<palette>` -
             - [?] **Symbol/Character** `<sym>` -
+                > **Token-based glyph authoring (human request, implemented in `26d0061`):** author PUA symbols with `char="[home]"` (or another registered token), resolved through `config.json.icons`, instead of copying the numeric Unicode codepoint. `name` is optional and should be omitted when it merely repeats that token. SVG path and width stay on the symbol; literal characters and numeric codepoints remain supported. Aliases sharing one codepoint need only one glyph definition. Both themes now follow this convention (92 unique PUA glyphs covering 95 tokens each). Font regressions verify byte-identical WOFF2 output against numeric definitions; types and content checks pass (71 pages, 39 existing warnings).
             - [?] **Layer** `<layer>` -
     - [/] **Print** `<print>` `cmp:/content/print` - Turns a page into paper/PDF without printing personal data the owner never published. A page opts in with `print="name"`, and for language L the engine picks the `<print>` with that name whose `lang` matches best: exact, prefix wildcard (`en*`), then `*`.
         - [?] `name` - Required, the mode (`resume`, `rirekisho`, `quotation`, `research`, â€¦)
