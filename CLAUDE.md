@@ -25,10 +25,12 @@ npm run test:{desk,loading,expertise}:browser   # Playwright (Chromium)
 
 CLI entry is `node src/main.ts <cmd>` (tsx is registered inside `main.ts`; no compile step). Commands: `build check serve watch clean icons graph pack deploy node`.
 
+Shared contracts live under `shared/`; import them directly rather than restoring compatibility files in `src/` or `server/src/shared/`. Build and listener fingerprints include `shared/`; synthetic engine fixtures and Docker must copy it alongside `src/`. The server compiler now emits to `server/dist/server/src/` and `server/dist/shared/`.
+
 ## Repository map
 
 ```
-config.json            site/owner/languages/icons/slots/seo/deploy (no secrets). Loaded+validated by src/config.ts
+config.json            site/owner/languages/icons/slots/seo/deploy (no secrets). Loaded+validated by shared/config.ts
 content/               OWNER-MANAGED. XML roots found by tag, anywhere: page theme project event blog print plugin
   *.xml                portfolio, projects, desk, work, privacy …   (names are conventions only)
   theme/               layout.xml = UNNAMED skeleton theme (inlined in every page); default/ memory/ skins; *.scss
@@ -75,7 +77,7 @@ dist/ .cache/ .wrangler/   generated, ignored
 
 | Task | Files (then docs) |
 |---|---|
-| Add/rename an XML attribute or tag | `src/schema.ts` → generator (`objects.ts` / `src/web/*`) → `docs/content/{tag}.md` → test in `tests/migration.test.ts` |
+| Add/rename an XML attribute or tag | `shared/content/schema.ts` → generator (`objects.ts` / `src/web/*`) → `docs/content/{tag}.md` → test in `tests/migration.test.ts` |
 | Page markup / header | `src/web/html_page.tsx`, `html_head.tsx`; themes in `content/theme/**` target these classes |
 | Expertise behaviour | `src/expertise.ts` (model) + `src/web/html_expertise.tsx` (DOM) + `src/web/client/expertise.ts`, `search.ts`, `pager.ts` |
 | A UI string | `config.json.languages.{en,ja}` (every language) |

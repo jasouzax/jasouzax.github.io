@@ -1,8 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { open_pty_session, type Pty_Link } from "../src/web/client/server_pty.ts"
-import { to_base64 } from "../server/src/shared/codec.ts"
-import type { Client_Message } from "../server/src/shared/protocol.ts"
+import { to_base64 } from "../shared/protocol/codec.ts"
+import type { Client_Message } from "../shared/protocol/wire.ts"
 
 function link() {
     const sent: Client_Message[] = []

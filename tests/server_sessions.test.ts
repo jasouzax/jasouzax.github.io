@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { Session_Store } from "../src/web/client/server_sessions_model.ts"
-import type { Window_Info } from "../server/src/shared/protocol.ts"
+import type { Window_Info } from "../shared/protocol/wire.ts"
 
 const win = (id: number, script: string): Window_Info => ({ id, script, title: "", url: "about:blank", icon: "", width: 800, height: 600, devtools: null })
 test("sessions keep stopped scripts available to restart and remove only deleted sessions", () => {

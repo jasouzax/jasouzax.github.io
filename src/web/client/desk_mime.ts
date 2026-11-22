@@ -3,7 +3,7 @@
 // pick any other type, or take one that is typed in.
 
 import { state } from "./desk.ts"
-import { find_by_name } from "../../mime.ts"
+import { find_by_name } from "../../../shared/mime.ts"
 
 const magic: { mime: string, bytes: (number | null)[], at?: number }[] = [
     { mime: "image/png", bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },

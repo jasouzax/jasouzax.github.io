@@ -1,4 +1,4 @@
-import { jsx, fragment, type child } from "./vnode.tsx"
+import { jsx, fragment, type child } from "../../shared/vnode/vnode.tsx"
 import { raw } from "./markup.tsx"
 import { readFileSync } from "node:fs"
 import { configured_resource } from "../resources.ts"

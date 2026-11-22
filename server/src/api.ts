@@ -13,8 +13,8 @@
  *   Knows names, routes and handlers only: no Electron, no sockets. A handler that is silent for 30 s answers 504.
  *   Whether a caller may see a private API is decided by the Worker (it answers 404 to everybody else); the agent trusts the relay.
  */
-import { api_body_limit, api_name_pattern, reserved_api_names } from './shared/protocol.ts';
-import type { Api_Answer, Api_Call, Api_Info } from './shared/protocol.ts';
+import { api_body_limit, api_name_pattern, reserved_api_names } from '../../shared/protocol/wire.ts';
+import type { Api_Answer, Api_Call, Api_Info } from '../../shared/protocol/wire.ts';
 
 export const api_methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
 export type Api_Method = (typeof api_methods)[number];

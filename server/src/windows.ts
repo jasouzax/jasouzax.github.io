@@ -16,7 +16,7 @@
 import { EventEmitter } from 'events';
 import { BrowserWindow } from 'electron';
 import type { WebContents } from 'electron';
-import type { Clipboard_Data, Input_Event, Selector_Candidate, Window_Info } from './shared/protocol.ts';
+import type { Clipboard_Data, Input_Event, Selector_Candidate, Window_Info } from '../../shared/protocol/wire.ts';
 import type { Web } from './web.ts';
 import { Audio_capture } from './server/audio.ts';
 import { Clipboard_bridge, max_clipboard_chars } from './server/clipboard.ts';

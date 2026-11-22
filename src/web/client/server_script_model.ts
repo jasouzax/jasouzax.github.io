@@ -8,7 +8,7 @@
  * Scope
  *   The agent keeps the real history (1000 lines per script) and replays it when a view opens; this store only mirrors it for the open views.
  */
-import type { Log_Entry } from "../../../server/src/shared/protocol.ts"
+import type { Log_Entry } from "../../../shared/protocol/wire.ts"
 
 export const max_log_entries = 1000
 

@@ -9,9 +9,9 @@ import { sync_repositories } from "../src/node/git_hooks.ts"
 import { enqueue, pending } from "../src/node/queue.ts"
 import { list_runs, start_runner } from "../src/node/runner.ts"
 import { listener_fingerprint, listener_updated } from "../src/node/job_process.ts"
-import { parse_xml } from "../src/xml.ts"
-import { validate_roots } from "../src/schema.ts"
-import { new_diagnostics } from "../src/diag.ts"
+import { parse_xml } from "../shared/content/xml.ts"
+import { validate_roots } from "../shared/content/schema.ts"
+import { new_diagnostics } from "../shared/diag.ts"
 
 function git(dir: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -24,7 +24,8 @@ function fixture(catalog_failure = false, staging = false) {
     const engine = join(root, "engine")
     mkdirSync(join(engine, "content"), { recursive: true })
     mkdirSync(join(engine, "src/node"), { recursive: true })
-    for (const file of ["xml.ts", "schema.ts", "diag.ts", "plugin_types.ts", "pipeline_types.ts", ...["job_main", "pipeline", "pipeline_process", "server_config", "project_catalog", "git_mirror", "queue", "repo_sync"].map(name => `node/${name}.ts`)]) cpSync(join("src", file), join(engine, "src", file))
+    for (const file of [...["job_main", "pipeline", "pipeline_process", "server_config", "project_catalog", "git_mirror", "queue", "repo_sync"].map(name => `node/${name}.ts`)]) cpSync(join("src", file), join(engine, "src", file))
+    cpSync("shared", join(engine, "shared"), { recursive: true })
     if (catalog_failure) {
         const worker = join(engine, "src/node/job_main.ts")
         writeFileSync(worker, 'if (process.argv[2] === "catalog") { console.error("catalog unavailable"); process.exit(12) }\n' + readFileSync(worker, "utf8"))
@@ -67,10 +68,10 @@ test("incoming engine uses its own new schema, pipeline commands and implementat
         const diag = new_diagnostics()
         validate_roots(parse_xml(xml, "future.xml"), diag)
         assert(diag.errors.some(error => error.includes('unknown attribute "listener_new"')))
-        const schema = join(f.author, "src/schema.ts")
+        const schema = join(f.author, "shared/content/schema.ts")
         writeFileSync(schema, readFileSync(schema, "utf8").replaceAll('"resume_end"', '"resume_end", "listener_new"'))
         writeFileSync(join(f.author, "content/projects.xml"), xml)
-        writeFileSync(join(f.author, "verify.mjs"), `import fs from 'node:fs'; import assert from 'node:assert/strict'; import {parse_xml} from './src/xml.ts'; import {validate_roots} from './src/schema.ts'; import {new_diagnostics} from './src/diag.ts'; const d=new_diagnostics(); validate_roots(parse_xml(fs.readFileSync('content/projects.xml','utf8'),'projects.xml'),d); assert.deepEqual(d.errors,[]); assert.equal(process.env.PRIVATE_SECRET,undefined);`)
+        writeFileSync(join(f.author, "verify.mjs"), `import fs from 'node:fs'; import assert from 'node:assert/strict'; import {parse_xml} from './shared/content/xml.ts'; import {validate_roots} from './shared/content/schema.ts'; import {new_diagnostics} from './shared/diag.ts'; const d=new_diagnostics(); validate_roots(parse_xml(fs.readFileSync('content/projects.xml','utf8'),'projects.xml'),d); assert.deepEqual(d.errors,[]); assert.equal(process.env.PRIVATE_SECRET,undefined);`)
         const pipeline = join(f.author, "src/node/pipeline.ts")
         writeFileSync(pipeline, readFileSync(pipeline, "utf8").replace('record.state = "running"', 'log("candidate implementation loaded\\n"); record.state = "running"'))
         const commit = f.publish()
@@ -150,9 +151,9 @@ test("the real node service exits 75 for its supervisor after listener runtime c
             output += chunk
             if (!changed && output.includes("personal node listening")) {
                 changed = true
-                appendFileSync(join(f.engine, "src/schema.ts"), "\n// accepted runtime update\n")
+                appendFileSync(join(f.engine, "shared/content/schema.ts"), "\n// accepted runtime update\n")
                 dirty_restart = listener_updated(f.engine, fingerprint)
-                git(f.engine, "add", "src/schema.ts")
+                git(f.engine, "add", "shared/content/schema.ts")
                 git(f.engine, "commit", "-qm", "update runtime")
             }
         })

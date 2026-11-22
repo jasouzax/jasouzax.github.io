@@ -1,7 +1,7 @@
 /* The agent's signed upgrade must be accepted by the Worker's own verifier (src/node/security.ts), and by nothing else. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { verify_origin } from '../../src/node/security.ts';
+import { verify_origin } from '../../shared/sign.ts';
 import { sign_upgrade } from '../src/sign.ts';
 
 const secret = 'k'.repeat(40);

@@ -11,9 +11,9 @@
  *   A file is read whole when opened (up to max_read_bytes); a bigger one fails with NotReadableError instead of flooding the connection.
  *   Entries that are neither files nor directories (devices, sockets) are not listed. Writes are applied when the stream closes.
  */
-import { fs_chunk_bytes } from "../../../server/src/shared/protocol.ts"
-import type { Fs_Code, Fs_Request, Fs_Result, Fs_Stat } from "../../../server/src/shared/protocol.ts"
-import { from_base64, to_base64 } from "../../../server/src/shared/codec.ts"
+import { fs_chunk_bytes } from "../../../shared/protocol/wire.ts"
+import type { Fs_Code, Fs_Request, Fs_Result, Fs_Stat } from "../../../shared/protocol/wire.ts"
+import { from_base64, to_base64 } from "../../../shared/protocol/codec.ts"
 import type { dir_handle, file_handle } from "./desk_fs.ts"
 
 export type Fs_Client = { fs(request: Fs_Request, timeout_ms?: number): Promise<Fs_Result> }

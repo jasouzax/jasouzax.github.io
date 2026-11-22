@@ -1,7 +1,7 @@
-import { jsx, fragment, raw_text, type child } from "./vnode.tsx"
+import { jsx, fragment, raw_text, type child } from "../../shared/vnode/vnode.tsx"
 import type { page, site_model } from "../model.ts"
 import { page_url, in_menu, crumb_chain } from "../model.ts"
-import { esc_attr, sha256, split_list, unique } from "../util.ts"
+import { esc_attr, sha256, split_list, unique } from "../../shared/util.ts"
 import {
     page_title,
     page_description,

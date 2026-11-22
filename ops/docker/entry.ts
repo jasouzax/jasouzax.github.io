@@ -10,7 +10,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { serve } from "../../src/node/serve.ts"
 import { load_project_declarations } from "../../src/node/project_catalog.ts"
-import { inside } from "../../src/paths.ts"
+import { inside } from "../../shared/paths.ts"
 
 const application = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 export type Docker_Options = { personal: boolean, runner: boolean, content?: string, config?: string, data: string, host: string, port: number, base_url?: string }

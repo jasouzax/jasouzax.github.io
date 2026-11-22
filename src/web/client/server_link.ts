@@ -13,9 +13,9 @@
  *   Free tier: the heartbeat is the text "ping", answered by the Durable Object without waking it; nothing else is sent while idle.
  *   Requests time out after 30 s (60 s for writes of a chunk); a lost socket fails every pending request at once.
  */
-import { heartbeat_ping, heartbeat_pong, parse_message } from "../../../server/src/shared/protocol.ts"
-import type { Client_Message, Fs_Code, Fs_Request, Fs_Result, Public_Status } from "../../../server/src/shared/protocol.ts"
-import { unpack_binary, type Binary_Frame } from "../../../server/src/shared/codec.ts"
+import { heartbeat_ping, heartbeat_pong, parse_message } from "../../../shared/protocol/wire.ts"
+import type { Client_Message, Fs_Code, Fs_Request, Fs_Result, Public_Status } from "../../../shared/protocol/wire.ts"
+import { unpack_binary, type Binary_Frame } from "../../../shared/protocol/codec.ts"
 
 export class Fs_Error extends Error {
     code: Fs_Code | "OFFLINE" | "TIMEOUT"

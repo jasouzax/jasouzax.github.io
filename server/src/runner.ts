@@ -20,7 +20,7 @@ import { createRequire } from 'module';
 import * as path from 'path';
 import { format, inspect } from 'util';
 import * as vm from 'vm';
-import type { Log_Entry, Log_Level, Script_Info } from './shared/protocol.ts';
+import type { Log_Entry, Log_Level, Script_Info } from '../../shared/protocol/wire.ts';
 import type { Web, web_options } from './web.ts';
 import type { Auto_Start } from './autostart.ts';
 import { Api_Registry } from './api.ts';

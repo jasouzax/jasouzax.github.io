@@ -1,4 +1,4 @@
-import { plugin_matches, select_case, select_flow_case, plugin_serves_flow, type plugin_info, type plugin_case } from "../../plugin_types.ts"
+import { plugin_matches, select_case, select_flow_case, plugin_serves_flow, type plugin_info, type plugin_case } from "../../../shared/content/plugin.ts"
 import { flow_kind_of } from "./desk_flow.ts"
 import type { desk_window, state as desk_state } from "./desk.ts"
 

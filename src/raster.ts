@@ -1,6 +1,6 @@
 // The only place that touches the native SVG renderer. It is imported lazily so `check`, `graph` and `watch` keep working
 // on a machine where `npm install` has not fetched @resvg/resvg-js yet; only a real build needs it.
-import { jazu_error } from "./diag.ts"
+import { jazu_error } from "../shared/diag.ts"
 
 export async function svg_to_png(svg: string, width: number): Promise<Buffer> {
     let module: typeof import("@resvg/resvg-js")

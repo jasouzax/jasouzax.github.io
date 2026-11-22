@@ -1,9 +1,9 @@
 import type { xml_node } from "./xml.ts"
 import { walk_nodes, where_of } from "./xml.ts"
-import type { diagnostics } from "./diag.ts"
-import { report_error } from "./diag.ts"
-import { plugin_hosts } from "./plugin_types.ts"
-import { parse_pipeline, repository_remote } from "./pipeline_types.ts"
+import type { diagnostics } from "../diag.ts"
+import { report_error } from "../diag.ts"
+import { plugin_hosts } from "./plugin.ts"
+import { parse_pipeline, repository_remote } from "./pipeline.ts"
 
 type rule = {
     attrs: string[]

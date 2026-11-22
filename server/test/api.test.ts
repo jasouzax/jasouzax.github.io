@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { Api_Registry, serve_http } from "../src/api.ts"
 import type { Api_Owner } from "../src/api.ts"
-import type { Api_Call } from "../src/shared/protocol.ts"
+import type { Api_Call } from "../../shared/protocol/wire.ts"
 
 function owner(): Api_Owner & { errors: unknown[] } {
     const errors: unknown[] = []

@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { Window_Store, site_key, site_url_of, is_site_url, window_uri, window_id_of } from "../src/web/client/server_windows.ts"
 import { site_key_pattern } from "../server/src/sites.ts"
-import type { Window_Info } from "../server/src/shared/protocol.ts"
+import type { Window_Info } from "../shared/protocol/wire.ts"
 
 const win = (id: number, script: string, extra: Partial<Window_Info> = {}): Window_Info => ({ id, script, title: `w${id}`, url: "https://x", icon: "", width: 800, height: 600, devtools: null, ...extra })
 

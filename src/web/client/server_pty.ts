@@ -8,8 +8,8 @@
  * Limits
  *   Output is decoded as streaming UTF-8 so a character split across two chunks stays whole; input is encoded the same way.
  */
-import type { Client_Message } from "../../../server/src/shared/protocol.ts"
-import { from_base64, to_base64 } from "../../../server/src/shared/codec.ts"
+import type { Client_Message } from "../../../shared/protocol/wire.ts"
+import { from_base64, to_base64 } from "../../../shared/protocol/codec.ts"
 
 export type Pty_Link = { send(message: Client_Message): boolean, on(type: string, handler: (message: { t: string, [key: string]: unknown }) => void): () => void }
 export type Pty_Session = { write: (data: string) => void, resize: (cols: number, rows: number) => void, close: () => void }

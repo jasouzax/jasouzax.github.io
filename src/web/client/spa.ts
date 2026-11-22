@@ -1,6 +1,6 @@
 import { init_reveal, update_tab_spy } from "./scroll.ts"
 import { sync_theme_radios } from "./menus.ts"
-import { deserialize, to_dom, type serialized_node } from "../vnode.tsx"
+import { deserialize, to_dom, type serialized_node } from "../../../shared/vnode/vnode.tsx"
 import { begin_loading, finish_loading, cancel_page_loading, wait_resources, wipe_page, page_signature, motion_reduced } from "./loading.ts"
 
 type page_payload = {

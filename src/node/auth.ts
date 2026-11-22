@@ -6,9 +6,9 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose"
 import type { Work_Env } from "./work.ts"
 import { api_error } from "./security.ts"
-import { encode_key } from "../work_crypto.ts"
+import { encode_key } from "../../shared/work/crypto.ts"
 import { google_access, save_google_grant } from "./google_grant.ts"
-import { google_picture } from "../work_profile.ts"
+import { google_picture } from "../../shared/work/profile.ts"
 import { realtime_revoke } from "./realtime_bus.ts"
 import { work_changed } from "./realtime_work.ts"
 

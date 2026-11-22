@@ -25,7 +25,7 @@ import { sign_upgrade } from "./sign"
 import { Site_Registry } from "./sites"
 import { Web } from "./web"
 import { Window_Registry } from "./windows"
-import { protocol_version } from "./shared/protocol"
+import { protocol_version } from "../../shared/protocol/wire.ts"
 
 Web.keep_alive = true
 

@@ -13,8 +13,8 @@
  * Limits
  *   One agent (a newer one replaces the older) and at most `max_owners` pages. Imports no `cloudflare:workers` code, so Node tests can load it.
  */
-import { agent_direct_types, agent_message_types, api_body_limit, api_name_pattern, client_message_types, parse_message, reserved_api_names } from "../../server/src/shared/protocol.ts"
-import type { Api_Answer, Api_Info, Public_Status } from "../../server/src/shared/protocol.ts"
+import { agent_direct_types, agent_message_types, api_body_limit, api_name_pattern, client_message_types, parse_message, reserved_api_names } from "../../shared/protocol/wire.ts"
+import type { Api_Answer, Api_Info, Public_Status } from "../../shared/protocol/wire.ts"
 import { api_error } from "./security.ts"
 import { Rate_Limit } from "./server_limits.ts"
 

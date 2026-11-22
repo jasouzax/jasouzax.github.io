@@ -1,5 +1,5 @@
 import { SaxesParser } from "saxes"
-import { jazu_error } from "./diag.ts"
+import { jazu_error } from "../diag.ts"
 
 export type xml_node = {
     tag: string

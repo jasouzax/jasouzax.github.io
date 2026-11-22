@@ -1,10 +1,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { Log_Store, log_stamp, count_label, max_log_entries } from "../src/web/client/server_script_model.ts"
-import { select_case, plugin_matches, type plugin_info, type plugin_case } from "../src/plugin_types.ts"
+import { select_case, plugin_matches, type plugin_info, type plugin_case } from "../shared/content/plugin.ts"
 import { load_site } from "../src/model.ts"
-import { load_config } from "../src/config.ts"
-import { new_diagnostics } from "../src/diag.ts"
+import { load_config } from "../shared/config.ts"
+import { new_diagnostics } from "../shared/diag.ts"
 
 const line = (id: number, level: "log" | "error" = "log") => ({ id, time: 1000 + id, level, text: `line ${id}` })
 

@@ -9,7 +9,7 @@
  *   An own resource beats a picked type, and a picked type beats a picked mode, so the child always has exactly one flow.
  *   Choosing the case that serves a flow is plugin_types.ts; drawing its body is desk_view.ts.
  */
-import type { Flow_Kind } from "../../plugin_types.ts"
+import type { Flow_Kind } from "../../../shared/content/plugin.ts"
 
 export type Child_Picks = { mime: boolean, mode: boolean, own: boolean }
 

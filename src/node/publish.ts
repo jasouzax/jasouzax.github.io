@@ -16,7 +16,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { spawnSync } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { dirname, join, relative, resolve, sep } from "node:path"
-import { output_file } from "../paths.ts"
+import { output_file } from "../../shared/paths.ts"
 
 export const pages_file_limit = 25 * 1024 * 1024
 export type Asset_Upload = { key: string, file: string, size: number, content_type: string }

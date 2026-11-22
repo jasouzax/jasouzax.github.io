@@ -13,9 +13,9 @@ import type { Job } from "../src/node/queue.ts"
 import { run_pipeline } from "../src/node/pipeline.ts"
 import type { Run_Record } from "../src/node/pipeline.ts"
 import { plan_batch } from "../src/node/runner.ts"
-import { parse_xml } from "../src/xml.ts"
-import { validate_roots } from "../src/schema.ts"
-import { new_diagnostics } from "../src/diag.ts"
+import { parse_xml } from "../shared/content/xml.ts"
+import { validate_roots } from "../shared/content/schema.ts"
+import { new_diagnostics } from "../shared/diag.ts"
 
 function git(dir: string, ...args: string[]): string {
     return execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()

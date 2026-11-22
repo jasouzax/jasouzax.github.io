@@ -1,12 +1,12 @@
-import type { xml_node } from "./xml.ts"
-import { child_nodes, where_of } from "./xml.ts"
+import type { xml_node } from "../shared/content/xml.ts"
+import { child_nodes, where_of } from "../shared/content/xml.ts"
 import type { site_model, page } from "./model.ts"
 import { pages_in, page_url, section_of, ui_text } from "./model.ts"
-import { report_error, report_warning } from "./diag.ts"
+import { report_error, report_warning } from "../shared/diag.ts"
 import type { year_month } from "./dates.ts"
 import { parse_date, format_label } from "./dates.ts"
-import { is_true } from "./schema.ts"
-import { round_to, slugify, split_list, unique } from "./util.ts"
+import { is_true } from "../shared/content/schema.ts"
+import { round_to, slugify, split_list, unique } from "../shared/util.ts"
 
 export const default_state = "expertise"
 

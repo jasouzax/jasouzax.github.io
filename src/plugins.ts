@@ -3,11 +3,11 @@ import { dirname, resolve } from "node:path"
 import { build } from "esbuild"
 import type { site_model } from "./model.ts"
 import type { output_files } from "./theme_css.ts"
-import type { plugin_info, plugin_case } from "./plugin_types.ts"
-import { inside } from "./paths.ts"
-import { report_error } from "./diag.ts"
-import { where_of } from "./xml.ts"
-import { sha256 } from "./util.ts"
+import type { plugin_info, plugin_case } from "../shared/content/plugin.ts"
+import { inside } from "../shared/paths.ts"
+import { report_error } from "../shared/diag.ts"
+import { where_of } from "../shared/content/xml.ts"
+import { sha256 } from "../shared/util.ts"
 
 export async function compile_plugins(model: site_model, files: output_files): Promise<plugin_info[]> {
     const manifest: plugin_info[] = []

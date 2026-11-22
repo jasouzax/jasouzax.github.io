@@ -1,8 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { load_site } from "../src/model.ts"
-import { load_config } from "../src/config.ts"
-import { new_diagnostics } from "../src/diag.ts"
+import { load_config } from "../shared/config.ts"
+import { new_diagnostics } from "../shared/diag.ts"
 
 test("/server exists in every language as a noindex desk that starts with one fastfetch window", async () => {
     const root = process.cwd()

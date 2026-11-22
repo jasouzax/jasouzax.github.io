@@ -8,7 +8,7 @@ import { work_outbox } from "../src/node/realtime_work.ts"
 import { Realtime_Hub } from "../src/node/realtime.ts"
 import { auth_hash, auth_route } from "../src/node/auth.ts"
 import { save_google_grant } from "../src/node/google_grant.ts"
-import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../src/work_crypto.ts"
+import { encrypt_message, decrypt_message, encode_key, generate_owner_key, wrap_room_key, unwrap_room_key } from "../shared/work/crypto.ts"
 const origin = "https://example.com", base = "/api/v1/work/rooms"
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 type Identity = { cookie: string, csrf: string }

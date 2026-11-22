@@ -1,6 +1,6 @@
 /* Public build snapshots are atomic. API, cookies, messages and private keys never enter CacheStorage. */
-import { device_key, first_notification } from "./notification_store.ts"
-import { preview_message, type Message_Notice } from "./notification_preview.ts"
+import { device_key, first_notification } from "../../shared/notification/store.ts"
+import { preview_message, type Message_Notice } from "../../shared/notification/preview.ts"
 declare const __PWA__: { version: string, entries: { url: string, revision: string }[], notifications: boolean }
 type Lifetime = { waitUntil(task: Promise<unknown>): void }
 type Fetch_Event = Lifetime & { request: Request, respondWith(response: Promise<Response>): void }

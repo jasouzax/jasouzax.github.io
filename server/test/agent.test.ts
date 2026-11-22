@@ -9,7 +9,7 @@ import { Api_Registry } from "../src/api.ts"
 import { Pty_Channel } from "../src/pty_channel.ts"
 import { Script_Runner } from "../src/runner.ts"
 import { Site_Registry } from "../src/sites.ts"
-import { unpack_binary, to_base64 } from "../src/shared/codec.ts"
+import { unpack_binary, to_base64 } from "../../shared/protocol/codec.ts"
 import type { Pty_Events } from "../src/pty.ts"
 
 class Fake_Web extends EventEmitter {

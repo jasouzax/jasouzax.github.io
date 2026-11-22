@@ -6,7 +6,7 @@ import { Fs_Error as Link_Error } from "../src/web/client/server_link.ts"
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { Fs_Request, Fs_Result } from "../server/src/shared/protocol.ts"
+import type { Fs_Request, Fs_Result } from "../shared/protocol/wire.ts"
 
 // The real agent channel on a real temp directory stands in for the Pi: the page's handles run against it unchanged
 function against(root: string): Fs_Client & { calls: Fs_Request[] } {

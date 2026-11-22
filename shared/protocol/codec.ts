@@ -9,7 +9,7 @@
  * Limits
  *   from_base64 throws on invalid input; callers at a trust boundary wrap it.
  */
-import { binary_audio, binary_video, audio_header_size, video_header_size } from "./protocol.ts"
+import { binary_audio, binary_video, audio_header_size, video_header_size } from "./wire.ts"
 
 export function to_base64(bytes: Uint8Array): string {
     let binary = ""

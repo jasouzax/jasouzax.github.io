@@ -8,7 +8,7 @@ import { mkdirSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { build } from "esbuild"
-import { clone_origins } from "../../src/pipeline_types.ts"
+import { clone_origins } from "../../shared/content/pipeline.ts"
 import { load_project_declarations } from "../../src/node/project_catalog.ts"
 
 const directory = dirname(fileURLToPath(import.meta.url))

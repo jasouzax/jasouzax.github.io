@@ -14,7 +14,7 @@
  *   A window is one parent's child at most; a child can itself be split, so links form a tree.
  */
 import type { desk_window } from "./desk.ts"
-import type { Flow_Kind } from "../../plugin_types.ts"
+import type { Flow_Kind } from "../../../shared/content/plugin.ts"
 import { flow_of } from "./desk_flow_rules.ts"
 
 export const link_hooks = {

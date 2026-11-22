@@ -13,9 +13,9 @@
  */
 import * as fs from "fs/promises"
 import * as path from "path"
-import { fs_chunk_bytes } from "./shared/protocol.ts"
-import type { Fs_Code, Fs_Entry, Fs_Kind, Fs_Request, Fs_Result, Fs_Stat } from "./shared/protocol.ts"
-import { from_base64, to_base64 } from "./shared/codec.ts"
+import { fs_chunk_bytes } from "../../shared/protocol/wire.ts"
+import type { Fs_Code, Fs_Entry, Fs_Kind, Fs_Request, Fs_Result, Fs_Stat } from "../../shared/protocol/wire.ts"
+import { from_base64, to_base64 } from "../../shared/protocol/codec.ts"
 
 const known_codes = new Set<string>(["ENOENT", "EEXIST", "ENOTDIR", "EISDIR", "ENOTEMPTY", "EACCES", "EROFS", "EINVAL", "EFBIG", "EIO"])
 

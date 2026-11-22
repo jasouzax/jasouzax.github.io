@@ -1,4 +1,4 @@
-import { jsx, fragment, type child } from "./vnode.tsx"
+import { jsx, fragment, type child } from "../vnode/vnode.tsx"
 
 // The 履歴書 sheets as two inline SVG pages. The layout copies, point for point, the A4 form produced by rirekisho.online (TCPDF, 595 x 842 pt):
 // every line, box and text anchor below is a coordinate taken from that PDF, so one SVG user unit is one PDF point and the print stylesheet only has
@@ -163,7 +163,7 @@ function num(value: number): string {
 type text_options = {
     anchor?: "start" | "middle" | "end"
     xs?: number[]
-    attrs?: import("./vnode.tsx").attributes
+    attrs?: import("../vnode/vnode.tsx").attributes
     plain?: boolean
 }
 

@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs"
 import { published_resource } from "../resources.ts"
 import type { site_model, page } from "../model.ts"
 import { pages_in, order_pages, find_page } from "../model.ts"
-import type { xml_node } from "../xml.ts"
-import { child_nodes } from "../xml.ts"
+import type { xml_node } from "../../shared/content/xml.ts"
+import { child_nodes } from "../../shared/content/xml.ts"
 import { page_description, canonical_url, indexable, site_summary, link_target } from "./seo_common.tsx"
 
 function title_case(text: string): string {

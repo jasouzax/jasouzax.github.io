@@ -4,7 +4,7 @@ TSX generators that turn the `site_model` into HTML and JSON. TSX is used so tem
 
 ## How TSX works here
 
-`tsconfig.json` sets `"jsx": "react"`, `"jsxFactory": "jsx"`, `"jsxFragmentFactory": "fragment"`. **There is no React.** `jsx()` in `src/web/vnode.tsx` returns small virtual nodes (`tag`, attributes, children), not strings. Two consumers:
+`tsconfig.json` sets `"jsx": "react"`, `"jsxFactory": "jsx"`, `"jsxFragmentFactory": "fragment"`. **There is no React.** `jsx()` in `shared/vnode/vnode.tsx` returns small virtual nodes (`tag`, attributes, children), not strings. Two consumers:
 
 | Function | Where | Notes |
 |---|---|---|

@@ -32,7 +32,7 @@ export function listener_fingerprint(dir: string): string {
             else if (entry.isFile()) hash.update(file.slice(dir.length)).update(readFileSync(file))
         }
     }
-    visit(join(dir, "src"))
+    for (const name of ["src", "shared"]) visit(join(dir, name))
     for (const file of ["package.json", "package-lock.json", "tsconfig.json"]) if (existsSync(join(dir, file))) hash.update(file).update(readFileSync(join(dir, file)))
     return hash.digest("hex")
 }

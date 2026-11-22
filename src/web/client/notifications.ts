@@ -1,8 +1,8 @@
 import { get_auth } from "./sign.ts"
 import { work_context, work_api } from "./work_session.ts"
-import { decode_key, decrypt_message } from "../../work_crypto.ts"
-import { device_key, type Device_Key } from "../notification_store.ts"
-import { preview_message, type Message_Notice } from "../notification_preview.ts"
+import { decode_key, decrypt_message } from "../../../shared/work/crypto.ts"
+import { device_key, type Device_Key } from "../../../shared/notification/store.ts"
+import { preview_message, type Message_Notice } from "../../../shared/notification/preview.ts"
 import { pwa_registration } from "./pwa.ts"
 let epoch = 0, email = "", memory: Device_Key | undefined, preparation: Promise<Device_Key | undefined> | undefined
 export async function prepare_notifications(): Promise<Device_Key | undefined> {

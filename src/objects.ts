@@ -1,12 +1,12 @@
 import { existsSync, statSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, resolve, relative, basename, sep, extname } from "node:path"
-import type { xml_node } from "./xml.ts"
-import { walk_nodes, where_of } from "./xml.ts"
+import type { xml_node } from "../shared/content/xml.ts"
+import { walk_nodes, where_of } from "../shared/content/xml.ts"
 import type { site_model, page } from "./model.ts"
-import { report_error, report_warning } from "./diag.ts"
-import { split_list, short_hash } from "./util.ts"
-import { inside } from "./paths.ts"
-import { research_sections } from "./schema.ts"
+import { report_error, report_warning } from "../shared/diag.ts"
+import { split_list, short_hash } from "../shared/util.ts"
+import { inside } from "../shared/paths.ts"
+import { research_sections } from "../shared/content/schema.ts"
 
 export function element(tag: string, attrs: Record<string, string>, source: xml_node, children: xml_node[] = []): xml_node {
     const node: xml_node = { tag, attrs, children, text: "", file: source.file, line: source.line, parent: null }

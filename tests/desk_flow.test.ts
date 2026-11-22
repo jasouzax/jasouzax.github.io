@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { flow_of, no_picks } from "../src/web/client/desk_flow_rules.ts"
 import { adopt, announce_edit, children_of, flow_kind_of, document_of, is_dirty, accept_save, forget_edits, latest_bytes, link_hooks, refresh_children, release_links, subscribe_edits } from "../src/web/client/desk_flow.ts"
 import type { desk_window } from "../src/web/client/desk.ts"
-import { case_flow, is_child_case, plugin_serves_flow, select_case, select_flow_case, type plugin_case, type plugin_target } from "../src/plugin_types.ts"
+import { case_flow, is_child_case, plugin_serves_flow, select_case, select_flow_case, type plugin_case, type plugin_target } from "../shared/content/plugin.ts"
 
 const file = new Blob(["x"])
 const target = (mime: string, mode: string, path = "", has_file = true): plugin_target => ({ mime, mode, path, file: has_file ? file : null })

@@ -1,5 +1,5 @@
 import type { page, site_model } from "./model.ts"
-import type { xml_node } from "./xml.ts"
+import type { xml_node } from "../shared/content/xml.ts"
 import { element } from "./objects.ts"
 
 export function select_print(model: site_model, page: page): xml_node | undefined {

@@ -1,6 +1,6 @@
 import { clipboard } from 'electron';
 import { EventEmitter } from 'events';
-import type { Clipboard_Data } from '../shared/protocol.ts';
+import type { Clipboard_Data } from '../../../shared/protocol/wire.ts';
 
 // Electron's clipboard has changed shape between versions (synchronous or promise based, `readHTML` or not),
 // so it is used through what it really offers at runtime instead of through its typings

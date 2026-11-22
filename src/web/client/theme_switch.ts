@@ -1,4 +1,4 @@
-import { deserialize, to_dom, type serialized_node } from "../vnode.tsx"
+import { deserialize, to_dom, type serialized_node } from "../../../shared/vnode/vnode.tsx"
 import { begin_loading, finish_loading, motion_reduced, wait_resources } from "./loading.ts"
 import { sync_theme_radios } from "./menus.ts"
 

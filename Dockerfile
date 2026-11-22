@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY config.json tsconfig.json .gitignore ./
 COPY src/ ./src/
+COPY shared/ ./shared/
 COPY content/ ./content/
 COPY build/ ./build/
 # WASM packages are compiled release inputs from build/. A missing input fails the website build.

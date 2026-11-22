@@ -17,7 +17,7 @@ Per-tag rules (every attribute, child, and what the validator enforces):
 | `<plugin>` (`<case>`) | [plugin.md](plugin.md) | A desk capability |
 | `<print>` | [print.md](print.md) | A paper/PDF layout |
 
-The authoritative validator is `src/schema.ts`. These pages describe it in prose; if they ever disagree, the validator wins (and the page should be fixed).
+The authoritative validator is `shared/content/schema.ts`. These pages describe it in prose; if they ever disagree, the validator wins (and the page should be fixed).
 
 ## 1. Ground rules
 
@@ -91,9 +91,9 @@ Everything that is not an object (page, project …) is in `config.json`. Top-le
 | `deploy` | `pages_project` and `worker_name` for Cloudflare |
 | `seo` | Description, keywords, Twitter handle, `Person`/`Organization` entity, theme/background colours, brand colours, manifest options, robots (`/work` is disallowed by default), `security.txt` contacts, `llms` summary. Partial blocks are merged one level deep with defaults |
 | `slots`, `slot_digits` | Number of empty background/foreground decoration elements emitted for themes (default 10 each) |
-| `font_formats`, `render`, `dropdown_limit`, `rebuild_present_monthly`, `sfx` | Engine switches with defaults in `src/config.ts` |
+| `font_formats`, `render`, `dropdown_limit`, `rebuild_present_monthly`, `sfx` | Engine switches with defaults in `shared/config.ts` |
 
-Loaded, merged with defaults and validated in `src/config.ts` (`base_url` must be a bare http(s) origin; `default_language` must exist in `languages`; `default_theme` must be selected by `themes`). `google_client_id` is read from the `GOOGLE_CLIENT_ID` environment variable, not from the file.
+Loaded, merged with defaults and validated in `shared/config.ts` (`base_url` must be a bare http(s) origin; `default_language` must exist in `languages`; `default_theme` must be selected by `themes`). `google_client_id` is read from the `GOOGLE_CLIENT_ID` environment variable, not from the file.
 
 ## 5. Daily workflow
 
@@ -119,4 +119,4 @@ Warnings are real editorial findings (missing images, over-long SEO descriptions
 | `stack` | ✔ | ✔ | ✔ | – | ✔ |
 | `lang` | ✔ | ✔ | ✔ | ✔ | – |
 
-(`page`, `project` and `event` share a common attribute pool defined in `src/schema.ts` as `page_attrs`; see each tag's page for the exact list.)
+(`page`, `project` and `event` share a common attribute pool defined in `shared/content/schema.ts` as `page_attrs`; see each tag's page for the exact list.)

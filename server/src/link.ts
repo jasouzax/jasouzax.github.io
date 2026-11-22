@@ -1,5 +1,5 @@
-import { client_message_types, heartbeat_ping, heartbeat_pong, parse_message, protocol_version } from './shared/protocol.ts';
-import type { Agent_Message, Agent_To_Hub, Hub_To_Agent, Client_Message, Relayed, Routed } from './shared/protocol.ts';
+import { client_message_types, heartbeat_ping, heartbeat_pong, parse_message, protocol_version } from '../../shared/protocol/wire.ts';
+import type { Agent_Message, Agent_To_Hub, Hub_To_Agent, Client_Message, Relayed, Routed } from '../../shared/protocol/wire.ts';
 
 /*
  * The agent's one connection to the Worker's Server_Hub Durable Object.

@@ -1,8 +1,8 @@
-import { jsx, fragment, type child } from "./vnode.tsx"
-import { child_nodes, type xml_node } from "../xml.ts"
+import { jsx, fragment, type child } from "../../shared/vnode/vnode.tsx"
+import { child_nodes, type xml_node } from "../../shared/content/xml.ts"
 import type { render_ctx } from "./html_common.tsx"
 import { t, glyph, link_attrs } from "./html_common.tsx"
-import { split_list } from "../util.ts"
+import { split_list } from "../../shared/util.ts"
 import { resume_format_of } from "./html_rirekisho.tsx"
 
 export function render_hero(ctx: render_ctx, node: xml_node, next_id = ""): child {

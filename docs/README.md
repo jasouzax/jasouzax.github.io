@@ -37,7 +37,7 @@ These are the features being worked on **right now**. Click one for its status l
 1. `docs/feat/README.md` is the single source of "what is done / ongoing / todo". Every statement there is a checkbox.
 2. A feature with sub-tasks has a page `docs/feat/{name}.md` with the full list and the technical contract. The index mirrors its top-level lines.
 3. This file lists only features currently in progress; finished ones leave this list.
-4. `docs/content/*` describes **what the validator accepts** (`src/schema.ts` is the truth). `docs/src/*` describes **how the code works**.
+4. `docs/content/*` describes **what the validator accepts** (`shared/content/schema.ts` is the truth). `docs/src/*` describes **how the code works**.
 5. Never claim something works unless a test, a command or a browser check showed it. Unverified plans stay unchecked.
 
 ## Placeholders the owner must replace

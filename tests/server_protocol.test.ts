@@ -1,8 +1,8 @@
 /* /server wire contract: base64 and binary frames round-trip, and the hub's allow-lists reject anything outside the contract. */
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { api_body_limit, agent_direct_types, agent_message_types, client_message_types, max_frame_bytes, parse_message, reserved_api_names, api_name_pattern } from "../server/src/shared/protocol.ts"
-import { from_base64, pack_audio, pack_video, to_base64, unpack_binary } from "../server/src/shared/codec.ts"
+import { api_body_limit, agent_direct_types, agent_message_types, client_message_types, max_frame_bytes, parse_message, reserved_api_names, api_name_pattern } from "../shared/protocol/wire.ts"
+import { from_base64, pack_audio, pack_video, to_base64, unpack_binary } from "../shared/protocol/codec.ts"
 
 test("base64 round-trips every byte value and large buffers", () => {
     const all = Uint8Array.from({ length: 256 }, (_, index) => index)

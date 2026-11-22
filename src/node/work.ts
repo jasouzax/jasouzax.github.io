@@ -4,9 +4,9 @@
  * D1 stores cookie hashes, public/wrapped keys, ciphertext and separately sealed client recovery keys.
  */
 import { api_error } from "./security.ts"
-import { decode_key, encode_key, type Work_Envelope } from "../work_crypto.ts"
+import { decode_key, encode_key, type Work_Envelope } from "../../shared/work/crypto.ts"
 import { read_session, valid_csrf, auth_hash } from "./auth.ts"
-import { google_picture } from "../work_profile.ts"
+import { google_picture } from "../../shared/work/profile.ts"
 import { unstored_route } from "./work_unstored.ts"
 import { work_outbox, wake_delivery, work_changed, type Realtime_Actor } from "./realtime_work.ts"
 import type { Realtime_Namespace } from "./realtime_bus.ts"

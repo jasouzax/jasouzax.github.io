@@ -1,12 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync, copyFileSync, mkdtempSync, rmSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { tmpdir } from "node:os"
-import type { xml_node } from "./xml.ts"
-import { child_nodes, where_of } from "./xml.ts"
+import type { xml_node } from "../shared/content/xml.ts"
+import { child_nodes, where_of } from "../shared/content/xml.ts"
 import type { site_model } from "./model.ts"
-import { jazu_error } from "./diag.ts"
-import { report_error } from "./diag.ts"
-import { short_hash, split_list } from "./util.ts"
+import { jazu_error } from "../shared/diag.ts"
+import { report_error } from "../shared/diag.ts"
+import { short_hash, split_list } from "../shared/util.ts"
 import { encode_font } from "./font/binary.ts"
 
 export type font_output = { family: string, files: Record<string, string>, role: string }

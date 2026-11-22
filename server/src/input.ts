@@ -1,4 +1,4 @@
-import type { Input_Event } from './shared/protocol.ts';
+import type { Input_Event } from '../../shared/protocol/wire.ts';
 
 export interface Input_Target {
     isDestroyed(): boolean;

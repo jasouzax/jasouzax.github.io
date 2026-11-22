@@ -1,9 +1,9 @@
-import { jsx, fragment, type child } from "./vnode.tsx"
+import { jsx, fragment, type child } from "../../shared/vnode/vnode.tsx"
 import { raw } from "./markup.tsx"
 import type { page, site_model } from "../model.ts"
 import { icon_of, ui_text, localize } from "../model.ts"
-import { esc_html, esc_attr } from "../util.ts"
-import type { html } from "../util.ts"
+import { esc_html, esc_attr } from "../../shared/util.ts"
+import type { html } from "../../shared/util.ts"
 import type { expertise_model } from "../expertise.ts"
 
 export type render_ctx = {
@@ -34,7 +34,7 @@ export function text_of(ctx: render_ctx, value: string | undefined): string {
     return icon(ctx, value)
 }
 
-export function link_attrs(ctx: render_ctx, href: string): import("./vnode.tsx").attributes {
+export function link_attrs(ctx: render_ctx, href: string): import("../../shared/vnode/vnode.tsx").attributes {
     const external = /^https?:\/\//.test(href)
     return {
         href: localize(ctx.model, ctx.lang, href),

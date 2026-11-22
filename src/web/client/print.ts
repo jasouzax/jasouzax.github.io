@@ -1,7 +1,7 @@
 // A printed resume carries the day it was printed, not the day the site was built.
 // The page ships the build date as a fallback; the browser fires beforeprint just before it lays the page out for the printer.
 // The 履歴書 writes the date as era + year + month + day (令和8年10月31日), one <text> per part, marked data-print_part="era|year|month|day".
-import { era_of } from "../../era.ts"
+import { era_of } from "../../../shared/era.ts"
 import { init_rireki_editor } from "./rireki_editor.ts"
 
 function fill_print_fields(): void {

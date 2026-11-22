@@ -10,7 +10,7 @@
  *   key_events      what a key press sends: text for characters, key events for everything else, nothing for IME in progress
  *   copy_shortcut   Ctrl/Cmd+C or +X
  */
-import type { Input_Event } from "../../../server/src/shared/protocol.ts"
+import type { Input_Event } from "../../../shared/protocol/wire.ts"
 
 export const double_click_ms = 400
 export const tap_slop_px = 8

@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 import { generateKeyPair, exportJWK, createLocalJWKSet, SignJWT } from "jose"
 import { auth_route, verify_google_token } from "../src/node/auth.ts"
 import { work_route, type Work_Env, type Work_Statement } from "../src/node/work.ts"
-import { encode_key } from "../src/work_crypto.ts"
+import { encode_key } from "../shared/work/crypto.ts"
 import { secure_response } from "../src/node/security.ts"
 import worker from "../src/node/worker.ts"
 

@@ -1,4 +1,4 @@
-import type { Input_Event } from '../../../server/src/shared/protocol.ts'
+import type { Input_Event } from '../../../shared/protocol/wire.ts'
 
 /*
  * A mouse for a finger (ported from Browsite's touch.ts): virtual cursor, tap / double tap / two-finger tap clicks, hold to drag, two fingers to scroll

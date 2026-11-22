@@ -1,6 +1,6 @@
 import type { desk_window } from "./desk.ts"
 import { state, text } from "./desk.ts"
-import { find_by_name } from "../../mime.ts"
+import { find_by_name } from "../../../shared/mime.ts"
 import { load_children, redraw, visible_entries, type fs_node, type file_handle } from "./desk_fs.ts"
 import { resolve } from "./desk_vfs.ts"
 import { open_source } from "./desk_view.ts"

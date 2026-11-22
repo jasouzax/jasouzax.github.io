@@ -23,6 +23,6 @@
     "src",
     "tests",
     "extension",
-    "server/src/shared"
+    "shared"
   ]
 }

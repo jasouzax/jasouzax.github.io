@@ -16,7 +16,7 @@ import { local_file_path } from "./desk_paths.ts"
 import { owner_link, owner_windows } from "./desk_server_owner.ts"
 import { window_uri } from "./server_windows.ts"
 import { Log_Store, count_label, log_stamp, max_log_entries } from "./server_script_model.ts"
-import type { Log_Entry } from "../../../server/src/shared/protocol.ts"
+import type { Log_Entry } from "../../../shared/protocol/wire.ts"
 
 function make<K extends keyof HTMLElementTagNameMap>(tag: K, class_name: string, content = ""): HTMLElementTagNameMap[K] {
     const element = document.createElement(tag)

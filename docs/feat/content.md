@@ -18,7 +18,7 @@
 - [x] Resolve relative resources from the declaring XML file and `/…` from the content root
 - [x] Preserve translations, SEO, SPA payloads and no-JavaScript HTML
 - [ ] Complete transitive Markdown/HTML resource discovery and collision-safe nested relative publication
-- [ ] Retire legacy tags still tolerated by `src/schema.ts` and `src/web/seo_text.tsx` (`landing`, `contact`, `error`, `resume`); no content uses them any more
+- [ ] Retire legacy tags still tolerated by `shared/content/schema.ts` and `src/web/seo_text.tsx` (`landing`, `contact`, `error`, `resume`); no content uses them any more
 - [ ] Owner: restore the ignored `content/media/` archive and supply the missing Hypro image (see [placeholders](../README.md#placeholders-the-owner-must-replace))
 
 ## Contract

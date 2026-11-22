@@ -1,6 +1,6 @@
 import type { site_model, page } from "../model.ts"
 import { page_url, find_page, localize } from "../model.ts"
-import { normalize_path } from "../util.ts"
+import { normalize_path } from "../../shared/util.ts"
 
 // The title every surface shares: <title>, og:title, twitter:title, the SPA payload.
 export function page_title(model: site_model, page: page): string {

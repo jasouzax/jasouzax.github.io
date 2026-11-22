@@ -1,12 +1,12 @@
 import { readFileSync, existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
-import type { xml_node } from "../xml.ts"
-import { child_nodes, where_of } from "../xml.ts"
+import type { xml_node } from "../../shared/content/xml.ts"
+import { child_nodes, where_of } from "../../shared/content/xml.ts"
 import type { page, site_model } from "../model.ts"
 import type { output_files } from "../theme_css.ts"
-import { report_error } from "../diag.ts"
+import { report_error } from "../../shared/diag.ts"
 import { select_print } from "../prints.ts"
-import { short_hash, snake } from "../util.ts"
+import { short_hash, snake } from "../../shared/util.ts"
 
 // A page-specific stylesheet: <style src="x.css" media="print"/> as a child of <page>. The file is copied as written (no scoping), so its
 // selectors start with the page's body class (see body_class) to stay page-specific. Pages navigate without a reload (client_spa), so the

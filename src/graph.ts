@@ -1,9 +1,9 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import type { xml_node } from "./xml.ts"
+import type { xml_node } from "../shared/content/xml.ts"
 import type { page, site_model } from "./model.ts"
 import { crumb_chain, menu_pages, page_url } from "./model.ts"
-import { sha256 } from "./util.ts"
+import { sha256 } from "../shared/util.ts"
 import { page_style_text } from "./web/page_style.tsx"
 import { icon_source } from "./web/seo_images.tsx"
 import { configured_resource } from "./resources.ts"
@@ -38,7 +38,7 @@ export function shared_hash(model: site_model, theme_refs: string): string {
     // Includes generator source changes until the finer source/HEAD manifest lands.
     const source_text = (dir: string): string => readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
         .map(entry => entry.isDirectory() ? source_text(join(dir, entry.name)) : readFileSync(join(dir, entry.name), "utf8")).join("\u0000")
-    const parts = [source_text(join(model.root, "src")), signature_text(model), JSON.stringify(model.config), JSON.stringify(model.icons), theme_refs, model.mode]
+    const parts = [["src", "shared"].map(name => existsSync(join(model.root, name)) ? source_text(join(model.root, name)) : "").join("\u0000"), signature_text(model), JSON.stringify(model.config), JSON.stringify(model.icons), theme_refs, model.mode]
     return sha256(parts.join("\u0001"))
 }
 

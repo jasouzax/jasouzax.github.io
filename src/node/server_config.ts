@@ -16,7 +16,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto"
-import type { Project_Pipeline } from "../pipeline_types.ts"
+import type { Project_Pipeline } from "../../shared/content/pipeline.ts"
 import { apply_project_catalog } from "./project_catalog.ts"
 
 export type Role = "owner" | "write" | "read"

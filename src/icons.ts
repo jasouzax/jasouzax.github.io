@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs"
-import { jazu_error } from "./diag.ts"
+import { jazu_error } from "../shared/diag.ts"
 
 export type icon_registry = {
     start: string

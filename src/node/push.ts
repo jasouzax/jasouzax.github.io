@@ -3,7 +3,7 @@ import { buildPushPayload, type PushSubscription } from "@block65/webcrypto-web-
 import { read_session, valid_csrf, session_token, auth_hash } from "./auth.ts"
 import type { Work_Env, Work_Message } from "./work.ts"
 import { work_access } from "./realtime_work.ts"
-import { decode_key } from "../work_crypto.ts"
+import { decode_key } from "../../shared/work/crypto.ts"
 import { api_error } from "./security.ts"
 const reply = (data: unknown) => Response.json(data, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer" } })
 export function push_endpoint(value: string): boolean {

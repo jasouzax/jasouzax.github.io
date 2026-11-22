@@ -4,25 +4,25 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, cpSync
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { execFileSync } from "node:child_process"
-import { load_config } from "../src/config.ts"
+import { load_config } from "../shared/config.ts"
 import { shared_hash } from "../src/graph.ts"
 import { configured_resource } from "../src/resources.ts"
 import { icon_source } from "../src/web/seo_images.tsx"
 import { load_site } from "../src/model.ts"
-import { new_diagnostics } from "../src/diag.ts"
+import { new_diagnostics } from "../shared/diag.ts"
 import { select_print, print_person } from "../src/prints.ts"
 import { resolve_request, serve } from "../src/node/serve.ts"
-import { output_directory, output_file } from "../src/paths.ts"
+import { output_directory, output_file } from "../shared/paths.ts"
 import { build_site } from "../src/build.ts"
 import { build_expertise, scss_data } from "../src/expertise.ts"
 import { memory_directory } from "../src/web/client/memory_fs.ts"
 import { build_font } from "../src/font_build.ts"
 import { render_expertise } from "../src/web/html_expertise.tsx"
-import { to_html } from "../src/web/vnode.tsx"
+import { to_html } from "../shared/vnode/vnode.tsx"
 import { parseHTML } from "linkedom"
-import { parse_xml } from "../src/xml.ts"
-import { validate_roots } from "../src/schema.ts"
-import { research_sections } from "../src/schema.ts"
+import { parse_xml } from "../shared/content/xml.ts"
+import { validate_roots } from "../shared/content/schema.ts"
+import { research_sections } from "../shared/content/schema.ts"
 import { render_desk } from "../src/web/html_desk.tsx"
 
 function fixture() {
@@ -83,7 +83,7 @@ test("print language matching chooses exact then prefix then wildcard, using pub
 test("output/HTTP paths reject traversal, dotfiles, malformed escapes and accidental source cleanup", () => {
     const f = fixture()
     try {
-        for (const path of [".", "content", "src/out", "../outside", ".git"]) assert.throws(() => output_directory(f.root, path))
+        for (const path of [".", "content", "src/out", "shared/out", "engine/out", "desk/out", "cloud/out", "server/out", "app/out", "extension/out", "../outside", ".git"]) assert.throws(() => output_directory(f.root, path))
         f.put("dist/index.html", "Home")
         f.put("dist/.env", "secret")
         for (const path of ["/../config.json", "/%2e%2e/config.json", "/.env", "/%zz", "/..\\config.json"]) assert.equal(resolve_request(join(f.root, "dist"), path), null)
@@ -242,6 +242,7 @@ test("builds repair JSON, invalidate inline layout and article changes, and prun
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        cpSync(resolve("shared"), join(f.root, "shared"), { recursive: true })
         symlinkSync(resolve("build"), join(f.root, "build"), "junction")
         symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         f.put("content/blogs/article.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
@@ -289,6 +290,7 @@ test("content folders can be renamed using only XML and config changes", async (
     const f = fixture()
     try {
         cpSync(resolve("src"), join(f.root, "src"), { recursive: true })
+        cpSync(resolve("shared"), join(f.root, "shared"), { recursive: true })
         symlinkSync(resolve("build"), join(f.root, "build"), "junction")
         symlinkSync(resolve("node_modules"), join(f.root, "node_modules"), "junction")
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M1 1L19 19" stroke="currentColor"/></svg>'
@@ -331,6 +333,10 @@ test("content folders can be renamed using only XML and config changes", async (
         assert(second.model.resources.get(image)?.endsWith(join("medias", "photo.svg")))
         assert(existsSync(join(options.out, image.slice(1))))
         let hash = shared_hash(second.model, "")
+        const shared_source = join(f.root, "shared/era.ts")
+        writeFileSync(shared_source, readFileSync(shared_source, "utf8") + "\n// shared build input\n")
+        assert.notEqual(shared_hash(second.model, ""), hash, "shared source edits invalidate page output")
+        hash = shared_hash(second.model, "")
         for (const name of ["drawing.svg", "mark.svg", "tab.svg"]) {
             const file = join(f.root, "content/signatures", name)
             writeFileSync(file, readFileSync(file, "utf8").replace("</svg>", "<!-- updated artwork --></svg>"))

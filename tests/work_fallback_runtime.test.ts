@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 import { auth_hash } from "../src/node/auth.ts"
-import { encode_key, generate_owner_key, wrap_room_key } from "../src/work_crypto.ts"
+import { encode_key, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
 
 test("edge fallback survives a new session and is removed only after verified private Drive storage", async () => {
     const token = encode_key(crypto.getRandomValues(new Uint8Array(32))), secret = encode_key(crypto.getRandomValues(new Uint8Array(32)))

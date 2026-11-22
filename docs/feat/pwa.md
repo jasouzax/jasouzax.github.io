@@ -4,7 +4,7 @@ Source: `src/pwa.ts` (build), `src/web/pwa_worker.ts` (service worker), `src/web
 
 ## Status
 Implemented in code but **unverified**: no dependencies or network were available when this was finished, so no checkbox below is evidence of a passing run; tick them only after the commands in the unchecked items succeed.
-- [x] `config.json` `pwa` block (validated by `src/config.ts`) is copied to `manifest.json` under `jazu.pwa`; icons, colours, display and shortcuts come from `seo` in the same file
+- [x] `config.json` `pwa` block (validated by `shared/config.ts`) is copied to `manifest.json` under `jazu.pwa`; icons, colours, display and shortcuts come from `seo` in the same file
 - [x] Service worker generated at build time with a SHA-256 allowlist of public output (pages in every language, both themes, fonts, artwork); `offline.json` lists it
 - [x] Excluded from the snapshot: `/api/`, `_*`/dot files, `*.git/`, `pwa.exclude_prefixes` (default `/assets/wasm/` = Desk toolchains) and expertise media/posters (`exclude_expertise_media`)
 - [x] Installation fetches canonical URLs (`/x/` for `/x/index.html`, because Pages redirects the latter), verifies each revision hash and deletes the whole cache on any mismatch; old snapshots are deleted on activation
@@ -20,4 +20,4 @@ Implemented in code but **unverified**: no dependencies or network were availabl
 - Public snapshots never contain API responses, cookies, messages or keys. `Desk` (WASM, files) and messaging need a connection.
 - Navigations are network-first so online visitors get new releases; a new worker waits until old documents close.
 - `VAPID_*` is a persistent pair independent of conversation keys. Never regenerate it while subscriptions exist; `push_keys.ts` refuses to replace one.
-- Add PWA options to `config.json` + `src/config.ts` only; the manifest picks them up from `jazu.pwa`.
+- Add PWA options to `config.json` + `shared/config.ts` only; the manifest picks them up from `jazu.pwa`.

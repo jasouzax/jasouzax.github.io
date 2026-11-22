@@ -4,7 +4,7 @@ import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
 import { Fs_Error, confine, handle_fs, read_text } from "../src/fs_channel.ts"
-import { from_base64, to_base64 } from "../src/shared/codec.ts"
+import { from_base64, to_base64 } from "../../shared/protocol/codec.ts"
 
 async function sandbox(): Promise<string> {
     return fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "jazu-fs-")))

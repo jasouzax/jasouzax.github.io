@@ -1,5 +1,5 @@
-import { render_form, first_page_rows, history_page_rows, licence_rows, type form_input } from "../rireki_form.tsx"
-import { to_dom } from "../vnode.tsx"
+import { render_form, first_page_rows, history_page_rows, licence_rows, type form_input } from "../../../shared/print/form.tsx"
+import { to_dom } from "../../../shared/vnode/vnode.tsx"
 
 // Editors are overlays; only the SVG underneath is sent to the printer.
 export function init_rireki_editor(): void {

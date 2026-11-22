@@ -10,7 +10,7 @@ export function output_directory(root: string, out: string): string {
     const base = resolve(root)
     const target = resolve(root, out)
     const path = relative(base, target)
-    if (!path || !inside(base, target) || ["src", "content", "tools", "tests", "gen-11", "node_modules"].includes(path.split(sep)[0]) || path.split(sep).some(part => part.startsWith("."))) {
+    if (!path || !inside(base, target) || ["src", "engine", "desk", "cloud", "server", "app", "extension", "shared", "content", "ops", "tools", "tests", "docs", "gen-11", "node_modules"].includes(path.split(sep)[0]) || path.split(sep).some(part => part.startsWith("."))) {
         throw new Error("Output must be a generated directory inside the project, outside source/content/cache")
     }
     // Resolve existing ancestors too, so a junction cannot redirect a build/clean outside the project.

@@ -3,7 +3,7 @@ import { open_source, set_mode } from "./desk_view.ts"
 import type { Server_Link } from "./server_link.ts"
 import { Window_Store, window_uri } from "./server_windows.ts"
 import { Session_Store } from "./server_sessions_model.ts"
-import type { Window_Info } from "../../../server/src/shared/protocol.ts"
+import type { Window_Info } from "../../../shared/protocol/wire.ts"
 
 export function mount_sessions(link: Server_Link, windows: Window_Store): () => void {
     const aside = state.desk?.querySelector<HTMLElement>(".desk_side")

@@ -5,7 +5,7 @@ import { build as esbuild_build } from "esbuild"
 import type { build_result } from "../build.ts"
 import { stage_pages, wrangler_pages_deploy } from "./publish.ts"
 import type { Asset_Upload } from "./publish.ts"
-import { clone_origins, project_declarations } from "../pipeline_types.ts"
+import { clone_origins, project_declarations } from "../../shared/content/pipeline.ts"
 
 export type asset_upload = Asset_Upload
 

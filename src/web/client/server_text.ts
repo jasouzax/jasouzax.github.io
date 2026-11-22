@@ -1,7 +1,7 @@
 /*
  * Pure text rules of the /server desk (no DOM): which mode a status means and what the fastfetch window says.
  */
-import type { Public_Status } from "../../../server/src/shared/protocol.ts"
+import type { Public_Status } from "../../../shared/protocol/wire.ts"
 
 // /server and /ja/server (a language prefix is two letters)
 export function is_server_page(pathname: string): boolean {

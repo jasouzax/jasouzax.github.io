@@ -1,6 +1,6 @@
 /* Guest/browser keys, immutable Drive recovery and client-only encrypted server fallback. */
 import { get_auth, type Auth_State } from "./sign.ts"
-import { generate_owner_key, wrap_room_key, encode_key, decode_key } from "../../work_crypto.ts"
+import { generate_owner_key, wrap_room_key, encode_key, decode_key } from "../../../shared/work/crypto.ts"
 import { open_drive, clear_drive, type Client_Key, type Drive_Vault } from "./work_drive.ts"
 export type Work_Room = { id: string, email: string, name?: string, picture?: string, guest_id: number | null, owner_wrap: Client_Key["owner_wrap"] | null, owner_key_id: string, revoked: number }
 export type Work_Context = { auth: Auth_State, csrf: string, owner_email: string, owner_key: { key_id: string, public_jwk: JsonWebKey } | null, room: Work_Room | null, guest_room: Work_Room | null, key?: Client_Key, vault?: Drive_Vault, storage?: "browser" | "drive" | "fallback", warning?: string, error?: string }

@@ -1,9 +1,9 @@
 /* Build a deterministic allowlist: public output only, never API responses or Git mirrors. */
 import { build } from "esbuild"
 import { join } from "node:path"
-import { sha256 } from "./util.ts"
+import { sha256 } from "../shared/util.ts"
 import type { output_files } from "./theme_css.ts"
-import type { site_config } from "./config.ts"
+import type { site_config } from "../shared/config.ts"
 
 export async function pwa_files(root: string, files: output_files, skipped: Map<string, string | Uint8Array>, config: site_config, expertise_media: Set<string>): Promise<void> {
     if (!config.pwa.enabled) return

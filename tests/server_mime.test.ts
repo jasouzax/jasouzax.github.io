@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { find_by_name, mime_from_name, mime_info_of, mime_table } from "../src/mime.ts"
+import { find_by_name, mime_from_name, mime_info_of, mime_table } from "../shared/mime.ts"
 
 test("compound extensions pick the automation types, plain ones keep their old type", () => {
     assert.equal(mime_from_name("backup.auto.js"), "application/auto-javascript")

@@ -14,8 +14,8 @@
 import { existsSync, statSync } from "fs"
 import { basename, dirname, join } from "path"
 import { userInfo } from "os"
-import type { Agent_Message, Client_Message, Relayed, Routed } from "./shared/protocol.ts"
-import { from_base64, to_base64 } from "./shared/codec.ts"
+import type { Agent_Message, Client_Message, Relayed, Routed } from "../../shared/protocol/wire.ts"
+import { from_base64, to_base64 } from "../../shared/protocol/codec.ts"
 import { open_pty, pick_backend } from "./pty.ts"
 import type { Pty_Backend, Pty_Events, Pty_Options, Pty_Session } from "./pty.ts"
 

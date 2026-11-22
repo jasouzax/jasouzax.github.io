@@ -1,7 +1,7 @@
 import { createServer } from "node:http"
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs"
 import { join, extname, resolve } from "node:path"
-import { inside } from "../paths.ts"
+import { inside } from "../../shared/paths.ts"
 import { is_work_path } from "./security.ts"
 
 const types: Record<string, string> = {

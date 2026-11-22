@@ -2,8 +2,8 @@
 import type { Work_Env } from "./work.ts"
 import { auth_hash, session_token, type Auth_Session } from "./auth.ts"
 import { google_access } from "./google_grant.ts"
-import { decode_key, encode_key } from "../work_crypto.ts"
-import type { Client_Key } from "../web/client/work_drive.ts"
+import { decode_key, encode_key } from "../../shared/work/crypto.ts"
+import type { Client_Key } from "../../shared/work/drive.ts"
 import { api_error } from "./security.ts"
 
 type Backup = { room_id: string, sealed: string }

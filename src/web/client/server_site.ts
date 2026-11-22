@@ -25,7 +25,7 @@ import { override_navigation, sync_navigation, type Live_Navigation } from "./de
 import { window_audio_enabled } from "./desk_window_controls.ts"
 import { Click_Counter, copy_shortcut, key_events, modifiers, mouse_button, page_point, wheel_pixels } from "./server_input.ts"
 import { is_site_url, site_key, site_url_of, window_id_of } from "./server_windows.ts"
-import type { Input_Event, Window_Info } from "../../../server/src/shared/protocol.ts"
+import type { Input_Event, Window_Info } from "../../../shared/protocol/wire.ts"
 
 export const site_mime = "application/auto-site"
 const fit_debounce_ms = 150

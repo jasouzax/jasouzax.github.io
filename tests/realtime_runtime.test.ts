@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { build } from "esbuild"
 import { Miniflare, convertV4MiniflareOptions } from "miniflare"
 import { auth_hash } from "../src/node/auth.ts"
-import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../src/work_crypto.ts"
+import { encode_key, generate_owner_key, wrap_room_key, encrypt_message, decrypt_message } from "../shared/work/crypto.ts"
 
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 function stream(ws: any) {

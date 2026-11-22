@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `server/` (Electron agent, own `package.json`), `server/src/shared/protocol.ts` (the wire contract), `src/node/server_hub.ts` (Durable Object + routes), `src/web/client/server_*.ts` (desk integration), `content/server.xml`
+- **Code:** `server/` (Electron agent, own `package.json`), `shared/protocol/wire.ts` (the wire contract), `src/node/server_hub.ts` (Durable Object + routes), `src/web/client/server_*.ts` (desk integration), `content/server.xml`
 - **Replaces:** the standalone *Browsite* prototype. Everything it did (scripts, windows, live feed, APIs) lives here; nothing of Browsite remains to deploy.
 - **Related guides:** [desk.md](desk.md), [filesystem.md](filesystem.md), [personal_server.md](personal_server.md), [desk_env.md](desk_env.md)
 
@@ -10,7 +10,7 @@
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
-- [x] Wire protocol shared by agent, Durable Object and page (`server/src/shared/protocol.ts`)
+- [x] Wire protocol shared by agent, Durable Object and page (`shared/protocol/wire.ts`)
 - [x] Pi agent: Electron app that dials out to the Worker, reconnects with backoff, serves fs, pty, scripts, windows, APIs and fastfetch (logic tested without Electron)
 - [x] Worker: `Server_Hub` Durable Object (hibernating sockets, endpoint map, one-minute public snapshot) and `/api/server/*`
 - [x] Worker: `jasouza.com/api/{endpoint}` gateway to scripts that publish APIs
@@ -93,7 +93,7 @@ An Electron app started by hand on the Pi (`cd server && npm start`, or `npm run
 
 ### Wire protocol (summary)
 
-Every text frame is JSON with a `t` field. Owners and the agent never talk directly: the Durable Object adds `peer` (the owner socket's id) to what it relays to the agent and routes `to` (a peer or `"*"`) from the agent back. Binary frames: `[kind u8][window id u32 BE][payload]` (1 = JPEG, 2 = Opus with a float64 timestamp). Full types: `server/src/shared/protocol.ts`.
+Every text frame is JSON with a `t` field. Owners and the agent never talk directly: the Durable Object adds `peer` (the owner socket's id) to what it relays to the agent and routes `to` (a peer or `"*"`) from the agent back. Binary frames: `[kind u8][window id u32 BE][payload]` (1 = JPEG, 2 = Opus with a float64 timestamp). Full types: `shared/protocol/wire.ts`.
 
 | Family | Owner → agent | Agent → owner |
 |---|---|---|

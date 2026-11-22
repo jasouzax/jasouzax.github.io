@@ -16,8 +16,8 @@
  *   Does not own the Electron windows or the shell processes: those are the injected collaborators.
  */
 import type { EventEmitter } from "events"
-import type { Agent_Message, Agent_To_Hub, Clipboard_Data, Client_Message, Fs_Request, Hub_To_Agent, Input_Event, Relayed, Routed, Selector_Candidate, Window_Info } from "./shared/protocol.ts"
-import { pack_audio, pack_video } from "./shared/codec.ts"
+import type { Agent_Message, Agent_To_Hub, Clipboard_Data, Client_Message, Fs_Request, Hub_To_Agent, Input_Event, Relayed, Routed, Selector_Candidate, Window_Info } from "../../shared/protocol/wire.ts"
+import { pack_audio, pack_video } from "../../shared/protocol/codec.ts"
 import { Fs_Error, handle_fs } from "./fs_channel.ts"
 import type { Pty_Channel } from "./pty_channel.ts"
 import type { Script_Runner } from "./runner.ts"

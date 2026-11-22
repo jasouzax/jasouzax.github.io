@@ -3,7 +3,7 @@
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
 
 import type { desk_window } from "./desk.ts"
-import { find_by_name } from "../../mime.ts"
+import { find_by_name } from "../../../shared/mime.ts"
 import { state, text, new_window, focus_window, refresh_tab, working_directory } from "./desk.ts"
 import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handlers } from "./desk_view.ts"
 import { resolve as resolve_node } from "./desk_vfs.ts"

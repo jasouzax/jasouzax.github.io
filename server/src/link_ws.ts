@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { Open_Socket, Socket_Like } from './link.ts';
-import { max_frame_bytes } from './shared/protocol.ts';
+import { max_frame_bytes } from '../../shared/protocol/wire.ts';
 
 // The production socket: the `ws` package behind the small Socket_Like contract. Not imported by tests
 export const open_ws: Open_Socket = (url, headers) => {

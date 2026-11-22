@@ -1,4 +1,4 @@
-import { jsx, fragment, raw_text, serialize, to_html, type child } from "./vnode.tsx"
+import { jsx, fragment, raw_text, serialize, to_html, type child } from "../../shared/vnode/vnode.tsx"
 import { raw } from "./markup.tsx"
 import type { render_ctx } from "./html_common.tsx"
 import { t } from "./html_common.tsx"

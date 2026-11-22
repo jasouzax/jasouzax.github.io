@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID } from 'crypto';
-import { agent_client_id } from './shared/protocol.ts';
+import { agent_client_id } from '../../shared/protocol/wire.ts';
 
 // Headers that make the Worker accept the upgrade: the same HMAC as src/node/security.ts (sign_origin, "hash" mode, empty body).
 // Fresh on every attempt: the Worker refuses a nonce it has seen and a timestamp more than a minute off

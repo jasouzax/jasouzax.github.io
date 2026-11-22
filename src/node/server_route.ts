@@ -14,8 +14,8 @@
  * Limits
  *   Without the SERVER_HUB binding every route here fails closed (503), and unknown /api/* paths keep their 501.
  */
-import { agent_client_id, api_body_limit, api_name_pattern, reserved_api_names } from "../../server/src/shared/protocol.ts"
-import type { Public_Status } from "../../server/src/shared/protocol.ts"
+import { agent_client_id, api_body_limit, api_name_pattern, reserved_api_names } from "../../shared/protocol/wire.ts"
+import type { Public_Status } from "../../shared/protocol/wire.ts"
 import { read_session } from "./auth.ts"
 import { api_error, verify_origin } from "./security.ts"
 import type { Work_Env } from "./work.ts"

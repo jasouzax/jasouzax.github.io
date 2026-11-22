@@ -1,7 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import type { site_model } from "./model.ts"
-import { inside } from "./paths.ts"
+import { inside } from "../shared/paths.ts"
 
 // Leading slashes address the content root; other XML paths address the declaring file.
 export function content_file(content_dir: string, reference: string, origin?: string): string | null {

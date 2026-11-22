@@ -19,7 +19,7 @@ import { fetch_public_status } from "./server_link.ts"
 import { init_site_sources } from "./server_site.ts"
 import { mode_of, snapshot_text, type Server_Mode } from "./server_text.ts"
 export { mode_of, snapshot_text, type Server_Mode }
-import type { Public_Status } from "../../../server/src/shared/protocol.ts"
+import type { Public_Status } from "../../../shared/protocol/wire.ts"
 
 export const server: { mode: Server_Mode, status: Public_Status | null, failed: boolean, live_refresh: (() => void) | null } = { mode: "unknown", status: null, failed: false, live_refresh: null }
 

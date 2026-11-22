@@ -5,11 +5,11 @@
  */
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { parse_xml } from "../xml.ts"
-import type { xml_node } from "../xml.ts"
-import { validate_roots } from "../schema.ts"
-import { new_diagnostics } from "../diag.ts"
-import { project_declarations } from "../pipeline_types.ts"
+import { parse_xml } from "../../shared/content/xml.ts"
+import type { xml_node } from "../../shared/content/xml.ts"
+import { validate_roots } from "../../shared/content/schema.ts"
+import { new_diagnostics } from "../../shared/diag.ts"
+import { project_declarations } from "../../shared/content/pipeline.ts"
 import type { Server_Config } from "./server_config.ts"
 
 function xml_files(path: string): string[] {

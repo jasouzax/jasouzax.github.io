@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { gateway_route, gateway_target, server_route, type Edge_Cache, type Server_Env } from "../src/node/server_route.ts"
 import { route, type worker_env } from "../src/node/worker.ts"
 import { sign_origin } from "../src/node/security.ts"
-import { agent_client_id } from "../server/src/shared/protocol.ts"
+import { agent_client_id } from "../shared/protocol/wire.ts"
 
 const token = "A".repeat(43)
 const cookie = `__Host-jazu_session=${token}`

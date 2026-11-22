@@ -1,4 +1,4 @@
-import type { Script_Info, Window_Info } from "../../../server/src/shared/protocol.ts"
+import type { Script_Info, Window_Info } from "../../../shared/protocol/wire.ts"
 
 export type Session = { path: string, running: boolean, autostart?: boolean, restarting?: boolean, windows: Window_Info[] }
 export class Session_Store {

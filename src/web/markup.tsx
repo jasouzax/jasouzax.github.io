@@ -1,5 +1,5 @@
 import { parseFragment } from "parse5"
-import { jsx, fragment, raw_text, type child } from "./vnode.tsx"
+import { jsx, fragment, raw_text, type child } from "../../shared/vnode/vnode.tsx"
 
 // Explicit build-only boundary for trusted signature SVG and Markdown rendered
 // with HTML disabled. Raw markup never appears in a browser page payload.

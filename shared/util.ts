@@ -54,7 +54,7 @@ export function unique<item>(items: item[]): item[] {
     return [...new Set(items)]
 }
 
-export type html = import("./web/vnode.tsx").child
+export type html = import("./vnode/vnode.tsx").child
 
 type attr_value = string | number | boolean | undefined | null
 

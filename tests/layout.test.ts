@@ -1,8 +1,32 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import postcss from "postcss"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { dirname, join, relative, resolve } from "node:path"
 import { split_layout_css } from "../src/layout_css.ts"
 import { headers_file, inline_script_hash } from "../src/web/seo.tsx"
+
+test("component roots import only themselves and shared contracts", () => {
+    const root = process.cwd()
+    const violations: string[] = []
+    const visit = (directory: string, owner: string): void => {
+        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+            if (["node_modules", "dist", "test", "tests", ".git"].includes(entry.name)) continue
+            const file = join(directory, entry.name)
+            if (entry.isDirectory()) { visit(file, owner); continue }
+            if (!/\.[cm]?[jt]sx?$/.test(entry.name)) continue
+            const source = readFileSync(file, "utf8")
+            for (const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|\bimport\s*)["'](\.[^"']+)["']/g)) {
+                const target = relative(root, resolve(dirname(file), match[1])).replace(/\\/g, "/").split("/")[0]
+                if (target !== owner && target !== "shared") violations.push(`${relative(root, file)} -> ${match[1]}`)
+            }
+        }
+    }
+    for (const owner of ["engine", "desk", "cloud", "server", "app", "extension", "shared"]) {
+        if (existsSync(join(root, owner))) visit(join(root, owner), owner)
+    }
+    assert.deepEqual(violations, [])
+})
 
 test("shared geometry keeps responsive state and dependent variables without importing a theme palette", () => {
     const result = split_layout_css(`

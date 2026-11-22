@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { Server_Link, Fs_Error, fetch_public_status, default_socket_url, type Socket_Like, type Timer_Api } from "../src/web/client/server_link.ts"
-import { pack_video } from "../server/src/shared/codec.ts"
+import { pack_video } from "../shared/protocol/codec.ts"
 
 class Fake implements Socket_Like {
     readyState = 0; binaryType = ""; sent: string[] = []

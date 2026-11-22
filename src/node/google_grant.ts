@@ -1,5 +1,5 @@
 /* Provider credentials are sealed per session; message encryption keys never pass through this module. */
-import { encode_key, decode_key } from "../work_crypto.ts"
+import { encode_key, decode_key } from "../../shared/work/crypto.ts"
 import { auth_hash } from "./auth.ts"
 import type { Work_Env } from "./work.ts"
 const drive_scope = "https://www.googleapis.com/auth/drive.appdata"

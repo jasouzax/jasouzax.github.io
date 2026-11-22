@@ -2,7 +2,7 @@
 
 > Status checklist and technical contract. Overview of all features: [README.md](README.md). Developer entry: [../README.md](../README.md).
 
-- **Code:** `src/web/*.tsx`, `src/web/vnode.tsx`, `src/web/seo*.tsx`, `src/web/client/{boot,spa,menus,search,scroll}.ts`
+- **Code:** `src/web/*.tsx`, `shared/vnode/vnode.tsx`, `src/web/seo*.tsx`, `src/web/client/{boot,spa,menus,search,scroll}.ts`
 - **Related guides:** [docs/src/web.md](../src/web.md), [docs/src/client.md](../src/client.md)
 - **Component numbers** such as `1.4` are stable ids used across the docs (index in [README.md](README.md#component-number-index)).
 
@@ -10,7 +10,7 @@
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
-- [x] TSX page generators with a custom JSX factory returning virtual nodes (`src/web/vnode.tsx`)
+- [x] TSX page generators with a custom JSX factory returning virtual nodes (`shared/vnode/vnode.tsx`)
 - [x] `to_html` (build) and `to_dom` (browser) renderers with regression tests
 - [x] SEO: meta, Open Graph, JSON-LD, sitemap, robots, manifest, llms.txt, security.txt, `_headers`, `_redirects`, generated icons and cover images (2.7)
 - [x] SPA navigation, search, theme switching, preferences and header menus (3.1–3.4)

@@ -1,5 +1,5 @@
-import { decrypt_message, unwrap_room_key, type Work_Envelope, type Owner_Wrap } from "../work_crypto.ts"
-import type { Device_Key } from "./notification_store.ts"
+import { decrypt_message, unwrap_room_key, type Work_Envelope, type Owner_Wrap } from "../work/crypto.ts"
+import type { Device_Key } from "./store.ts"
 export type Message_Notice = { channel: string, conversation: string, id: string, sender: string, href: string }
 export type Preview_Response = { email: string, owner_wrap: Owner_Wrap | null, message: { id: string, author: "owner" | "client", envelope: Work_Envelope } }
 export async function preview_message(data: Message_Notice, device: Device_Key, upstream: typeof fetch = fetch): Promise<string> {

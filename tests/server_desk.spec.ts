@@ -1,6 +1,6 @@
 import type { WebSocketRoute } from "@playwright/test"
 import { test, expect, type Page } from "./desk_fixture.ts"
-import type { Window_Info } from "../server/src/shared/protocol.ts"
+import type { Window_Info } from "../shared/protocol/wire.ts"
 
 async function owner(page: Page, stale_plugins = false) {
     const messages: any[] = []

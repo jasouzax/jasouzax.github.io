@@ -1,4 +1,4 @@
-import type { Selector_Candidate } from './shared/protocol.ts';
+import type { Selector_Candidate } from '../../shared/protocol/wire.ts';
 
 // Finds the most resilient pure CSS selectors of an element: it prefers identity (test hooks, validated
 // IDs, ARIA / data attributes) over structure, anchors on the nearest unique ancestor and adds as few

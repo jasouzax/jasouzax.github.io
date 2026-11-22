@@ -7,7 +7,7 @@
  *   site_url_of    the first http(s) URL in the text of an application/auto-site file
  *   window_uri / window_id_of   `server:window:<id>`, the source of a desk window that shows a script's window
  */
-import type { Window_Info } from "../../../server/src/shared/protocol.ts"
+import type { Window_Info } from "../../../shared/protocol/wire.ts"
 
 export const window_uri_prefix = "server:window:"
 

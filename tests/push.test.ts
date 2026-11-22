@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite"
 import { readFileSync, readdirSync } from "node:fs"
 import { push_route, push_deliver, push_endpoint } from "../src/node/push.ts"
 import { auth_hash, auth_route } from "../src/node/auth.ts"
-import { encode_key, decode_key, encrypt_message, generate_owner_key, wrap_room_key } from "../src/work_crypto.ts"
-import { preview_message } from "../src/web/notification_preview.ts"
+import { encode_key, decode_key, encrypt_message, generate_owner_key, wrap_room_key } from "../shared/work/crypto.ts"
+import { preview_message } from "../shared/notification/preview.ts"
 import type { Work_Env, Work_Statement } from "../src/node/work.ts"
 const origin = "https://example.com", random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 async function fixture() {

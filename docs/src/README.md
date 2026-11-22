@@ -9,8 +9,8 @@ For people (and AI agents) changing how the website is **built, rendered, run or
 | Browser runtime | [client.md](client.md) | `src/web/client/*.ts` |
 | Desktop (`desk`): kernel, shell, WASM programs | [desk.md](desk.md) | `src/desk/`, `src/web/client/{kernel,wasm_*,desk_*}.ts` |
 | Nodes: Worker, personal server, local server, deploy | [node.md](node.md) | `src/node/` |
-| Google sign-in and encrypted Work chat | [Work contract and setup](../feat/work.md#encrypted-messaging-implementation) | `src/work_crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_messages,sign}.ts` |
-| Helpers: paths, util, dates, icons, mime, fonts, theme CSS | [helper.md](helper.md) | `src/util.ts`, `paths.ts`, `diag.ts`, `dates.ts`, `era.ts`, `icons.ts`, `mime.ts`, `gitignore.ts`, `raster.ts`, `font_build.ts`, `font/`, `theme_css.ts`, `layout_css.ts` |
+| Google sign-in and encrypted Work chat | [Work contract and setup](../feat/work.md#encrypted-messaging-implementation) | `shared/work/crypto.ts`, `src/node/{work,auth}.ts`, `src/web/client/{desk_messages,sign}.ts` |
+| Helpers: paths, util, dates, icons, mime, fonts, theme CSS | [helper.md](helper.md) | `shared/util.ts`, `paths.ts`, `diag.ts`, `dates.ts`, `era.ts`, `icons.ts`, `mime.ts`, `gitignore.ts`, `raster.ts`, `font_build.ts`, `font/`, `theme_css.ts`, `layout_css.ts` |
 | Infrastructure as code | [../infra.md](../infra.md) | `terraform/`, `migrations/`, `wrangler.local.jsonc` |
 | Tests | [tests.md](tests.md) | `tests/` |
 
@@ -60,3 +60,7 @@ dist/, .cache/ (ignored) generated output and incremental state
 ## Data flow in one paragraph
 
 `content/**` + `config.json` → `load_site` (parse, validate, expand generators, collect referenced resources) → `build_expertise` per language → compile plugins, themes (SCSS → CSS, fonts) and the inline skeleton → bundle browser runtime with esbuild (+ BusyBox/program WASM into `assets/wasm`) → render each page with TSX to HTML and to a JSON vnode payload (skipping pages whose hash is unchanged) → write SEO files, icons, covers, `_headers`, `_redirects` → write only changed files to `dist/` and prune the previous manifest. `deploy` stages `dist/` (splitting >25 MiB media for R2), bundles the Worker, and runs Terraform. See [engine.md](engine.md).
+
+## Shared contracts
+
+Cross-runtime modules live in `shared/`: `content/{schema,xml,pipeline,plugin}.ts`, `protocol/{wire,codec}.ts`, `work/{crypto,profile,drive}.ts`, `vnode/vnode.tsx`, `print/form.tsx`, `notification/{preview,store}.ts`, `sign.ts` and the config/basic helpers. Consumers import these paths directly. `tests/layout.test.ts` checks that component roots import only themselves or `shared/`. Legacy engine/browser/cloud code still lives in `src/` pending migration. Source hashes and listener fingerprints include `shared/`, and Docker copies it. The agent build uses repository-level `rootDir` so compiled code lives in `server/dist/server/src/` alongside `server/dist/shared/`.
