@@ -1,6 +1,7 @@
 <page lang="en" path="/desk" name="Desktop" icon="[desk]" rank="90" info="Free browser tools: a desktop of windows for text, images, video and vector editing.">
         <desk name="Desktop" icon="[desk]" info="Files and tools" auto="true">
             <menu name="Files" icon="[folder]" path="file:///">
+                <map/>
                 <entry type="Folder" id="fs_top" name="/" info="Root of the file system" open="true">
                     <entry type="Folder" id="fs_bin" name="bin" info="Essential commands" />
                     <entry type="Folder" id="fs_boot" name="boot" info="Boot loader files" />
@@ -24,6 +25,7 @@
                     <entry type="Folder" id="fs_var" name="var" info="Variable data" />
                 </entry>
             </menu>
+            <window/>
         </desk>
     </page>
 
@@ -38,6 +40,7 @@
 <page path="/desk" lang="ja" name="デスクトップ" icon="[desk]" rank="90" info="ブラウザで使える無料ツール：テキスト、画像、動画、ベクター編集のためのウィンドウ型デスクトップ。">
         <desk name="デスクトップ" icon="[desk]" info="ファイルとツール" auto="true">
             <menu name="ファイル" icon="[folder]" path="file:///">
+                <map/>
                 <entry type="Folder" id="fs_top" name="/" info="ファイルシステムのルート" open="true">
                     <entry type="Folder" id="fs_bin" name="bin" info="基本コマンド" />
                     <entry type="Folder" id="fs_boot" name="boot" info="ブートローダーのファイル" />
@@ -61,6 +64,7 @@
                     <entry type="Folder" id="fs_var" name="var" info="可変データ" />
                 </entry>
             </menu>
+            <window/>
         </desk>
     </page>
 

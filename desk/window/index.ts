@@ -27,6 +27,7 @@ import { message_body } from "./messages.ts"
 import { auto_script_body } from "../server/script.ts"
 import { auto_site_body } from "../server/site.ts"
 import { bind_window_controls } from "../action/controls.ts"
+import { register_map_resources } from "../menu/map.ts"
 
 // every child of the window except its head is the body
 export function set_body(item: desk_window, body: Node): void {
@@ -229,7 +230,7 @@ function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     body.className = "desk_mirror_body"
     const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body,
         media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
-        messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
+        messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
         for (const { context, module } of candidates) {
@@ -269,7 +270,7 @@ function body_for(item: desk_window): void {
         sync_save(item)
         return
     }
-    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window }
+    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return

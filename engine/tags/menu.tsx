@@ -7,6 +7,7 @@ import { child_nodes } from "../../shared/content/xml.ts"
 import type { html } from "../../shared/util.ts"
 import type { render_ctx } from "./page/context.tsx"
 import { glyph, icon } from "./page/context.tsx"
+import { ui_text } from "../load/model.ts"
 
 export function render_side_head(ctx: render_ctx, desk: xml_node): html {
     const sides = child_nodes(desk, "menu")
@@ -27,6 +28,7 @@ export function render_side_head(ctx: render_ctx, desk: xml_node): html {
             <header class={"desk_side_head"}>
                 {glyph(ctx, desk.attrs.icon, "desk_side_icon")}
                 <h2 class={"desk_side_name"}>{desk.attrs.name ?? ""}</h2>
+                <button type="button" class="desk_side_mode needs_js" aria-pressed="false" hidden>{ui_text(ctx.model, ctx.lang, "desk_map")}</button>
                 <p class={"desk_side_info"}>{desk.attrs.info ?? ""}</p>
                 <nav class={"desk_side_tabs"}>
                     <ul class={"desk_side_tabs_ul"}>{tabs}</ul>

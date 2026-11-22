@@ -31,6 +31,10 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 ## Window bodies and plugins
 
+`desk/menu/map.ts` owns map mode, active-menu synchronization and observer disposal; `desk/menu/map/model.ts` owns deterministic placement and zoom. `engine/tags/map.tsx` preserves metadata and fallback links. Plugins call `context.host.register_map_resources(() => ({ nodes, edges }), context.signal)`. Nodes have unique `id`, `name` and optional `info`, `icon`, `link`, `parent`, `x`, `y`, `active`, `hidden`; edges have `from`, `to` and optional `text`.
+
+`desk/action/save/destination.ts` owns the VFS destination dialog and permission/name/overwrite checks. `desk/action/save.ts` serializes duplicate saves per shared document, preserves drafts on cancellation/failure and updates navigation after writing.
+
 `desk_plugins.ts` loads the plugin manifest, picks the first matching plugin/case via `plugin_types.ts`, and asks `desk_view.ts` for the body (`text`, `hex`, `folder`, `media`, `shell`, `markdown`, `default`) or a plugin script's `render`. Plugin scripts can contribute through `host.state.desk` / `host.state.windows`.
 
 ## <a id="artifacts"></a>Build artifacts (important)

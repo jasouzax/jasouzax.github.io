@@ -1,6 +1,7 @@
 import { plugin_matches, select_case, select_flow_case, plugin_serves_flow, type plugin_info, type plugin_case } from "../../shared/content/plugin.ts"
 import { flow_kind_of } from "./flow.ts"
 import type { desk_window, state as desk_state } from "../index.ts"
+import type { register_map_resources } from "../menu/map.ts"
 
 export type plugin_host = {
     html: (item: desk_window, signal: AbortSignal) => HTMLElement
@@ -19,6 +20,7 @@ export type plugin_host = {
     text: (key: string) => string
     render_window: (item: desk_window) => void
     save_window: (item: desk_window) => Promise<void>
+    register_map_resources: typeof register_map_resources
 }
 
 export type plugin_context = {

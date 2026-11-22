@@ -19,6 +19,13 @@
   },
   "languages": {
     "en": {
+      "desk_map": "Map",
+      "save_destination": "Save to folder",
+      "save_overwrite": "Replace the existing file",
+      "desk_windows": "Windows",
+      "map_zoom_in": "Zoom in",
+      "map_zoom_out": "Zoom out",
+      "map_reset": "Reset view",
       "sign_out_google": "Sign out of Google",
       "sign_out_google_title": "Sign out of this website; your Google account remains signed in to Google.",
       "delete_account": "Delete Account",
@@ -297,6 +304,13 @@
       "pwa_offline": "Offline · Public pages and themes are available. Desk and messaging require a connection."
     },
     "ja": {
+      "desk_map": "マップ",
+      "save_destination": "保存先フォルダー",
+      "save_overwrite": "既存のファイルを置き換える",
+      "desk_windows": "ウィンドウ",
+      "map_zoom_in": "拡大",
+      "map_zoom_out": "縮小",
+      "map_reset": "表示をリセット",
       "sign_out_google": "Googleからログアウト",
       "sign_out_google_title": "このサイトからログアウトします。Google自体のログイン状態は変わりません。",
       "delete_account": "アカウントを削除",

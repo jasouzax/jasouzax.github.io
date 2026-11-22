@@ -1,0 +1,27 @@
+// Map geometry is shared by every theme; colour follows the active theme's tokens.
+.desk[data-map-ready] .desk_side_page .desk_map { display: none; }
+.desk_map_view {
+    grid-area: 1 / 3 / -1 / -2;
+    min-width: 0;
+    min-height: 24em;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    color: var(--text);
+    overflow: hidden;
+}
+.desk_map_tools { display: flex; flex-wrap: wrap; gap: .5em; padding: .5em; }
+.desk_map_surface { position: relative; flex: 1; min-height: 20em; overflow: hidden; touch-action: none; cursor: grab; }
+.desk_map_surface:active { cursor: grabbing; }
+.desk_map_canvas { position: absolute; inset: 0; transform-origin: 0 0; }
+.desk_map_edges { position: absolute; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.desk_map_edges path { stroke: currentColor; fill: none; stroke-width: 1.5; }
+.desk_map_edges text { fill: currentColor; font-size: 12px; }
+.desk_map_node { position: absolute; box-sizing: border-box; width: 220px; min-height: 80px; padding: .5em; background: var(--panel); border: 1px solid currentColor; border-radius: .25em; overflow-wrap: anywhere; }
+.desk_map_node[data-active] { outline: 3px solid var(--accent, currentColor); }
+.desk_map_node[data-hidden-resource] { border-style: dashed; }
+.desk_map_node_info { margin: .25em 0 0; font-size: .8em; max-height: 3em; overflow: auto; }
+.desk_map_node_name { display: block; }
+@media (orientation: portrait) {
+    .desk_map_view { grid-area: 1 / 1; min-height: calc(100dvh - 5em); }
+}

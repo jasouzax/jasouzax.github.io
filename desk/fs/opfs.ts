@@ -323,7 +323,8 @@ export function redraw(): void {
     tree.selection = new Set([...tree.selection].filter(path => find_node(path)))
     if (tree.anchor && !find_node(tree.anchor)) { tree.anchor = tree.selected?.path ?? null; tree.range_base = null }
     const holder = tree.page
-    holder.replaceChildren(render_node(tree.root, tree))
+    const decorations = [...holder.children].filter(child => child.matches(".desk_map, .desk_menu_foot"))
+    holder.replaceChildren(render_node(tree.root, tree), ...decorations)
     sync_buttons()
     // a row that waits for its name keeps the focus (and what was typed) through a redraw
     if (tree.draft) {

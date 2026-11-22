@@ -32,6 +32,8 @@ Children: `<menu>`, `<window>`.
 
 One tab of the side panel.
 
+The head grows with its description so tabs remain below the text. Its top-right button switches between the active tab's map and windows, preserving layout and focus. It appears only when the tab declares `<map>`; selecting a tab without one restores windows. In portrait the button also dismisses the menu overlay.
+
 | Attribute | Meaning |
 |---|---|
 | `name`, `icon` | Tab label |
@@ -60,9 +62,10 @@ Tool strip at the bottom of a menu tab (create file, upload, compose). Children:
 
 ### `<map>`
 
-A zoomable node-and-arrow diagram that belongs to a menu tab; a map button appears in the menu head when the active tab has one. *Pan/zoom and the window/map toggle are not implemented yet; today the static link-list fallback is rendered.*
+A zoomable node-and-arrow diagram belonging to a menu tab. Drag the background or use arrow keys to pan; use the wheel or buttons to zoom, and Reset view to restore the initial position. Keyboard `+`, `-` and `0` work with the surface focused. Window nodes restore/focus windows; file/process nodes open resources. Authored links work without JavaScript. A desk with maps and no authored windows starts in map mode.
 
 - `<map/>` with no children is **automatic** (derived from menu content and live resources).
+- Automatic maps include files, windows, split flows and processes. Dashed borders indicate minimized windows or processes without windows.
 - With children it is **manual**:
 
 | Element | Attributes |
@@ -90,6 +93,8 @@ Shows or edits one resource in a tile. Windows declared in content are the desk'
 The body is chosen by the [plugin](plugin.md) whose case matches (mime, url, mode). If none match, the window says viewing/editing is unsupported for that mime.
 
 Windows whose source is known at build time (markdown, text, images, code) are pre-rendered into the HTML so search engines and no-JavaScript readers get the content.
+
+Save writes to an existing writable source. New/read-only documents open a VFS destination picker at `/home/user`; choose a folder and filename. Replacing files requires selecting the overwrite checkbox. Cancel preserves the dirty draft. Later saves reuse the chosen path.
 
 ## Related
 

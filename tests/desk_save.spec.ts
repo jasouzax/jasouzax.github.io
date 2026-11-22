@@ -1,0 +1,61 @@
+/** Read-only source saving: destination browsing, cancellation, overwrite consent and durable bytes. */
+import { test, expect, type Page } from "./desk_fixture.ts"
+
+async function readonly_editor(page: Page): Promise<void> {
+    await page.route("**/readonly.txt", route => route.fulfill({ status: 200, contentType: "text/plain", body: "original read-only source" }))
+    await page.goto("/desk")
+    const source = page.locator(".desk_wbox_head_path").first()
+    await source.fill("/readonly.txt"); await source.press("Enter")
+    await expect(page.locator(".desk_wbox_body_text_input").first()).toHaveValue("original read-only source")
+    await page.locator(".desk_wbox_body_text_input").first().fill("persisted draft")
+}
+
+test("Save of a read-only resource selects a folder, persists bytes and reuses its new path", async ({ page }) => {
+    await readonly_editor(page)
+    await page.evaluate(async () => {
+        const home = await navigator.storage.getDirectory()
+        await home.getDirectoryHandle("drafts", { create: true })
+    })
+    await page.locator(".desk_wbox_head_save").first().click()
+    const dialog = page.getByRole("dialog", { name: "Save to folder" })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole("button", { name: "drafts", exact: true }).click()
+    await dialog.locator('input[name="filename"]').fill("note.txt")
+    await dialog.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.locator(".desk_wbox_head_path").first()).toHaveValue("file:///home/user/drafts/note.txt")
+    const read = () => page.evaluate(async () => (await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle("drafts")).getFileHandle("note.txt")).getFile()).text())
+    await expect.poll(read).toBe("persisted draft")
+    await expect(page.locator(".desk_wbox_head_save").first()).not.toHaveClass(/is_dirty/)
+    await page.locator(".desk_wbox_body_text_input").first().fill("second save")
+    await page.keyboard.press("Control+s")
+    await expect.poll(read).toBe("second save")
+    await expect(dialog).toHaveCount(0)
+})
+
+test("cancel preserves dirty edits and overwriting requires explicit selection", async ({ page }) => {
+    await readonly_editor(page)
+    const save = page.locator(".desk_wbox_head_save").first()
+    await save.click()
+    await page.keyboard.press("Escape")
+    await expect(page.locator("dialog")).toHaveCount(0)
+    await expect(save).toHaveClass(/is_dirty/)
+    await page.evaluate(async () => {
+        const file = await (await navigator.storage.getDirectory()).getFileHandle("existing.txt", { create: true })
+        const writer = await file.createWritable(); await writer.write("keep me"); await writer.close()
+    })
+    await save.click()
+    const dialog = page.getByRole("dialog")
+    await dialog.locator('input[name="filename"]').fill("../invalid.txt")
+    await dialog.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(dialog.getByRole("status")).not.toHaveText("")
+    await dialog.locator('input[name="filename"]').fill("existing.txt")
+    await dialog.getByRole("button", { name: "Save", exact: true }).click()
+    const overwrite = dialog.getByRole("checkbox", { name: "Replace the existing file" })
+    await expect(overwrite).toBeVisible()
+    expect(await page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle("existing.txt")).getFile()).text())).toBe("keep me")
+    await overwrite.check()
+    await dialog.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect.poll(() => page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle("existing.txt")).getFile()).text())).toBe("persisted draft")
+})

@@ -16,6 +16,8 @@ import { mime_table } from "../../shared/mime.ts"
 
 // Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
+    "desk_map", "desk_windows", "map_zoom_in", "map_zoom_out", "map_reset",
+    "save_destination", "save_overwrite",
     "sign_out_google",
     "sign_out_google_title",
     "delete_account",
@@ -207,6 +209,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const sides = child_nodes(desk, "menu")
     const pages = sides.map((side, index) => render_menu(ctx, side, index))
     const windows = window_infos(ctx, desk)
+    const map_only = !windows.length && sides.some(side => child_nodes(side, "map").length)
     // Match init_desk's initial empty window before the boot skeleton is captured.
     if (!windows.length) windows.push(empty_window_info(ctx))
     const columns = Math.max(1, Math.ceil(Math.sqrt(windows.length)))
@@ -219,7 +222,8 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
         "data-cwd": desk.attrs.cwd,
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
         "data-fixed": is_true(desk.attrs.fixed) ? "" : undefined,
-        "data-runtime": runtime ? "" : undefined
+        "data-runtime": runtime ? "" : undefined,
+        "data-map-initial": map_only ? "" : undefined
     }
     const side = (
         <>

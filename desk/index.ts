@@ -10,6 +10,7 @@ import { init_server } from "./server/desk.ts"
 import { init_server_owner } from "./server/owner.ts"
 import { adopt, release_links } from "./plugin/flow.ts"
 import { no_picks, type Child_Picks } from "./plugin/rules.ts"
+import { init_map, show_windows } from "./menu/map.ts"
 
 export type desk_data = {
     text: Record<string, string>
@@ -75,6 +76,7 @@ let row_weights: number[] = []
 let rows: desk_window[][] = []
 let custom = false
 let cancel_drag: (() => void) | null = null
+let dispose_map: (() => void) | null = null
 
 const portrait = matchMedia("(orientation: portrait)")
 
@@ -120,6 +122,7 @@ export function refresh_tab(item: desk_window): void {
     item.tab.title = label_of(item)
     const mark = item.el.querySelector(".desk_wbox_head_icon")
     if (mark) mark.textContent = item.icon
+    document.dispatchEvent(new Event("jazu:desk:change"))
 }
 
 function make_tab(item: desk_window): HTMLAnchorElement {
@@ -139,6 +142,7 @@ function restore_tabs(): void {
 // ---- layout -----------------------------------------------------------------------------------------------------------------------
 
 function shown_windows(): desk_window[] {
+    if (state.desk?.dataset.displayMode === "map") return []
     let list = state.windows.filter(item => !item.minimized)
     if (state.maximized) list = [state.maximized]
     // portrait is one window at a time: the focused one. When the focused window is minimized nothing is shown (like the Windows taskbar),
@@ -247,6 +251,7 @@ export function arrange(): void {
         else item.tab.removeAttribute("aria-current")
     }
     desk.toggleAttribute("data-empty", state.windows.length === 0)
+    document.dispatchEvent(new Event("jazu:desk:change"))
     if (flat) {
         desk.style.gridTemplateColumns = ""
         desk.style.gridTemplateRows = ""
@@ -300,6 +305,7 @@ export function arrange(): void {
 
 export function focus_window(item: desk_window | null): void {
     if (!item) return
+    show_windows()
     if (state.focused === item && !item.minimized) return
     item.minimized = false
     state.focused = item
@@ -309,6 +315,7 @@ export function focus_window(item: desk_window | null): void {
 // A child (made by split_window) starts with everything off: no type, no source, no mode. Its mode is "" until the user picks one.
 export function new_window(existing?: HTMLElement, parent: desk_window | null = null): desk_window | null {
     const desk = state.desk
+    if (!existing) show_windows()
     if (!existing && desk?.hasAttribute("data-fixed") && state.windows.length) {
         const item = state.focused ?? state.windows[0]
         focus_window(item)
@@ -356,6 +363,8 @@ export const window_hooks = {
 }
 
 function dispose(): void {
+    dispose_map?.()
+    dispose_map = null
     cancel_drag?.()
     for (const item of state.windows) { window_hooks.closed(item); release_links(item, false); item.tab.remove() }
     state.windows = []
@@ -704,6 +713,7 @@ export function toggle_maximize(item: desk_window | null): void {
 // Maximize is the exception: pressing the maximized window's own tab restores it, and pressing another window's tab while one is
 // maximized hands the full desk to the pressed window.
 export function activate(item: desk_window): void {
+    if (state.desk?.dataset.displayMode === "map") { show_windows(); focus_window(item); return }
     if (state.maximized) toggle_maximize(item)
     else if (item.minimized) focus_window(item)
     else if (state.focused === item) toggle_minimize(item)
@@ -743,6 +753,7 @@ export function init_desk(): void {
     // A desk whose windows are all made by the runtime starts blank: it opens with one empty window (the first file opened fills it).
     if (state.windows.length === 0) new_window()
     arrange()
+    dispose_map = init_map(desk)
 }
 
 let bound = false
