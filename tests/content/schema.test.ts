@@ -11,6 +11,11 @@ function errors(xml: string): string[] {
     return diag.errors
 }
 
+test("fixed desks accept boolean authoring", () => {
+    assert.deepEqual(errors('<page path="/" name="Home"><desk fixed><window view/></desk></page>'), [])
+    assert.deepEqual(errors('<page path="/" name="Home"><desk fixed="false"/></page>'), [])
+})
+
 test("skills and stacks are independent vocabulary entries", () => {
     assert.deepEqual(errors('<page path="/" name="Home"><expertise><skill id="web" name="Web" group="Software"/><stack id="ts" name="TypeScript"/></expertise></page>'), [])
     for (const attribute of ['info="old"', 'stack="ts"']) assert(errors(`<page path="/" name="Home"><expertise><skill name="Web" ${attribute}/></expertise></page>`).some(error => error.includes("unknown attribute")))

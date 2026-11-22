@@ -30,6 +30,9 @@ import { output_directory, output_file } from "../../shared/paths.ts"
 import { serialize, type serialized_node } from "../../shared/vnode/vnode.tsx"
 import { compile_plugins } from "../tags/plugin.ts"
 import { pwa_files } from "../routes/sw.js.ts"
+import { rss_xml } from "../routes/blogs/rss.xml.tsx"
+import { atom_xml } from "../routes/blogs/atom.xml.tsx"
+import { feed_path } from "../seo/rss.ts"
 
 export type build_options = {
     root: string
@@ -117,7 +120,7 @@ export async function build_site(options: build_options): Promise<build_result> 
     }
     if (!themes[config.default_theme]) throw new jazu_error(`default theme "${config.default_theme}" is not built`, 2)
     files.set("assets/themes/manifest.json", JSON.stringify(manifest))
-    const page_styles = emit_page_styles(model, files)
+    const page_styles = emit_page_styles(model, files, data_scss)
     fail_on_errors(diag)
     const runtime = await bundle_runtime(options.root, files, options.mode)
     const nav = JSON.stringify(nav_index(model))
@@ -151,6 +154,10 @@ export async function build_site(options: build_options): Promise<build_result> 
     }
     fail_on_errors(diag)
     files.set("sitemap.xml", sitemap_xml(model))
+    for (const lang of Object.keys(config.languages)) {
+        files.set(feed_path(model, lang, "rss").slice(1), rss_xml(model, lang))
+        files.set(feed_path(model, lang, "atom").slice(1), atom_xml(model, lang))
+    }
     files.set("robots.txt", robots_txt(model))
     files.set("_headers", headers_file([inline_script_hash(runtime.boot)], [inline_script_hash(inline_css)], model.config.base_url))
     files.set("_redirects", redirects_file())

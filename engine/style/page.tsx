@@ -7,6 +7,7 @@ import type { output_files } from "./theme.ts"
 import { report_error } from "../../shared/diag.ts"
 import { select_print } from "../tags/print/model.ts"
 import { short_hash, snake } from "../../shared/util.ts"
+import { compile_print } from "./print.ts"
 
 // A page-specific stylesheet: <style src="x.css" media="print"/> as a child of <page>. The file is copied as written (no scoping), so its
 // selectors start with the page's body class (see body_class) to stay page-specific. Pages navigate without a reload (client_spa), so the
@@ -31,14 +32,17 @@ export function page_style_text(page: page): string {
         .join("\u0000")
 }
 
-export function emit_page_styles(model: site_model, files: output_files): Map<page, page_style[]> {
+export function emit_page_styles(model: site_model, files: output_files, data_scss = ""): Map<page, page_style[]> {
     const result = new Map<page, page_style[]>()
+    const prints = new Map<xml_node, page_style>()
     for (const page of model.pages) {
         const styles: page_style[] = []
-        for (const node of [
-            ...child_nodes(page.node, "style"),
-            ...(select_print(model, page)?.children.filter((node) => node.tag === "style") ?? [])
-        ]) {
+        const print = select_print(model, page)
+        if (print) {
+            if (!prints.has(print)) prints.set(print, compile_print(model, print, files, data_scss))
+            styles.push(prints.get(print)!)
+        }
+        for (const node of child_nodes(page.node, "style")) {
             const { css, missing } = style_source(node)
             if (missing) {
                 report_error(model.diag, where_of(node), `page style not found: ${missing}`)

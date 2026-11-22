@@ -8,6 +8,8 @@
 
 ## Status
 
+- [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Native messaging host: framing, strict request validation, real pty shells (python backend with resize, `script` fallback), flow control, hang-up on exit (`tests/extension/host/host.test.ts`)

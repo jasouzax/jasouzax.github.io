@@ -90,7 +90,7 @@ export function scope_css(css: string, theme: string): string {
     return root.toString()
 }
 
-function rewrite_urls(css: string, base_dir: string, theme: string, files: output_files, model: site_model): string {
+export function rewrite_urls(css: string, base_dir: string, theme: string, files: output_files, model: site_model): string {
     const root = postcss.parse(css)
     root.walkDecls(decl => {
         decl.value = decl.value.replace(/url\(\s*(["']?)([^"')]+)\1\s*\)/g, (whole, quote: string, target: string) => {
@@ -113,7 +113,7 @@ function api_source(model: site_model, node: xml_node, data_scss: string): strin
     return `${data_scss}\n${palette_scss(node)}\n${api_mixins}`
 }
 
-function compile_scss(model: site_model, node: xml_node, style: xml_node, data_scss: string): { css: string, base_dir: string } {
+export function compile_scss(model: site_model, node: xml_node, style: xml_node, data_scss: string): { css: string, base_dir: string } {
     const base_dir = style.attrs.src ? dirname(resolve(dirname(node.file), style.attrs.src)) : dirname(node.file)
     const source = style.attrs.src ? readFileSync(resolve(dirname(node.file), style.attrs.src), "utf8") : `@use "jazu:api" as *;\n${style.text}`
     const api = api_source(model, node, data_scss)
@@ -189,7 +189,7 @@ function collect_preloads(css: string, families: string[]): string[] {
     return urls
 }
 
-function emit_font_to_map(model: site_model, font: xml_node, theme: string, files: output_files, url_dir: string): { css: string, preload: string[] } {
+export function emit_font_to_map(model: site_model, font: xml_node, theme: string, files: output_files, url_dir: string): { css: string, preload: string[] } {
     const dir = mkdtempSync(join(tmpdir(), "jazu_out_"))
     const result = emit_font(model, font, dirname(font.file), dir, url_dir, model.config.font_formats)
     for (const name of readdirSync(dir)) files.set(`assets/themes/${theme}/${name}`, readFileSync(join(dir, name)))

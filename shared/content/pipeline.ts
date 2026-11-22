@@ -10,7 +10,7 @@ import type { xml_node } from "./xml.ts"
 
 export type Pipeline_Phase = "ci" | "build" | "deploy"
 export type Pipeline_Step = { name: string, phase: Pipeline_Phase, command: string, args: string[], timeout_ms: number, credentials: string[], continue?: boolean }
-export type Project_Pipeline = { branch: string, steps: Pipeline_Step[] }
+export type Project_Pipeline = { branch: string, hook?: string, steps: Pipeline_Step[] }
 export type Project_Declaration = { remote?: string, pipeline?: Project_Pipeline, pipelines: Record<string, Project_Pipeline>, private: boolean, confidental?: boolean, collaborators?: string[], sources?: Repo_Source[] }
 export const pipeline_variables = ["project", "branch", "commit", "mirror_dir", "publish_state"]
 
@@ -56,6 +56,8 @@ export function valid_branch(branch: string): boolean {
 
 export function parse_pipeline(node: xml_node): Project_Pipeline {
     const branch = node.attrs.branch ?? "master"
+    const hook = node.attrs.hook
+    if (hook !== undefined && !/^[a-z0-9][a-z0-9-]{0,63}$/.test(hook)) throw new Error("pipeline hook must be a lowercase safe URL segment")
     if (!valid_branch(branch)) throw new Error("pipeline branch must be a safe Git branch name")
     if (node.attrs.poll_seconds !== undefined) throw new Error("pipeline poll_seconds was removed; use repository post-receive or manual sync")
     const names = new Set<string>()
@@ -88,5 +90,5 @@ export function parse_pipeline(node: xml_node): Project_Pipeline {
         if (credentials.some(name => !/^[A-Z][A-Z0-9_]*$/.test(name) || ["PATH", "HOME", "NODE_OPTIONS", "GIT_SSH_COMMAND", "LD_PRELOAD"].includes(name))) throw new Error("credentials must name secret environment variables, not runtime control variables")
         return { name, phase: phase as Pipeline_Phase, command, args: args as string[], timeout_ms: timeout * 1000, credentials, continue: step.attrs.continue === "true" }
     })
-    return { branch, steps }
+    return { branch, ...(hook ? { hook } : {}), steps }
 }

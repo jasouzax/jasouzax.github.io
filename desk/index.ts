@@ -309,6 +309,11 @@ export function focus_window(item: desk_window | null): void {
 // A child (made by split_window) starts with everything off: no type, no source, no mode. Its mode is "" until the user picks one.
 export function new_window(existing?: HTMLElement, parent: desk_window | null = null): desk_window | null {
     const desk = state.desk
+    if (!existing && desk?.hasAttribute("data-fixed") && state.windows.length) {
+        const item = state.focused ?? state.windows[0]
+        focus_window(item)
+        return item
+    }
     const template = document.getElementById("desk_window_template") as HTMLTemplateElement | null
     if (!desk || !template) return null
     const element = existing ?? template.content.firstElementChild!.cloneNode(true) as HTMLElement
@@ -334,7 +339,7 @@ export function new_window(existing?: HTMLElement, parent: desk_window | null = 
 // The head's split control: a new empty window beside this one, connected to it (desk_flow.ts). What the pair does depends on what the user
 // then picks in the child, and on the plugins (desk_view.ts). In portrait the child is a new tab, like any window.
 export function split_window(parent: desk_window | null): desk_window | null {
-    if (!parent || !state.desk) return null
+    if (!parent || !state.desk || state.desk.hasAttribute("data-fixed")) return null
     parent.minimized = false
     if (state.maximized) state.maximized = null
     const child = new_window(undefined, parent)
@@ -404,7 +409,7 @@ function on_click(event: MouseEvent): void {
 }
 
 export function toggle_minimize(item: desk_window | null): void {
-    if (!item) return
+    if (!item || state.desk?.hasAttribute("data-fixed")) return
     item.minimized = !item.minimized
     if (item.minimized && state.maximized === item) state.maximized = null
     state.focused = item
@@ -478,6 +483,7 @@ function take_out(item: desk_window): void {
 
 // puts the window in the row of `target` (before or after it) or in a row of its own above or below that row
 export function dock_window(item: desk_window, target: desk_window, side: "left" | "right" | "top" | "bottom"): void {
+    if (state.desk?.matches("[data-fixed], [data-auto]")) return
     sync_rows()
     if (item === target || !find_window(item) || !find_window(target)) return
     const before = shape_key()
@@ -492,6 +498,7 @@ export function dock_window(item: desk_window, target: desk_window, side: "left"
 }
 
 export function move_window(item: desk_window, way: string): void {
+    if (state.desk?.matches("[data-fixed], [data-auto]")) return
     const other = neighbour(item, way)
     if (other) {
         swap_windows(item, other)
@@ -530,6 +537,7 @@ function zone_of(box: HTMLElement, x: number, y: number): drop_zone {
 // another window the dragged window docks on that side of it; on the edge of its own window it moves that way, like the menu's options. A
 // press that does not travel is the ordinary click that opens the menu.
 function start_drag(event: PointerEvent): void {
+    if (state.desk?.matches("[data-fixed], [data-auto]")) return
     const summary = (event.target as Element).closest<HTMLElement>(".desk_wbox_head_drop > summary")
     const item = summary ? window_of(summary) : null
     if (!summary || !item || event.button !== 0 || portrait.matches) return
@@ -610,7 +618,7 @@ const min_track = 96
 
 function resize_tracks(vertical: boolean, boundary: number, delta: number, start: number[] | null = null): void {
     const desk = state.desk
-    if (!desk) return
+    if (!desk || desk.matches("[data-fixed], [data-auto]")) return
     const weights = vertical ? col_weights : row_weights
     const sizes = (getComputedStyle(desk)[vertical ? "gridTemplateColumns" : "gridTemplateRows"]).split(" ").map(parseFloat)
     // window tracks: columns are at 2, 4, ... (after the side and the edge), rows at 0, 2, ...
@@ -666,7 +674,7 @@ function key_resize(event: KeyboardEvent): void {
 
 // Closing removes the window completely: its element, its tab and whatever it held.
 export function close_window(item: desk_window | null): void {
-    if (!item) return
+    if (!item || state.desk?.hasAttribute("data-fixed")) return
     const index = state.windows.indexOf(item)
     window_hooks.closed(item)
     item.el.remove()
@@ -679,7 +687,7 @@ export function close_window(item: desk_window | null): void {
 }
 
 export function toggle_maximize(item: desk_window | null): void {
-    if (!item) return
+    if (!item || state.desk?.hasAttribute("data-fixed")) return
     if (state.maximized === item) state.maximized = null
     else {
         item.minimized = false
@@ -707,6 +715,7 @@ export function init_desk(): void {
     const desk = document.querySelector<HTMLElement>(".desk[data-runtime]")
     if (!desk) return
     state.desk = desk
+    for (const control of document.querySelectorAll<HTMLButtonElement>("#head_new, #head_mini, #head_full, #head_exit")) control.disabled = desk.hasAttribute("data-fixed")
     state.data = read_data()
     state.next_id = 1
     restore_tabs()

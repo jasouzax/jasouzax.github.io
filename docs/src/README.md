@@ -1,5 +1,7 @@
 # Site developer guide (`src/`)
 
+New entry points: [bootstrap/extension packaging](bootstrap.md), [cloud preflight](cloud-preflight.md), [JWT sessions](jwt-sessions.md), [Electron desktop](../../app/README.md). Print compilation lives in `engine/style/print.ts`; feed routes in `engine/routes/blogs/`; named hooks in `cloud/api/projects.ts` and `server/pipeline/hook.ts`. Reusable native messaging/PTY code is `shared/host/`.
+
 For people (and AI agents) changing how the website is **built, rendered, run or deployed**. Content authors should read [../content/README.md](../content/README.md) instead.
 
 | Area | Guide | Code |

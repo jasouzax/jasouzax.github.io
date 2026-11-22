@@ -39,6 +39,7 @@ export async function prepare_deploy(root: string, out: string, result: build_re
 export function load_env(root: string): void {
     const file = join(root, ".env")
     if (existsSync(file)) process.loadEnvFile(file)
+    if (process.env.AUTH_JWT_SECRET && !process.env.TF_VAR_auth_jwt_secret) process.env.TF_VAR_auth_jwt_secret = process.env.AUTH_JWT_SECRET
     for (const [name, variable] of [["ORIGIN_HMAC_SECRET", "TF_VAR_origin_hmac_secret"], ["ACCESS_CLIENT_ID", "TF_VAR_access_client_id"], ["ACCESS_CLIENT_SECRET", "TF_VAR_access_client_secret"], ["SERVER_AGENT_SECRET", "TF_VAR_server_agent_secret"], ["SERVER_OWNER_EMAILS", "TF_VAR_server_owner_emails"]]) {
         if (process.env[name] && !process.env[variable]) process.env[variable] = process.env[name]
     }

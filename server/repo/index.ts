@@ -8,6 +8,7 @@ import { git_route, handle_git_http, make_throttle } from "./git/http.ts"
 import { list_runs } from "../pipeline/runner.ts"
 import type { Server_Config } from "../config/repositories.ts"
 import { is_active, is_public, repository_path } from "../config/repositories.ts"
+import { pipeline_hook } from "../pipeline/hook.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
 export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config }
@@ -84,7 +85,11 @@ export function personal_server(options: personal_options) {
                 handle_git_http(incoming, outgoing, url, options.config, throttle)
                 return
             }
-            const response = request.method !== "GET" || !await verify_origin(request, options.secret, seen)
+            const hook = request.method === "POST" && url.pathname.startsWith("/projects/") && options.config && request.headers.get("x-jazu-client") === "pipeline"
+            const verified = await verify_origin(request, options.secret, seen)
+            const response = hook && verified
+                ? pipeline_hook(url.pathname, options.config!)
+                : request.method !== "GET" || !verified
                 ? api_error("unauthorized", "Signed GET request required", 401)
                 : read_response(request, options)
             outgoing.writeHead(response.status, Object.fromEntries(response.headers))

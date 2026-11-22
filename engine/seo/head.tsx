@@ -154,6 +154,8 @@ export function managed_head(model: site_model, page: page, theme_colors: [strin
     const modified = page_lastmod(model, page)
     const twitter = model.config.seo.twitter.replace(/^@?/, "@")
     const lines: child[] = [
+        <link rel="alternate" type="application/rss+xml" title="Blog RSS" href={`${page.lang === model.config.default_language ? "" : `/${page.lang}`}/blogs/rss.xml`} data-seo=""/>,
+        <link rel="alternate" type="application/atom+xml" title="Blog Atom" href={`${page.lang === model.config.default_language ? "" : `/${page.lang}`}/blogs/atom.xml`} data-seo=""/>,
         meta("name", "description", description, true),
         meta("name", "keywords", keywords.join(", "), true),
         meta("name", "author", owner, true),

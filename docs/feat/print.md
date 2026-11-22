@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] Print SCSS, fonts and assets compile behind print-only media.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Select the `<print>` root by page language: exact, prefix wildcard, then `*` (1.13)

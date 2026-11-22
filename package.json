@@ -7,6 +7,8 @@
     "jazu": "./src/main.ts"
   },
   "scripts": {
+    "app:build": "node app/build.mjs",
+    "test:app": "node --import tsx tests/app/smoke.ts",
     "build": "node src/main.ts build",
     "pkgbuild": "node --import tsx src/tools/pkgbuild.ts",
     "check": "node src/main.ts check",

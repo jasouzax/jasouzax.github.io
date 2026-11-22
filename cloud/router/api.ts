@@ -6,10 +6,12 @@ import { health_route } from "../api/health.ts"
 import { auth_route } from "../api/auth.ts"
 import { realtime_route } from "../room/room.ts"
 import { push_route } from "../api/push.ts"
+import { projects_route } from "../api/projects.ts"
 import { gateway_route, gateway_target, server_route } from "../api/server.ts"
 import type { worker_env } from "./index.ts"
 export async function api_route(request: Request, env: worker_env): Promise<Response> {
     const url = new URL(request.url), path = url.pathname
+    if (path.startsWith("/api/_/projects/")) return projects_route(request, env)
     if (path === "/api/_/realtime") return realtime_route(request, env)
     if (path === "/api/_/server" || path.startsWith("/api/_/server/")) return server_route(request, env)
     if (path.startsWith("/api/_/push/")) return push_route(request, env)

@@ -15,7 +15,7 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
     let id_token = ""
     const runtime = new Miniflare(convertV4MiniflareOptions({
         modules: true, script: bundle.outputFiles[0].text, compatibilityDate: "2026-11-04",
-        bindings: { GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "synthetic-secret", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com" },
+        bindings: { GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "synthetic-secret", GOOGLE_ADMIN_EMAIL: "jason@jasouza.com", AUTH_JWT_SECRET: "synthetic-runtime-key-that-is-at-least-32-characters" },
         d1Databases: ["DB"],
         outboundService: async request => {
             if (request.url === "https://www.googleapis.com/oauth2/v3/certs") return Response.json({ keys: [jwk] })
@@ -51,5 +51,12 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
         const cookie = callback.headers.getSetCookie().find(value => value.startsWith("__Host-jazu_session="))!.split(";")[0]
         const session = await runtime.dispatchFetch("https://staging.example.com/api/_/session", { headers: { cookie } })
         assert.deepEqual((await session.json() as any).user, { email: "jason@jasouza.com", name: "Owner", picture: "", role: "owner" })
+        const access = callback.headers.getSetCookie().find(value => value.startsWith("__Host-jazu_access="))!.split(";")[0]
+        const cached = await runtime.dispatchFetch("https://staging.example.com/api/_/session", { headers: { cookie: `${cookie}; ${access}` } })
+        const data = await cached.json() as any
+        assert.equal(data.user.role, "owner")
+        await db.prepare("DELETE FROM auth_sessions").run()
+        const logout = await runtime.dispatchFetch("https://staging.example.com/api/_/auth/logout", { method: "POST", headers: { cookie: `${cookie}; ${access}`, origin: "https://staging.example.com", "x-jazu-csrf": data.csrf, "x-jazu-work": "1" } })
+        assert.equal(logout.status, 403, "revoked refresh credentials cannot perform sensitive actions with a cached JWT")
     } finally { await runtime.dispose() }
 })

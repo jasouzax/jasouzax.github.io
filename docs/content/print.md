@@ -21,6 +21,8 @@ A page opts in with `print="resume"`. For a page in language L the engine choose
 
 Children: `<style>`, `<font>` (same as in [themes](theme.md), but scoped to print mode).
 
+Print styles accept SCSS (inline or `src`) and the theme `jazu:api` mixins. Fonts use the same generated/prebuilt pipeline as themes. Selected styles are emitted in a content-hashed stylesheet with both `media="print"` on its page link and an `@media print` wrapper. Font and relative asset changes update the stylesheet URL; SPA navigation loads only the current page's print stylesheet.
+
 ## The privacy rule
 
 **Only published information is used.**
