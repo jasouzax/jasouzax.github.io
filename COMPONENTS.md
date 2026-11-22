@@ -370,6 +370,8 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] `fixed` *(optional)* - Boolean, fixes the window setup, meaning no deleting/creating windows. Any request to open a new window instead opens in an existing window and adds to history. This is useful in `{domain}/work` where clients might get lost by accidentally closing a window or opening a new window.
             - [?] `auto` *(optional)* - Boolean, the desk grows with its content and shares the page scrollbar (blogs) instead of filling the viewport
             - [?] **Menu** `<menu>` `cmp:/content/page/desk/menu` - One tab of the desk's side panel menu (e.g. a list of blogs), if contains content it is hard-coded in the XML, rendered as real links, indexable and works without Javascript. At runtime javascript updates the content based on its `path`.
+                - [ ] **Head** `cmp:/content/page/desk/menu/head` - The desktop menu head has automatic height so its description never overflows or blocks the tabs area.
+                    - [ ] **Display mode** - A button in the top-right corner of the menu head toggles between `map` and `window` mode. Map mode hides the windows and shows the active menu's map (`cmp:/content/page/desk/menu/map`); window mode hides the map and shows the windows.
                 - [?] `name`, `icon` - Tab label
                 - [?] `path` *(optiona)* - URI source of the tab: `file:///`, `window:N:/options`, `im:{email}`, or one defined by a plugin
                 - [?] **Entry** `<entry>` `cmp:/content/page/desk/menu/entry` - A navigable item (file, folder, message, post, editor entity, sub-event). Entries nest without limit and nesting is sticky, so the chain of parents acts as the breadcrumb.
