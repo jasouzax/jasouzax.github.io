@@ -4,6 +4,17 @@ mock_provider "cloudflare" {
   }
 }
 
+run "preserve_existing_signing_key" {
+  command = plan
+  variables {
+    inherited_secret_names = ["VAPID_PRIVATE_KEY"]
+  }
+  assert {
+    condition = one([for binding in cloudflare_workers_script.router.bindings : binding.type if binding.name == "VAPID_PRIVATE_KEY"]) == "inherit" && one([for binding in cloudflare_workers_script.router.bindings : binding.text if binding.name == "VAPID_PRIVATE_KEY"]) == null
+    error_message = "An existing signing key must be inherited without sending an empty or replacement value."
+  }
+}
+
 variables {
   work_migrations_enabled = false
   account_id              = "test-account"

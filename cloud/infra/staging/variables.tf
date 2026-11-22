@@ -2,6 +2,16 @@ variable "account_id" {
   type = string
 }
 
+variable "inherited_secret_names" {
+  type        = set(string)
+  default     = []
+  description = "Existing Worker secrets to inherit unchanged when their values are unavailable locally. Confirm each exists before applying."
+  validation {
+    condition = length(setsubtract(var.inherited_secret_names, toset(["ORIGIN_HMAC_SECRET", "ACCESS_CLIENT_ID", "ACCESS_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", "WORK_FALLBACK_KEY", "VAPID_PRIVATE_KEY", "SERVER_AGENT_SECRET", "AUTH_JWT_SECRET"]))) == 0
+    error_message = "Only known secret bindings may be inherited."
+  }
+}
+
 variable "zone_id" {
   type = string
 }
