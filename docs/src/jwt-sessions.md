@@ -1,0 +1,7 @@
+# Access and refresh sessions
+
+`AUTH_JWT_SECRET` enables the five-minute access JWT in a separate `__Host-jazu_access` HttpOnly, Secure, SameSite=Lax cookie. The existing opaque `__Host-jazu_session` cookie is the refresh credential. Only its SHA-256 hash is stored in D1. Existing sessions upgrade on `/api/_/session` without signing in again. Unconfigured deployments retain opaque sessions.
+
+The discovery endpoint verifies HS256, token type, issuer, audience, required claims, age, expiry and the refresh-cookie hash before using a JWT without D1. An expired or missing access JWT is reissued only after a D1 check. Discovery may show cached identity for at most five minutes after remote revocation; it grants no operation authority. Every existing privileged API, Work operation and socket connection continues to call D1-backed `read_session`, including CSRF enforcement. Logout/deletion clear both cookies and revoke refresh records. Refresh tokens are not rotated because encrypted Google grants are bound to that credential.
+
+JWT claims and cryptographic verification use [jose](https://github.com/panva/jose/blob/main/docs/jwt/verify/interfaces/JWTVerifyOptions.md). Tests exercise cross-origin replay, mismatched refresh credentials, wrong signing keys, expiry, duplicate cookies, and revoked sensitive reads. Deploy the signing secret with the Worker; keep it private and stable. Real Google login still requires acceptance testing.

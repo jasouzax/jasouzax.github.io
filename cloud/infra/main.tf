@@ -14,6 +14,7 @@ locals {
   )
 
   secret_bindings = concat(
+    var.auth_jwt_secret == null ? [] : [{ name = "AUTH_JWT_SECRET", type = "secret_text", text = var.auth_jwt_secret }],
     var.origin_hmac_secret == null ? [] : [{ name = "ORIGIN_HMAC_SECRET", type = "secret_text", text = var.origin_hmac_secret }],
     var.server_agent_secret == null ? [] : [{ name = "SERVER_AGENT_SECRET", type = "secret_text", text = var.server_agent_secret }],
     var.access_client_id == null ? [] : [{ name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id }],

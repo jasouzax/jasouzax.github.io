@@ -14,6 +14,7 @@ import { work_changed } from "../room/work.ts"
 
 import { session_route } from "./session.ts"
 import { session_cookie, session_lifetime as month, cookie, read_cookie } from "./auth/cookies.ts"
+import { access_cookie, issue_access } from "./auth/jwt.ts"
 const flow_cookie = "__Host-jazu_oauth"
 const callback_path = "/api/_/auth/google/callback"
 const google_keys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"))
@@ -67,6 +68,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         await realtime_revoke(env, session.subject, await auth_hash(session_token(request)))
         const response = reply({ signed_out: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
+        response.headers.append("set-cookie", cookie(access_cookie, "", 0))
         return response
     }
     if (url.pathname === "/api/_/auth/account/delete" && request.method === "POST") {
@@ -96,6 +98,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         for (const room of linked_rooms) try { await work_changed(env, room.id, session.subject) } catch { /* Metadata is also refreshed on reconnect. */ }
         const response = reply({ deleted: true })
         response.headers.set("set-cookie", cookie(session_cookie, "", 0))
+        response.headers.append("set-cookie", cookie(access_cookie, "", 0))
         return response
     }
     if (url.pathname === "/api/_/auth/drive" && request.method === "POST") {
@@ -169,5 +172,12 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     }
     const response = redirect_work()
     response.headers.append("set-cookie", cookie(session_cookie, token, month / 1000))
+    if (env.AUTH_JWT_SECRET) {
+        const session = await read_session(new Request(request.url, { headers: { cookie: `${session_cookie}=${token}` } }), env)
+        if (session) {
+            const access = await issue_access(request, env, session, token)
+            if (access) response.headers.append("set-cookie", access)
+        }
+    }
     return response
 }

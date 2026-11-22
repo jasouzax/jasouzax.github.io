@@ -52,6 +52,16 @@ variable "project_clone_origins" {
   description = "Public HTTPS Git read origins derived from the project's XML repo attributes."
 }
 
+variable "auth_jwt_secret" {
+  type      = string
+  sensitive = true
+  default   = null
+  validation {
+    condition     = var.auth_jwt_secret == null ? true : length(var.auth_jwt_secret) >= 32
+    error_message = "AUTH_JWT_SECRET must contain at least 32 characters."
+  }
+}
+
 variable "work_fallback_key" {
   type      = string
   sensitive = true

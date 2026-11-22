@@ -1,4 +1,14 @@
 # ---- Owner inputs (cloud/infra/terraform.tfvars, never committed) ----
+variable "auth_jwt_secret" {
+  type      = string
+  sensitive = true
+  default   = null
+  validation {
+    condition     = var.auth_jwt_secret == null ? true : length(var.auth_jwt_secret) >= 32
+    error_message = "AUTH_JWT_SECRET must contain at least 32 characters."
+  }
+}
+
 variable "account_id" {
   type        = string
   description = "Cloudflare account id."
