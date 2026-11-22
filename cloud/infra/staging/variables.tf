@@ -21,6 +21,12 @@ variable "worker_bundle" {
   description = "Worker module bundled by setup.ts before Terraform runs."
 }
 
+variable "object_migration_enabled" {
+  type        = bool
+  default     = true
+  description = "Apply the initial realtime-v1 to server-v1 class migration. Set false after it has been applied; never replay it."
+}
+
 variable "staging_domain" {
   type    = string
   default = "staging.jasouza.com"

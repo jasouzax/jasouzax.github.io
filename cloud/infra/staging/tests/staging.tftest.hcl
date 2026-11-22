@@ -4,6 +4,17 @@ mock_provider "cloudflare" {
   }
 }
 
+run "do_not_replay_existing_migration" {
+  command = plan
+  variables {
+    object_migration_enabled = false
+  }
+  assert {
+    condition = cloudflare_workers_script.router.migrations == null
+    error_message = "Existing namespaces must be preserved without replaying the initial migration."
+  }
+}
+
 run "preserve_existing_signing_key" {
   command = plan
   variables {

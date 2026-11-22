@@ -17,6 +17,8 @@ The setup command also reads public project `repo` declarations into the Worker'
 
 ## Validation without provisioning
 
+Set `TF_VAR_object_migration_enabled=false` on an existing deployment that already applied `server-v1`. Replaying its initial class migration is rejected by Cloudflare. Omitting it preserves the existing Durable Objects; it does not delete them. New deployments still need the initial migration enabled.
+
 For an existing deployment whose secret values are unavailable locally, set `TF_VAR_inherited_secret_names` to a JSON array of existing secret names (for example `["VAPID_PRIVATE_KEY"]`). Terraform uploads those as Cloudflare `inherit` bindings and leaves their values unchanged. Verify the names exist on the live Worker first. Other required input variables still need valid values for validation, but inherited secret values are not uploaded. Do not generate replacement signing/recovery keys to fill a missing local backup. An inherited secret must be backed up separately by its original owner; Cloudflare does not return its value.
 
 Google sign-in reuses `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from private `.env`; the latter is a Worker secret. `GOOGLE_ADMIN_EMAIL` defaults to `jason@jasouza.com`, independently of the Google Cloud project owner. Register `https://staging.jasouza.com/api/_/auth/google/callback` as the Web client's exact redirect URI. Applying this root migrates D1 authentication tables before publishing the updated Worker. See [Google sign-in and account/key behavior](../../docs/feat/work.md#google-sign-in). No provider tokens or client secrets are embedded in Pages.
