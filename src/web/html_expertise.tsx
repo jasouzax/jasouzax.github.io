@@ -419,25 +419,7 @@ function render_media(ctx: render_ctx, entry: entry): html {
 }
 
 function render_tags(ctx: render_ctx, data: expertise_model, entry: entry): html {
-    const items = entry.tags.map((id) => {
-        const def = data.stack_defs.get(id)
-        const tag = `#${def?.tag ?? id}`
-        if (!def?.link)
-            return (
-                <>
-                    <li>{tag}</li>
-                </>
-            )
-        return (
-            <>
-                <li>
-                    <a href={def.link} target={"_blank"} rel={"noopener noreferrer"}>
-                        {tag}
-                    </a>
-                </li>
-            </>
-        )
-    })
+    const items = entry.tags.map(id => <li>{`#${data.stack_defs.get(id)?.name.replace(/\s+/g, "") ?? id}`}</li>)
     return (
         <>
             <ul class={"slide_tags"}>{items}</ul>

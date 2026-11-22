@@ -117,21 +117,6 @@ function resolve_list(value: string | undefined, table: Map<string, string>): st
         .join(", ")
 }
 
-function contact_lines(model: site_model, lang: string, node: xml_node): string[] {
-    const lines: string[] = []
-    for (const contact of child_nodes(node, "contact")) {
-        const label = contact.attrs.name ?? ""
-        const text = contact.attrs.text ?? ""
-        const link =
-            contact.attrs.link && !contact.attrs.link.startsWith("#")
-                ? ` <${link_target(model, lang, contact.attrs.link)}>`
-                : ""
-        if (label || text) lines.push(`- ${[label, text].filter(Boolean).join(": ")}${link}`)
-        lines.push(...contact_lines(model, lang, contact))
-    }
-    return lines
-}
-
 function read_window_file(model: site_model, path: string): string | null {
     const file = published_resource(model, path)
     if (!file || !/\.(md|markdown|txt)$/i.test(file)) return null
@@ -141,12 +126,13 @@ function read_window_file(model: site_model, path: string): string | null {
 function node_lines(model: site_model, page: page, node: xml_node, names: names): string[] {
     const lang = page.lang
     const out: string[] = []
-    if (node.tag === "landing") {
-        const who = one_line([node.attrs.greet, node.attrs.name, node.attrs.family].filter(Boolean).join(" "))
-        for (const line of [who, node.attrs.role, node.attrs.info, node.attrs.status])
-            if (line) out.push(one_line(line), "")
-        const contacts = contact_lines(model, lang, node)
-        if (contacts.length) out.push(...contacts, "")
+    if (node.tag === "hero") {
+        for (const line of [node.attrs.name, node.attrs.tags, node.attrs.info]) if (line) out.push(one_line(line), "")
+        for (const item of child_nodes(node, "item")) {
+            const label = [item.attrs.name, item.attrs.text].filter(Boolean).join(": ")
+            const link = item.attrs.link ? ` <${link_target(model, lang, item.attrs.link)}>` : ""
+            if (label) out.push(`- ${label}${link}`)
+        }
     }
     if (node.tag === "expertise") {
         out.push(`### ${node.attrs.name ?? "Expertise"}`, "")
@@ -167,13 +153,6 @@ function node_lines(model: site_model, page: page, node: xml_node, names: names)
         if (stacks.length) out.push("", `Tools: ${stacks.map((stack) => stack.attrs.name).join(", ")}`)
         out.push("")
     }
-    if (node.tag === "contact") {
-        out.push(`### ${node.attrs.name ?? "Contact"}`, "")
-        if (node.attrs.info) out.push(one_line(node.attrs.info), "")
-        const contacts = contact_lines(model, lang, node)
-        if (contacts.length) out.push(...contacts, "")
-    }
-    if (node.tag === "error" && node.attrs.info) out.push(one_line(node.attrs.info), "")
     if (node.tag === "desk") {
         if (node.attrs.info) out.push(one_line(node.attrs.info), "")
         for (const entry of node.children.flatMap(function flat(item: xml_node): xml_node[] {
@@ -204,7 +183,7 @@ export function page_text(model: site_model, page: page): string {
         ["Skills", resolve_list(attrs.skill, names.skills)],
         [
             "Technologies",
-            resolve_list([attrs.stack, attrs.feature_stack].filter(Boolean).join(","), names.stacks)
+            resolve_list([attrs.stack, attrs.featured_stack].filter(Boolean).join(","), names.stacks)
         ],
         ["Tags", attrs.tags ?? ""],
         ["Website", attrs.website ? link_target(model, page.lang, attrs.website) : ""],

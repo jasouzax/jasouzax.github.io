@@ -19,7 +19,7 @@ export function object_info(node: xml_node): string {
     if (node.tag !== "project") return node.attrs.info ?? ""
     const slides = node.children.filter(child => child.tag === "slide" && child.attrs.private !== "true")
     const slide = slides.find(child => child.attrs.featured === "true") ?? slides[0]
-    return slide ? slide.attrs.info ?? slide.attrs.description ?? slide.text.trim() : ""
+    return slide ? slide.attrs.info ?? slide.text.trim() : ""
 }
 
 function page_of(model: site_model, node: xml_node): page {

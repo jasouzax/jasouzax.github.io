@@ -5,78 +5,105 @@ import { report_error } from "../diag.ts"
 import { plugin_hosts } from "./plugin.ts"
 import { parse_pipeline, repository_remote } from "./pipeline.ts"
 
-type rule = {
-    attrs: string[]
-    required: string[]
-    children: string[]
-    bools?: string[]
-}
-
-const page_attrs = [
-    "path", "lang", "name", "info", "rank", "featured", "date", "icon", "skill", "image", "noindex",
-    "menu", "short", "note", "role", "sub", "media", "poster", "alt", "stack", "tags", "feature_stack", "website", "paper", "event", "source",
-    "keywords", "canonical", "robots", "lastmod", "cover", "print",
-]
+import type { Tag_Rule } from "./rule.ts"
+import { action_rule } from "./tags/action.ts"
+import { blog_rule } from "./tags/blog.ts"
+import { case_rule } from "./tags/case.ts"
+import { desk_rule } from "./tags/desk.ts"
+import { edge_rule } from "./tags/edge.ts"
+import { entry_rule } from "./tags/entry.ts"
+import { event_rule } from "./tags/event.ts"
+import { expertise_rule } from "./tags/expertise.ts"
+import { font_rule } from "./tags/font.ts"
+import { foot_rule } from "./tags/foot.ts"
+import { frameworks_rule } from "./tags/frameworks.ts"
+import { hero_rule } from "./tags/hero.ts"
+import { item_rule } from "./tags/item.ts"
+import { layer_rule } from "./tags/layer.ts"
+import { map_rule } from "./tags/map.ts"
+import { menu_rule } from "./tags/menu.ts"
+import { methodology_rule } from "./tags/methodology.ts"
+import { node_rule } from "./tags/node.ts"
+import { objectives_rule } from "./tags/objectives.ts"
+import { page_rule } from "./tags/page.ts"
+import { palette_rule } from "./tags/palette.ts"
+import { pipeline_rule } from "./tags/pipeline.ts"
+import { plugin_rule } from "./tags/plugin.ts"
+import { point_rule } from "./tags/point.ts"
+import { print_rule } from "./tags/print.ts"
+import { problem_rule } from "./tags/problem.ts"
+import { project_rule } from "./tags/project.ts"
+import { research_rule } from "./tags/research.ts"
+import { results_rule } from "./tags/results.ts"
+import { significance_rule } from "./tags/significance.ts"
+import { similar_rule } from "./tags/similar.ts"
+import { skill_rule } from "./tags/skill.ts"
+import { slide_rule } from "./tags/slide.ts"
+import { solution_rule } from "./tags/solution.ts"
+import { stack_rule } from "./tags/stack.ts"
+import { step_rule } from "./tags/step.ts"
+import { style_rule } from "./tags/style.ts"
+import { sym_rule } from "./tags/sym.ts"
+import { terminology_rule } from "./tags/terminology.ts"
+import { theme_rule } from "./tags/theme.ts"
+import { window_rule } from "./tags/window.ts"
 
 export const research_sections: Record<string, string> = {
-    terminology: "Terminology", problem: "Problem", solution: "Solution", significance: "Significance",
-    objectives: "Objectives", literature_review: "Literature Review", frameworks: "Frameworks",
-    methodology: "Methodology", results: "Results",
+    "terminology": "Terminology",
+    "problem": "Problem",
+    "solution": "Solution",
+    "significance": "Significance",
+    "objectives": "Objectives",
+    "similar": "Similar",
+    "frameworks": "Frameworks",
+    "methodology": "Methodology",
+    "results": "Results"
 }
 
-export const rules: Record<string, rule> = {
-    page: { attrs: page_attrs, required: ["path", "name"], children: ["hero", "expertise", "desk", "style"], bools: ["featured", "noindex", "menu"] },
-    landing: { attrs: ["greet", "name", "family", "role", "info", "status", "tab", "icon"], required: [], children: ["action", "contact"] },
-    action: { attrs: ["icon", "text", "link", "primary"], required: ["text", "link"], children: [], bools: ["primary"] },
-    contact: { attrs: ["name", "info", "icon", "text", "link", "tab", "button", "act", "tz", "print"], required: [], children: ["contact", "action"] },
-    expertise: { attrs: ["tab", "icon", "name", "info", "featured_chips"], required: [], children: ["skill", "stack"] },
-    skill: { attrs: ["id", "name", "icon", "info", "stack", "group"], required: ["name"], children: ["stack"] },
-    stack: { attrs: ["id", "name", "link", "tag", "icon"], required: ["name"], children: [] },
-    event: { attrs: ["id", "name", "sub", "date", "icon", "type", "skill", "featured", "info", "note", "image", "resume", "resume_start", "resume_end"], required: ["name", "date"], children: [], bools: ["featured"] },
-    error: { attrs: ["code", "name", "info", "home", "maybe"], required: ["name"], children: [] },
-    desk: { attrs: ["icon", "name", "date", "info", "auto", "server"], required: [], children: ["menu", "window"], bools: ["auto", "server"] },
-    menu: { attrs: ["name", "icon", "path"], required: [], children: ["entry", "foot", "map"] },
-    entry: { attrs: ["id", "type", "name", "from", "data", "info", "icon", "date", "acts", "image", "open", "link"], required: [], children: ["entry"], bools: ["open"] },
-    window: { attrs: ["icon", "type", "mode", "path", "full", "data", "save", "flow"], required: [], children: [], bools: ["full", "save", "flow"] },
-    theme: { attrs: ["name", "label", "icon", "color", "js", "background", "preload"], required: [], children: ["font", "style"] },
-    font: { attrs: ["name", "author", "size", "role", "src", "weight"], required: ["name"], children: ["palette", "sym"] },
-    palette: { attrs: ["mode", "colors"], required: ["mode", "colors"], children: [] },
-    sym: { attrs: ["char", "name", "path", "img", "width", "variant"], required: ["char"], children: ["layer"] },
-    layer: { attrs: ["path", "color", "paint"], required: ["path"], children: [] },
-    style: { attrs: ["src", "scope", "media"], required: [], children: [] },
-    // Personal details for a printed resume in a fixed national form (format="rirekisho" is the Japanese 履歴書). Anything left out prints as an empty box.
-    resume: {
-        attrs: [
-            "format", "photo", "name", "kana", "birth", "gender", "postal", "address", "address_kana", "phone", "mobile", "email",
-            "contact_postal", "contact_address", "contact_kana", "contact_phone", "appeal", "motivation", "wishes",
-            "commute_hours", "commute_minutes", "dependents", "spouse", "spouse_support",
-        ],
-        required: [], children: ["license"], bools: ["spouse", "spouse_support"],
-    },
-    license: { attrs: ["date", "text"], required: ["text"], children: [] },
+export const rules: Record<string, Tag_Rule> = {
+    action: action_rule,
+    blog: blog_rule,
+    case: case_rule,
+    desk: desk_rule,
+    edge: edge_rule,
+    entry: entry_rule,
+    event: event_rule,
+    expertise: expertise_rule,
+    font: font_rule,
+    foot: foot_rule,
+    frameworks: frameworks_rule,
+    hero: hero_rule,
+    item: item_rule,
+    layer: layer_rule,
+    map: map_rule,
+    menu: menu_rule,
+    methodology: methodology_rule,
+    node: node_rule,
+    objectives: objectives_rule,
+    page: page_rule,
+    palette: palette_rule,
+    pipeline: pipeline_rule,
+    plugin: plugin_rule,
+    point: point_rule,
+    print: print_rule,
+    problem: problem_rule,
+    project: project_rule,
+    research: research_rule,
+    results: results_rule,
+    significance: significance_rule,
+    similar: similar_rule,
+    skill: skill_rule,
+    slide: slide_rule,
+    solution: solution_rule,
+    stack: stack_rule,
+    step: step_rule,
+    style: style_rule,
+    sym: sym_rule,
+    terminology: terminology_rule,
+    theme: theme_rule,
+    window: window_rule,
 }
-
-Object.assign(rules, {
-    hero: { attrs: ["status", "name", "tab", "tags", "info", "profile"], required: [], children: ["item", "action"] },
-    item: { attrs: ["icon", "name", "text", "link", "print"], required: [], children: [] },
-    project: { attrs: [...page_attrs.filter(attr => !["skill", "info"].includes(attr)), "id", "repo", "private", "lang"], required: ["id", "name", "date"], children: ["slide", "menu", "window", "action", "research", "pipeline"], bools: ["featured", "private"] },
-    pipeline: { attrs: ["branch", "poll_seconds"], required: [], children: ["step"] },
-    step: { attrs: ["name", "phase", "command", "args", "timeout_seconds", "credentials"], required: ["name", "command"], children: [] },
-    research: { attrs: [], required: [], children: Object.keys(research_sections) },
-    point: { attrs: ["name"], required: ["name"], children: ["point"] },
-    slide: { attrs: ["media", "poster", "alt", "info", "description", "skill", "stack", "feature_stack", "hashtags", "tags", "featured", "private"], required: ["skill"], children: [], bools: ["featured", "private"] },
-    event: { attrs: [...page_attrs, "id", "type", "lang", "resume", "resume_start", "resume_end"], required: ["id", "name", "date"], children: ["event"], bools: ["featured"] },
-    blog: { attrs: ["id", "name", "date", "icon", "info", "lang"], required: ["id", "name"], children: ["menu", "window"] },
-    print: { attrs: ["name", "lang", "size", "layout"], required: ["name"], children: ["style", "font"] },
-    map: { attrs: ["layout"], required: [], children: ["node", "edge"] },
-    node: { attrs: ["id", "name", "icon", "info", "link", "x", "y"], required: ["id"], children: ["node"] },
-    edge: { attrs: ["from", "to", "text"], required: ["from", "to"], children: [] },
-    foot: { attrs: [], required: [], children: ["action"] },
-    plugin: { attrs: ["id", "name", "icon", "version", "mime", "path", "mode", "from", "to", "flow", "wasm", "sha256", "script", "options"], required: ["id", "version"], children: ["case"] },
-    case: { attrs: ["file", "error", "view", "edit", "mime", "url", "host", "script", "child_file", "child_view", "child_edit", "child_mime", "child_url"], required: [], children: [], bools: ["file", "error", "view", "edit", "child_file", "child_view", "child_edit"] },
-} satisfies Record<string, rule>)
-for (const name of Object.keys(research_sections)) rules[name] = { attrs: [], required: [], children: name === "terminology" ? [] : ["point"] }
-export const root_tags = ["page", "theme", "project", "event", "blog", "print", "plugin"]
+export const root_tags = ["page","theme","project","event","blog","print","plugin"]
 
 function check_node(node: xml_node, diag: diagnostics): void {
     const rule = rules[node.tag]

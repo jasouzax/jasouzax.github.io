@@ -64,3 +64,5 @@ dist/, .cache/ (ignored) generated output and incremental state
 ## Shared contracts
 
 Cross-runtime modules live in `shared/`: `content/{schema,xml,pipeline,plugin}.ts`, `protocol/{wire,codec}.ts`, `work/{crypto,profile,drive}.ts`, `vnode/vnode.tsx`, `print/form.tsx`, `notification/{preview,store}.ts`, `sign.ts` and the config/basic helpers. Consumers import these paths directly. `tests/layout.test.ts` checks that component roots import only themselves or `shared/`. Legacy engine/browser/cloud code still lives in `src/` pending migration. Source hashes and listener fingerprints include `shared/`, and Docker copies it. The agent build uses repository-level `rootDir` so compiled code lives in `server/dist/server/src/` alongside `server/dist/shared/`.
+
+Content vocabulary is owned per tag by `shared/content/tags/{tag}.ts`, aggregated by `shared/content/schema.ts`. Edit the matching tag file when changing accepted attributes or children. Tests live under `tests/content/`; `npm test` includes nested test files.

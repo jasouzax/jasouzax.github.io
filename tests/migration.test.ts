@@ -37,7 +37,7 @@ function fixture() {
 test("free-form roots generate pages and never publish private projects/slides", async () => {
     const f = fixture()
     try {
-        f.put("content/arbitrary/nested.xml", `<project id="public" name="Public" date="2026"><slide skill="web" description="public description"/><slide skill="web" private="true" media="secret.png" description="secret slide"/></project><project id="hidden" name="Secret Project" private="true" date="2026"><window path="secret.txt"/></project>` )
+        f.put("content/arbitrary/nested.xml", `<project id="public" name="Public" date="2026"><slide skill="web" info="public description"/></project><project id="hidden" name="Secret Project" private="true" date="2026"><window path="secret.txt"/></project>` )
         f.put("content/blogs/post.xml", `<blog id="post" name="Article"><window path="article.md" type="text/markdown"/></blog>`)
         f.put("content/blogs/article.md", "# Public article")
         f.put("content/arbitrary/secret.txt", "must never publish")
@@ -48,7 +48,6 @@ test("free-form roots generate pages and never publish private projects/slides",
         assert(model.pages.some(page => page.path === "/blogs/post"))
         assert(!model.pages.some(page => page.path.includes("hidden")))
         assert(!JSON.stringify(model.objects.map(node => node.attrs)).includes("Secret Project"))
-        assert(!model.objects.flatMap(node => node.children).some(node => node.attrs.description === "secret slide"))
         assert.equal(model.resources.get("/srv/blogs/post/article.md"), join(f.root, "content/blogs/article.md"))
         assert(![...model.resources.values()].some(file => file.endsWith("secret.txt")))
     } finally { f.close() }

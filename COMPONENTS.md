@@ -1,6 +1,8 @@
 # JAZU Components Development Document
 **JAZU** *(JAsouZa User interface)* is a website system, while `Components Development Document` (CDD) acts as a central document used by human like the owner, to align their interest with AI agents or developers and componentize the whole codebase, AI agents shouldnt change the details or description as they can only suggest changes or update checkboxes. So a complex system is broken down to a set of components interacting with each other, all assigned an URI so that referencing each other is easier like `obj:/...` to identify objectives, and `cmp:/...` to identify components. Resources can be identified through URI too like `{root}/path/to/resource`, it can be for the codebase `{codebase}`, or the domain website `{website}` which in this case is `jasouza.com`, and the owner `{owner}` which in this case is `jason@jasouza.com`, and `{vfs}` which represents the desk's virtual filesystem. Note that every Blockquotes `>` are to be removed in the final `COMPONENTS.md` because they currently act as notes of changes to be done from the original goal or current codebase status. Note that checkboxes are represented by `[ ]` meaning not yet implemented, `[/]` is incomplete but currently working on it, `[!]` priorty issue the human must check, `[?]` completed feature that the human must check and accept, `[x]` the human as marked the feature/component complete (AI Agents should never place this mark), `[*]` the feature exists in the code but must be refactored (or renamed/moved/removed) to align with the new vision, the blockquote under it says what to change. Note that blockquotes acts like comments to indicate messages from human to AI or AI to human.
 
+> **Content alignment (AI, 2026-11-22):** vocabulary now lives in `shared/content/tags/{tag}.ts`. Skills have no info/stack or children; stacks have only id/name. Slides use `info` and `featured_stack`, with privacy on the project; research uses `<similar>`. Authored XML, rendering and docs follow these names. Legacy landing/contact/error/resume tags are rejected; SEO text reads hero/items. Event resume_start/resume_end were removed in favor of date-based history wording; `resume` remains for license classification. The broader page/project/event vocabulary cleanup, hero/print redesign and engine tag moves remain open.
+
 > **Alignment pass (AI, 2026-11-22):** shared contracts now live under `shared/` (protocol, content/schema, pipeline/plugin shapes, work crypto/profile/Drive format, vnodes, print form, notifications, config and basic helpers). Existing consumers import them directly. Build and listener fingerprints include shared sources; cleanup protects all planned roots. The full engine/desk/cloud/server split and per-tag schema extraction remain unfinished; the shared checkbox stays `[/]` until that work and the import boundary audit are complete.
 
 > **Status review (AI, 2026-11-22):** every mark below was set from the code in the uploaded `codebase.zip` and `docs/feat/*`, not from memory. `[?]` means code exists and the docs/tests claim it works, so the human must still accept it. Marks on small leaf items are inherited from their parent unless a blockquote says otherwise, verify them when you work on that component. Nothing was run, no test or build was executed.
@@ -279,14 +281,14 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
                 - [?] `link` - Link of the action, e.g. `/work`
                 - [?] `primary` - Boolean, if true it highlights the button.
         - [?] **Expertise** `<expertise>` `cmp:/content/page/expertise` - An interface to allow users to browse the owner's events (experience, education, certifications, competitions) and projects through header tabs, filter chips, timeline graph, and slideshow. The contents of this is detected from every `<event>` and `<project>` root elements, but its children determines what contents to be inserted, no children means no content.
-            - [*] **Skill** `<skill>` `cmp:/content/page/expertise/skill` - A tab in the expertise, to filter towards specific events/projects. 
+            - [?] **Skill** `<skill>` `cmp:/content/page/expertise/skill` - A tab in the expertise, to filter towards specific events/projects. 
                 > Refactor: the schema still accepts `info` and `stack` on `<skill>`; remove them (a `<stack>` belongs to many skills).
                 > Removed skill's info from outdated version, and <stack> is not a child of <skill> because a <stack> could be used in multiple skills
                 - [?] `id` - The ID of that skill, this is used by event or project slide to determine when to show the slide.
                 - [?] `icon` - The icon of the skill tab in PUA icon character.
                 - [?] `name` - The name of the skill shown in the tab head.
                 - [?] `group` - Group label the the skill, has multiple skills can be inside one group like `web-app` and `cloud` inside of `Software`
-            - [*] **Stack** `<stack>` `cmp:/content/page/expertise/stack` - A filter chip that determines what slide to render, it can be a tool or technology.
+            - [?] **Stack** `<stack>` `cmp:/content/page/expertise/stack` - A filter chip that determines what slide to render, it can be a tool or technology.
                 > Refactor: the schema still accepts `link`, `tag`, `icon` on `<stack>`; remove them.
                 > Removed icon, tag, and link from stack, a chip doesnt need them
                 - [?] `id` - The ID of that stack, this is used by event or project slide to determine when to show the slide
@@ -369,7 +371,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
         - [?] `paper` *(optional)* -
         - [?] `event` *(optional)* -
         - [?] `lang` *(optional)* -
-        - [*] **Slide** `<slide>` `cmp:/content/project/slide` - A slide representation of the project for one or more skills, no children.
+        - [?] **Slide** `<slide>` `cmp:/content/project/slide` - A slide representation of the project for one or more skills, no children.
             > Refactor: the schema calls it `feature_stack` (and has `description`), this document says `featured_stack`. Decide one name and migrate the content (`content/projects.xml`); `private` on a slide is allowed today but the rule says only the parent has it.
             > Removed `private` because thats the parent's responsibility
             - [?] `skill` - Skill/s of the slide
@@ -378,11 +380,11 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] `poster` -
             - [?] `alt` -
             - [?] `stack` -
-            - [*] `featured_stack` -
+            - [?] `featured_stack` -
             - [?] `hashtags` -
             - [?] `tags` -
             - [?] `featured` -
-        - [*] **Research** `<research>` `cmp:/content/project/research` - At most one per project, generates the **Overview** menu `cmp:/desk/over`.
+        - [?] **Research** `<research>` `cmp:/content/project/research` - At most one per project, generates the **Overview** menu `cmp:/desk/over`.
             > Refactor: rename `<literature_review>` to `<similar>` (`research_sections` in `src/schema.ts`, `html_sections.tsx`, content, tests/migration).
             > Renamed `literature_review` with `similar`
             - [?] `<terminology>` - contains the details about the project like the logo, the name, the history, the slogan, etc.
@@ -390,7 +392,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] `<solution>` -
             - [?] `<significance>` -
             - [?] `<objectives>` -
-            - [*] `<similar>` -
+            - [?] `<similar>` -
             - [?] `<frameworks>` -
             - [?] `<methodology>` -
             - [?] `<results>` -

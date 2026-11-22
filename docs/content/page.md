@@ -31,7 +31,7 @@ One navigable URL: its identity in navigation and search, and its content. Back 
 | `noindex` | `true` removes it from search-engine files |
 | `print` | Name of the `<print>` mode used when printing this page ([print.md](print.md)) |
 | `image`, `cover`, `keywords`, `canonical`, `robots`, `lastmod` | SEO overrides |
-| `featured`, `date`, `skill`, `short`, `note`, `role`, `sub`, `media`, `poster`, `alt`, `stack`, `tags`, `feature_stack`, `website`, `paper`, `event`, `source` | Shared attribute pool also used by `<project>`/`<event>`; accepted on `<page>` by the validator but only meaningful on those generators |
+| `featured`, `date`, `skill`, `short`, `note`, `role`, `sub`, `media`, `poster`, `alt`, `stack`, `tags`, `featured_stack`, `website`, `paper`, `event`, `source` | Shared attribute pool also used by `<project>`/`<event>`; accepted on `<page>` by the validator but only meaningful on those generators |
 
 Booleans: `featured`, `noindex`, `menu`.
 

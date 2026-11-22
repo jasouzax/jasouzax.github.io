@@ -10,14 +10,14 @@ import { round_to, slugify, split_list, unique } from "../shared/util.ts"
 
 export const default_state = "expertise"
 
-export type skill = { id: string, name: string, icon: string, info: string, group: string }
-export type stack_def = { id: string, name: string, link: string, tag: string }
+export type skill = { id: string, name: string, icon: string, group: string }
+export type stack_def = { id: string, name: string }
 
 export type bar = {
     id: string, name: string, sub: string, info: string, image: string
     date_label: string, period: string, resume: "" | "education" | "experience"
-    // calendar parts and the wording a fixed-format resume (rirekisho) uses for the start and end of the period
-    start_ym: year_month, end_ym: year_month, ongoing: boolean, resume_start: string, resume_end: string
+    // Calendar parts drive history dates and default start/end wording.
+    start_ym: year_month, end_ym: year_month, ongoing: boolean
     start: number, end: number, lane: number, ord: number, states: string[]
 }
 
@@ -54,14 +54,13 @@ function make_skill(node: xml_node): skill {
         id: node.attrs.id ?? slugify(node.attrs.name),
         name: node.attrs.name,
         icon: node.attrs.icon ?? "",
-        info: node.attrs.info ?? "",
         group: node.attrs.group ?? "",
     }
 }
 
 function make_stack_def(node: xml_node): stack_def {
     const id = node.attrs.id ?? slugify(node.attrs.name)
-    return { id, name: node.attrs.name, link: node.attrs.link ?? "", tag: node.attrs.tag ?? node.attrs.name.replace(/\s+/g, "") }
+    return { id, name: node.attrs.name }
 }
 
 function compare_entries(a: entry, b: entry): number {
@@ -146,7 +145,7 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
     if (!host) return null
     const node = section_of(host, "expertise")!
     const skills = child_nodes(node, "skill").map(make_skill)
-    const stack_nodes = [...child_nodes(node, "stack"), ...child_nodes(node, "skill").flatMap(skill => child_nodes(skill, "stack"))]
+    const stack_nodes = child_nodes(node, "stack")
     const stack_defs = new Map(stack_nodes.map(make_stack_def).map(def => [def.id, def]))
     const events = child_nodes(node, "event")
     const bars: bar[] = []
@@ -157,7 +156,7 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
     const add_stack = (id: string, where: string): void => {
         if (stack_defs.has(id)) return
         report_warning(model.diag, where, `stack "${id}" has no <stack> definition, using its id as the label`)
-        stack_defs.set(id, { id, name: id, link: "", tag: id })
+        stack_defs.set(id, { id, name: id })
     }
     for (const event of events) {
         const span = parse_date(event.attrs.date, model.now)
@@ -177,7 +176,6 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
                 id, name: event.attrs.name, sub: event.attrs.sub ?? "", info: event.attrs.info ?? "", image: event.attrs.image ?? "",
                 period: label, resume: resume === "education" || resume === "experience" ? resume : "",
                 start_ym: span.start_ym, end_ym: span.end_ym ?? span.start_ym, ongoing: span.ongoing,
-                resume_start: event.attrs.resume_start ?? "", resume_end: event.attrs.resume_end ?? "",
                 date_label: label + note, start: round_to(span.start, 2), end: round_to(span.end, 2), lane: 0,
                 ord: Math.round((span.start - 2000) * 100), states: unique([...states, id]),
             })
@@ -197,7 +195,7 @@ export function build_expertise(model: site_model, lang: string): expertise_mode
                 seen.add(id)
                 return true
             })
-            const attrs = { ...page.node.attrs, ...slide.attrs, info: slide.attrs.info ?? slide.attrs.description ?? slide.text.trim(),
+            const attrs = { ...page.node.attrs, ...slide.attrs, info: slide.attrs.info ?? slide.text.trim(),
                 skill: skills.join(","), featured: slide === featured && page.node.attrs.featured === "true" ? "true" : "false" }
             const entry = entry_from_page(model, { ...page, info: attrs.info, node: { ...page.node, attrs } }, lang, state_ids, add_stack)
             if (entry) {
@@ -245,10 +243,10 @@ function entry_from_page(model: site_model, page: page, lang: string, state_ids:
     const wanted = split_list(attrs.skill).map(item => resolve_state(item, state_ids, where, model)).filter((item): item is string => item !== null)
     const states = unique([...(is_true(attrs.featured) ? [default_state] : []), ...wanted])
     const all_stack = split_list(attrs.stack)
-    const feature_stack = attrs.feature_stack ? split_list(attrs.feature_stack) : all_stack
-    for (const id of [...all_stack, ...feature_stack]) add_stack(id, where)
+    const featured_stack = attrs.featured_stack ? split_list(attrs.featured_stack) : all_stack
+    for (const id of [...all_stack, ...featured_stack]) add_stack(id, where)
     const stacks: Record<string, string[]> = {}
-    for (const state of states) stacks[state] = state === default_state ? feature_stack : all_stack
+    for (const state of states) stacks[state] = state === default_state ? featured_stack : all_stack
     return {
         id: page.path.split("/").pop()!, name: page.name, short: attrs.short ?? page.name, note: attrs.note ?? "", role: attrs.role ?? "", sub: attrs.sub ?? "",
         desc: page.info, date_label: shown_label(model, lang, span.label), at: round_to(span.start, 2), lane: 0, ord: Math.round((2030 - span.start) * 100),

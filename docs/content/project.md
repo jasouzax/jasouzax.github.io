@@ -24,12 +24,11 @@ Required: `id`, `name`, `date`.
 | `featured` | `bool`; included in the slideshow when no skill is focused. Its `featured="true"` slide (or first public slide) is used |
 | `private` | `bool`; excludes the project from rendering, watching and generation |
 | `repo` | External Git repository synchronized by the personal server: `github.com/org/repo`, `https://host/org/repo.git`, `ssh://git@host/org/repo.git`, or `git@host:org/repo.git`. Hostname/path expands to HTTPS. Credentials and local paths belong in the server’s private Git/server configuration. The attribute and pipeline commands are excluded from generated page payloads |
-| `stack`, `feature_stack` | `list`; extra stacks for the timeline. `feature_stack` is the set shown while no skill is focused |
 | `website`, `source`, `paper`, `event` | Action buttons: *View Website / Source Code / Paper / Event*. They stay visible while slide content crossfades |
 | `lang` | Language of this root; keep translations in the same file |
 | `media`, `poster`, `alt`, `tags`, `menu`, `image`, `keywords`, `canonical`, `robots`, `lastmod`, `cover`, `print`, `noindex`, `path` | Shared attribute pool; rarely needed here |
 
-**Not allowed on `<project>`:** `skill` and `info` (put them on slides). Unknown attributes are errors.
+**Not allowed on `<project>`:** `skill`, `info`, `stack` and `featured_stack` (put them on slides). Unknown attributes are errors.
 
 Children: `<slide>`, `<menu>`, `<window>`, `<action>`, `<research>`, `<pipeline>`. Multiple pipelines are allowed, each with a distinct branch. The first pipeline is the primary deployment branch; keep that order consistent across branches and translations.
 
@@ -40,20 +39,19 @@ One **version of the project for one skill**. `skill` is **required**.
 | Attribute | Meaning |
 |---|---|
 | `skill` | **Required.** `list`; one slide may serve several skills. Each skill may belong to only one *public* slide per project |
-| `info` | The explanation (alias `description`, then the element's text as a fallback) |
+| `info` | The explanation (element text is a fallback) |
 | `media`, `poster`, `alt` | Picture/video/diagram, video poster, alternative text (searched too) |
-| `stack`, `feature_stack` | Tools used / tools shown in the default view |
+| `stack`, `featured_stack` | Tools used / tools shown in the default view |
 | `hashtags`, `tags` | Labels shown in the slide head |
 | `featured` | `bool`; makes this the project's default version |
-| `private` | `bool`; excludes the slide |
 
-Slides have no children. A project's summary in Featured, page summaries and the generated desk comes from its featured (or first public) slide. The footer lists all the project's slide skills; choosing one crossfades the content and changes the fragment (`#web-app/example` → `#cloud/example`).
+Privacy is declared only on the parent `<project>`; `private` on a slide is rejected. Slides have no children. A project's summary in Featured, page summaries and the generated desk comes from its featured (or first public) slide. The footer lists all the project's slide skills; choosing one crossfades the content and changes the fragment (`#web-app/example` → `#cloud/example`).
 
 ## `<research>`
 
 At most one per project. Generates an **Overview** menu with these sections, in order, each optional but never duplicated:
 
-`<terminology>`, `<problem>`, `<solution>`, `<significance>`, `<objectives>`, `<literature_review>`, `<frameworks>`, `<methodology>`, `<results>`.
+`<terminology>`, `<problem>`, `<solution>`, `<significance>`, `<objectives>`, `<similar>`, `<frameworks>`, `<methodology>`, `<results>`.
 
 Write each section's explanation as body text. Except `<terminology>`, a section may nest `<point name="…">Explanation<point name="…">More detail</point></point>` — expandable explanations with no links or buttons. The English `stesis` project in `content/projects.xml` is a complete **placeholder** reference; its prompts and results are not verified research.
 

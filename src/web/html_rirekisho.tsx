@@ -90,14 +90,14 @@ function bar_lines(ctx: render_ctx, bars: bar[], enter_key: string, leave_key: s
             at: month_index(bar.start_ym.year, bar.start_ym.month),
             year: bar.start_ym.year,
             month: bar.start_ym.month,
-            text: bar.resume_start || default_text(bar, enter_key)
+            text: default_text(bar, enter_key)
         })
         if (bar.ongoing) continue
         lines.push({
             at: month_index(bar.end_ym.year, bar.end_ym.month),
             year: bar.end_ym.year,
             month: bar.end_ym.month,
-            text: bar.resume_end || default_text(bar, leave_key)
+            text: default_text(bar, leave_key)
         })
     }
     // oldest first; two lines in the same month keep the order they were written in
