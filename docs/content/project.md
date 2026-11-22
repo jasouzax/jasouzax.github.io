@@ -1,5 +1,7 @@
 # `<project>`, `<slide>`, `<research>`, `<pipeline>`
 
+Named pipeline hooks use `<pipeline branch="staging" hook="publish">`. An owner can POST to `/api/_/projects/{id}/publish` with the normal same-origin CSRF headers (`x-jazu-work: 1`, `x-jazu-csrf`). No request body or caller-selected command is used. The Worker checks the live D1 session, signs the internal request and adds Access credentials. The server queues each matching branch's exact current commit and returns 202 with job IDs. Unknown hooks return 404; unsigned or replayed origin requests are rejected. External webhook providers need a separate credential/signature adapter.
+
 One project = one place for its description, files, history and workspace, appearing in expertise in as many skill versions as you want. Back to [content guide](README.md).
 
 ```xml
