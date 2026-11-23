@@ -8,6 +8,8 @@ The restored ignored `.env` passes real token/account/zone/eight-service read ch
 
 `cloud --preflight` now performs read-only checks, supports account-owned/user-owned token verification and refuses to generate replacement keys already held by the configured Worker. Terraform signing-key aliases are reused. Staging also preserves optional inherited JWT/agent bindings when local input values are null. Root types, focused Node tests, staging Terraform validation and four mocked-provider Terraform tests pass. No live deployment, DNS change or credential rotation occurred; Access/Tunnel bootstrap remains incomplete.
 
+The next preflight continuation aggregates independent local validation failures before network access and aggregates service denials after discovery. Matching VAPID key material is verified cryptographically, optional inputs/aliases are checked, and generated configuration cannot partially update the environment on validation/write failure. Twelve focused tests, root types and the real read-only CLI check pass; the restored `.env` is unchanged.
+
 ## Staging continuation — 2026-11-23
 
 Blog book printing now supports cover/contents, authored nested chapter order, language/private/noindex filtering, chapter breaks, source links and page numbers. Nested blog routes and resource ownership use sibling-relative IDs. Child source changes invalidate the parent book. The existing bilingual reference opts in without adding invented article content. Types, content/build, 30 focused content/print/layout tests and four Chrome book/research print regressions pass; rendered PDF inspection also caught and corrected a duplicate chapter heading. The Book component is `[?]`; scene/Canvas/video authoring remains incomplete.
