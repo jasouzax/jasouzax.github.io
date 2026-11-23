@@ -100,6 +100,8 @@ dist/ .cache/ .wrangler/ generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Restored cloud credentials (2026-11-23):** `.env` exists and is ignored; never print or replace its values. `cloud --preflight` is read-only and verifies either account-owned or user-owned tokens. The real account/zone/eight-service checks pass. Deployed routers hold `AUTH_JWT_SECRET` without a local copy; preserve it through inherited bindings or restore its original backup, never generate a replacement. Full bootstrap and interactive Google consent are separate from credential presence. Terraform is at `.cache/tools/terraform/terraform.exe`; staging validate/four mocked tests pass. Optional inherited JWT/agent bindings must remain included even when their input value is null. See `docs/src/cloud-preflight.md`.
+
 - **Hidden windows:** `desk_window.hidden` is separate from minimization and DOM `el.hidden` (which also reflects map/portrait display). `set_window_hidden` preserves drafts/processes. Tab refresh, focus repair, layout and Ctrl+Tab must all respect the flag. The live Windows menu fingerprints before rebuilding, otherwise map/arrange change events form a redraw loop. Reparenting must remove the old parent's `kids` link without orphaning the child's descendants.
 
 - **Version menus:** Public history uses `desk/menu/version.ts` and `shared/repo/history.ts`; only the latest 100 commits are loaded. Branch/tag selections pin hashes. Version maps set `data-map-readonly`, so generic map movement must respect it. API log replies now include parent IDs and refs include peeled tag targets; deploy the matching origin with the runtime. Work/private history and historical file browsing remain open.

@@ -84,8 +84,8 @@ resource "cloudflare_workers_script" "router" {
     { name = "ACCESS_CLIENT_ID", type = "secret_text", text = var.access_client_id },
     { name = "ACCESS_CLIENT_SECRET", type = "secret_text", text = var.access_client_secret },
     ],
-    var.server_agent_secret == null ? [] : [{ name = "SERVER_AGENT_SECRET", type = "secret_text", text = var.server_agent_secret }],
-    var.auth_jwt_secret == null ? [] : [{ name = "AUTH_JWT_SECRET", type = "secret_text", text = var.auth_jwt_secret }],
+    var.server_agent_secret == null && !contains(var.inherited_secret_names, "SERVER_AGENT_SECRET") ? [] : [{ name = "SERVER_AGENT_SECRET", type = "secret_text", text = var.server_agent_secret }],
+    var.auth_jwt_secret == null && !contains(var.inherited_secret_names, "AUTH_JWT_SECRET") ? [] : [{ name = "AUTH_JWT_SECRET", type = "secret_text", text = var.auth_jwt_secret }],
     var.server_owner_emails == null ? [] : [{ name = "SERVER_OWNER_EMAILS", type = "plain_text", text = var.server_owner_emails }],
   ) : merge(binding, contains(var.inherited_secret_names, binding.name) ? { type = "inherit", text = null } : {})]
   depends_on = [terraform_data.work_migrations]

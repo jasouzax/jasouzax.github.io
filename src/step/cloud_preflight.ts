@@ -5,6 +5,10 @@ import { generateKeyPairSync, randomBytes } from "node:crypto"
 import { join } from "node:path"
 import type { site_config } from "../../shared/config.ts"
 
+class provider_error extends Error {
+    constructor(message: string, readonly status: number) { super(message) }
+}
+
 export function persist_generated(root: string, values: Record<string, string>, env: NodeJS.ProcessEnv = process.env): string[] {
     const file = join(root, ".env"), source = existsSync(file) ? readFileSync(file, "utf8") : ""
     const current = parseEnv(source), added: string[] = [], lines: string[] = []
@@ -23,7 +27,7 @@ export function persist_generated(root: string, values: Record<string, string>, 
     return added
 }
 
-export async function cloud_preflight(root: string, config: site_config, env: NodeJS.ProcessEnv = process.env, request: typeof fetch = fetch): Promise<void> {
+export async function cloud_preflight(root: string, config: site_config, env: NodeJS.ProcessEnv = process.env, request: typeof fetch = fetch, options: { persist?: boolean } = {}): Promise<void> {
     const required = ["CLOUDFLARE_API_TOKEN", "ORIGIN_HMAC_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
     const missing = required.filter(name => !env[name]?.trim())
     if (missing.length) throw new Error(`Cloud preflight: missing ${missing.join(", ")}`)
@@ -31,7 +35,7 @@ export async function cloud_preflight(root: string, config: site_config, env: No
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.owner.email)) throw new Error("Cloud preflight: config owner.email is required")
     const api = async <T>(path: string, label: string): Promise<T> => {
         const response = await request(`https://api.cloudflare.com/client/v4${path}`, { headers: { authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` }, redirect: "error", signal: AbortSignal.timeout(15000) })
-        if (!response.ok) throw new Error(`Cloud preflight: ${label} denied (${response.status}); check token permissions and resource scope`)
+        if (!response.ok) throw new provider_error(`Cloud preflight: ${label} denied (${response.status}); check token permissions and resource scope`, response.status)
         const body = await response.json() as { success: boolean, result: T }
         if (!body.success) throw new Error(`Cloud preflight: ${label} failed`)
         return body.result
@@ -40,6 +44,14 @@ export async function cloud_preflight(root: string, config: site_config, env: No
     const account = env.CLOUDFLARE_ACCOUNT_ID || (accounts.length === 1 ? accounts[0].id : "")
     if (!account || !accounts.some(item => item.id === account)) throw new Error("Cloud preflight: set CLOUDFLARE_ACCOUNT_ID to an account accessible to this token")
     if (!/^[a-f0-9]{32}$/i.test(account)) throw new Error("Cloud preflight: invalid account ID")
+    // Account-owned and user-owned tokens have different verification endpoints.
+    let token: { status: string }
+    try { token = await api(`/accounts/${account}/tokens/verify`, "account token verification") }
+    catch (error) {
+        if (!(error instanceof provider_error) || ![401, 403].includes(error.status)) throw error
+        token = await api("/user/tokens/verify", "user token verification")
+    }
+    if (token.status !== "active") throw new Error("Cloud preflight: Cloudflare token is not active")
     const host = new URL(config.base_url).hostname
     const labels = host.split(".")
     let zones: { id: string, name: string, account?: { id: string } }[] = []
@@ -50,9 +62,34 @@ export async function cloud_preflight(root: string, config: site_config, env: No
     const results = await Promise.allSettled(probes.map(([path, label]) => api(path, label)))
     const failures = results.filter((item): item is PromiseRejectedResult => item.status === "rejected")
     if (failures.length) throw new Error(failures.map(item => item.reason.message).join("\n"))
-    if (Boolean(env.VAPID_PUBLIC_KEY) !== Boolean(env.VAPID_PRIVATE_KEY)) throw new Error("Cloud preflight: restore the incomplete VAPID key pair; it will not be regenerated")
-    const generated: Record<string, string> = { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_ZONE_ID: zones[0].id, GOOGLE_ADMIN_EMAIL: config.owner.email, VAPID_SUBJECT: `mailto:${config.owner.email}`, AUTH_JWT_SECRET: env.AUTH_JWT_SECRET || randomBytes(32).toString("base64url") }
-    if (!env.VAPID_PUBLIC_KEY) {
+    const jwt = env.AUTH_JWT_SECRET || env.TF_VAR_auth_jwt_secret
+    const vapid_public = env.VAPID_PUBLIC_KEY || env.TF_VAR_vapid_public_key
+    const vapid_private = env.VAPID_PRIVATE_KEY || env.TF_VAR_vapid_private_key
+    if (Boolean(vapid_public) !== Boolean(vapid_private)) throw new Error("Cloud preflight: restore the incomplete VAPID key pair; it will not be regenerated")
+    const absent = [!jwt && "AUTH_JWT_SECRET", !vapid_private && "VAPID_PRIVATE_KEY"].filter((name): name is string => Boolean(name))
+    let deployed: string[] = []
+    if (absent.length && config.deploy?.worker_name) {
+        try {
+            const settings = await api<{ bindings?: { name: string, type: string }[] }>(`/accounts/${account}/workers/scripts/${encodeURIComponent(config.deploy.worker_name)}/settings`, "existing Worker signing keys")
+            deployed = absent.filter(name => settings.bindings?.some(binding => binding.name === name && binding.type === "secret_text"))
+        } catch (error) {
+            if (!(error instanceof provider_error) || error.status !== 404) throw error
+        }
+    }
+    if (deployed.length) {
+        const message = `Cloud preflight: existing Worker has ${deployed.join(", ")} without local copies; restore the original keys or use a deployment path with inherited secret bindings. No replacement keys were generated.`
+        if (options.persist !== false) throw new Error(message)
+        console.log(message)
+    }
+    if (options.persist === false) {
+        console.log("Cloud preflight passed token, account, zone and service-read checks. Configuration and infrastructure unchanged; write permissions and Google consent are not exercised.")
+        return
+    }
+    const generated: Record<string, string> = { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_ZONE_ID: zones[0].id, GOOGLE_ADMIN_EMAIL: config.owner.email, VAPID_SUBJECT: `mailto:${config.owner.email}`, AUTH_JWT_SECRET: jwt || randomBytes(32).toString("base64url") }
+    if (vapid_public) {
+        generated.VAPID_PUBLIC_KEY = vapid_public
+        generated.VAPID_PRIVATE_KEY = vapid_private!
+    } else {
         const pair = generateKeyPairSync("ec", { namedCurve: "prime256v1" }), public_key = pair.publicKey.export({ format: "jwk" }), private_key = pair.privateKey.export({ format: "jwk" })
         generated.VAPID_PUBLIC_KEY = Buffer.concat([Buffer.from([4]), Buffer.from(public_key.x!, "base64url"), Buffer.from(public_key.y!, "base64url")]).toString("base64url")
         generated.VAPID_PRIVATE_KEY = private_key.d!

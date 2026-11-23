@@ -10,7 +10,7 @@ run "do_not_replay_existing_migration" {
     object_migration_enabled = false
   }
   assert {
-    condition = cloudflare_workers_script.router.migrations == null
+    condition     = cloudflare_workers_script.router.migrations == null
     error_message = "Existing namespaces must be preserved without replaying the initial migration."
   }
 }
@@ -21,8 +21,21 @@ run "preserve_existing_signing_key" {
     inherited_secret_names = ["VAPID_PRIVATE_KEY"]
   }
   assert {
-    condition = one([for binding in cloudflare_workers_script.router.bindings : binding.type if binding.name == "VAPID_PRIVATE_KEY"]) == "inherit" && one([for binding in cloudflare_workers_script.router.bindings : binding.text if binding.name == "VAPID_PRIVATE_KEY"]) == null
+    condition     = one([for binding in cloudflare_workers_script.router.bindings : binding.type if binding.name == "VAPID_PRIVATE_KEY"]) == "inherit" && one([for binding in cloudflare_workers_script.router.bindings : binding.text if binding.name == "VAPID_PRIVATE_KEY"]) == null
     error_message = "An existing signing key must be inherited without sending an empty or replacement value."
+  }
+}
+
+run "inherit_optional_secrets_without_local_copies" {
+  command = plan
+  variables {
+    inherited_secret_names = ["AUTH_JWT_SECRET", "SERVER_AGENT_SECRET"]
+    auth_jwt_secret        = null
+    server_agent_secret    = null
+  }
+  assert {
+    condition     = alltrue([for name in ["AUTH_JWT_SECRET", "SERVER_AGENT_SECRET"] : one([for binding in cloudflare_workers_script.router.bindings : binding.type if binding.name == name]) == "inherit" && one([for binding in cloudflare_workers_script.router.bindings : binding.text if binding.name == name]) == null])
+    error_message = "Optional secrets must remain inherited even when their local values are absent."
   }
 }
 

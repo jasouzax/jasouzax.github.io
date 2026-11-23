@@ -1,6 +1,12 @@
 # Component implementation audit
 
-The original 2026-11-22 pass used feature branches/no-ff merges. The 2026-11-23 continuation works directly on `staging` only, as requested. `[?]` means implemented and awaiting human acceptance; `[!]` names missing functionality or an operational notice. No acceptance marks were invented. This is an implementation attempt and a gap inventory, not completion of every target system.
+The original 2026-11-22 pass used feature branches/no-ff merges. The 2026-11-23 continuation works directly on `staging` only, as requested. `[?]` means implemented and awaiting human acceptance. Historical `[!]` labels in the original table used an obsolete convention; current statuses in `COMPONENTS.md` use `[ ]` for absent work, `[/]` for incomplete work, and `[!]` only for human-only blockers. No acceptance marks were invented. This is an implementation attempt and a gap inventory, not completion of every target system.
+
+## Restored provider inputs — 2026-11-23
+
+The restored ignored `.env` passes real token/account/zone/eight-service read checks without changing its bytes. Account-token introspection exposes the required service edit groups. Google distinguishes the restored OAuth secret from an invalid control; no tokens were issued, and full interactive consent is not verified. Provider account inputs are now `[?]`, with no missing-credential human blocker. See [verification details](../src/cloud-preflight.md).
+
+`cloud --preflight` now performs read-only checks, supports account-owned/user-owned token verification and refuses to generate replacement keys already held by the configured Worker. Terraform signing-key aliases are reused. Staging also preserves optional inherited JWT/agent bindings when local input values are null. Root types, focused Node tests, staging Terraform validation and four mocked-provider Terraform tests pass. No live deployment, DNS change or credential rotation occurred; Access/Tunnel bootstrap remains incomplete.
 
 ## Staging continuation — 2026-11-23
 
