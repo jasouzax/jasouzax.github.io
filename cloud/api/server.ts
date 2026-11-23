@@ -40,7 +40,7 @@ export async function is_owner(request: Request, env: Server_Env): Promise<boole
     // No cookie, no D1 read: strangers never cost a query
     if (!request.headers.get("cookie")?.includes("jazu_session=")) return false
     const session = await read_session(request, env).catch(() => null)
-    return Boolean(session && owner_emails(env).includes(session.email.toLowerCase()))
+    return Boolean(session && !session.passkey_pending && owner_emails(env).includes(session.email.toLowerCase()))
 }
 
 function hub_of(env: Server_Env) {

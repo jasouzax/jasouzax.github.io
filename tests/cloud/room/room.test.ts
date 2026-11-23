@@ -119,6 +119,25 @@ test("account deletion revokes every device and removes private presence/queued 
     } finally { await f.runtime.dispose() }
 })
 
+test("realtime owner authority uses the same passkey proof as HTTP, including an already open socket", async () => {
+    const f = await fixture()
+    try {
+        const owner = await f.session("passkey-owner"), client = await f.session("passkey-client")
+        await f.db.prepare("INSERT INTO auth_owner VALUES (1,'passkey-owner')").run()
+        const api = (path: string, who: typeof owner, body: unknown) => f.runtime.dispatchFetch(`https://example.com${path}`, { method: "POST", headers: { origin: "https://example.com", cookie: who.cookie, "content-type": "application/json", "x-jazu-work": "1", "x-jazu-csrf": who.csrf }, body: JSON.stringify(body) })
+        const pair = await generate_owner_key(), published = await (await api("/api/_/work/owner-key", owner, { public_jwk: pair.public_jwk })).json() as any
+        const conversation = crypto.randomUUID(), key = random()
+        assert.equal((await api("/api/_/work/rooms", client, { id: conversation, key_id: published.key_id, owner_wrap: await wrap_room_key(key, pair.public_jwk, conversation) })).status, 201)
+        const ws = (await f.connect(owner.cookie)).webSocket!; ws.accept()
+        const events = stream(ws); await events.wait(value => value.type === "ready")
+        await f.db.prepare("INSERT INTO auth_passkeys VALUES ('test-key','passkey-owner','public',0,'[]','Test',?)").bind(Date.now()).run()
+        assert.ok((await events.command({ type: "watch", conversation, after: 0 })).error)
+        await f.db.prepare("INSERT INTO auth_stepups VALUES (?,?)").bind(await auth_hash(owner.token), Date.now()).run()
+        assert.equal((await events.command({ type: "watch", conversation, after: 0 })).error, undefined)
+        ws.close(1000, "Bye")
+    } finally { await f.runtime.dispose() }
+})
+
 test("concurrent conversations on one socket retain every subscription", async () => {
     const f = await fixture()
     try {

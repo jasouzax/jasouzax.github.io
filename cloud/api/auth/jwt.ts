@@ -14,7 +14,7 @@ export async function issue_access(request: Request, env: Work_Env, session: Aut
     const secret = key(env)
     if (!secret) return null
     const origin = new URL(request.url).origin
-    const token = await new SignJWT({ email: session.email, name: session.name, picture: session.picture, role: session.role, sid: await auth_hash(refresh) }).setProtectedHeader({ alg: "HS256", typ: "JWT", kid: (await auth_hash(env.AUTH_JWT_SECRET!)).slice(0, 16) }).setSubject(session.subject).setIssuer(origin).setAudience("jazu-session").setIssuedAt().setExpirationTime(`${access_lifetime}s`).sign(secret)
+    const token = await new SignJWT({ email: session.email, name: session.name, picture: session.picture, role: session.role, ...(session.step_up ? { step_up: true } : {}), sid: await auth_hash(refresh) }).setProtectedHeader({ alg: "HS256", typ: "JWT", kid: (await auth_hash(env.AUTH_JWT_SECRET!)).slice(0, 16) }).setSubject(session.subject).setIssuer(origin).setAudience("jazu-session").setIssuedAt().setExpirationTime(`${access_lifetime}s`).sign(secret)
     return cookie(access_cookie, token, access_lifetime)
 }
 
@@ -28,6 +28,6 @@ export async function read_access(request: Request, env: Work_Env): Promise<Auth
     try {
         const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"], typ: "JWT", issuer: new URL(request.url).origin, audience: "jazu-session", maxTokenAge: access_lifetime, requiredClaims: ["exp", "iat", "sub", "sid", "email", "name", "role"] })
         if (payload.sid !== await auth_hash(refresh) || typeof payload.sub !== "string" || !payload.sub || typeof payload.email !== "string" || typeof payload.name !== "string" || !["owner", "client"].includes(String(payload.role))) return null
-        return { subject: payload.sub, email: payload.email, name: payload.name, picture: google_picture(payload.picture), role: payload.role as "owner" | "client", csrf: await auth_hash(`csrf\n${refresh}`) }
+        return { subject: payload.sub, email: payload.email, name: payload.name, picture: google_picture(payload.picture), role: payload.role as "owner" | "client", csrf: await auth_hash(`csrf\n${refresh}`), ...(payload.step_up === true ? { step_up: true } : {}) }
     } catch { return null }
 }

@@ -10,6 +10,7 @@ The [implementation audit](implementation-audit.md) records validation evidence 
 - [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
 - [?] RSS 2.0 and Atom feeds with per-language autodiscovery and private-page exclusion.
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
+- [?] Optional passkeys protect owner login and account deletion, with recent Google sign-in required when no key is enrolled; see [passkeys](passkeys.md).
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
 - [?] Blog books print nested public chapters in authored order with contents and page numbers.

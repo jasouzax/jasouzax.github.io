@@ -235,6 +235,9 @@ export function render_head(ctx: render_ctx, tabs: tab[], has_desk: boolean): ch
             </button>
         </li>
         <li class="list_drop_li" data-auth="user" hidden="true">
+            <button type="button" data-sign="passkeys"><span class="sign_text">Passkeys</span></button>
+        </li>
+        <li class="list_drop_li" data-auth="user" hidden="true">
             <button type="button" data-sign="delete" data-confirm={t(ctx, "delete_account_confirm")}>
                 <span class="sign_text">{t(ctx, "delete_account")}</span>
             </button>

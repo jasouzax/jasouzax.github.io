@@ -15,11 +15,12 @@ import { work_changed } from "../room/work.ts"
 import { session_route } from "./session.ts"
 import { session_cookie, session_lifetime as month, cookie, read_cookie } from "./auth/cookies.ts"
 import { access_cookie, issue_access } from "./auth/jwt.ts"
+import { passkey_route, recent_auth } from "./auth/passkey.ts"
 const flow_cookie = "__Host-jazu_oauth"
 const callback_path = "/api/_/auth/google/callback"
 const google_keys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"))
 type Identity = { subject: string, email: string, name: string, picture?: string }
-export type Auth_Session = Identity & { role: "owner" | "client", csrf: string }
+export type Auth_Session = Identity & { role: "owner" | "client", csrf: string, step_up?: boolean, passkey_pending?: boolean }
 export type Auth_Dependencies = { fetch?: typeof fetch, keys?: JWTVerifyGetKey }
 const random = () => encode_key(crypto.getRandomValues(new Uint8Array(32)))
 const reply = (data: unknown) => Response.json(data, { headers: { "cache-control": "no-store", "referrer-policy": "no-referrer", vary: "Cookie" } })
@@ -33,11 +34,17 @@ export const session_token = (request: Request) => read_cookie(request, session_
 export async function read_session(request: Request, env: Work_Env): Promise<Auth_Session | null> {
     const token = read_cookie(request, session_cookie)
     if (!token || !env.DB) return null
-    const hash = await auth_hash(token)
-    const row = await env.DB.prepare("SELECT u.subject, u.email, u.name, p.picture, s.last_seen, o.subject AS owner_subject FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_profiles p ON p.subject = u.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(hash, Date.now() - month).first<Identity & { last_seen: number, owner_subject: string | null }>()
+    return read_session_hash(await auth_hash(token), env, await auth_hash(`csrf\n${token}`))
+}
+
+// Durable Objects already hold the refresh hash, never the raw cookie. They use the identical authority check.
+export async function read_session_hash(hash: string, env: Work_Env, csrf: string): Promise<Auth_Session | null> {
+    if (!env.DB) return null
+    const row = await env.DB.prepare("SELECT u.subject, u.email, u.name, p.picture, s.last_seen, o.subject AS owner_subject, (SELECT count(*) FROM auth_passkeys k WHERE k.subject = u.subject) AS passkey_count, (SELECT verified_at FROM auth_stepups a WHERE a.session_hash = s.token_hash) AS stepup_verified FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_profiles p ON p.subject = u.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(hash, Date.now() - month).first<Identity & { last_seen: number, owner_subject: string | null, passkey_count: number, stepup_verified: number | null }>()
     if (!row) return null
     if (row.last_seen < Date.now() - 300000) await env.DB.prepare("UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?").bind(Date.now(), hash).run()
-    return { subject: row.subject, email: row.email, name: row.name, picture: google_picture(row.picture), role: row.owner_subject ? "owner" : "client", csrf: await auth_hash(`csrf\n${token}`) }
+    const pending = row.passkey_count > 0 && !row.stepup_verified, locked = !!row.owner_subject && pending
+    return { subject: row.subject, email: row.email, name: row.name, picture: google_picture(row.picture), role: row.owner_subject && !locked ? "owner" : "client", csrf, ...(locked ? { step_up: true } : {}), ...(pending ? { passkey_pending: true } : {}) }
 }
 
 export function valid_csrf(request: Request, session: Auth_Session): boolean {
@@ -57,6 +64,7 @@ export async function verify_google_token(token: string, client: string, nonce: 
 export async function auth_route(request: Request, env: Work_Env, dependencies: Auth_Dependencies = {}): Promise<Response> {
     const url = new URL(request.url)
     if (!env.DB) return api_error("auth_unconfigured", "Sign-in is not configured", 503)
+    if (url.pathname === "/api/_/auth/passkeys" || url.pathname.startsWith("/api/_/auth/passkeys/")) return passkey_route(request, env)
     if (url.pathname === "/api/_/session") return session_route(request, env)
     if (url.pathname === "/api/_/auth/logout" && request.method === "POST") {
         const session = await read_session(request, env)
@@ -74,10 +82,14 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (url.pathname === "/api/_/auth/account/delete" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session) || request.headers.get("x-jazu-confirm-delete") !== "account") return api_error("forbidden", "Confirm account deletion from the signed-in account menu", 403)
+        if (!await recent_auth(request, env, session)) return api_error("step_up_required", "Verify your passkey or sign in with Google again before deleting your account", 403)
         if (!env.DB.batch) return api_error("unavailable", "Account deletion is temporarily unavailable", 503)
         const linked_rooms = env.REALTIME ? (await env.DB.prepare("SELECT id FROM work_rooms WHERE google_subject = ? AND owner_wrap IS NOT NULL").bind(session.subject).all<{ id: string }>()).results : []
         // Revoke every device and linked conversation while preserving the other participant's encrypted history.
         await env.DB.batch([
+            env.DB.prepare("DELETE FROM auth_passkey_challenges WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_stepups WHERE session_hash IN (SELECT token_hash FROM auth_sessions WHERE subject = ?)").bind(session.subject),
+            env.DB.prepare("DELETE FROM auth_passkeys WHERE subject = ?").bind(session.subject),
             env.DB.prepare("DELETE FROM push_receipts WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE subject = ?)").bind(session.subject),
             env.DB.prepare("DELETE FROM push_subscriptions WHERE subject = ?").bind(session.subject),
             env.DB.prepare("UPDATE work_rooms SET revoked = 1, token_hash = 'deleted:' || id, email = 'deleted-' || id || '@deleted.invalid', google_subject = NULL WHERE google_subject = ?").bind(session.subject),

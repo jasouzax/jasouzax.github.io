@@ -48,6 +48,8 @@
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0",
     "@resvg/resvg-js": "^2.6.2",
+    "@simplewebauthn/browser": "14.0.0",
+    "@simplewebauthn/server": "14.1.0",
     "@wasmer/sdk": "^0.19.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
