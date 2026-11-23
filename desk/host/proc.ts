@@ -10,6 +10,7 @@ import type { program } from "../kernel/types.ts"
 import { make_fs } from "../fs/vfs.ts"
 import { mount_executables } from "../fs/opfs.ts"
 import { host_programs, probe_host } from "./host.ts"
+import { init_native_desktop } from "./desktop.ts"
 import { server_programs, server_shell_uri } from "../server/terminal.ts"
 import { is_server_page } from "../server/text.ts"
 import { Terminal } from "@xterm/xterm"
@@ -215,6 +216,7 @@ function terminal_body(item: desk_window): HTMLElement {
 // ---- wiring -------------------------------------------------------------------------------------------------------------------------
 
 export function init_proc(): void {
+    init_native_desktop()
     const programs = async () => {
         if (is_server_page(location.pathname)) return server_programs
         const programs = await load_runtime()

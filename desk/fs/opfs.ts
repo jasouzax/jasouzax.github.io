@@ -75,7 +75,8 @@ export async function swap_root(handle: dir_handle, writable: boolean): Promise<
     remote_active = true
     root.handle = handle; root.writable = writable; root.children = null
     root.readable = root.content_readable = root.write_allowed = undefined
-    await load_children(root)
+    try { await load_children(root) }
+    catch (error) { Object.assign(root, saved); remote_active = false; throw error }
     if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
     redraw()
     document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))

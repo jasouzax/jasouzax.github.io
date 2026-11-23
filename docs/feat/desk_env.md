@@ -8,7 +8,9 @@
 
 ## Status
 
-- [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+- [/] Independent Electron desktop: native VFS/editor save, clipboard, system volume and native-window controls exist; native window projection, full capture and Wayland input remain open. See [desktop package](../../app/README.md).
+- [?] Window-manager adapters for i3, Sway, Hyprland and EWMH X11: validated discovery/place/focus/close operations. Live i3/X11 acceptance passed in an isolated ARM64 display; Sway/Hyprland device acceptance remains for review.
+- [?] Native filesystem channel shared with the personal server; Windows path confinement regressions and native Electron open/save pass.
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 

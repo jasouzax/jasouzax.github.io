@@ -19,7 +19,7 @@ The [implementation audit](implementation-audit.md) records validation evidence 
 - [?] Notebook view/edit preserves nbformat-4 metadata, outputs and attachments; Markdown previews follow unsaved edits. Kernel execution remains unimplemented.
 - [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
 - [/] Cloud preflight validates restored credentials and aggregates input problems; full Access/Tunnel/write-scope bootstrap is incomplete.
-- [/] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+- [/] Independent Electron desktop: native VFS/editor save, clipboard, system volume and native-window adapters exist; projection, full capture and Wayland input remain open.
 
 Every feature of JAZU, ordered roughly by dependency. This is the single place to see **what is done, what is ongoing and what is next**.
 
