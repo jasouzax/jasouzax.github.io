@@ -17,7 +17,7 @@ const site = () => new Map<string, string | Buffer>([
 
 test("offline snapshot lists public pages and themes but never private, toolchain, expertise-media or Git outputs", async () => {
     const result = await offline(site(), new Map([["assets/themes/default/default.css", "b{}"]]), new Set(["/assets/media/talk.mp4"]))
-    assert.deepEqual(result.files, ["/assets/themes/default/default.css", "/assets/themes/memory/memory.css", "/index.html", "/ja/index.html"])
+    assert.deepEqual(result.files, ["/assets/themes/default/default.css", "/assets/themes/memory/memory.css", "/index.html", "/ja/index.html", "/offline.html"])
     assert.ok(result.bytes > 0)
 })
 
@@ -27,6 +27,15 @@ test("snapshot version changes with any byte and the worker is emitted only when
     const disabled = new Map<string, string | Buffer>([["index.html", "x"]])
     await pwa_files(process.cwd(), disabled, new Map(), { ...config, pwa: { ...config.pwa, enabled: false } }, new Set())
     assert.equal(disabled.has("service-worker.js"), false)
+})
+
+test("online-only desks and prior snapshot metadata never enter offline caches", async () => {
+    const files = site()
+    for (const path of ["desk/index.html", "desk/tool/index.json", "server/index.html", "work/index.html", "ja/server/index.json", "ja/work/index.html", "service-worker.js", "offline.json"]) files.set(path, "must not cache")
+    const result = await offline(files)
+    assert.equal(result.files.some(path => /\/(?:desk|server|work)(?:\/|$)/.test(path) || path === "/service-worker.js" || path === "/offline.json"), false)
+    assert.match(files.get("offline.html") as string, /Connection required/)
+    assert.doesNotMatch(files.get("offline.html") as string, /<script|must not cache/)
 })
 
 test("worker bundle embeds the allowlist, notification switch and the Pages-safe canonical install fetch", async () => {

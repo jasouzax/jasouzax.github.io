@@ -21,6 +21,9 @@
 <plugin id="auto_site" name="Automation site" version="1.0.0">
     <case view edit mime="application/auto-site" host="auto_site" />
 </plugin>
+<plugin id="notebook" name="Notebook" version="1.0.0">
+    <case file view edit mime="text/markdown,application/x-ipynb+json" host="notebook" />
+</plugin>
 <plugin id="text" name="Text" version="1.0.0">
     <case file view edit mime="text/plain" host="text" />
     <case file edit mime="text/*,application/json,application/*+json,application/xml,application/*+xml,application/javascript,application/auto-javascript,application/typescript,application/x-sh,application/x-yaml,application/sql" host="text" />

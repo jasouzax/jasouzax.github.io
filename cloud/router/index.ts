@@ -7,6 +7,7 @@ import { api_error, secure_response, is_work_path } from "../security/headers.ts
 import { repository_route } from "../repo/front.ts"
 import { type Work_Env } from "../api/work.ts"
 import { type Server_Env } from "../api/server.ts"
+import { render_server_page, server_page_path } from "../render/page.ts"
 export { Realtime_Hub } from "../room/room.ts"
 export { Server_Hub } from "../hub/hub.ts"
 
@@ -61,8 +62,13 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     // Only public request headers are forwarded to Pages; UUID query secrets never reach it.
     const target = new URL(is_work_path(path) ? url.pathname : url.pathname + url.search, pages)
     const headers = new Headers()
-    for (const name of ["accept", "accept-encoding", "range", "if-none-match", "if-modified-since"]) if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
-    return upstream(new Request(target, { method: request.method, headers, redirect: "manual" }))
+    const dynamic_page = server_page_path(path)
+    for (const name of ["accept", "accept-encoding", "range", "if-none-match", "if-modified-since"]) {
+        if (dynamic_page && ["range", "if-none-match", "if-modified-since"].includes(name)) continue
+        if (request.headers.has(name)) headers.set(name, request.headers.get(name)!)
+    }
+    const response = await upstream(new Request(target, { method: dynamic_page && request.method === "HEAD" ? "GET" : request.method, headers, redirect: "manual" }))
+    return dynamic_page ? render_server_page(request, response, env.SERVER_HUB) : response
 }
 
 export default {

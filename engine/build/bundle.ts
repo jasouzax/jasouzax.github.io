@@ -110,6 +110,10 @@ export async function bundle_runtime(root: string, files: output_files, mode: st
     files.set("assets/wasm/busybox-LICENSE", readFileSync(join(bb_dir, "LICENSE")))
     files.set("assets/wasm/busybox.config", readFileSync(join(bb_dir, "busybox.config")))
     files.set("assets/terminal/xterm-5.5.0.css", readFileSync(fileURLToPath(import.meta.resolve("@xterm/xterm/css/xterm.css"))))
+    const media_root = join(dirname(fileURLToPath(import.meta.resolve("mediabunny"))), "../../..")
+    const media_version = JSON.parse(readFileSync(join(media_root, "package.json"), "utf8")).version as string
+    files.set("assets/vendor/mediabunny-LICENSE.txt", readFileSync(join(media_root, "LICENSE")))
+    files.set("assets/vendor/mediabunny-NOTICE.txt", `Mediabunny ${media_version}\nUnmodified library bundled for blog video export.\nLicense: Mozilla Public License 2.0 (mediabunny-LICENSE.txt).\nSource package: https://registry.npmjs.org/mediabunny/-/mediabunny-${media_version}.tgz\n`)
     files.set("assets/wasm/busybox-source.tar.bz2", readFileSync(join(bb_dir, "busybox-source.tar.bz2")))
     for (const name of ["build.sh", "port.py", "host.c"]) {
         const p = join(root, "desk/program/busybox", name)

@@ -32,6 +32,8 @@ Children: `<menu>`, `<window>`.
 
 One tab of the side panel.
 
+The head grows with its description so tabs remain below the text. Its top-right button switches between the active tab's map and windows, preserving layout and focus. It appears only when the tab declares `<map>`; selecting a tab without one restores windows. In portrait the button also dismisses the menu overlay.
+
 | Attribute | Meaning |
 |---|---|
 | `name`, `icon` | Tab label |
@@ -60,9 +62,11 @@ Tool strip at the bottom of a menu tab (create file, upload, compose). Children:
 
 ### `<map>`
 
-A zoomable node-and-arrow diagram that belongs to a menu tab; a map button appears in the menu head when the active tab has one. *Pan/zoom and the window/map toggle are not implemented yet; today the static link-list fallback is rendered.*
+A zoomable node-and-arrow diagram belonging to a menu tab. Drag the background or use arrow keys to pan; use the wheel or buttons to zoom, and Reset view to restore the initial position. Keyboard `+`, `-` and `0` work with the surface focused. Window nodes restore/focus windows; file/process nodes open resources. Authored links work without JavaScript. A desk with maps and no authored windows starts in map mode.
 
 - `<map/>` with no children is **automatic** (derived from menu content and live resources).
+- Automatic maps include files, windows, split flows and processes. Dashed borders indicate minimized windows or processes without windows.
+- Drag a node's background to place it, or focus it and use Shift+arrow keys. Positions stay in this browser per page/menu; changing the viewport or switching tabs preserves them. Moving nodes updates their arrows. Authored icons support glyphs and HTTP/relative image URLs.
 - With children it is **manual**:
 
 | Element | Attributes |
@@ -73,6 +77,10 @@ A zoomable node-and-arrow diagram that belongs to a menu tab; a map button appea
 
 ## `<window>`
 
+Non-fixed desks add a live **Windows** menu. It shows each window and its split children. Expand an entry for Show, Hide/Unhide and Close controls. Hidden windows disappear from the desktop and header tabs, while retaining drafts, process attachments and map nodes; Ctrl+Tab skips their hidden tabs. Show or activate their map node to restore focus. In portrait, Show also dismisses the menu overlay.
+
+Drag one file window's menu entry onto another to make it a comparison child. Parent cycles and operations in fixed desks are rejected. Available comparisons still depend on plugins. Named/persistent desktop groups remain planned; ordinary windows remain volatile across page navigation/reload.
+
 Shows or edits one resource in a tile. Windows declared in content are the desk's starting windows. Window ids: `window:N` is 1-based in document order. Processes are `pid://name` or `pid:N`.
 
 | Attribute | Meaning |
@@ -82,7 +90,7 @@ Shows or edits one resource in a tile. Windows declared in content are the desk'
 | `view`, `edit` | Mutually exclusive booleans; View is the default. |
 | `split` | Earlier parent window ID, starting at 1 in authored window order. |
 | `path` | `uri` of the resource. Relative paths resolve from the declaring XML. Empty shows an upload area |
-| `data` | Inline content |
+| `data` | Inline content; becomes a local runtime document as well as the static fallback. `path` takes precedence when both are supplied. |
 | `flow` | `bool`; show the split control |
 | `save` | `bool`; show the save control |
 | `full` | `bool`; hide the head and fill the tile |
@@ -90,6 +98,12 @@ Shows or edits one resource in a tile. Windows declared in content are the desk'
 The body is chosen by the [plugin](plugin.md) whose case matches (mime, url, mode). If none match, the window says viewing/editing is unsupported for that mime.
 
 Windows whose source is known at build time (markdown, text, images, code) are pre-rendered into the HTML so search engines and no-JavaScript readers get the content.
+
+Save writes to an existing writable source. New/read-only documents open a VFS destination picker at `/home/user`; choose a folder and filename. Replacing files requires selecting the overwrite checkbox. Cancel preserves the dirty draft. Later saves reuse the chosen path.
+
+Volume: click to mute/unmute; right-click, touch, or press ArrowDown on the button to open the slider. Nonaudio windows disable it. Mute/level survive viewer changes, and a badge identifies muted playback, including remote browser audio. Escape closes the slider.
+
+Fullscreen removes the frame. During video playback, idle tools fade after 2.5 seconds; the fullscreen head overlays the video and fades too. Pointer/touch/keyboard interaction restores controls. Keyboard focus or open menus keeps them visible.
 
 ## Related
 

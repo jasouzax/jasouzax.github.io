@@ -1,0 +1,19 @@
+// Notebook geometry is shared across skins; controls inherit the active theme.
+.desk_notebook { min-width: 0; min-height: 0; height: 100%; overflow: auto; padding: .75em; box-sizing: border-box; }
+.notebook_toolbar, .notebook_cell_head { display: flex; flex-wrap: wrap; align-items: center; gap: .4em; }
+.notebook_toolbar { margin-bottom: .6em; }
+.notebook_toolbar button, .notebook_cell_head button { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: .2em; padding: .25em .5em; cursor: pointer; }
+.notebook_toolbar button:disabled, .notebook_cell_head button:disabled { opacity: .45; cursor: default; }
+.notebook_toolbar button:focus-visible, .notebook_cell_head button:focus-visible, .notebook_input:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.notebook_status { margin: .5em 0; font-size: .85em; }
+.notebook_cell { display: block; padding: .75em 0; border-top: 1px solid currentColor; }
+.notebook_cell_head { margin-bottom: .5em; }
+.notebook_cell_head h3 { margin: 0 auto 0 0; font-size: 1em; }
+.notebook_input { display: block; width: 100%; box-sizing: border-box; resize: vertical; min-height: 5em; font: .9em/1.5 monospace; padding: .5em; color: inherit; background: transparent; border: 1px solid currentColor; tab-size: 4; }
+.notebook_source, .notebook_output { display: block; margin: .6em 0; white-space: pre-wrap; overflow-wrap: anywhere; font: .9em/1.5 monospace; }
+.notebook_source code { font: inherit; }
+.notebook_image { display: block; max-width: 100%; height: auto; margin: .5em 0; }
+.notebook_prose { overflow-wrap: anywhere; }
+.notebook_prose p, .notebook_preview p { margin: .6em 0; }
+.notebook_prose ul, .notebook_prose ol { padding-left: 1.5em; }
+.notebook_prose a { text-decoration: underline; }

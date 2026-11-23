@@ -9,7 +9,7 @@
 ## Status
 
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
-- [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
+- [/] Cloud preflight and generated credentials exist; restored provider credentials pass real read checks. Full Access/Tunnel/write-scope bootstrap is incomplete. See [verification and key preservation](../src/cloud-preflight.md).
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 

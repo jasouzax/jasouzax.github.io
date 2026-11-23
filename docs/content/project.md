@@ -30,6 +30,7 @@ Required: `id`, `name`, `date`. IDs are unreserved lowercase DNS labels of 1–6
 | `repo` | Ordered `type:value` sources (`git`, `npm`, `pypi`, `docker`, `deb`, `rpm`); a bare URL remains Git. The first Git source is synchronized by the personal server: `github.com/org/repo`, `https://host/org/repo.git`, `ssh://git@host/org/repo.git`, or `git@host:org/repo.git`. Hostname/path expands to HTTPS. Credentials and local paths belong in the server’s private Git/server configuration. The attribute and pipeline commands are excluded from generated page payloads |
 | `website`, `source`, `paper`, `event` | Action buttons: *View Website / Source Code / Paper / Event*. They stay visible while slide content crossfades |
 | `lang` | Language of this root; keep translations in the same file |
+| `print` | Optional named print mode, e.g. `research`. A selected research layout prints the authored research instead of the desktop. See [print layouts](print.md). |
 | `media`, `poster`, `alt`, `tags`, `menu`, `image`, `keywords`, `canonical`, `robots`, `lastmod`, `cover`, `print`, `noindex`, `path` | Shared attribute pool; rarely needed here |
 
 **Not allowed on `<project>`:** `skill`, `info`, `stack` and `featured_stack` (put them on slides). Unknown attributes are errors.
@@ -61,7 +62,7 @@ Write each section's explanation as body text. Except `<terminology>`, a section
 
 ## Generated desk tabs
 
-Files, Version and Agent tabs are planned (repository-backed; Agent for signed-in contributors only). See [status](../feat/objects.md).
+Generated tabs include Files, Overview (when research is authored) and Version. Version lazily loads the public repository's latest 100 commits, groups merged branch commits, offers branch/tag selection and exposes a fixed-position commit graph. Failures retain the last loaded history. Private Work history, older-history pagination, historical file browsing, repository-backed Files and the contributor-only Agent remain open. See [status](../feat/objects.md).
 
 ## Related
 
@@ -96,17 +97,34 @@ For public projects, `repo` also supplies the preferred clone/fetch provider whe
 | `branch` | `master` | Git branch to receive, synchronize, test and deploy (unique within the project); a safe branch name without traversal, empty segments or `.lock` components |
 Upstream sync runs once on startup or a changed source declaration. Later updates use local post-receive jobs or explicit sync; external webhook ingestion is not implemented. No interval polls run.
 
+### Public desk extensions
+
+A pipeline can also contain `<menu>`, `<window>` and `<action>` children. Menus and windows join the generated project desk after its ordinary content; each pipeline's action links appear in a `Pipeline: {branch}` menu foot. These are public presentation declarations: use published documents and links, never credentials or private logs. Only direct `<step>` children and their nested steps enter execution policy. Commands, step arguments and credential names are excluded from generated page markup/payloads.
+
+```xml
+<pipeline branch="main">
+    <step name="Check" command="npm" args='["test"]'/>
+    <menu name="Build notes"><entry name="About the build" data="Published explanation."/></menu>
+    <window type="text/plain" data="An editable public example." edit/>
+    <window split="1" view/>
+    <action text="Open server" link="/server"/>
+</pipeline>
+```
+
+Pipeline window split IDs start at 1 within that pipeline and are rebased when merged into the project desk. Omit the child MIME to mirror a parent in another mode; selecting a MIME requests conversion. Inline `data` initializes the runtime document as well as the no-JavaScript presentation. Action links retain normal navigation and authentication behavior; declaring a link does not grant execution permission.
+
 ### `<step>` attributes
 
-Steps are sequential and stop at the first failure. Their phases must appear in `ci`, `build`, `deploy` order. Step names must be unique within a pipeline.
+Steps run sequentially in authored depth-first order and normally stop at the first failure. A step with `continue="true"` retains its failure while allowing following steps to run. Nested steps inherit their parent's phase; phases must appear in `ci`, `build`, `deploy` order. Step names must be unique within a pipeline.
 
 | Attribute | Default | Rule |
 |---|---|---|
 | `name` | Required | Nonempty name shown in CI status and private logs |
-| `command` | Required | Executable, such as `npm`, `node`, `python3`, `cargo` or a checked-in executable script |
+| `command` | Empty | Executable, such as `npm`, `node`, `python3`, `cargo` or a checked-in executable script; omit for a log-only point |
 | `args` | `[]` | JSON array of strings, passed as separate arguments; never an implicitly evaluated shell command |
 | `phase` | `ci` | `ci`, `build`, or `deploy` |
 | `timeout_seconds` | `600` | Integer 1–3600 |
+| `continue` | `false` | Continue after this step fails, preserving the failed result |
 | `credentials` | Empty | Comma-separated environment variable names, e.g. `CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID`; permitted only for `deploy` steps. Values come from the private service environment, never XML. Runtime controls such as `HOME`, `PATH` and `NODE_OPTIONS` are rejected |
 
 `node` uses the running Node executable. On Windows, `npm`/`npx` use their Node CLI without routing arguments through `cmd.exe`. Other Windows commands must be executables or Node scripts, rather than `.cmd`/`.bat` files. For complex commands, put the logic in a versioned script and pass its filename in `args`.

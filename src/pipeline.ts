@@ -46,7 +46,7 @@ async function npm_step(args: string[], background = false): Promise<void> {
 export async function run_pipeline(args: string[]): Promise<void> {
     const { words } = parse_args(args)
     if (!words.length || !step_order.includes(aliases[words[0]] ?? words[0].split(":")[0]) && words[0] !== "all" && !words[0].includes("-")) return run_command(args)
-    if (words[0] === "server" && words.length > 1 && ["init", "repo", "user", "run", "status", "sync"].includes(words[1])) return run_command(args)
+    if (words[0] === "server" && words.length > 1 && ["init", "repo", "user", "run", "status", "sync", "api"].includes(words[1])) return run_command(args)
     const options = args.filter((value, index) => !words.includes(value) || index > 0 && args[index - 1].startsWith("--"))
     let static_server: Server | undefined
     const flags = parse_args(options).flags, root = resolve(String(flags.root ?? process.cwd()))

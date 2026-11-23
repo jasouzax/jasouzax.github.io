@@ -1,0 +1,10 @@
+// Fullscreen presentation overrides paint supplied by any asynchronously loaded skin.
+.desk_wbox:fullscreen { border: 0 !important; border-radius: 0 !important; outline: 0 !important; box-shadow: none !important; }
+.desk_wbox:fullscreen[data-fullscreen-media] > .desk_wbox_head { position: absolute; inset: 0 0 auto; z-index: 20; background: var(--panel); }
+.desk_wbox[data-media-idle] .desk_wbox_body_media :is(.desk_wbox_body_media_head, .desk_wbox_body_media_tool, .desk_wbox_body_media_time),
+.desk_wbox:fullscreen[data-media-idle] > .desk_wbox_head { opacity: 0; pointer-events: none; }
+.desk_wbox:fullscreen[data-fullscreen-media] video { max-height: 100dvh; }
+@media (prefers-reduced-motion: no-preference) {
+    .desk_wbox:fullscreen > .desk_wbox_head,
+    .desk_wbox_body_media :is(.desk_wbox_body_media_head, .desk_wbox_body_media_tool, .desk_wbox_body_media_time) { transition: opacity .2s; }
+}

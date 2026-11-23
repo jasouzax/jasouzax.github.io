@@ -62,8 +62,8 @@ test("paths must be absolute and stay inside the root, also through .. and symli
     for (const bad of ["relative", "", `${root}/../x`, `${root}/a/../../etc`, `${outside}/secret`]) assert.equal(await code_of(confine(root, bad)), bad === "relative" || bad === "" ? "EINVAL" : "EACCES", bad)
     assert.equal(await code_of(handle_fs(root, { op: "read", path: `${root}/link/secret`, offset: 0, length: 10 })), "EACCES")
     assert.equal(await code_of(handle_fs(root, { op: "write", path: `${root}/link/new`, offset: 0, data: "", truncate: true })), "EACCES")
-    assert.equal(await confine(root, `${root}/new/deep/file`), `${root}/new/deep/file`)
-    assert.equal(await confine("/", "/etc//hosts/"), "/etc/hosts")
+    assert.equal(await confine(root, `${root}/new/deep/file`), path.resolve(root, "new/deep/file"))
+    assert.equal(await confine(path.parse(root).root, "/etc//hosts/"), path.resolve("/etc/hosts"))
     assert.equal(await code_of(confine(root, 5 as unknown as string)), "EINVAL")
 })
 

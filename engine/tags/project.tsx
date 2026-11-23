@@ -3,6 +3,7 @@ import type { xml_node } from "../../shared/content/xml.ts"
 import type { site_model } from "../load/model.ts"
 import { research_sections } from "../../shared/content/schema.ts"
 import { element } from "./objects.ts"
+import { pipeline_children } from "./project/pipeline.ts"
 
 export function project_children(model: site_model, object: xml_node, children: xml_node[]): void {
 const id = object.attrs.id
@@ -23,4 +24,5 @@ const id = object.attrs.id
         children.splice(1, 0, element("menu", { name: "Overview" }, research, sections))
     }
     children.push(element("menu", { name: "Version", path: `https://repo.${new URL(model.config.base_url).hostname}/${id}/_/log` }, object))
+    pipeline_children(model, object, children)
 }

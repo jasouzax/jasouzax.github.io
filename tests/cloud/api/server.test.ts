@@ -111,5 +111,5 @@ test("gateway: a script's reply is filtered, sandboxed and never cached for the 
     const passed = await gateway_route(new Request(`${site}/api/sample`), missing.env, "sample", "")
     assert.equal(passed.status, 404)
     const worker = await route(new Request(`${site}/api/sample`), { DOMAIN: "jasouza.com", PAGES_ORIGIN: "https://p.pages.dev", ...hub_env({}, () => Response.json(answer)).env })
-    assert.equal(worker.status, 201, "the Worker router hands /api/{name} to the gateway")
+    assert.equal(worker.status, 501, "the Worker does not expose the retired unversioned API prototype")
 })

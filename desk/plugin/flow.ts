@@ -32,6 +32,7 @@ export function children_of(item: desk_window): desk_window[] {
 }
 
 export function adopt(parent: desk_window, child: desk_window): void {
+    if (child.parent) kids.get(child.parent)?.delete(child)
     resources.set(parent, resource_of(parent))
     child.parent = parent
     if (!kids.has(parent)) kids.set(parent, new Set())

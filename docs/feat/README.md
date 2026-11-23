@@ -1,15 +1,29 @@
 # Feature status
 
-The [2026-11-22 implementation audit](implementation-audit.md) records this pass, validation evidence and every remaining component gap. In the new entries, `[?]` means implemented and awaiting human acceptance; `[!]` means incomplete or an operator notice. Historical `[x]` marks below are preserved.
+The [implementation audit](implementation-audit.md) records validation evidence and remaining component gaps. `[?]` means implemented and awaiting human acceptance; `[/]` means incomplete; `[!]` is reserved for human-only blockers, as clarified in `COMPONENTS.md`. Historical `[x]` marks below are preserved.
 
 - [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+- [/] Windows menu supports split hierarchy, reversible hiding and comparison drops; persistent desktop groups remain open.
+- [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
+- [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
+- [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
 - [?] RSS 2.0 and Atom feeds with per-language autodiscovery and private-page exclusion.
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
+- [?] Optional passkeys protect owner login and account deletion, with recent Google sign-in required when no key is enrolled; see [passkeys](passkeys.md).
+- [?] PWA offline snapshots exclude online-only workspaces and show a connection-required fallback; Chrome verifies both themes, private-route exclusion and offline navigation. Real-device push/install acceptance remains open.
+- [?] Remote browser frames decoded after closure cannot revive a closed feed; all 13 server-desk Chrome regressions pass.
+- [/] Versioned custom APIs: [Phase 1 core](custom-apis.md) is implemented and tested with child processes, SQLite, signed gateway and CLI deployment; later phases and multi-server/desk integration remain open.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
-- [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
-- [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+- [?] Blog books print nested public chapters in authored order with contents and page numbers.
+- [?] Nested blog scenes provide fixed reading windows, seekable Canvas previews and 1080p VP9/Opus WebM export with offline audio mixing; see [blog media](blog-media.md).
+- [?] Public server SSR and Durable Object ESR render fresh/cached status into HTML and SPA payloads; see [server rendering](server-rendering.md).
+- [?] Pipeline-authored menus/windows/action links extend project desks without exposing execution policy.
+- [?] Notebook view/edit preserves nbformat-4 metadata, outputs and attachments; Markdown previews follow unsaved edits. Kernel execution remains unimplemented.
+- [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
+- [/] Cloud preflight validates restored credentials and aggregates input problems; full Access/Tunnel/write-scope bootstrap is incomplete.
+- [/] Independent Electron desktop: native VFS/editor save, clipboard, system volume and native-window adapters exist; projection, full capture and Wayland input remain open.
 
 Every feature of JAZU, ordered roughly by dependency. This is the single place to see **what is done, what is ongoing and what is next**.
 
@@ -81,8 +95,9 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Generate project, event and blog pages plus `/projects`, `/blogs` listings from roots (1.5–1.7)
   - [x] Exclude private projects and slides from generated public resources and pages
   - [x] Project `<research>` block renders an Overview menu (terminology … results)
+  - [?] A project's named research print layout reveals authored public research, with matching-language isolation and nested points.
   - [x] Slides act as skill variations inside one carousel position; the footer switches skill in place
-  - [ ] Load repository Files/Version snapshots from the personal server (1.5)
+  - [/] Public Version history loads lazily with merge groups, branch/tag selection and a fixed graph; Files, historical file browsing, private Work history and older-history pagination remain open (1.5).
   - [ ] Contributor-only Agent menu (1.5)
   - [ ] Repository change scanning (`repo` attribute) applied at build time
   - [ ] `/srv/events/{id}` and `/srv/repo/{id}` mounted in the browser filesystem (see [filesystem](filesystem.md))
@@ -146,8 +161,8 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] Preserve desk windows, layout, resizing, syntax colouring, processes and the visitor OPFS home (3.5, 3.7)
   - [x] Replace the JavaScript shell with compiled BusyBox ash and applets: Worker processes, shared byte filesystem calls, inherited descriptors, pipes, fork/exec/wait and local xterm.js (build recipes: `src/desk/README.md`)
   - [x] Keep uploads strictly in memory (`/tmp`); remove inherited OPFS `/tmp` behaviour
-  - [ ] Map/window toggling, pan and zoom (1.4.3, 3.6)
-  - [ ] Offer a destination picker on Save for new/read-only windows
+  - [?] Map/window toggling, pan and zoom (1.4.3, 3.6); desktop/portrait Chrome and model/render contracts pass.
+  - [?] Offer a destination picker on Save for new/read-only windows; Chrome verifies durable bytes, cancellation, overwrite and subsequent saves.
   - [x] Empty split children, shared live editors/HTML preview, independent text comparisons and image-to-PDF WASM conversion with a local PDF viewer
   - [ ] Complete the plugin flow graph, MIME conversions, map resources and hidden processes (3.5–3.6)
   - [ ] Bundle further programs (htop/fastfetch/tcc artifacts exist; ffmpeg and ImageMagick are not bundled)

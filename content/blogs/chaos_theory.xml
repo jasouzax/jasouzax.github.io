@@ -1,7 +1,17 @@
-<blog lang="en" name="Chaos theory, drawn" icon="[blog]" info="A short tour of the logistic map with a live simulation window." id="chaos-theory">
-        <window path="chaos_theory/index.md" type="text/markdown" view="true" />
+<blog lang="en" name="Chaos theory, drawn" icon="[blog]" info="A short tour of the logistic map with a live simulation window." id="chaos-theory" print="book">
+        <scene name="The logistic map" duration="3" script="A simple equation can lead to complex behavior.">
+            <window path="chaos_theory/index.md" type="text/markdown" view="true" />
+            <scene name="Try it yourself" duration="3" script="Change the growth rate and compare the results.">
+                <window type="text/plain" data="x_next = r * x * (1 - x)" edit="true"/>
+            </scene>
+        </scene>
     </blog>
 
-<blog lang="ja" name="カオス理論を描く" icon="[blog]" info="ライブシミュレーションウィンドウ付きの、ロジスティック写像のミニツアー。" id="chaos-theory">
-        <window path="chaos_theory/index.ja.md" type="text/markdown" view="true" />
+<blog lang="ja" name="カオス理論を描く" icon="[blog]" info="ライブシミュレーションウィンドウ付きの、ロジスティック写像のミニツアー。" id="chaos-theory" print="book">
+        <scene name="ロジスティック写像" duration="3" script="単純な方程式から複雑な振る舞いが生まれます。">
+            <window path="chaos_theory/index.ja.md" type="text/markdown" view="true" />
+            <scene name="試してみましょう" duration="3" script="増殖率を変えて結果を比較しましょう。">
+                <window type="text/plain" data="x_next = r * x * (1 - x)" edit="true"/>
+            </scene>
+        </scene>
     </blog>

@@ -23,6 +23,7 @@ import { Touch_control } from "./touch.ts"
 import { server_audio } from "./audio.ts"
 import { override_navigation, sync_navigation, type Live_Navigation } from "../action/history.ts"
 import { window_audio_enabled } from "../action/controls.ts"
+import { window_volume, remote_audio_state } from "../action/volume.ts"
 import { Click_Counter, copy_shortcut, key_events, modifiers, mouse_button, page_point, wheel_pixels } from "./input.ts"
 import { is_site_url, site_key, site_url_of, window_id_of } from "./windows.ts"
 import type { Input_Event, Window_Info } from "../../shared/protocol/wire.ts"
@@ -136,6 +137,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     }
     const sync = (): void => {
         const window_info = info()
+        remote_audio_state(item, Boolean(window_info?.audible))
         if (window_info) { asked_open = true; seen_window = true }
         navigation.path = window_info?.url || navigation.path
         navigation.can_back = Boolean(window_info?.can_back)
@@ -174,13 +176,15 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
 
     // ---- frames
     let busy = false
-    let latest: Uint8Array | null = null
-    const paint = async (bytes: Uint8Array): Promise<void> => {
-        if (busy) { latest = bytes; return }
+    let latest: { bytes: Uint8Array, id: number } | null = null
+    const paint = async (bytes: Uint8Array, id: number): Promise<void> => {
+        if (signal.aborted || id !== current_id() || !link.connected || !link.online) return
+        if (busy) { latest = { bytes, id }; return }
         busy = true
         try {
             const bitmap = await createImageBitmap(new Blob([bytes.slice().buffer], { type: "image/jpeg" }))
-            if (!signal.aborted && context) {
+            // Decoding may finish after a close, disconnect or source change; a stale picture must not revive the feed.
+            if (!signal.aborted && context && id === current_id() && link.connected && link.online) {
                 if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) { canvas.width = bitmap.width; canvas.height = bitmap.height; touch.refresh() }
                 context.drawImage(bitmap, 0, 0)
                 canvas.hidden = false
@@ -189,11 +193,11 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
             bitmap.close()
         } catch { /* a broken frame is skipped */ }
         busy = false
-        if (latest) { const next = latest; latest = null; void paint(next) }
+        if (latest) { const next = latest; latest = null; void paint(next.bytes, next.id) }
     }
     const off_frames = link.on_binary(frame => {
         if (frame.id !== current_id()) return
-        if (frame.kind === "video") void paint(frame.payload)
+        if (frame.kind === "video") void paint(frame.payload, frame.id)
         else if (active_feed === item && window_audio_enabled(item) && item.mode !== "edit") audio.push(frame.timestamp, frame.payload)
     })
 
@@ -280,6 +284,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     const change_sound = (): void => {
         active_feed = item
         audio.enabled = window_audio_enabled(item)
+        audio.volume = window_volume(item)
         if (!audio.enabled) audio.reset()
         watch(true)
     }
@@ -290,6 +295,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
         if (active_feed !== item) audio.reset()
         active_feed = item
         if (audio.enabled !== window_audio_enabled(item)) audio.enabled = window_audio_enabled(item)
+        audio.volume = window_volume(item)
         watch(true)
     }
     item.el.addEventListener("pointerdown", claim)
@@ -300,6 +306,7 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
     draw_sound()
     const offs = [store.on_change(sync), link.on_state(sync), off_frames, off_clipboard]
     signal.addEventListener("abort", () => {
+        remote_audio_state(item, false)
         for (const off of offs) off()
         restore_navigation()
         item.el.removeEventListener("jazu:window-audio", change_sound)

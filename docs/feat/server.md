@@ -8,6 +8,8 @@
 
 ## Status
 
+- [?] Remote-site decoding preserves closed/offline state: late JPEGs recheck the current window and connection before painting. A deterministic held-frame regression and all 13 server-desk Chrome checks pass (2026-11-23); the channel is mocked, not a claim of live Pi/phone acceptance.
+
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
 - [x] Wire protocol shared by agent, Durable Object and page (`shared/protocol/wire.ts`)

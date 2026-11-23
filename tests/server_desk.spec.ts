@@ -88,7 +88,7 @@ async function owner(page: Page, stale_plugins = false) {
     await page.goto("/server")
     jpeg = Buffer.from(await page.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8; canvas.getContext("2d")!.fillRect(0, 0, 8, 8); return canvas.toDataURL("image/jpeg").split(",")[1] }), "base64")
     await expect.poll(() => messages.some(message => message.t === "auto_state")).toBe(true)
-    return { messages, update, send }
+    return { messages, update, send, windows, frame }
 }
 async function sessions(page: Page) {
     await page.locator("#head_menu > summary").click()
@@ -161,9 +161,9 @@ test("every window groups volume and save, with fullscreen between split and mov
     const pane = page.locator('.desk_wbox').first(), head = pane.locator('.desk_wbox_head')
     expect(await head.locator('.desk_wbox_head_actions > button').evaluateAll(buttons => buttons.map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_audio', 'desk_wbox_head_save'])
     expect(await head.locator(':scope > .desk_wbox_head_split, :scope > .desk_wbox_head_fullscreen, :scope > .desk_wbox_head_drop').evaluateAll(buttons => buttons.map(button => button.className.split(' ').at(-1)))).toEqual(['desk_wbox_head_split', 'desk_wbox_head_fullscreen', 'desk_wbox_head_drop'])
-    await pane.locator('.desk_wbox_head_audio').click()
+    await expect(pane.locator('.desk_wbox_head_audio')).toBeDisabled()
     await pane.locator('[data-mode="edit"]').click()
-    await expect(pane.locator('.desk_wbox_head_audio')).toHaveAttribute('aria-pressed', 'false')
+    await expect(pane.locator('.desk_wbox_head_audio')).toBeDisabled()
     await pane.locator('.desk_wbox_head_fullscreen').click()
     await expect.poll(() => page.evaluate(() => document.fullscreenElement?.classList.contains('desk_wbox'))).toBe(true)
     await pane.locator('.desk_wbox_head_fullscreen').click()
@@ -176,6 +176,21 @@ test("every window groups volume and save, with fullscreen between split and mov
     await page.screenshot({ path: '.cache/desk-browser-results/server-header-portrait.png' })
 })
 
+
+test("remote browser audio reports a muted activity badge and accepts header volume", async ({ page }) => {
+    const api = await owner(page), panel = await sessions(page)
+    await panel.locator('[data-session-uri="server:window:1"]').click()
+    const pane = page.locator('.desk_wbox').last(), volume = pane.locator('.desk_wbox_head_audio')
+    await expect(volume).toBeEnabled()
+    await volume.click()
+    api.send({ t: "window_updated", window: { ...api.windows[0], audible: true } })
+    await expect(volume).toHaveAttribute('data-muted-playing', '')
+    await volume.click({ button: 'right' })
+    await page.locator('.desk_volume_popup:not([hidden]) input').fill('0.25')
+    await expect(volume).toHaveAttribute('aria-pressed', 'true')
+    await expect(volume).not.toHaveAttribute('data-muted-playing', '')
+    await page.keyboard.press('Escape')
+})
 
 test("an auto-site file switches between its page and DevTools without opening a second session", async ({ page }) => {
     const api = await owner(page)
@@ -201,6 +216,30 @@ test("an auto-site file switches between its page and DevTools without opening a
     await page.screenshot({ path: '.cache/desk-browser-results/server-site-view.png' })
 })
 
+
+test("a frame decoded after remote closure cannot revive the closed feed", async ({ page }) => {
+    const api = await owner(page)
+    const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
+    await address.fill('server:window:1'); await address.press('Enter')
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await page.evaluate(() => {
+        const decode = window.createImageBitmap.bind(window)
+        ;(window as any).held_frames = []
+        window.createImageBitmap = (async (...args: any[]) => {
+            const bitmap = await (decode as any)(...args)
+            await new Promise<void>(resolve => (window as any).held_frames.push(resolve))
+            return bitmap
+        }) as typeof createImageBitmap
+    })
+    api.frame(1)
+    await expect.poll(() => page.evaluate(() => (window as any).held_frames.length)).toBeGreaterThan(0)
+    api.send({ t: 'window_removed', id: 1 })
+    await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
+    await page.evaluate(() => { for (const release of (window as any).held_frames.splice(0)) release() })
+    await page.waitForTimeout(100)
+    await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
+    await expect(pane.locator('.server_site_canvas')).toBeHidden()
+})
 
 test("Sessions use standard side items with icons and persistent script actions", async ({ page }) => {
     const api = await owner(page), panel = await sessions(page)

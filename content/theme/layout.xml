@@ -7,6 +7,13 @@
     <style src="work.scss"/>
     <style src="realtime.scss"/>
     <style src="slide_skills.scss"/>
+    <style src="desk_map.scss"/>
+    <style src="desk_save.scss"/>
+    <style src="desk_volume.scss"/>
+    <style src="desk_fullscreen.scss"/>
+    <style src="desk_version.scss"/>
+    <style src="desk_note.scss"/>
+    <style src="desk_native.scss"/>
     <style><![CDATA[
         #head_tray, #theme_background { display: contents; }
         .needs_js { display: none; }
@@ -20,6 +27,7 @@
         .visually_hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
         [hidden]:not(.landing_resume):not(.expertise_resume) { display: none !important; }
         @media screen { :is(.landing_resume, .expertise_resume)[hidden] { display: none !important; } }
+        @media screen { .research_paper, .blog_book { display: none !important; } }
         .theme_radio, .list_drop_li > input { position: absolute; opacity: 0; }
         :root.js .expertise .expertise_track .arrow { display: none !important; }
         .expertise .expertise_nav .arrow[hidden] { display: none !important; }

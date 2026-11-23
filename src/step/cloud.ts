@@ -8,9 +8,10 @@ import { load_env } from "./cloud_deploy.ts"
 import { load_config } from "../../shared/config.ts"
 
 export async function cloud_command(root: string, flags: flags): Promise<void> {
+    if (flags.preflight && flags.dry_run) throw new Error("Choose --preflight for online read-only checks or --dry_run for offline deployment preparation")
     if (!flags.dry_run) {
         load_env(root)
-        await cloud_preflight(root, await load_config(root))
+        await cloud_preflight(root, await load_config(root), process.env, fetch, { persist: !flags.preflight })
         if (flags.preflight) return
     }
     const result = await run_build(root, flags, false)

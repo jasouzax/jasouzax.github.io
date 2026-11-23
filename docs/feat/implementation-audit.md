@@ -1,8 +1,66 @@
 # Component implementation audit
 
-This pass follows the requested branch/Conventional Commit/no-ff merge workflow into `staging`. `[?]` means implemented and awaiting human acceptance; `[!]` names missing functionality or an operational notice. No acceptance marks were invented. This is an implementation attempt and a complete gap inventory, not completion of every target system.
+The original 2026-11-22 pass used feature branches/no-ff merges. The earlier 2026-11-23 continuation worked directly on `staging`; the native/security/offline pass below uses its own feature branch. `[?]` means implemented and awaiting human acceptance. Historical `[!]` labels in the original table used an obsolete convention; current statuses in `COMPONENTS.md` use `[ ]` for absent work, `[/]` for incomplete work, and `[!]` only for human-only blockers. No acceptance marks were invented. This is an implementation attempt and a gap inventory, not completion of every target system.
+
+## Native desktop, passkeys and offline continuation — 2026-11-23
+
+This continuation uses feature branch `codex/native-desktop-integration`; the older staging-only note describes the previous pass. Pre-existing uncommitted desktop-group/navigation/configuration edits were preserved and are not part of these commits.
+
+Implemented native filesystem open/save, async system clipboard, PipeWire volume/mute, X11 keys and separate i3/Sway/Hyprland/X11 window-manager adapters. Electron IPC accepts bounded operations from only the pinned top-level localhost document. Filesystem reads are staged before mounting and cancelled/restored before SPA initialization. Real Electron verifies editor and filesystem/clipboard roundtrips, malicious request rejection, renderer isolation, external-navigation blocking and `/desk` → project → `/desk` remount/reopen. Live i3 and X11 discovery/place/resize/focus/close pass in an ephemeral ARM64 Xvfb container on the personal server. The container and temporary files were removed. Full native-window projection, system capture and Wayland input remain open; Sway/Hyprland physical-compositor acceptance remains unverified.
+
+Optional passkeys now register/list/remove in account settings. D1 stores public credentials, counters, single-use session-bound challenges and proof; verified assertions gate new owner authority and recent account deletion. Accounts without keys need a Google session created within five minutes. HTTP, personal-server owner access and realtime commands share the proof policy. Real SQLite/workerd and virtual CTAP2 browser tests cover enrollment, signature verification, replay, stale proof, owner locking and account deletion; existing Google/Work browser regressions pass. Migration 0009 and matching browser/Worker assets are required on deployment. No production account was used for deletion or enrollment.
+
+Offline snapshots now exclude online-only workspace HTML/JSON in every configured language and exclude their own service-worker/manifest metadata. A script-free connection-required document handles offline workspace navigation, preserving the requested URL for retry. Chrome verifies unvisited public pages, both themes, private/API/toolchain exclusions and `/desk`, `/server`, `/work` plus translated-server fallbacks. Physical-device installation and real Web Push acceptance remain open.
+
+Verification: bounded main suite **319 passes, four skips, no failures**; isolated WASM suite **44 passes**; server suite **72 passes, one unavailable-PTY skip**. Root/app/server types, content checking (71 pages, 39 existing warnings), static/server builds and staging Worker preparation pass. Separate focused snapshot, filesystem, push and boundary checks pass. All twelve existing sign-in/Work browser checks and both passkey browser checks pass. The initial unconstrained suite was stopped after overload; an intermediate bounded run caught ASN.1 dependency resolution in the neutral-target deployment bundle. Switching deployment preparation to staging's browser target fixed it; the focused rerun and final bounded suite pass. No infrastructure, DNS, `.env`, active server container or published image was changed. These results cover this continuation, not completion of the remaining `COMPONENTS.md` backlog.
+
+The final server-desk browser run found a late-image decode race that could clear the closed-window message after removal. Painting now rechecks the current window identity and live connection after decoding. A deterministic test holds a real JPEG decode until after removal; all **13 server-desk Chrome checks pass** with the fix. These browser checks use a mocked owner channel, while i3/X11 acceptance above used the real ARM64 display in an isolated container.
+
+## Restored provider inputs — 2026-11-23 (earlier pass)
+
+The restored ignored `.env` passes real token/account/zone/eight-service read checks without changing its bytes. Account-token introspection exposes the required service edit groups. Google distinguishes the restored OAuth secret from an invalid control; no tokens were issued, and full interactive consent is not verified. Provider account inputs are now `[?]`, with no missing-credential human blocker. See [verification details](../src/cloud-preflight.md).
+
+`cloud --preflight` now performs read-only checks, supports account-owned/user-owned token verification and refuses to generate replacement keys already held by the configured Worker. Terraform signing-key aliases are reused. Staging also preserves optional inherited JWT/agent bindings when local input values are null. Root types, focused Node tests, staging Terraform validation and four mocked-provider Terraform tests pass. No live deployment, DNS change or credential rotation occurred; Access/Tunnel bootstrap remains incomplete.
+
+The next preflight continuation aggregates independent local validation failures before network access and aggregates service denials after discovery. Matching VAPID key material is verified cryptographically, optional inputs/aliases are checked, and generated configuration cannot partially update the environment on validation/write failure. Twelve focused tests, root types and the real read-only CLI check pass; the restored `.env` is unchanged.
+
+## Staging continuation — 2026-11-23
+
+Notebook windows now provide structured nbformat-4 view/edit with cell insertion, reordering/deletion, undo/redo and explicit output clearing. Saves preserve metadata, attachments, unknown fields and existing output unless explicitly cleared; unchanged documents keep exact original bytes. Split notebooks/Markdown previews share unsaved edits. Published notebooks also render without JavaScript and in book output. Stored HTML/JavaScript stays inert and notebook image rendering uses embedded raster data rather than remote requests. Cell execution/kernel connections remain absent, keeping Notebook `[/]`.
+
+Verification: focused model/render/plugin/flow checks and four isolated Chrome regressions pass, including OPFS reload, unchanged-byte save, dirty-state synchronization and invalid-file recovery. Book and pipeline Chrome checks also pass. The full run reported **337 passes, 4 skips and 7 failed test results**: four known Windows-path failures plus C/C++/Python timeout failures and their parent suite. All **44 WASM tests passed** when rerun alone, resolving those three load-related results. Browser-server startup also timed out while the heavy suite ran; the isolated browser rerun passed. Content check reports 71 pages and 39 existing warnings. This pass changes only staging source/docs; `.env`, infrastructure and published services are untouched.
+
+Pipeline-authored menus/windows/actions now extend the generated public project desk, with per-branch action menus and rebased local split IDs. The engine copies only explicit public UI; execution steps, arguments and credential declarations stay server-only. Inline window content initializes runtime documents and mirrors instead of remaining a static fallback. Schema/privacy/split/hook contracts, root/server types, server/static builds and Chrome editing checks pass. The pipeline desk-extension component is `[?]`.
+
+The bounded full suite completed with **334 passes, 4 skips and the same 4 Windows/POSIX filesystem failures** in `tests/desk/server/fs.test.ts`. The later pipeline extension passed 27 focused checks, plus Chrome verification of inline pipeline editing; the six book/Windows browser checks also pass. Content validation still reports 71 pages and 39 existing warnings. Full-suite default concurrency overloaded this machine and was stopped; `--test-concurrency=2` completed. No live infrastructure, published site, `.env` contents or other branch was changed.
+
+Blog book printing now supports cover/contents, authored nested chapter order, language/private/noindex filtering, chapter breaks, source links and page numbers. Nested blog routes and resource ownership use sibling-relative IDs. Child source changes invalidate the parent book. The existing bilingual reference opts in without adding invented article content. Types, content/build, 30 focused content/print/layout tests and four Chrome book/research print regressions pass; rendered PDF inspection also caught and corrected a duplicate chapter heading. The Book component is `[?]`; scene/Canvas/video authoring remains incomplete.
+
+The menu-head specification was committed first as `4e566ae` with the requested message. `f365c33` implements automatic head height, active-menu map/window mode, accessible pan/zoom, authored maps, live files/windows/flows/processes and plugin resource contributions; it also adds the VFS Save destination picker with cancellation and explicit overwrite handling. The continuation adds draggable/keyboard node placement saved per page/menu, per-window audio controls and native fullscreen video inactivity. `b320d4c` fixes a pre-existing fastfetch test that compared volatile live memory readings from separate snapshots.
+
+Validation: root/server typechecks, static build (71 pages), server build, focused map/render/layout/gain/protocol tests and 16 real Chrome regressions pass across the focused runs. The main suite reports 307 passes, 4 skips and the 4 documented Windows/POSIX filesystem failures. After correcting the volatile-memory assertion, the server suite reports 65 passes, 1 skip and its 7 documented filesystem failures. Content validation reports 71 pages and 39 existing warnings. The desk browser configuration now builds before serving; plain `serve` can reuse stale output. No branch other than staging, live service, DNS, infrastructure state or published image was changed.
+
+Continue from the component statuses, preserving `[?]` for human review. The desktop and Specific actions remain `[/]`: resource-bound comments (including Work persistence/annotations), grouped persistent desktops, full MIME conversion graph and shell restoration/accounting remain unfinished. The broader Blog/People/collaboration/custom API/multi-server/cloud/native application gaps in this inventory also remain open; this continuation does not relabel them as delivered.
 
 ## Delivered changes
+
+### Additional continuation — Windows navigation
+
+Non-fixed desks now expose a live Windows menu with split hierarchy, Show/Hide/Close controls, hidden/minimized state and resource-map synchronization. Hiding removes both desktop tiles and header tabs without disposing drafts or processes; keyboard cycling skips hidden tabs. File windows can be dropped under another as comparison children, with ancestor-cycle rejection and stale-parent cleanup. Group persistence is still absent, so Windows remains `[/]`.
+
+Root typechecking, flow/layout contracts and ten Chrome Windows/Version/map regressions pass, including shared unsaved draft restoration, comparison drops, fixed-desk guards and portrait behavior. No live deployment occurred.
+
+### Additional continuation — public Version menus
+
+Public project Version menus now load bounded repository history only when selected. The origin exposes commit parents in topological order and peeled annotated tag targets; the browser validates replies, groups non-first-parent branch commits under merge entries, resolves named refs to hashes, and builds a fixed-position DAG with branch/tag labels. Refresh errors preserve the loaded snapshot. Requests omit credentials, enforce a response-size/time bound, and abort on navigation. Selecting map nodes reveals their commit entry.
+
+Root/server types, server build, real-Git no-ff/tag fixtures, nested-merge validation, Worker regressions and six Chrome Version/map checks pass. Private Work history, older-history pagination and historical file browsing remain open, so Versions stays `[/]`. The matching origin must be deployed with the runtime; no live deployment was performed.
+
+### Additional continuation — research printing
+
+Project `print="research"` now selects a built-in research paper layout through the existing named/language-aware print system. The paper uses only matching-language public research, preserves nested points and placeholder wording, and excludes private projects and repository/collaborator data. Title/date, safe source links, configurable fonts/paper size and page numbers are provided. Screen mode retains the desktop; print mode replaces it with the paper. The English Stesis reference opts in explicitly.
+
+Root typechecking, focused print/page/layout/privacy tests and content validation pass (71 pages, 39 existing warnings). Real Chrome print tests pass for Default and Memory; exported three-page A4 PDFs were rendered with Poppler and inspected, including page breaks and nested headings. Full main/server suite results above remain from the earlier pass; this continuation uses focused regressions for the changed print path. No live deployment occurred.
 
 | Area | Implementation and evidence |
 |---|---|
@@ -79,7 +137,7 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | `<menu>`, `<window>`, `<action>` | Pipeline schema accepts only steps; menu/window/action children and their runtime bindings are absent. |
 | [!] | **Blog** `<blog>` `cmp:/content/blog` | Only Markdown/menu/window blog expansion exists. Scene schema, Canvas timeline, audio and encoding are absent. |
 | [?] | **Theme** `<theme>` `cmp:/content/theme` | Existing themes, font generation and Material Design icon token mapping are implemented and tested; remaining artistic/device review is manual. |
-| [!] | **Print** `<print>` `cmp:/content/print` | Selected print SCSS/fonts now compile behind print media; arbitrary layouts, blog books and research-paper layouts remain incomplete. |
+| [!] | **Print** `<print>` `cmp:/content/print` | Selected print SCSS/fonts and the research layout work; arbitrary layouts, blog books and quotations remain incomplete. |
 | [!] | Only published information is used: personal details come from the landing page's first `<hero>` (`name`, `profile`, `<item print="label">`), history from the expertise. Missing values print as empty boxes which can be editted (the user toggle print mode in dev tools, add the content, and then print), nothing is invented/placeholder. Dates/age are refreshed on `beforeprint`. | Published-data filtering exists, but structured profile/photo fields and every beforeprint/form variant still need acceptance against the current hero contract. |
 | [!] | **Plugin** `<plugin>` `cmp:/content/plugin` | Existing plugin loading and split/edit/compare flows work; complete trigger/conversion graph, blog render plugins and map/resource integration are incomplete. |
 | [!] | **Pipeline Script** `cmp:/src/pipeline` | All named stages now have entry points, including inst/ext/app; full cloud/server stage semantics depend on missing provisioning and roles. |
@@ -94,10 +152,10 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | **Personal** `cmp:/desk/fs/personal` | Drive is used for Work key files only. Visitor file storage, identity home paths, permission prompts and conflict copies are absent. |
 | [!] | **Public** `cmp:/desk/fs/public` | Published HTTP resources exist, but no consistent /srv projects/events/blogs mount or authenticated persistent writeback exists. |
 | [!] | **Collaboration** `cmp:/desk/fs/collab` | No authorized shared-folder protocol, account isolation, collaborator-home projection or conflict resolution exists. |
-| [!] | **Submenu** `cmp:/desk/menu` | Existing menus work; dynamic windows/groups, version graph and People menus are incomplete. |
+| [/] | **Submenu** `cmp:/desk/menu` | Public Version menus and maps work; dynamic windows/groups, private Work history and People menus remain incomplete. |
 | [!] | **Chats** `cmp:/desk/menu/chat` | Encrypted Work chat exists; consistent chat menus and collaboration across arbitrary desk resources are incomplete. |
-| [!] | **Windows** `cmp:/desk/menu/windows` | Taskbar-style activation exists; hiding tabs/windows and grouped desktop/menu/map synchronization are incomplete. |
-| [!] | **Versions** `cmp:/desk/menu/version` | No live Git commit tree menu with no-ff merge nesting and snapshots is implemented. |
+| [/] | **Windows** `cmp:/desk/menu/windows` | Live split tree, reversible hiding, comparison drops and map/tab synchronization work; persistent desktop groups remain open. |
+| [/] | **Versions** `cmp:/desk/menu/version` | Public history, no-ff merge nesting, refs/tags and fixed graph work; private Work history, pagination and historical file browsing remain open. |
 | [!] | **People** `cmp:/desk/menu/people` | People storage, region grants and graph projection are absent; the menu cannot safely expose nonexistent authorization. |
 | [!] | **Notebook** `cmp:/desk/window/note` | Markdown reading works; editable notebooks, Jupyter cell execution and persistence are absent. |
 | [!] | **AutoSite** `cmp:/desk/window/autosite` - | Existing AutoSite automation browser works; final owner/device interaction and the new API integration remain unverified/incomplete. |
@@ -110,9 +168,9 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | **Fullscreen** | Maximizing exists; full media-specific hover/touch header and fullscreen presentation behavior are not fully verified. |
 | [!] | **Split** | Split editors/compare/image-to-PDF work; arbitrary MIME convert/compare/mirror graph search is incomplete. |
 | [!] | **Drag/Move** | Existing drag/dock and fixed/auto movement guards work; every portrait/touch/menu interaction still needs acceptance. |
-| [!] | **Projects** `cmp:/projects` | Project rendering and Git access exist; authenticated editing, repository filesystem and research print are incomplete. |
+| [!] | **Projects** `cmp:/projects` | Project rendering, research printing and Git access exist; authenticated editing and repository filesystem remain incomplete. |
 | [!] | **Git Repo** `cmp:/projects/git` | Smart HTTP and collaborator tokens pass regressions; authenticated desktop editing and live project snapshots remain incomplete. |
-| [!] | **Research Paper** `cmp:/projects/paper` | No research-paper print layout or page opt-in implementation exists. |
+| [?] | **Research Paper** `cmp:/projects/paper` | Named research layout and project opt-in render ordered public research with nested points, print geometry and language/privacy isolation; Chrome/PDF and focused contracts pass. |
 | [!] | **Blogs** `cmp:/blogs` | Blog pages and subscriptions work; scenes, owner management, video render and book print remain absent. |
 | [!] | **Media Generation** `cmp:/blogs/gen` | No pure-time Canvas scene renderer, deterministic assets/audio mix, offline WebCodecs encoding or export UI exists. |
 | [!] | **Book** `cmp:/blogs/book` | No book pagination, layout template or blog print integration exists. |

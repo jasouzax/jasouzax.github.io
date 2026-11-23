@@ -13,9 +13,16 @@ import { icon } from "./page/context.tsx"
 import { ui_text } from "../load/model.ts"
 import { is_true } from "../../shared/content/schema.ts"
 import { mime_table } from "../../shared/mime.ts"
+import { scene_heading, scene_player, scene_timeline } from "./scene.tsx"
 
 // Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
+    "note_loading", "note_stored_outputs", "note_invalid", "note_undo", "note_redo", "note_add_code", "note_add_markdown", "note_add_raw", "note_kind_code", "note_kind_markdown", "note_kind_raw", "note_move_up", "note_move_down", "note_delete", "note_clear_outputs", "note_cell_source",
+    "desk_map", "desk_windows", "map_zoom_in", "map_zoom_out", "map_reset",
+    "save_destination", "save_overwrite",
+    "audio", "mute",
+    "version_ref", "version_parents", "version_loading", "version_empty", "version_unavailable", "version_commits",
+    "window_hidden", "window_show", "window_hide", "window_unhide", "window_minimized", "windows_empty",
     "sign_out_google",
     "sign_out_google_title",
     "delete_account",
@@ -180,7 +187,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh"]
+    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh", "audio", "mute"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 
@@ -207,6 +214,8 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const sides = child_nodes(desk, "menu")
     const pages = sides.map((side, index) => render_menu(ctx, side, index))
     const windows = window_infos(ctx, desk)
+    const scenes = desk.children.some(child => child.tag === "scene")
+    const map_only = !windows.length && sides.some(side => child_nodes(side, "map").length)
     // Match init_desk's initial empty window before the boot skeleton is captured.
     if (!windows.length) windows.push(empty_window_info(ctx))
     const columns = Math.max(1, Math.ceil(Math.sqrt(windows.length)))
@@ -218,8 +227,9 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const flags = {
         "data-cwd": desk.attrs.cwd,
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
-        "data-fixed": is_true(desk.attrs.fixed) ? "" : undefined,
-        "data-runtime": runtime ? "" : undefined
+        "data-fixed": is_true(desk.attrs.fixed) || scenes ? "" : undefined,
+        "data-runtime": runtime ? "" : undefined,
+        "data-map-initial": map_only ? "" : undefined
     }
     const side = (
         <>
@@ -230,11 +240,17 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
         </>
     )
     const extra = runtime ? [render_window_template(ctx), render_runtime_data(ctx)] : null
+    let window_index = 0
+    const reading = (node: xml_node, depth = 0): child => {
+        if (node.tag === "window") return render_window(ctx, windows[window_index++], columns, windows.length)
+        if (node.tag === "scene") return [scene_heading(node, depth), ...node.children.map(child => reading(child, depth + 1))]
+        return null
+    }
     return (
         <>
-            <article class={"desk article"} id={"desk"} style={`--desk-initial-columns: ${initial_columns}; --desk-initial-rows: ${initial_rows}`} {...flags}>
+            <article class={"desk article"} id={"desk"} data-blog-scenes={scenes ? "" : undefined} style={`--desk-initial-columns: ${initial_columns}; --desk-initial-rows: ${initial_rows}`} {...flags}>
                 {side}
-                {windows.map((info) => render_window(ctx, info, columns, windows.length))}
+                {scenes ? [scene_player(ctx, scene_timeline(ctx, desk)), ...desk.children.map(node => reading(node))] : windows.map((info) => render_window(ctx, info, columns, windows.length))}
                 {extra}
             </article>
         </>

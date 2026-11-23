@@ -48,6 +48,7 @@ import { sym_rule } from "./tags/sym.ts"
 import { terminology_rule } from "./tags/terminology.ts"
 import { theme_rule } from "./tags/theme.ts"
 import { window_rule } from "./tags/window.ts"
+import { scene_rule } from "./tags/scene.ts"
 
 export const research_sections: Record<string, string> = {
     "terminology": "Terminology",
@@ -103,6 +104,7 @@ export const rules: Record<string, Tag_Rule> = {
     terminology: terminology_rule,
     theme: theme_rule,
     window: window_rule,
+    scene: scene_rule,
 }
 export const root_tags = ["page","theme","project","event","blog","print","plugin"]
 
@@ -111,6 +113,10 @@ function check_node(node: xml_node, diag: diagnostics): void {
     if (!rule) {
         report_error(diag, where_of(node), `unknown element <${node.tag}>`)
         return
+    }
+    if (node.tag === "scene") {
+        if (node.attrs.duration !== undefined && (!/^\d+(?:\.\d+)?$/.test(node.attrs.duration) || Number(node.attrs.duration) <= 0 || Number(node.attrs.duration) > 600)) report_error(diag, where_of(node), "scene duration must be greater than 0 and at most 600 seconds")
+        for (const name of ["background", "color"]) if (node.attrs[name] && !/^#[a-f\d]{6}$/i.test(node.attrs[name])) report_error(diag, where_of(node), `scene ${name} must be a six-digit hex color`)
     }
     if (node.tag === "project" && node.children.filter(child => child.tag === "research").length > 1)
         report_error(diag, where_of(node), "project may contain only one <research>")
@@ -131,7 +137,7 @@ function check_node(node: xml_node, diag: diagnostics): void {
     }
     if (node.tag === "page" && (!node.attrs.path?.startsWith("/") || /[\\?#%]/.test(node.attrs.path) || node.attrs.path.split("/").some(part => part === "." || part === ".."))) report_error(diag, where_of(node), "page path must be an absolute URL path without traversal, query or fragment")
     for (const [name, value] of Object.entries(node.attrs)) {
-        if (["link", "href", "media", "profile", "image", "cover", "poster"].includes(name) && /^\s*(?:javascript|vbscript|data):/i.test(value)) report_error(diag, where_of(node), `unsafe URI in ${name}`)
+        if (["link", "href", "media", "profile", "image", "cover", "poster", "audio"].includes(name) && /^\s*(?:javascript|vbscript|data):/i.test(value)) report_error(diag, where_of(node), `unsafe URI in ${name}`)
     }
     for (const name of Object.keys(node.attrs)) {
         if (!rule.attrs.includes(name)) report_error(diag, where_of(node), `unknown attribute "${name}"`)

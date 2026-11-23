@@ -8,7 +8,14 @@
 
 ## Status
 
+- [?] Structured nbformat-4 notebook view/edit: cells, stored outputs, attachments, reordering, undo/redo, shared split documents and normal persistent saves; kernel execution remains unimplemented.
+- [?] Markdown view/edit and unsaved live previews work for uploaded, local and published resources.
+
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
+- [/] Windows menu supports split hierarchy, reversible hiding and comparison drops; persistent desktop groups remain open.
+- [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
+- [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
+- [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
@@ -17,8 +24,8 @@
 - [x] Preserve desk windows, layout, resizing, syntax colouring, processes and the visitor OPFS home (3.5, 3.7)
 - [x] Replace the JavaScript shell with compiled BusyBox ash and applets: Worker processes, shared byte filesystem calls, inherited descriptors, pipes, fork/exec/wait and local xterm.js (build recipes: `src/desk/README.md`)
 - [x] Keep uploads strictly in memory (`/tmp`); remove inherited OPFS `/tmp` behaviour
-- [ ] Map/window toggling, pan and zoom (1.4.3, 3.6)
-- [ ] Offer a destination picker on Save for new/read-only windows
+- [?] Map/window toggling, pan and zoom (1.4.3, 3.6); desktop/portrait Chrome and model/render contracts pass.
+- [?] Offer a destination picker on Save for new/read-only windows; Chrome verifies durable bytes, cancellation, overwrite and subsequent saves.
 - [x] Empty split children, shared live editors/HTML preview, independent text comparisons and image-to-PDF WASM conversion with a local PDF viewer
 - [ ] Complete the plugin flow graph, MIME conversions, map resources and hidden processes (3.5–3.6)
 - [ ] Bundle further programs (htop/fastfetch/tcc artifacts exist; ffmpeg and ImageMagick are not bundled)

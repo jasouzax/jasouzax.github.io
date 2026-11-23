@@ -1,5 +1,7 @@
 /* Render window chrome and initial document bodies as virtual nodes. */
 import { markdown_nodes } from "../../shared/markdown.ts"
+import { parse_notebook, notebook_mime } from "../../shared/notebook.ts"
+import { notebook_cell_content } from "../../shared/notebook/render.tsx"
 import { window_video } from "./window/video.tsx"
 import { window_svg_edit } from "./window/svg_edit.tsx"
 import { jsx, fragment, type child, type attributes } from "../../shared/vnode/vnode.tsx"
@@ -28,7 +30,17 @@ export function base_name(path: string): string {
 }
 
 export function window_infos(ctx: render_ctx, desk: xml_node): window_info[] {
-    return child_nodes(desk, "window").map((node, index) => {
+    const nodes: xml_node[] = []
+    const visit = (parent: xml_node): void => {
+        for (const child of parent.children) {
+            if (child.tag === "window") nodes.push(child)
+            else if (child.tag === "scene") visit(child)
+        }
+    }
+    visit(desk)
+    return nodes.map((original, index) => {
+        const target = original.attrs.split ? original.parent?.children.filter(child => child.tag === "window")[Number(original.attrs.split) - 1] : undefined
+        const node = target ? { ...original, attrs: { ...original.attrs, split: String(nodes.indexOf(target) + 1) } } : original
         const mime = node.attrs.type ?? (node.attrs.path ? mime_from_name(node.attrs.path) : "")
         const label =
             node.attrs.path && !/^(window|shell|pid):/.test(node.attrs.path)
@@ -244,6 +256,7 @@ export function render_window_body(ctx: render_ctx, info: window_info): html {
     const path = attrs.path ?? ""
     const mime = attrs.type ?? (path ? mime_from_name(path) : "")
     const mode = attrs.edit === "true" ? "edit" : "view"
+    if (path === "server:fastfetch") return <div class="server_public_render" data-server-render=""><p>{t(ctx, "server_offline")}</p></div>
     if (!mime && !path)
         return (
             <>
@@ -266,6 +279,12 @@ export function render_window_body(ctx: render_ctx, info: window_info): html {
         )
     if (/^(window|shell|pid):/.test(path)) return note(ctx, "needs_js", path)
     const source = attrs.data ?? read_source(ctx, path)
+    if (mime === notebook_mime && source !== null) {
+        try {
+            const notebook = parse_notebook(source)
+            return <div class="desk_notebook">{notebook.cells.map(cell => <section class="notebook_cell">{notebook_cell_content(cell)}</section>)}</div>
+        } catch { return <div class="desk_notebook"><p>{t(ctx, "note_invalid")}</p><pre class="notebook_source">{source}</pre></div> }
+    }
     const is_text = mime.startsWith("text/") || mime === "application/json"
     if (mode === "edit" && is_text && source !== null) return render_text_body(source)
     if (mode === "view" && mime === "text/markdown" && source !== null)
@@ -308,6 +327,7 @@ export function render_window(ctx: render_ctx, info: window_info, columns: numbe
                 style={`grid-area: ${1 + 2 * row} / ${from} / ${2 + 2 * row} / ${from + 2 * span - 1}`}
                 data-full={is_true(info.node.attrs.full) ? "" : undefined}
                 data-path={info.node.attrs.path ?? ""}
+                data-source={info.node.attrs.data}
                 data-mode={info.node.attrs.edit === "true" ? "edit" : "view"}
                 data-mime={info.node.attrs.type ?? ""}
                 data-split={info.node.attrs.split}

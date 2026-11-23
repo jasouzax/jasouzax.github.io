@@ -15,8 +15,9 @@
 - [x] Generate project, event and blog pages plus `/projects`, `/blogs` listings from roots (1.5–1.7)
 - [x] Exclude private projects and slides from generated public resources and pages
 - [x] Project `<research>` block renders an Overview menu (terminology … results)
+- [?] A project's named research print layout reveals authored public research, with matching-language isolation and nested points.
 - [x] Slides act as skill variations inside one carousel position; the footer switches skill in place
-- [ ] Load repository Files/Version snapshots from the personal server (1.5)
+- [/] Public Version history loads lazily with merge groups, branch/tag selection and a fixed graph; Files, historical file browsing, private Work history and older-history pagination remain open (1.5).
 - [ ] Contributor-only Agent menu (1.5)
 - [ ] Repository change scanning (`repo` attribute) applied at build time
 - [ ] `/srv/events/{id}` and `/srv/repo/{id}` mounted in the browser filesystem (see [filesystem](filesystem.md))

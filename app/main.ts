@@ -13,7 +13,7 @@ else app.whenReady().then(async () => {
     window.webContents.on("will-navigate", (event, target) => { if (new URL(target).origin !== url.origin) event.preventDefault() })
     window.webContents.on("will-redirect", (event, target) => { if (new URL(target).origin !== url.origin) event.preventDefault() })
     window.webContents.on("will-attach-webview", event => event.preventDefault())
-    window.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => callback(contents === window.webContents && new URL(details.requestingUrl).origin === url.origin && ["media", "clipboard-sanitized-write"].includes(permission)))
+    window.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => callback(contents === window.webContents && details.isMainFrame && new URL(details.requestingUrl).origin === url.origin && ["media", "clipboard-sanitized-write"].includes(permission)))
     app.on("second-instance", () => { if (window.isMinimized()) window.restore(); window.focus() })
     await window.loadURL(url.href)
 })

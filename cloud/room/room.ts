@@ -1,5 +1,5 @@
 /* Hibernating account/guest sockets, private event routing and heartbeat-derived presence. */
-import { read_session, auth_hash, session_token, type Auth_Session } from "../api/auth.ts"
+import { read_session, read_session_hash, auth_hash, session_token, type Auth_Session } from "../api/auth.ts"
 import { guest_token, type Work_Env } from "../api/work.ts"
 import { api_error } from "../security/headers.ts"
 import { realtime_call } from "./bus.ts"
@@ -60,10 +60,9 @@ export class Realtime_Hub {
             const guest = await this.env.DB!.prepare("SELECT id FROM work_guests WHERE cookie_hash = ? AND created_at > ? AND NOT EXISTS (SELECT 1 FROM work_rooms WHERE guest_id = work_guests.id AND (google_subject IS NOT NULL OR revoked = 1))").bind(a.credential, Date.now() - 365 * 86400000).first<{ id: number }>()
             return guest && `g:${guest.id}` === a.principal ? { session: null, guest_id: guest.id, csrf } : null
         }
-        const user = await this.env.DB!.prepare("SELECT u.subject, u.email, u.name, o.subject AS owner_subject, s.last_seen FROM auth_sessions s JOIN auth_users u ON u.subject = s.subject LEFT JOIN auth_owner o ON o.subject = u.subject WHERE s.token_hash = ? AND s.last_seen > ?").bind(a.credential, Date.now() - 30 * 86400000).first<{ subject: string, email: string, name: string, owner_subject: string | null, last_seen: number }>()
-        if (!user || `a:${user.subject}` !== a.principal) return null
-        if (user.last_seen < Date.now() - 300000) await this.env.DB!.prepare("UPDATE auth_sessions SET last_seen = ? WHERE token_hash = ?").bind(Date.now(), a.credential).run()
-        return { session: { ...user, role: user.owner_subject ? "owner" : "client", csrf }, guest_id: null, csrf }
+        const session = await read_session_hash(a.credential, this.env, csrf)
+        if (!session || `a:${session.subject}` !== a.principal) return null
+        return { session, guest_id: null, csrf }
     }
     private async snapshot(): Promise<Presence> {
         return await this.ctx.storage.get<Presence>("presence") ?? { online: false, last_online: null, version: 0, peer_id: "" }

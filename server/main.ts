@@ -9,13 +9,20 @@ import { personal_server } from "./repo/index.ts"
 import { load_server_config, is_public, repository_path } from "./config/repositories.ts"
 import { sync_repositories } from "./repo/git/hooks.ts"
 import { start_runner, start_site_watcher } from "./pipeline/runner.ts"
+import { Api_Manager } from "./api/manager.ts"
+import { join } from "node:path"
 
 export function start_listener(root: string, flags: Record<string, string | boolean>): void {
     const legacy: Record<string, string> = JSON.parse(process.env.JAZU_REPOSITORIES_JSON ?? "{}")
     const file = resolve(root, String(flags.config ?? process.env.JAZU_SERVER_CONFIG ?? "server.json"))
     const config = existsSync(file) ? load_server_config(file, legacy) : undefined
     const repositories = config ? Object.fromEntries(Object.keys({ ...config.projects, [config.site.project]: 1 }).filter(id => is_public(config, id)).map(id => [id, repository_path(config, id)])) : legacy
-    const server = personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), host: String(flags.host ?? process.env.JAZU_LISTEN_HOST ?? "127.0.0.1"), config })
+    if ((process.env.ORIGIN_HMAC_SECRET ?? "").length < 32) throw new Error("Set ORIGIN_HMAC_SECRET to at least 32 random characters")
+    const apis = new Api_Manager(join(config?.state_dir ?? resolve(root, ".server"), "apis"), join(root, "server/api/child.ts"))
+    void apis.restore()
+    const server = personal_server({ secret: process.env.ORIGIN_HMAC_SECRET ?? "", repositories, port: Number(flags.port ?? 8788), host: String(flags.host ?? process.env.JAZU_LISTEN_HOST ?? "127.0.0.1"), config, apis })
+    server.on("close", () => apis.close())
+    for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => apis.close())
     if (!config) return console.log(`no ${file}: push and CI/CD are disabled (read-only Git API only)`)
     console.log(`hooks synced for: ${sync_repositories(config).join(", ") || "(no repositories yet)"}`)
     if (process.env.JAZU_DISABLE_RUNNER === "1") return console.log("transport-only mode: repository polling and CI/CD disabled")

@@ -15,6 +15,8 @@ import { body_class, type page_style } from "../style/page.tsx"
 import { background_default } from "./theme/background_default.tsx"
 import { background_memory } from "./theme/background_memory.tsx"
 import { skeleton_css } from "../style/skeleton.ts"
+import { render_research_paper } from "./print/research.tsx"
+import { render_book } from "./print/book.tsx"
 
 export type theme_assets = {
     name: string
@@ -88,6 +90,8 @@ function main_content(ctx: render_ctx): { body: child; tabs: tab[]; has_desk: bo
                 tabs.push({ href: `#window-${info.index}`, icon: info.icon, label: info.label })
         }
     }
+    parts.push(render_research_paper(ctx))
+    parts.push(render_book(ctx))
     return { body: parts, tabs, has_desk }
 }
 function footer(ctx: render_ctx): child {

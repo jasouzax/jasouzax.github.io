@@ -25,6 +25,7 @@ server.json
 .server/
 repos/
 .env
+.jazu-api-*.sqlite*
 .env.*
 !.env.example
 .dev.vars*

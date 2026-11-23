@@ -1,0 +1,8 @@
+.desk_save_dialog { width: min(32em, calc(100vw - 2em)); max-height: calc(100dvh - 2em); overflow: auto; background: var(--panel); color: var(--text); border: 1px solid currentColor; padding: 1em; }
+.desk_save_dialog form { display: flex; flex-direction: column; gap: .75em; }
+.desk_save_dialog h2, .desk_save_dialog p { margin: 0; overflow-wrap: anywhere; }
+.desk_save_dialog label { display: flex; gap: .5em; align-items: center; }
+.desk_save_dialog input[name="filename"] { flex: 1; min-width: 0; }
+.desk_save_folders { display: flex; flex-direction: column; max-height: 12em; overflow: auto; }
+.desk_save_folders button { text-align: start; }
+.desk_save_dialog::backdrop { background: #0008; }

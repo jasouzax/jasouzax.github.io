@@ -102,6 +102,16 @@ export type kernel_hooks = {
 }
 
 const screen_limit = 400_000
+const process_listeners = new Set<() => void>()
+
+export function subscribe_processes(listener: () => void): () => void {
+    process_listeners.add(listener)
+    return () => { process_listeners.delete(listener) }
+}
+
+function changed(): void {
+    for (const listener of process_listeners) listener()
+}
 
 export const kernel = {
     table: new Map<number, proc>(),
@@ -114,6 +124,7 @@ export function reset_kernel(): void {
     for (const item of kernel.table.values()) if (item.running) item.abort.abort()
     kernel.table.clear()
     kernel.next_pid = 1
+    changed()
 }
 
 export function list_procs(): proc_info[] {
@@ -143,6 +154,7 @@ function finish(item: proc, code: number): void {
     const parent = kernel.table.get(item.ppid)
     parent?.children.delete(item.pid)
     if (!item.root) kernel.table.delete(item.pid)
+    changed()
     for (const listener of [...item.exit_listeners]) listener()
 }
 
@@ -186,6 +198,7 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
         item.stderr = make_sink(text => emit(text, true))
     }
     kernel.table.set(pid, item)
+    changed()
     parent?.children.add(pid)
     const aborted = new Promise<number>(done => item.abort.signal.addEventListener("abort", () => done(item.code ?? interrupted_code())))
     const api: proc_api = {

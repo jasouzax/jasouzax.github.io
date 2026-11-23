@@ -8,6 +8,7 @@ export const mime_table: mime_info[] = [
     { mime: "text/x-python", icon: "[code]", label: "Python", extensions: ["py"] },
     { mime: "text/javascript", icon: "[code]", label: "JavaScript", extensions: ["js", "mjs"] },
     { mime: "text/markdown", icon: "[markdown]", label: "Markdown", extensions: ["md"] },
+    { mime: "application/x-ipynb+json", icon: "[code]", label: "Jupyter Notebook", extensions: ["ipynb"] },
     { mime: "text/plain", icon: "[file]", label: "Plain text", extensions: ["txt"] },
     { mime: "application/json", icon: "[file_json]", label: "JSON", extensions: ["json"] },
     { mime: "image/png", icon: "[image]", label: "PNG", extensions: ["png"] },

@@ -1,5 +1,6 @@
 import { project_children } from "./project.tsx"
 import { event_children } from "./event.tsx"
+import { blog_id, public_blogs } from "./blog.tsx"
 import { valid_subdomain_id } from "../../shared/content/ids.ts"
 import { relative } from "node:path"
 import type { xml_node } from "../../shared/content/xml.ts"
@@ -29,20 +30,20 @@ function page_of(model: site_model, node: xml_node): page {
 
 export function expand_objects(model: site_model): void {
     // Private objects never reach pages, navigation, search, resource publishing or expertise.
-    model.objects = model.objects.filter(node => node.attrs.private !== "true")
+    model.objects = model.objects.filter(node => node.attrs.private !== "true").flatMap(node => node.tag === "blog" ? public_blogs(node, model.config.default_language) : [node])
     for (const object of model.objects) {
         object.children = object.children.filter(node => node.attrs.private !== "true")
         const id = object.attrs.id
-        if (object.tag === "project" ? !valid_subdomain_id(id) : !/^[a-z0-9][a-z0-9_-]*$/.test(id ?? "")) {
+        if (object.tag === "project" ? !valid_subdomain_id(id) : object.tag === "blog" ? !blog_id(object).split("/").every(part => /^[a-z0-9][a-z0-9_-]*$/.test(part)) : !/^[a-z0-9][a-z0-9_-]*$/.test(id ?? "")) {
             report_error(model.diag, where_of(object), "id must be a safe URL segment")
             continue
         }
-        const path = `/${object.tag}s/${id}`
+        const path = `/${object.tag}s/${object.tag === "blog" ? blog_id(object) : id}`
         const info = object_info(object)
-        const children = object.children.filter(node => ["menu", "window"].includes(node.tag))
+        const children = object.children.filter(node => ["menu", "window", "scene"].includes(node.tag))
         if (object.tag === "event") event_children(object, children)
         if (object.tag === "project") project_children(model, object, children)
-        if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
+        if (!children.some(node => ["window", "scene"].includes(node.tag))) children.push(element("window", object.tag === "project" ? {
             type: "inode/directory", view: "true", path: `file:///srv/projects/${id}`,
         } : {
             type: "text/markdown", view: "true", data: info || object.attrs.name,
@@ -66,9 +67,9 @@ export function expand_objects(model: site_model): void {
             if (!source) continue
             const name = kind === "project" ? "Projects" : "Blogs"
             const entries = objects.map(node => element("entry", { name: node.attrs.name, info: object_info(node),
-                type: kind === "blog" ? "Post" : "Folder", link: `${path}/${node.attrs.id}` }, node))
+                type: kind === "blog" ? "Post" : "Folder", link: `${path}/${kind === "blog" ? blog_id(node) : node.attrs.id}` }, node))
             const map = element("map", { layout: "tree" }, source, objects.map(node => element("node", {
-                id: node.attrs.id, name: node.attrs.name, link: `${path}/${node.attrs.id}`,
+                id: kind === "blog" ? blog_id(node) : node.attrs.id, name: node.attrs.name, link: `${path}/${kind === "blog" ? blog_id(node) : node.attrs.id}`,
             }, node)))
             const menu = element("menu", { name }, source, [...entries, map])
             const desk = element("desk", { name, auto: "true" }, source, [menu])

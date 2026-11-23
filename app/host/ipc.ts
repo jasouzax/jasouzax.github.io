@@ -4,15 +4,25 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { join } from "node:path"
 import { Frame_Reader, encode_frame } from "../../shared/host/frame.ts"
 import { parse_request } from "../../shared/host/protocol.ts"
+import { desktop_service } from "./desktop.ts"
 
 export function attach_host(window: BrowserWindow, origin: string, directory: string): void {
     let host: ChildProcessWithoutNullStreams | null = null
+    const desktop = desktop_service(window)
+    let generation = 0, active = 0
     const send = (message: unknown) => { if (!window.isDestroyed()) window.webContents.send("jazu-host", message) }
-    const close = () => { host?.stdin.end(); host = null }
+    const close = () => { generation++; host?.stdin.end(); host = null }
     const receive = (event: Electron.IpcMainEvent, message: unknown) => {
         if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || new URL(event.senderFrame.url).origin !== origin) return
         try {
-            const value = message as { type?: string }
+            const value = message as { type?: string, id?: number, request?: unknown }
+            if (value?.type === "desktop") {
+                if (!Number.isSafeInteger(value.id) || value.id! < 1 || active >= 32) return
+                const epoch = generation
+                active++
+                void desktop(value.request).then(result => { if (epoch === generation) send({ type: "desktop_result", id: value.id, result }) }, error => { if (epoch === generation) send({ type: "desktop_result", id: value.id, error: { message: error.message, code: error.code || "EIO" } }) }).finally(() => active--)
+                return
+            }
             if (value?.type === "hello") {
                 send({ type: "hello", extension: "electron", timeout_ms: 8000 })
                 if (host) return

@@ -12,6 +12,7 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { server_command } from "./tools/server.ts"
+import { api_command } from "./tools/api.ts"
 import { parse_args } from "./config.ts"
 
 import { icons_audit, icons_command } from "./tools/icons.ts"
@@ -26,6 +27,7 @@ export async function run_command(args = process.argv.slice(2)): Promise<void> {
         return
     }
     if (command === "server") {
+        if (words[1] === "api") { await api_command(root, words.slice(2), flags); return }
         server_command(words.slice(1), flags, root)
         return
     }

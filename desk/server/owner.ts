@@ -86,12 +86,13 @@ export async function stop_owner(): Promise<void> {
 async function sync_owner(): Promise<void> {
     if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) { await stop_owner(); return }
     await load_status()
+    if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) { await stop_owner(); return }
     if (server.mode === "owner") await start_owner()
     else await stop_owner()
 }
 
 export function init_server_owner(): void {
     document.addEventListener("jazu:fs:init", () => { void sync_owner() })
-    document.addEventListener("jazu:page", () => { if (!document.querySelector(".desk[data-runtime]")) void stop_owner() })
+    document.addEventListener("jazu:page", () => { if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) void stop_owner() }, { capture: true })
     window.addEventListener("pagehide", () => { link?.close() })
 }
