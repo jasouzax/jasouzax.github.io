@@ -12,6 +12,7 @@ test("downloads public snapshots and both themes, then navigates unvisited pages
     expect(snapshot.urls.some(url => url.startsWith("/assets/themes/default/"))).toBe(true)
     expect(snapshot.urls.some(url => url.startsWith("/assets/themes/memory/"))).toBe(true)
     expect(snapshot.urls.some(url => url.startsWith("/api/") || url.startsWith("/assets/wasm/"))).toBe(false)
+    expect(snapshot.urls.some(url => /^\/(?:ja\/)?(?:desk|server|work)(?:\/|$)/.test(url))).toBe(false)
     await context.setOffline(true)
     await page.goto("/privacy/")
     await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
@@ -24,4 +25,12 @@ test("downloads public snapshots and both themes, then navigates unvisited pages
     await expect(page.locator("html")).toHaveAttribute("data-theme", "memory", { timeout: 30000 })
     expect(await page.evaluate(async () => { try { await fetch("/api/_/session"); return false } catch { return true } })).toBe(true)
     await page.screenshot({ path: ".cache/pwa-offline-memory.png", fullPage: true })
+    for (const path of ["/desk/", "/server/", "/work/", "/ja/server/"]) {
+        await page.goto(path)
+        await expect(page.getByRole("heading", { name: "Connection required" })).toBeVisible()
+        await expect(page.locator(".desk")).toHaveCount(0)
+        expect(await page.evaluate(() => location.pathname)).toBe(path)
+    }
+    await page.getByRole("link", { name: "Browse the offline website" }).click()
+    await expect(page.locator("#main-content")).toBeVisible()
 })

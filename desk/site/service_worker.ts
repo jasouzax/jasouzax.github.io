@@ -1,7 +1,8 @@
 /* Public build snapshots are atomic. API, cookies, messages and private keys never enter CacheStorage. */
 import { device_key, first_notification } from "../../shared/notification/store.ts"
 import { preview_message, type Message_Notice } from "../../shared/notification/preview.ts"
-declare const __PWA__: { version: string, entries: { url: string, revision: string }[], notifications: boolean }
+import { online_route } from "../../shared/offline.ts"
+declare const __PWA__: { version: string, entries: { url: string, revision: string }[], notifications: boolean, online_prefixes: string[] }
 type Lifetime = { waitUntil(task: Promise<unknown>): void }
 type Fetch_Event = Lifetime & { request: Request, respondWith(response: Promise<Response>): void }
 const worker = globalThis as unknown as {
@@ -41,6 +42,13 @@ worker.addEventListener("activate", (event: Lifetime) => event.waitUntil((async 
 worker.addEventListener("fetch", (event: Fetch_Event) => {
     const url = new URL(event.request.url)
     if (event.request.method !== "GET" || url.origin !== worker.location.origin || url.pathname.startsWith("/api/") || event.request.headers.has("range")) return
+    if (online_route(url.pathname, __PWA__.online_prefixes)) {
+        if (event.request.mode === "navigate") event.respondWith((async () => {
+            try { return await fetch(event.request) }
+            catch { return (await (await caches.open(cache_name)).match("/offline.html")) ?? new Response("Connection required", { status: 503, headers: { "content-type": "text/plain", "cache-control": "no-store" } }) }
+        })())
+        return
+    }
     let path = url.pathname
     if (!allowed.has(path)) path = path.endsWith("/") ? `${path}index.html` : `${path}/index.html`
     if (!allowed.has(path)) return
