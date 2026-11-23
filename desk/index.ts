@@ -13,6 +13,7 @@ import { no_picks, type Child_Picks } from "./plugin/rules.ts"
 import { init_map, show_windows } from "./menu/map.ts"
 import { init_versions } from "./menu/version.ts"
 import { init_windows_menu } from "./menu/windows.ts"
+import type { Desktop_Layout } from "./menu/windows/model.ts"
 
 export type desk_data = {
     text: Record<string, string>
@@ -78,6 +79,16 @@ let row_weights: number[] = []
 // the layout custom, and then windows that come and go are only taken out of or appended to it.
 let rows: desk_window[][] = []
 let custom = false
+export function capture_layout(): Desktop_Layout {
+    return { rows: rows.map(row => row.map(item => item.id)), columns: col_weights.slice(), heights: row_weights.slice(), custom, focused: state.focused?.id ?? null, maximized: state.maximized?.id ?? null }
+}
+export function restore_layout(layout: Desktop_Layout, windows: Map<number, desk_window>): void {
+    rows = layout.rows.map(row => row.map(id => windows.get(id)!).filter(Boolean)).filter(row => row.length)
+    col_weights = layout.columns.slice(); row_weights = layout.heights.slice(); custom = layout.custom
+    state.focused = windows.get(layout.focused ?? -1) ?? null
+    state.maximized = windows.get(layout.maximized ?? -1) ?? null
+    arrange()
+}
 let cancel_drag: (() => void) | null = null
 let dispose_map: (() => void) | null = null
 let dispose_versions: (() => void) | null = null
@@ -661,6 +672,7 @@ function resize_tracks(vertical: boolean, boundary: number, delta: number, start
     weights[boundary] = pair * next / total
     weights[boundary + 1] = pair - weights[boundary]
     apply_template(col_weights.length, row_weights.length)
+    document.dispatchEvent(new Event("jazu:desk:change"))
 }
 
 function start_resize(event: PointerEvent): void {

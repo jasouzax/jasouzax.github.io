@@ -1,4 +1,5 @@
 import { init_reveal, update_tab_spy } from "./scroll.ts"
+import { prepare_navigation } from "./navigation.ts"
 import { sync_theme_radios } from "./menus.ts"
 import { deserialize, to_dom, type serialized_node } from "../../shared/vnode/vnode.tsx"
 import { begin_loading, finish_loading, cancel_page_loading, wait_resources, wipe_page, page_signature, motion_reduced } from "./loading.ts"
@@ -159,6 +160,8 @@ function transition_names(active: boolean): void {
 
 export async function navigate(url: URL, push: boolean, position?: [number, number]): Promise<void> {
     const mine = ++navigation
+    if (!await prepare_navigation()) { if (!push && mine === navigation) history.replaceState(history.state, "", current_path); return }
+    if (mine !== navigation) return
     cancel_navigation()
     const root = document.documentElement, controller = new AbortController(), signature = page_signature()
     let outgoing: ReturnType<typeof wipe_page> | undefined

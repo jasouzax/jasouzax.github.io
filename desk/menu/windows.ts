@@ -2,6 +2,7 @@
 import { state, text, label_of, focus_window, set_window_hidden, close_window, arrange, type desk_window } from "../index.ts"
 import { adopt, latest_bytes, document_of, is_dirty, announce_edit } from "../plugin/flow.ts"
 import { render_window } from "../window/index.ts"
+import { init_desktop_groups } from "./windows/groups.ts"
 
 const drag_type = "application/x-jazu-window"
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, class_name = "", value = ""): HTMLElementTagNameMap[K] {
@@ -37,6 +38,7 @@ export function init_windows_menu(desk: HTMLElement): () => void {
     map.dataset.mapAuto = ""; map.dataset.mapLayout = "flow"; map.setAttribute("open", "")
     map.append(element("summary", "", text("desk_map")))
     panel.append(entries, map); side.append(panel)
+    const dispose_groups = init_desktop_groups(desk, panel, entries)
     let fingerprint = "", queued = false
     let draw_abort = new AbortController()
     const opened = new Map<number, boolean>()
@@ -110,5 +112,5 @@ export function init_windows_menu(desk: HTMLElement): () => void {
         queued = true; queueMicrotask(() => { queued = false; draw() })
     }, { signal })
     draw()
-    return () => { abort.abort(); draw_abort.abort(); panel.remove(); tab.remove() }
+    return () => { dispose_groups(); abort.abort(); draw_abort.abort(); panel.remove(); tab.remove() }
 }
