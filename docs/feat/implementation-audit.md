@@ -12,6 +12,12 @@ Continue from the component statuses, preserving `[?]` for human review. The des
 
 ## Delivered changes
 
+### Additional continuation — public Version menus
+
+Public project Version menus now load bounded repository history only when selected. The origin exposes commit parents in topological order and peeled annotated tag targets; the browser validates replies, groups non-first-parent branch commits under merge entries, resolves named refs to hashes, and builds a fixed-position DAG with branch/tag labels. Refresh errors preserve the loaded snapshot. Requests omit credentials, enforce a response-size/time bound, and abort on navigation. Selecting map nodes reveals their commit entry.
+
+Root/server types, server build, real-Git no-ff/tag fixtures, nested-merge validation, Worker regressions and six Chrome Version/map checks pass. Private Work history, older-history pagination and historical file browsing remain open, so Versions stays `[/]`. The matching origin must be deployed with the runtime; no live deployment was performed.
+
 ### Additional continuation — research printing
 
 Project `print="research"` now selects a built-in research paper layout through the existing named/language-aware print system. The paper uses only matching-language public research, preserves nested points and placeholder wording, and excludes private projects and repository/collaborator data. Title/date, safe source links, configurable fonts/paper size and page numbers are provided. Screen mode retains the desktop; print mode replaces it with the paper. The English Stesis reference opts in explicitly.
@@ -108,10 +114,10 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | **Personal** `cmp:/desk/fs/personal` | Drive is used for Work key files only. Visitor file storage, identity home paths, permission prompts and conflict copies are absent. |
 | [!] | **Public** `cmp:/desk/fs/public` | Published HTTP resources exist, but no consistent /srv projects/events/blogs mount or authenticated persistent writeback exists. |
 | [!] | **Collaboration** `cmp:/desk/fs/collab` | No authorized shared-folder protocol, account isolation, collaborator-home projection or conflict resolution exists. |
-| [!] | **Submenu** `cmp:/desk/menu` | Existing menus work; dynamic windows/groups, version graph and People menus are incomplete. |
+| [/] | **Submenu** `cmp:/desk/menu` | Public Version menus and maps work; dynamic windows/groups, private Work history and People menus remain incomplete. |
 | [!] | **Chats** `cmp:/desk/menu/chat` | Encrypted Work chat exists; consistent chat menus and collaboration across arbitrary desk resources are incomplete. |
 | [!] | **Windows** `cmp:/desk/menu/windows` | Taskbar-style activation exists; hiding tabs/windows and grouped desktop/menu/map synchronization are incomplete. |
-| [!] | **Versions** `cmp:/desk/menu/version` | No live Git commit tree menu with no-ff merge nesting and snapshots is implemented. |
+| [/] | **Versions** `cmp:/desk/menu/version` | Public history, no-ff merge nesting, refs/tags and fixed graph work; private Work history, pagination and historical file browsing remain open. |
 | [!] | **People** `cmp:/desk/menu/people` | People storage, region grants and graph projection are absent; the menu cannot safely expose nonexistent authorization. |
 | [!] | **Notebook** `cmp:/desk/window/note` | Markdown reading works; editable notebooks, Jupyter cell execution and persistence are absent. |
 | [!] | **AutoSite** `cmp:/desk/window/autosite` - | Existing AutoSite automation browser works; final owner/device interaction and the new API integration remain unverified/incomplete. |

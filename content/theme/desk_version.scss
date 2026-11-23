@@ -1,0 +1,6 @@
+.version_tools { display: flex; align-items: center; gap: .5em; padding: .5em; position: sticky; bottom: 0; background: var(--panel); z-index: 4; }
+.version_tools label { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.version_tools select { min-width: 0; max-width: 100%; }
+.version_status { margin: .5em; }
+.version_commit_id { overflow-wrap: anywhere; }
+.desk_map_view[data-map-readonly] .desk_map_node { cursor: default; }

@@ -11,6 +11,7 @@ import { init_server_owner } from "./server/owner.ts"
 import { adopt, release_links } from "./plugin/flow.ts"
 import { no_picks, type Child_Picks } from "./plugin/rules.ts"
 import { init_map, show_windows } from "./menu/map.ts"
+import { init_versions } from "./menu/version.ts"
 
 export type desk_data = {
     text: Record<string, string>
@@ -77,6 +78,7 @@ let rows: desk_window[][] = []
 let custom = false
 let cancel_drag: (() => void) | null = null
 let dispose_map: (() => void) | null = null
+let dispose_versions: (() => void) | null = null
 
 const portrait = matchMedia("(orientation: portrait)")
 
@@ -363,6 +365,8 @@ export const window_hooks = {
 }
 
 function dispose(): void {
+    dispose_versions?.()
+    dispose_versions = null
     dispose_map?.()
     dispose_map = null
     cancel_drag?.()
@@ -754,6 +758,7 @@ export function init_desk(): void {
     if (state.windows.length === 0) new_window()
     arrange()
     dispose_map = init_map(desk)
+    dispose_versions = init_versions(desk)
 }
 
 let bound = false

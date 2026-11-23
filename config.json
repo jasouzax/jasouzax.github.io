@@ -19,6 +19,12 @@
   },
   "languages": {
     "en": {
+      "version_ref": "Branch or tag",
+      "version_parents": "Parents",
+      "version_loading": "Loading repository history…",
+      "version_empty": "No commits available.",
+      "version_unavailable": "Repository history unavailable. Any previously loaded history is retained.",
+      "version_commits": "latest commits",
       "research_terminology": "Terminology",
       "research_paper_source": "Paper source",
       "research_problem": "Problem",
@@ -314,6 +320,12 @@
       "pwa_offline": "Offline · Public pages and themes are available. Desk and messaging require a connection."
     },
     "ja": {
+      "version_ref": "ブランチまたはタグ",
+      "version_parents": "親コミット",
+      "version_loading": "履歴を読み込み中…",
+      "version_empty": "コミットがありません。",
+      "version_unavailable": "履歴を取得できません。読み込み済みの履歴はそのまま表示されます。",
+      "version_commits": "最新のコミット",
       "research_terminology": "用語",
       "research_paper_source": "論文の出典",
       "research_problem": "課題",

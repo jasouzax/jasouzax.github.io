@@ -62,7 +62,7 @@ Write each section's explanation as body text. Except `<terminology>`, a section
 
 ## Generated desk tabs
 
-Files, Version and Agent tabs are planned (repository-backed; Agent for signed-in contributors only). See [status](../feat/objects.md).
+Generated tabs include Files, Overview (when research is authored) and Version. Version lazily loads the public repository's latest 100 commits, groups merged branch commits, offers branch/tag selection and exposes a fixed-position commit graph. Failures retain the last loaded history. Private Work history, older-history pagination, historical file browsing, repository-backed Files and the contributor-only Agent remain open. See [status](../feat/objects.md).
 
 ## Related
 

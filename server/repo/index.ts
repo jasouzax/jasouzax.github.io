@@ -9,6 +9,7 @@ import { list_runs } from "../pipeline/runner.ts"
 import type { Server_Config } from "../config/repositories.ts"
 import { is_active, is_public, repository_path } from "../config/repositories.ts"
 import { pipeline_hook } from "../pipeline/hook.ts"
+import { history_limit } from "../../shared/repo/history.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
 export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config }
@@ -20,14 +21,14 @@ export function git_read(repository: string, action: string, url: URL): Response
     const git = (args: string[], maxBuffer = 2 * 1024 * 1024) => execFileSync("git", ["-C", resolve(repository), ...args], { maxBuffer, windowsHide: true })
     try {
         if (action === "refs") {
-            const refs = git(["for-each-ref", "--format=%(refname)%00%(objectname)", "refs/heads", "refs/tags"]).toString("utf8").trim().split("\n").filter(Boolean).map(line => {
-                const [name, hash] = line.split("\0"); return { name, hash }
+            const refs = git(["for-each-ref", "--format=%(refname)%00%(objectname)%00%(*objectname)", "refs/heads", "refs/tags"]).toString("utf8").trim().split("\n").filter(Boolean).map(line => {
+                const [name, hash, peeled] = line.split("\0"); return { name, hash, commit: peeled || hash }
             })
             return Response.json({ refs })
         }
         if (action === "log") {
-            const commits = git(["log", "-n", "100", "--format=%H%x00%ct%x00%s", ref, "--", ...(path ? [path] : [])]).toString("utf8").trim().split("\n").filter(Boolean).map(line => {
-                const [id, timestamp, subject] = line.split("\0"); return { id, timestamp: Number(timestamp), subject }
+            const commits = git(["log", "--topo-order", "-n", String(history_limit), "--format=%H%x00%P%x00%ct%x00%s", ref, "--", ...(path ? [path] : [])]).toString("utf8").trim().split("\n").filter(Boolean).map(line => {
+                const [id, parents, timestamp, subject] = line.split("\0"); return { id, parents: parents ? parents.split(" ") : [], timestamp: Number(timestamp), subject }
             })
             return Response.json({ commits })
         }

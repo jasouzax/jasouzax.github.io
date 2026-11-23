@@ -31,6 +31,8 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 ## Window bodies and plugins
 
+`desk/menu/version.ts` recognizes only generated repository Version sources, lazily fetches public `/ID/_/refs` and `/ID/_/log` data without credentials, and disposes requests on navigation. Replies are bounded/validated by `shared/repo/history.ts`. `desk/menu/version/model.ts` owns merge nesting and fixed DAG coordinates. Named refs are resolved to commit hashes before reading history; the server returns topological parent IDs and peeled annotated tag targets. Version maps set `data-map-readonly`, preserving pan/zoom while disabling position changes. Older pages, private Work history and historical file browsing are not implemented.
+
 `desk/menu/map.ts` owns map mode, active-menu synchronization and observer disposal; `desk/menu/map/model.ts` owns deterministic placement and zoom. `engine/tags/map.tsx` preserves metadata and fallback links. Plugins call `context.host.register_map_resources(() => ({ nodes, edges }), context.signal)`. Nodes have unique `id`, `name` and optional `info`, `icon`, `link`, `parent`, `x`, `y`, `active`, `hidden`; edges have `from`, `to` and optional `text`.
 
 `desk/action/save/destination.ts` owns the VFS destination dialog and permission/name/overwrite checks. `desk/action/save.ts` serializes duplicate saves per shared document, preserves drafts on cancellation/failure and updates navigation after writing.

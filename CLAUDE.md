@@ -100,6 +100,8 @@ dist/ .cache/ .wrangler/ generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Version menus:** Public history uses `desk/menu/version.ts` and `shared/repo/history.ts`; only the latest 100 commits are loaded. Branch/tag selections pin hashes. Version maps set `data-map-readonly`, so generic map movement must respect it. API log replies now include parent IDs and refs include peeled tag targets; deploy the matching origin with the runtime. Work/private history and historical file browsing remain open.
+
 - **Research printing:** `engine/tags/print/research.tsx` reads the matching public project's authored research, never the repository/collaborator attributes. The layout CSS is included through the selected print template. Keep the paper hidden with a screen-only layout rule; adding `[hidden]` without a print exemption would trigger the layered hidden-rule trap. The Stesis research example is explicitly placeholder text and must stay labeled as such in print.
 
 - **Desk maps/saving (2026-11-23):** `desk/menu/map.ts` owns map mode; file-tree redraws must preserve `.desk_map` and `.desk_menu_foot`. Plugins use injected `register_map_resources` to avoid duplicated bundle singletons. Save destination cancellation must never clear edits. `PLAYWRIGHT_CHROMIUM_CHANNEL=chrome` selects installed Chrome for Windows desk regressions.

@@ -205,11 +205,12 @@ export function init_map(desk: HTMLElement): () => void {
             active_page = page
             graph_key = ""
             positions_key = `jazu:map:${location.pathname}:${page?.dataset.path ?? index}`
-            positions = Object.assign(Object.create(null), read_positions(positions_key))
+            positions = Object.assign(Object.create(null), map?.hasAttribute("data-map-readonly") ? {} : read_positions(positions_key))
             view = (map && views.get(map)) || { x: 0, y: 0, scale: 1 }
             transform()
         }
         button!.hidden = !map
+        viewport.toggleAttribute("data-map-readonly", Boolean(map?.hasAttribute("data-map-readonly")))
         mode(desk.dataset.displayMode === "map")
     }
     button.addEventListener("click", () => {
@@ -225,6 +226,7 @@ export function init_map(desk: HTMLElement): () => void {
         const card = (event.target as Element).closest<HTMLElement>("[data-map-id]")
         if (card && event.shiftKey && event.key.startsWith("Arrow")) {
             event.preventDefault()
+            if (active_map?.hasAttribute("data-map-readonly")) return
             const id = card.dataset.mapId!, x = parseFloat(card.style.left), y = parseFloat(card.style.top)
             positions[id] = { x: x + (event.key === "ArrowLeft" ? -10 : event.key === "ArrowRight" ? 10 : 0), y: y + (event.key === "ArrowUp" ? -10 : event.key === "ArrowDown" ? 10 : 0) }
             graph_key = ""; render(); save_positions(positions_key, positions)
@@ -246,6 +248,7 @@ export function init_map(desk: HTMLElement): () => void {
     surface.addEventListener("pointerdown", event => {
         if (event.button !== 0 || (event.target as Element).closest("a, button")) return
         const card = (event.target as Element).closest<HTMLElement>("[data-map-id]")
+        if (card && active_map?.hasAttribute("data-map-readonly")) return
         drag = { id: event.pointerId, x: event.clientX, y: event.clientY, node: card?.dataset.mapId, node_x: card ? parseFloat(card.style.left) : 0, node_y: card ? parseFloat(card.style.top) : 0 }
         surface.setPointerCapture(event.pointerId)
         surface.focus({ preventScroll: true })

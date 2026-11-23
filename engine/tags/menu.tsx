@@ -39,7 +39,10 @@ export function render_side_head(ctx: render_ctx, desk: xml_node): html {
 }
 
 export function render_menu(ctx: render_ctx, side: xml_node, index: number): html {
-    return <div role="feed" class="desk_side_page" data-path={side.attrs.path}>
+    const path = side.attrs.path ?? ""
+    const prefix = `https://repo.${new URL(ctx.model.config.base_url).hostname}/`
+    const version = path.startsWith(prefix) && /^[a-z0-9-]+\/_\/log$/.test(path.slice(prefix.length)) ? path : undefined
+    return <div role="feed" class="desk_side_page" data-path={side.attrs.path} data-version-url={version}>
         {child_nodes(side, "entry").map(entry => render_entry(ctx, entry, index))}
         {child_nodes(side, "map").map(map => render_map(ctx, map))}
         {child_nodes(side, "foot").map(foot => render_foot(ctx, foot))}

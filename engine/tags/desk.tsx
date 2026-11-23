@@ -19,6 +19,7 @@ const runtime_keys = [
     "desk_map", "desk_windows", "map_zoom_in", "map_zoom_out", "map_reset",
     "save_destination", "save_overwrite",
     "audio", "mute",
+    "version_ref", "version_parents", "version_loading", "version_empty", "version_unavailable", "version_commits",
     "sign_out_google",
     "sign_out_google_title",
     "delete_account",
