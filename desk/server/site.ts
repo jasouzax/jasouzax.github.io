@@ -176,13 +176,15 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
 
     // ---- frames
     let busy = false
-    let latest: Uint8Array | null = null
-    const paint = async (bytes: Uint8Array): Promise<void> => {
-        if (busy) { latest = bytes; return }
+    let latest: { bytes: Uint8Array, id: number } | null = null
+    const paint = async (bytes: Uint8Array, id: number): Promise<void> => {
+        if (signal.aborted || id !== current_id() || !link.connected || !link.online) return
+        if (busy) { latest = { bytes, id }; return }
         busy = true
         try {
             const bitmap = await createImageBitmap(new Blob([bytes.slice().buffer], { type: "image/jpeg" }))
-            if (!signal.aborted && context) {
+            // Decoding may finish after a close, disconnect or source change; a stale picture must not revive the feed.
+            if (!signal.aborted && context && id === current_id() && link.connected && link.online) {
                 if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) { canvas.width = bitmap.width; canvas.height = bitmap.height; touch.refresh() }
                 context.drawImage(bitmap, 0, 0)
                 canvas.hidden = false
@@ -191,11 +193,11 @@ function build(item: desk_window, signal: AbortSignal, link: NonNullable<ReturnT
             bitmap.close()
         } catch { /* a broken frame is skipped */ }
         busy = false
-        if (latest) { const next = latest; latest = null; void paint(next) }
+        if (latest) { const next = latest; latest = null; void paint(next.bytes, next.id) }
     }
     const off_frames = link.on_binary(frame => {
         if (frame.id !== current_id()) return
-        if (frame.kind === "video") void paint(frame.payload)
+        if (frame.kind === "video") void paint(frame.payload, frame.id)
         else if (active_feed === item && window_audio_enabled(item) && item.mode !== "edit") audio.push(frame.timestamp, frame.payload)
     })
 

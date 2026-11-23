@@ -12,6 +12,7 @@ The [implementation audit](implementation-audit.md) records validation evidence 
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
 - [?] Optional passkeys protect owner login and account deletion, with recent Google sign-in required when no key is enrolled; see [passkeys](passkeys.md).
 - [?] PWA offline snapshots exclude online-only workspaces and show a connection-required fallback; Chrome verifies both themes, private-route exclusion and offline navigation. Real-device push/install acceptance remains open.
+- [?] Remote browser frames decoded after closure cannot revive a closed feed; all 13 server-desk Chrome regressions pass.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
 - [?] Blog books print nested public chapters in authored order with contents and page numbers.

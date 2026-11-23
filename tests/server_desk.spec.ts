@@ -88,7 +88,7 @@ async function owner(page: Page, stale_plugins = false) {
     await page.goto("/server")
     jpeg = Buffer.from(await page.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = 8; canvas.height = 8; canvas.getContext("2d")!.fillRect(0, 0, 8, 8); return canvas.toDataURL("image/jpeg").split(",")[1] }), "base64")
     await expect.poll(() => messages.some(message => message.t === "auto_state")).toBe(true)
-    return { messages, update, send, windows }
+    return { messages, update, send, windows, frame }
 }
 async function sessions(page: Page) {
     await page.locator("#head_menu > summary").click()
@@ -216,6 +216,30 @@ test("an auto-site file switches between its page and DevTools without opening a
     await page.screenshot({ path: '.cache/desk-browser-results/server-site-view.png' })
 })
 
+
+test("a frame decoded after remote closure cannot revive the closed feed", async ({ page }) => {
+    const api = await owner(page)
+    const pane = page.locator('.desk_wbox').first(), address = pane.locator('.desk_wbox_head_path')
+    await address.fill('server:window:1'); await address.press('Enter')
+    await expect(pane.locator('.server_site_canvas')).toBeVisible()
+    await page.evaluate(() => {
+        const decode = window.createImageBitmap.bind(window)
+        ;(window as any).held_frames = []
+        window.createImageBitmap = (async (...args: any[]) => {
+            const bitmap = await (decode as any)(...args)
+            await new Promise<void>(resolve => (window as any).held_frames.push(resolve))
+            return bitmap
+        }) as typeof createImageBitmap
+    })
+    api.frame(1)
+    await expect.poll(() => page.evaluate(() => (window as any).held_frames.length)).toBeGreaterThan(0)
+    api.send({ t: 'window_removed', id: 1 })
+    await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
+    await page.evaluate(() => { for (const release of (window as any).held_frames.splice(0)) release() })
+    await page.waitForTimeout(100)
+    await expect(pane.locator('.server_site_feed')).toHaveAttribute('data-state', 'This window is closed.')
+    await expect(pane.locator('.server_site_canvas')).toBeHidden()
+})
 
 test("Sessions use standard side items with icons and persistent script actions", async ({ page }) => {
     const api = await owner(page), panel = await sessions(page)
