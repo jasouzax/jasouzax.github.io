@@ -8,6 +8,7 @@ const pending = new Map<number, { resolve: (value: any) => void, reject: (error:
 let next_id = 1, initialized = false, info: Desktop_Info | null = null, starting = false
 let restore: (() => Promise<void>) | null = null, panel: HTMLElement | null = null, generation = 0
 let sync_queue: Promise<void> = Promise.resolve()
+let mounting: AbortController | null = null
 const local_desk = () => /^\/(?:[a-z]{2}\/)?desk(?:\/|$)/.test(location.pathname) && !!document.querySelector(".desk[data-runtime]")
 
 export function desktop_request<T = unknown>(request: Desktop_Request): Promise<T> {
@@ -80,7 +81,12 @@ async function apply_desktop(): Promise<void> {
     if (!local_desk()) { panel?.remove(); panel = null; const undo = restore; restore = null; await undo?.(); return }
     await filesystem_initialized()
     if (epoch !== generation || !local_desk()) return
-    if (!restore) restore = await swap_root(remote_directory({ fs: request => desktop_request<Fs_Result>({ op: "fs", request }) }), true)
+    if (!restore) {
+        const controller = mounting = new AbortController()
+        try { restore = await swap_root(remote_directory({ fs: request => desktop_request<Fs_Result>({ op: "fs", request }) }), true, controller.signal) }
+        catch (error) { if (!controller.signal.aborted) throw error; return }
+        finally { if (mounting === controller) mounting = null }
+    }
     if (epoch !== generation || !local_desk()) { const undo = restore; restore = null; await undo?.(); return }
     const desk = document.querySelector<HTMLElement>(".desk[data-runtime]")
     if (desk) desk.dataset.cwd = info.home
@@ -111,5 +117,10 @@ export function init_native_desktop(): void {
         }
     })
     document.addEventListener("jazu:fs:init", () => { void sync_desktop().catch(console.error) })
-    document.addEventListener("jazu:page", () => { if (!local_desk()) void sync_desktop().catch(console.error) })
+    // Capture precedes init_desk's bubble listener: the next page must initialize against browser handles.
+    document.addEventListener("jazu:page", () => {
+        generation++; mounting?.abort()
+        panel?.remove(); panel = null
+        const undo = restore; restore = null; void undo?.()
+    }, { capture: true })
 }

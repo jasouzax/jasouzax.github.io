@@ -67,16 +67,21 @@ export function filesystem_initialized(): Promise<void> { return filesystem_read
 // handle and children are kept and put back by the returned function. The polling of picked folders and the /bin mount skip a remote root.
 let remote_active = false
 export function remote_root_active(): boolean { return remote_active }
-export async function swap_root(handle: dir_handle, writable: boolean): Promise<() => Promise<void>> {
+export async function swap_root(handle: dir_handle, writable: boolean, signal?: AbortSignal): Promise<() => Promise<void>> {
     await filesystem_ready
+    signal?.throwIfAborted()
     const root = shared_root
     if (!root) throw new Error("No desk file system")
+    // Read into a detached node. A page change during I/O must never seed browser folders into a native handle.
+    const staged: fs_node = { ...root, handle, writable, children: null, readable: undefined, content_readable: undefined, write_allowed: undefined }
+    await load_children(staged)
+    signal?.throwIfAborted()
+    if (staged.readable === false) throw new Error("Unable to read the filesystem root")
     const saved = { handle: root.handle, writable: root.writable, children: root.children, readable: root.readable, content_readable: root.content_readable, write_allowed: root.write_allowed }
     remote_active = true
-    root.handle = handle; root.writable = writable; root.children = null
-    root.readable = root.content_readable = root.write_allowed = undefined
-    try { await load_children(root) }
-    catch (error) { Object.assign(root, saved); remote_active = false; throw error }
+    root.handle = handle; root.writable = writable; root.children = staged.children
+    root.readable = staged.readable; root.content_readable = staged.content_readable; root.write_allowed = staged.write_allowed
+    for (const child of root.children ?? []) child.parent = root
     if (tree) { tree.open = new Set(["/"]); tree.selected = root; tree.selection = new Set(["/"]); tree.anchor = "/"; tree.range_base = null }
     redraw()
     document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
