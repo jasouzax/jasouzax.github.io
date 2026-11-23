@@ -14,12 +14,13 @@ class API extends Runtime_API {
         super(config, dirname(source)); instance = this
     }
 }
-const close = () => { try { instance?.store.close() } finally { process.exit(0) } }
+const close = () => { try { instance?.close() } finally { process.exit(0) } }
 process.on("disconnect", close)
 process.on("SIGTERM", close)
 process.on("uncaughtException", () => { send({ type: "fatal", message: "API child failed" }); process.exit(1) })
 process.on("unhandledRejection", () => { send({ type: "fatal", message: "API child rejected an asynchronous task" }); process.exit(1) })
 process.on("message", (value: any) => {
+    if (value?.type === "activate" && instance) { instance.activate(); return }
     if (value?.type !== "call" || !instance) return
     void instance.dispatch(value.call as Api_Call).then(result => send({ type: "result", id: value.id, result }), () => send({ type: "fatal", message: "API dispatcher failed" }))
 })

@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite"
 import { chmodSync } from "node:fs"
 export class Api_Store {
     readonly db: DatabaseSync
+    private transaction_depth = 0
     constructor(file: string) {
         this.db = new DatabaseSync(file)
         chmodSync(file, 0o600)
@@ -17,9 +18,11 @@ export class Api_Store {
     delete(key: string): boolean { return Number(this.db.prepare("DELETE FROM api_values WHERE key = ?").run(key).changes) > 0 }
     keys(prefix = ""): string[] { return this.db.prepare("SELECT key FROM api_values WHERE substr(key,1,length(?)) = ? ORDER BY key LIMIT 1000").all(prefix, prefix).map(row => String(row.key)) }
     transaction<T>(action: () => T): T {
-        this.db.exec("BEGIN IMMEDIATE")
-        try { const result = action(); if (result && typeof (result as any).then === "function") throw new Error("Store transactions must be synchronous"); this.db.exec("COMMIT"); return result }
-        catch (error) { this.db.exec("ROLLBACK"); throw error }
+        const depth = this.transaction_depth, savepoint = `api_tx_${depth}`
+        this.db.exec(depth ? `SAVEPOINT ${savepoint}` : "BEGIN IMMEDIATE"); this.transaction_depth++
+        try { const result = action(); if (result && typeof (result as any).then === "function") throw new Error("Store transactions must be synchronous"); this.db.exec(depth ? `RELEASE ${savepoint}` : "COMMIT"); return result }
+        catch (error) { this.db.exec(depth ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : "ROLLBACK"); throw error }
+        finally { this.transaction_depth-- }
     }
     audit(event: string, detail: unknown): void {
         this.db.prepare("INSERT INTO api_audit(time,event,detail) VALUES (?,?,?)").run(Date.now(), event, JSON.stringify(detail))

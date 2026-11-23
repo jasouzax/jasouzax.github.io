@@ -1,6 +1,6 @@
 /* HMAC-authenticated transport: the gateway carries identity in the signed JSON body; only local operators deploy code. */
 import type { IncomingMessage } from "node:http"
-import { api_limit, api_methods, api_failure, type Api_Call } from "../../shared/api/types.ts"
+import { api_header, api_limit, api_transport_limit, api_methods, api_failure, type Api_Call } from "../../shared/api/types.ts"
 import { verify_origin } from "../../shared/sign.ts"
 import { valid_subdomain_id } from "../../shared/content/ids.ts"
 import type { Api_Manager } from "./manager.ts"
@@ -9,7 +9,7 @@ async function read_body(incoming: IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = []; let size = 0, failed = false
         incoming.on("error", reject)
-        incoming.on("data", chunk => { if (failed) return; size += chunk.length; if (size > api_limit + 16384) { failed = true; chunks.length = 0; reject(new Error("body_limit")); return }; chunks.push(Buffer.from(chunk)) })
+        incoming.on("data", chunk => { if (failed) return; size += chunk.length; if (size > api_transport_limit) { failed = true; chunks.length = 0; reject(new Error("body_limit")); return }; chunks.push(Buffer.from(chunk)) })
         incoming.on("end", () => { if (!failed) resolve(Buffer.concat(chunks).toString("utf8")) })
     })
 }
@@ -40,7 +40,7 @@ export async function api_transport(incoming: IncomingMessage, manager: Api_Mana
         const match = /^\/custom-api\/([a-z0-9-]+)\/v([1-9][0-9]{0,3})$/.exec(path)
         if (!match || !valid_subdomain_id(match[1])) return fail("not_found", "Unknown API transport route", 404)
         const call = body as Api_Call
-        if (!call || !api_methods.includes(call.method as any) || typeof call.path !== "string" || typeof call.ip !== "string" || call.ip.length > 128 || typeof call.request_id !== "string" || call.request_id.length > 100 || !call.actor || typeof call.actor.owner !== "boolean" || !call.query || typeof call.query !== "object" || !call.headers || typeof call.headers !== "object" || Object.entries(call.headers).some(([key, value]) => typeof value !== "string" || !["authorization", "content-type", "accept", "idempotency-key"].includes(key))) return fail("invalid_request", "Invalid API call envelope", 400)
+        if (!call || !api_methods.includes(call.method as any) || typeof call.path !== "string" || typeof call.ip !== "string" || call.ip.length > 128 || typeof call.request_id !== "string" || call.request_id.length > 100 || !call.actor || typeof call.actor.owner !== "boolean" || !call.query || typeof call.query !== "object" || !call.headers || typeof call.headers !== "object" || Object.keys(call.headers).length > 20 || Object.entries(call.headers).some(([key, value]) => typeof value !== "string" || value.length > 2048 || !api_header(key)) || call.raw_body !== undefined && (typeof call.raw_body !== "string" || Buffer.byteLength(call.raw_body) > api_limit)) return fail("invalid_request", "Invalid API call envelope", 400)
         return Response.json(await manager.call(match[1], Number(match[2]), call), { headers: { "cache-control": "no-store" } })
     } catch (error) { return fail((error as Error).message === "body_limit" ? "body_too_large" : "invalid_request", (error as Error).message === "body_limit" ? "API body exceeds the transport limit" : client === "api-admin" ? (error as Error).message : "Invalid API request", (error as Error).message === "body_limit" ? 413 : 400) }
 }

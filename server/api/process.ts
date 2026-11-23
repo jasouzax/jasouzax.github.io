@@ -15,12 +15,12 @@ export class Api_Process {
         this.child.stdout?.on("data", bytes => log(String(bytes).slice(0, 4096)))
         this.child.stderr?.on("data", bytes => log(String(bytes).slice(0, 4096)))
         this.ready = new Promise((resolve, reject) => {
-            const timer = setTimeout(() => { this.child.kill(); reject(new Error("API startup timed out")) }, 10000)
+            const timer = setTimeout(() => { this.child.kill("SIGKILL"); reject(new Error("API startup timed out")) }, 10000)
             const fail = () => { clearTimeout(timer); reject(new Error("API process exited before readiness")) }
             this.child.once("error", fail); this.child.once("exit", fail)
             this.child.on("message", (message: any) => {
                 if (message?.type === "ready" && !this.manifest) { clearTimeout(timer); this.manifest = message.manifest; resolve(message.manifest) }
-                if (message?.type === "fatal") { clearTimeout(timer); reject(new Error(String(message.message))); this.child.kill() }
+                if (message?.type === "fatal") { clearTimeout(timer); reject(new Error(String(message.message))); this.terminate() }
                 if (message?.type === "result") {
                     const pending = this.pending.get(message.id)
                     if (!pending) return
@@ -32,20 +32,26 @@ export class Api_Process {
         })
         this.child.once("exit", () => { for (const request of this.pending.values()) { clearTimeout(request.timer); request.resolve(api_failure("api_offline", "API process is unavailable", 503)) }; this.pending.clear(); exited() })
     }
-    call(call: Api_Call): Promise<Api_Result> {
+    call(call: Api_Call, deadline_ms = 31000): Promise<Api_Result> {
         if (!this.child.connected || !this.manifest) return Promise.resolve(api_failure("api_offline", "API process is unavailable", 503, call.request_id))
         if (this.pending.size >= 32) return Promise.resolve(api_failure("busy", "API has too many pending requests", 503, call.request_id))
         const id = ++this.sequence
         return new Promise(resolve => {
-            const timer = setTimeout(() => { this.pending.delete(id); resolve(api_failure("timeout", "API process timed out", 504, call.request_id)); this.child.kill() }, 31000)
+            const timer = setTimeout(() => { this.pending.delete(id); resolve(api_failure("timeout", "API process timed out", 504, call.request_id)); this.child.kill("SIGKILL") }, deadline_ms)
             this.pending.set(id, { resolve, timer })
             this.child.send({ type: "call", id, call }, error => { if (error) { clearTimeout(timer); this.pending.delete(id); resolve(api_failure("api_offline", "API process is unavailable", 503, call.request_id)) } })
         })
     }
+    terminate(): void {
+        this.child.kill()
+        const timer = setTimeout(() => this.child.kill("SIGKILL"), 1000)
+        timer.unref(); void this.stopped.then(() => clearTimeout(timer))
+    }
+    activate(): void { if (this.child.connected) this.child.send({ type: "activate" }, () => {}) }
     stop(): void {
-        if (!this.pending.size) { this.child.kill(); return }
+        if (!this.pending.size) { this.terminate(); return }
         // Replaced releases drain existing requests while new requests already use the new process.
-        const timer = setInterval(() => { if (!this.pending.size) { clearInterval(timer); this.child.kill() } }, 20)
-        setTimeout(() => { clearInterval(timer); this.child.kill() }, 32000).unref()
+        const timer = setInterval(() => { if (!this.pending.size) { clearInterval(timer); this.terminate() } }, 20)
+        setTimeout(() => { clearInterval(timer); this.child.kill("SIGKILL") }, 32000).unref()
     }
 }

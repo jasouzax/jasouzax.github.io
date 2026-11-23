@@ -22,6 +22,16 @@ JSON Schema draft-07 validation uses strict Ajv, without implicit coercion or pr
 
 Deployment and operator commands are in [the custom API guide](docs/src/custom-apis.md). The old Electron VM prototype remains an internal automation compatibility surface, but its unversioned public gateway is retired without aliases.
 
+## Jobs and hooks
+
+`api.job(name, handler)` returns a handle with `run(input, { key })`. Jobs start after release activation; `api.jobs.get/list/cancel` controls durable records. Cancellation signals cooperative handlers. Restarted queued/running jobs become interrupted and never execute automatically. Jobs run serially within each child. Synchronous store transactions support nested savepoints, including atomic job enqueue.
+
+Route option `idempotent: true` requires Idempotency-Key and binds it to version, principal, route, query and canonical JSON body. Completed results replay; changed input, pending or interrupted outcomes return 409. Authentication and hook verification run before every replay. Request/job history is retained for operator-managed cleanup; application SQL must preserve platform `api_` tables.
+
+`api.hook(path, { verify, headers, ...options }, handler)` exposes exact UTF-8 JSON as `raw_body` to verification. Only declared provider headers cross the gateway. Authorization is available to verification; normal handler context excludes authorization and cookies. `api.webhook.send` supports optional HMAC, stable delivery keys and at most three bounded attempts. Receivers must deduplicate retries to avoid duplicate side effects. Redirects are refused. Credentials and payloads are excluded from platform delivery audit records. Interrupted deliveries are never retried automatically.
+
+`API.open(id, version, { origin, token, timeout_ms })` supplies REST/QUERY methods with bounded JSON responses, deadlines and redirect refusal. APIs run as trusted owner code with ordinary Node network/filesystem access.
+
 ## Remaining phases
 
-Jobs/idempotency, verified inbound/outbound hooks and `API.open` are Phase 2. SSE/WebSocket channels, resume and tickets are Phase 3. Pub/sub, OpenAPI/typed clients and live log streaming are Phase 4. Durable Object/MQTT live transport and per-owner origins are Phase 5. Multi-server API registration and desk Sessions controls remain integration work. These are not implied by completion of the core. Jobs cut off by restart must be marked interrupted rather than silently resumed; stream `emit` must remain independent of transport. Service-token enforcement stays on the server in every phase.
+Phase 2 jobs/idempotency, verified inbound/outbound hooks and `API.open` are implemented. SSE/WebSocket channels, resume and tickets are Phase 3. Pub/sub, OpenAPI/typed clients and live log streaming are Phase 4. Durable Object/MQTT live transport and per-owner origins are Phase 5. Multi-server API registration and desk Sessions controls remain integration work. Stream `emit` must remain independent of transport. Service-token enforcement stays on the server in every phase.

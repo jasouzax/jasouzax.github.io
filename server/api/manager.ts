@@ -75,8 +75,8 @@ export class Api_Manager {
         if (createHash("sha256").update(readFileSync(file)).digest("hex") !== release.current) throw new Error("API release hash does not match its stored source")
         const child = this.spawn(file, release.source, key)
         this.active.set(key, child)
-        try { const manifest = await child.ready; if (`${manifest.id}/v${manifest.version}` !== key) throw new Error("Restored API identity changed") }
-        catch (error) { child.child.kill(); this.audit("restore_failed", { key }); throw error }
+        try { const manifest = await child.ready; if (`${manifest.id}/v${manifest.version}` !== key) throw new Error("Restored API identity changed"); child.activate() }
+        catch (error) { child.terminate(); this.audit("restore_failed", { key }); throw error }
     }
     async restore(): Promise<void> { for (const key of this.releases.keys()) try { await this.restore_one(key) } catch { /* Failed autostarts remain desired and retry with backoff. */ } }
     deploy(source: string): Promise<Api_Manifest> {
@@ -95,7 +95,7 @@ export class Api_Manager {
                 const previous = this.releases.get(key), record = { id: manifest.id, version: manifest.version, source, current: hash, ...(previous?.current && previous.current !== hash ? { previous: previous.current } : previous?.previous ? { previous: previous.previous } : {}) }
                 await this.activate(key, candidate, record)
                 return manifest
-            } catch (error) { candidate.child.kill(); throw error }
+            } catch (error) { candidate.terminate(); throw error }
         })
     }
     private async activate(key: string, candidate: Api_Process, record: Release): Promise<void> {
@@ -110,7 +110,8 @@ export class Api_Manager {
             this.active.delete(key)
             this.retries.set(key, setTimeout(() => { this.retries.delete(key); void this.serial(() => this.restore_one(key)).catch(() => {}) }, 200))
         })
-        old?.stop(); this.audit("activate", { key, revision: record.current })
+        if (old) { old.stop(); void old.stopped.then(() => candidate.activate()) } else candidate.activate()
+        this.audit("activate", { key, revision: record.current })
     }
     rollback(id: string, version: number): Promise<Api_Manifest> {
         return this.serial(async () => {
@@ -120,7 +121,7 @@ export class Api_Manager {
             if (createHash("sha256").update(readFileSync(file)).digest("hex") !== record.previous) throw new Error("Rollback release hash does not match its stored source")
             const child = this.spawn(file, record.source)
             try { const manifest = await child.ready; if (`${manifest.id}/v${manifest.version}` !== key) throw new Error("Rollback identity differs"); await this.activate(key, child, { ...record, current: record.previous, previous: record.current }); return manifest }
-            catch (error) { child.child.kill(); throw error }
+            catch (error) { child.terminate(); throw error }
         })
     }
     stop(id: string, version: number): Promise<void> {
@@ -135,7 +136,7 @@ export class Api_Manager {
     close(): Promise<void> {
         if (this.closing_task) return this.closing_task
         this.closing = true
-        this.closing_task = (async () => { for (const timer of this.retries.values()) clearTimeout(timer); this.retries.clear(); const children = [...this.children]; for (const child of children) child.child.kill(); this.active.clear(); await Promise.all(children.map(child => child.stopped)); this.control.exec("ROLLBACK"); this.control.close() })()
+        this.closing_task = (async () => { for (const timer of this.retries.values()) clearTimeout(timer); this.retries.clear(); const children = [...this.children]; for (const child of children) child.terminate(); this.active.clear(); await Promise.all(children.map(child => child.stopped)); this.control.exec("ROLLBACK"); this.control.close() })()
         return this.closing_task
     }
 }

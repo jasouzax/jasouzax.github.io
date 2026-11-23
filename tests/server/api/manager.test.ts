@@ -82,3 +82,22 @@ test("Worker gateway and real Node listener use signed envelopes, strip cookies 
         assert.equal((await custom_api_route(new Request("https://example.com/api/sample/v1/"), env, upstream)).status, 404)
     } finally { await manager.close(); await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections() }); rmSync(root, { recursive: true, force: true }) }
 })
+
+test("the parent watchdog stops a CPU-bound handler and replay reports the interrupted request", { timeout: 15000 }, async () => {
+    const root = mkdtempSync(join(tmpdir(), "jazu-api-watchdog-")), source = join(root, "hang.auto.js"), manager = new Api_Manager(join(root, "state"), entry)
+    try {
+        writeFileSync(source, "const api=new API({id:'watchdog',version:1,access:'public'});const held=api.job('held',()=>new Promise(()=>{}));api.post('/job',()=>api.reply(held.run(null,{key:'held'}),202));api.get('/jobs/:id',ctx=>api.jobs.get(ctx.params.id));api.post('/',{idempotent:true},()=>{api.store.set('count',(api.store.get('count')||0)+1);while(true){}});api.get('/',()=>api.store.get('count'));")
+        await manager.deploy(source)
+        const queued = await manager.call("watchdog", 1, { ...call(), method: "POST", path: "/job" }), job = (queued.body as any).data
+        const job_call = { ...call(), path: `/jobs/${job.id}` }
+        for (let attempt = 0; attempt < 30 && ((await manager.call("watchdog", 1, job_call)).body as any).data.state !== "running"; attempt++) await setTimeout(10)
+        const first = manager.active.get("watchdog/v1")!
+        const request = { ...call(), method: "POST", body: {}, headers: { "idempotency-key": "interrupted" } }
+        assert.equal((await first.call(request, 300)).status, 504)
+        await first.stopped
+        for (let attempt = 0; attempt < 100 && !manager.active.get("watchdog/v1")?.manifest; attempt++) await setTimeout(30)
+        assert.equal((await manager.call("watchdog", 1, request)).status, 409)
+        assert.equal(((await manager.call("watchdog", 1, call())).body as any).data, 1)
+        assert.equal(((await manager.call("watchdog", 1, job_call)).body as any).data.state, "interrupted")
+    } finally { await manager.close(); rmSync(root, { recursive: true, force: true }) }
+})
