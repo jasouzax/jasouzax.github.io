@@ -12,6 +12,12 @@ Continue from the component statuses, preserving `[?]` for human review. The des
 
 ## Delivered changes
 
+### Additional continuation — Windows navigation
+
+Non-fixed desks now expose a live Windows menu with split hierarchy, Show/Hide/Close controls, hidden/minimized state and resource-map synchronization. Hiding removes both desktop tiles and header tabs without disposing drafts or processes; keyboard cycling skips hidden tabs. File windows can be dropped under another as comparison children, with ancestor-cycle rejection and stale-parent cleanup. Group persistence is still absent, so Windows remains `[/]`.
+
+Root typechecking, flow/layout contracts and ten Chrome Windows/Version/map regressions pass, including shared unsaved draft restoration, comparison drops, fixed-desk guards and portrait behavior. No live deployment occurred.
+
 ### Additional continuation — public Version menus
 
 Public project Version menus now load bounded repository history only when selected. The origin exposes commit parents in topological order and peeled annotated tag targets; the browser validates replies, groups non-first-parent branch commits under merge entries, resolves named refs to hashes, and builds a fixed-position DAG with branch/tag labels. Refresh errors preserve the loaded snapshot. Requests omit credentials, enforce a response-size/time bound, and abort on navigation. Selecting map nodes reveals their commit entry.
@@ -116,7 +122,7 @@ Every entry still `[ ]` or `[/]` when the final audit began is listed below; ite
 | [!] | **Collaboration** `cmp:/desk/fs/collab` | No authorized shared-folder protocol, account isolation, collaborator-home projection or conflict resolution exists. |
 | [/] | **Submenu** `cmp:/desk/menu` | Public Version menus and maps work; dynamic windows/groups, private Work history and People menus remain incomplete. |
 | [!] | **Chats** `cmp:/desk/menu/chat` | Encrypted Work chat exists; consistent chat menus and collaboration across arbitrary desk resources are incomplete. |
-| [!] | **Windows** `cmp:/desk/menu/windows` | Taskbar-style activation exists; hiding tabs/windows and grouped desktop/menu/map synchronization are incomplete. |
+| [/] | **Windows** `cmp:/desk/menu/windows` | Live split tree, reversible hiding, comparison drops and map/tab synchronization work; persistent desktop groups remain open. |
 | [/] | **Versions** `cmp:/desk/menu/version` | Public history, no-ff merge nesting, refs/tags and fixed graph work; private Work history, pagination and historical file browsing remain open. |
 | [!] | **People** `cmp:/desk/menu/people` | People storage, region grants and graph projection are absent; the menu cannot safely expose nonexistent authorization. |
 | [!] | **Notebook** `cmp:/desk/window/note` | Markdown reading works; editable notebooks, Jupyter cell execution and persistence are absent. |

@@ -20,6 +20,7 @@ const runtime_keys = [
     "save_destination", "save_overwrite",
     "audio", "mute",
     "version_ref", "version_parents", "version_loading", "version_empty", "version_unavailable", "version_commits",
+    "window_hidden", "window_show", "window_hide", "window_unhide", "window_minimized", "windows_empty",
     "sign_out_google",
     "sign_out_google_title",
     "delete_account",

@@ -153,6 +153,17 @@ test("edits reach subscribers and the newest bytes are kept until forgotten", ()
     assert.equal(latest_bytes(source), null)
 })
 
+test("reparenting removes stale links without detaching a child's own descendants", () => {
+    const first = fake_window(), next = fake_window(), child = fake_window(), descendant = fake_window()
+    adopt(first, child); adopt(child, descendant); adopt(next, child)
+    assert.deepEqual(children_of(first), [])
+    assert.deepEqual(children_of(next), [child])
+    assert.deepEqual(children_of(child), [descendant])
+    release_links(first, false)
+    assert.equal(child.parent, next)
+    assert.equal(descendant.parent, child)
+})
+
 
 test("mirrors share current edits both ways; comparisons keep independent bytes", () => {
     const parent = fake_window(), mirror = fake_window(), sibling = fake_window(), compare = fake_window()

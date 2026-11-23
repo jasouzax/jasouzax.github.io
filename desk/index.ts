@@ -12,6 +12,7 @@ import { adopt, release_links } from "./plugin/flow.ts"
 import { no_picks, type Child_Picks } from "./plugin/rules.ts"
 import { init_map, show_windows } from "./menu/map.ts"
 import { init_versions } from "./menu/version.ts"
+import { init_windows_menu } from "./menu/windows.ts"
 
 export type desk_data = {
     text: Record<string, string>
@@ -26,6 +27,7 @@ export type desk_window = {
     el: HTMLElement
     tab: HTMLAnchorElement
     minimized: boolean
+    hidden?: boolean
     // what the window holds; the viewer (client_desk_view.ts) fills these in
     name: string
     mime: string
@@ -79,6 +81,7 @@ let custom = false
 let cancel_drag: (() => void) | null = null
 let dispose_map: (() => void) | null = null
 let dispose_versions: (() => void) | null = null
+let dispose_windows_menu: (() => void) | null = null
 
 const portrait = matchMedia("(orientation: portrait)")
 
@@ -122,6 +125,7 @@ export function refresh_tab(item: desk_window): void {
     item.tab.toggleAttribute("data-minimized", item.minimized)
     item.tab.toggleAttribute("data-maximized", state.maximized === item)
     item.tab.title = label_of(item)
+    item.tab.hidden = Boolean(item.hidden)
     const mark = item.el.querySelector(".desk_wbox_head_icon")
     if (mark) mark.textContent = item.icon
     document.dispatchEvent(new Event("jazu:desk:change"))
@@ -145,7 +149,7 @@ function restore_tabs(): void {
 
 function shown_windows(): desk_window[] {
     if (state.desk?.dataset.displayMode === "map") return []
-    let list = state.windows.filter(item => !item.minimized)
+    let list = state.windows.filter(item => !item.minimized && !item.hidden)
     if (state.maximized) list = [state.maximized]
     // portrait is one window at a time: the focused one. When the focused window is minimized nothing is shown (like the Windows taskbar),
     // so a tab pressed to minimize the window in view really leaves an empty desk instead of revealing another window.
@@ -171,7 +175,7 @@ function auto_rows(list: desk_window[]): desk_window[][] {
 
 // brings `rows` in line with the windows that are not minimized: gone ones leave, new ones come in
 function sync_rows(): void {
-    const live = state.windows.filter(item => !item.minimized)
+    const live = state.windows.filter(item => !item.minimized && !item.hidden)
     const kept = rows.map(row => row.filter(item => live.includes(item))).filter(row => row.length > 0)
     const placed = new Set(kept.flat())
     const added = live.filter(item => !placed.has(item))
@@ -200,10 +204,10 @@ function normalized(weights: number[], count: number): number[] {
 }
 
 export function fix_focus(): void {
-    const list = state.windows.filter(item => !item.minimized)
+    const list = state.windows.filter(item => !item.minimized && !item.hidden)
     if (state.maximized && !list.includes(state.maximized)) state.maximized = null
     // A minimized window keeps the focus (so the menu's Minimize brings it back); only a window that is gone loses it.
-    if (!state.focused || !state.windows.includes(state.focused)) state.focused = state.maximized ?? list[list.length - 1] ?? null
+    if (!state.focused || state.focused.hidden || !state.windows.includes(state.focused)) state.focused = state.maximized ?? list[list.length - 1] ?? null
 }
 
 function apply_template(columns: number, rows: number): void {
@@ -308,7 +312,9 @@ export function arrange(): void {
 export function focus_window(item: desk_window | null): void {
     if (!item) return
     show_windows()
-    if (state.focused === item && !item.minimized) return
+    const was_hidden = Boolean(item.hidden)
+    item.hidden = false
+    if (state.focused === item && !item.minimized && !was_hidden) return
     item.minimized = false
     state.focused = item
     arrange()
@@ -365,6 +371,8 @@ export const window_hooks = {
 }
 
 function dispose(): void {
+    dispose_windows_menu?.()
+    dispose_windows_menu = null
     dispose_versions?.()
     dispose_versions = null
     dispose_map?.()
@@ -426,6 +434,13 @@ export function toggle_minimize(item: desk_window | null): void {
     item.minimized = !item.minimized
     if (item.minimized && state.maximized === item) state.maximized = null
     state.focused = item
+    arrange()
+}
+
+export function set_window_hidden(item: desk_window, hidden: boolean): void {
+    if (!state.windows.includes(item) || state.desk?.hasAttribute("data-fixed")) return
+    item.hidden = hidden
+    if (hidden && state.maximized === item) state.maximized = null
     arrange()
 }
 
@@ -759,6 +774,7 @@ export function init_desk(): void {
     arrange()
     dispose_map = init_map(desk)
     dispose_versions = init_versions(desk)
+    dispose_windows_menu = init_windows_menu(desk)
 }
 
 let bound = false
@@ -780,7 +796,7 @@ function desk_shortcut(event: KeyboardEvent): void {
         else if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) action = () => move_window(item, key.slice(5))
     }
     if (item && ctrl && key === "tab") action = () => {
-        const tabs = [...document.querySelectorAll<HTMLAnchorElement>("#head_tabs a[data-desk-tab]")]
+        const tabs = [...document.querySelectorAll<HTMLAnchorElement>("#head_tabs a[data-desk-tab]")].filter(tab => !tab.hidden)
         const list = tabs.map(tab => state.windows.find(window => window.tab === tab)).filter((window): window is desk_window => !!window)
         const index = list.indexOf(item)
         const next = list[(index + (event.shiftKey ? -1 : 1) + list.length) % list.length]

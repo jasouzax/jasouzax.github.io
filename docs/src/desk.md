@@ -31,6 +31,8 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 ## Window bodies and plugins
 
+`desk/menu/windows.ts` owns the generated Windows menu, recursive split tree and comparison drop actions. It renders only after a window-state fingerprint changes, disposes listeners with each redraw and cleans up on navigation. `desk/index.ts` owns the separate hidden flag: it hides tabs and desktop tiles, excludes hidden windows from keyboard cycling and keeps resource/process state intact. `desk/plugin/flow.ts` removes stale parent links when a child is reparented. Group persistence is not implemented yet.
+
 `desk/menu/version.ts` recognizes only generated repository Version sources, lazily fetches public `/ID/_/refs` and `/ID/_/log` data without credentials, and disposes requests on navigation. Replies are bounded/validated by `shared/repo/history.ts`. `desk/menu/version/model.ts` owns merge nesting and fixed DAG coordinates. Named refs are resolved to commit hashes before reading history; the server returns topological parent IDs and peeled annotated tag targets. Version maps set `data-map-readonly`, preserving pan/zoom while disabling position changes. Older pages, private Work history and historical file browsing are not implemented.
 
 `desk/menu/map.ts` owns map mode, active-menu synchronization and observer disposal; `desk/menu/map/model.ts` owns deterministic placement and zoom. `engine/tags/map.tsx` preserves metadata and fallback links. Plugins call `context.host.register_map_resources(() => ({ nodes, edges }), context.signal)`. Nodes have unique `id`, `name` and optional `info`, `icon`, `link`, `parent`, `x`, `y`, `active`, `hidden`; edges have `from`, `to` and optional `text`.

@@ -19,6 +19,12 @@
   },
   "languages": {
     "en": {
+      "window_hidden": "Hidden",
+      "window_unhide": "Unhide window",
+      "window_minimized": "Minimized",
+      "window_show": "Show window",
+      "window_hide": "Hide window",
+      "windows_empty": "No windows are open.",
       "version_ref": "Branch or tag",
       "version_parents": "Parents",
       "version_loading": "Loading repository history…",
@@ -320,6 +326,12 @@
       "pwa_offline": "Offline · Public pages and themes are available. Desk and messaging require a connection."
     },
     "ja": {
+      "window_hidden": "非表示",
+      "window_unhide": "非表示を解除",
+      "window_minimized": "最小化中",
+      "window_show": "ウィンドウを表示",
+      "window_hide": "ウィンドウを隠す",
+      "windows_empty": "開いているウィンドウはありません。",
       "version_ref": "ブランチまたはタグ",
       "version_parents": "親コミット",
       "version_loading": "履歴を読み込み中…",

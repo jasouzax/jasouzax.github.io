@@ -47,7 +47,7 @@ function manual_graph(map: HTMLElement): Map_Graph {
 
 function auto_graph(page: HTMLElement): Map_Graph {
     const graph: Map_Graph = { nodes: [], edges: [] }
-    const entries = [...page.querySelectorAll<HTMLElement>(".desk_side_item")]
+    const entries = page.dataset.path === "desk:windows" ? [] : [...page.querySelectorAll<HTMLElement>(".desk_side_item")]
     const entry_id = (entry: HTMLElement) => `entry:${entry.dataset.path ?? entry.dataset.entryId ?? entries.indexOf(entry)}`
     for (const entry of entries) {
         const head = entry.querySelector(":scope > details > summary, :scope > summary") ?? entry.querySelector(".desk_side_item_head")
@@ -60,7 +60,7 @@ function auto_graph(page: HTMLElement): Map_Graph {
     }
     for (const item of state.windows) {
         const id = `window:${item.id}`
-        graph.nodes.push({ id, name: label_of(item), info: item.path || item.mime, link: id, icon: item.icon, active: item === state.focused, hidden: item.minimized, parent: item.parent ? `window:${item.parent.id}` : undefined })
+        graph.nodes.push({ id, name: label_of(item), info: item.path || item.mime, link: id, icon: item.icon, active: item === state.focused, hidden: item.minimized || item.hidden, parent: item.parent ? `window:${item.parent.id}` : undefined })
         if (item.parent) {
             const flow = flow_kind_of(item)
             if (flow) {

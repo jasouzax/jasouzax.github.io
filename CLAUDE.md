@@ -100,6 +100,8 @@ dist/ .cache/ .wrangler/ generated, ignored
 
 ## Notes & tips (read, and extend)
 
+- **Hidden windows:** `desk_window.hidden` is separate from minimization and DOM `el.hidden` (which also reflects map/portrait display). `set_window_hidden` preserves drafts/processes. Tab refresh, focus repair, layout and Ctrl+Tab must all respect the flag. The live Windows menu fingerprints before rebuilding, otherwise map/arrange change events form a redraw loop. Reparenting must remove the old parent's `kids` link without orphaning the child's descendants.
+
 - **Version menus:** Public history uses `desk/menu/version.ts` and `shared/repo/history.ts`; only the latest 100 commits are loaded. Branch/tag selections pin hashes. Version maps set `data-map-readonly`, so generic map movement must respect it. API log replies now include parent IDs and refs include peeled tag targets; deploy the matching origin with the runtime. Work/private history and historical file browsing remain open.
 
 - **Research printing:** `engine/tags/print/research.tsx` reads the matching public project's authored research, never the repository/collaborator attributes. The layout CSS is included through the selected print template. Keep the paper hidden with a screen-only layout rule; adding `[hidden]` without a print exemption would trigger the layered hidden-rule trap. The Stesis research example is explicitly placeholder text and must stay labeled as such in print.

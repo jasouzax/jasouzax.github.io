@@ -1,7 +1,7 @@
 /** Public repository Version menus: bounded history, merge groups, refs and immutable commit maps.
  * Requests omit credentials; offline/error states retain the last visible snapshot without inventing history.
  */
-import { text } from "../index.ts"
+import { state, text } from "../index.ts"
 import { history_commits, history_refs, history_limit, type History_Commit, type History_Ref } from "../../shared/repo/history.ts"
 import { history_graph, history_tree, type Commit_Entry } from "./version/model.ts"
 
@@ -21,7 +21,7 @@ function entry(item: Commit_Entry, labels: Map<string, string[]>): HTMLElement {
     const details = element("details", "desk_side_item_box")
     details.open = item.children.length > 0
     const head = element("summary", "desk_side_item_head")
-    head.append(element("span", "desk_side_item_icon", "⌘"), element("h3", "desk_side_item_name", commit.subject || commit.id.slice(0, 8)))
+    head.append(element("span", "desk_side_item_icon", state.data?.file_icon ?? ""), element("h3", "desk_side_item_name", commit.subject || commit.id.slice(0, 8)))
     const date = element("time", "desk_side_item_date", new Date(commit.timestamp * 1000).toLocaleDateString(document.documentElement.lang || "en"))
     date.dateTime = new Date(commit.timestamp * 1000).toISOString()
     head.append(element("span", "desk_side_item_code", commit.id.slice(0, 8)), date)

@@ -77,6 +77,10 @@ A zoomable node-and-arrow diagram belonging to a menu tab. Drag the background o
 
 ## `<window>`
 
+Non-fixed desks add a live **Windows** menu. It shows each window and its split children. Expand an entry for Show, Hide/Unhide and Close controls. Hidden windows disappear from the desktop and header tabs, while retaining drafts, process attachments and map nodes; Ctrl+Tab skips their hidden tabs. Show or activate their map node to restore focus. In portrait, Show also dismisses the menu overlay.
+
+Drag one file window's menu entry onto another to make it a comparison child. Parent cycles and operations in fixed desks are rejected. Available comparisons still depend on plugins. Named/persistent desktop groups remain planned; ordinary windows remain volatile across page navigation/reload.
+
 Shows or edits one resource in a tile. Windows declared in content are the desk's starting windows. Window ids: `window:N` is 1-based in document order. Processes are `pid://name` or `pid:N`.
 
 | Attribute | Meaning |
