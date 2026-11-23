@@ -1,10 +1,14 @@
 # Feature status
 
+- [?] Custom API SSE/WebSocket streams, resume cursors, single-use tickets, pub/sub, OpenAPI/TypeScript clients and scoped log streams; [status and limits](custom-apis.md).
+- [?] Owner Sessions controls deploy, roll back and stop Node API versions through an owner/CSRF-protected BFF.
+- [/] Custom API live layer: MQTT 5 bridge is implemented; Durable Object transport, per-owner origins and multi-server registration remain development work.
+
 The [implementation audit](implementation-audit.md) records validation evidence and remaining component gaps. `[?]` means implemented and awaiting human acceptance; `[/]` means incomplete; `[!]` is reserved for human-only blockers, as clarified in `COMPONENTS.md`. Historical `[x]` marks below are preserved.
 
 - [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
-- [/] Windows menu supports split hierarchy, reversible hiding and comparison drops; persistent desktop groups remain open.
+- [/] Windows menu supports split hierarchy, hiding, comparison drops and persistent browser-local document groups; live-resource desktop snapshots remain open.
 - [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
 - [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
 - [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.
@@ -13,7 +17,7 @@ The [implementation audit](implementation-audit.md) records validation evidence 
 - [?] Optional passkeys protect owner login and account deletion, with recent Google sign-in required when no key is enrolled; see [passkeys](passkeys.md).
 - [?] PWA offline snapshots exclude online-only workspaces and show a connection-required fallback; Chrome verifies both themes, private-route exclusion and offline navigation. Real-device push/install acceptance remains open.
 - [?] Remote browser frames decoded after closure cannot revive a closed feed; all 13 server-desk Chrome regressions pass.
-- [/] Versioned custom APIs: [Phase 1 core](custom-apis.md) is implemented and tested with child processes, SQLite, signed gateway and CLI deployment; later phases and multi-server/desk integration remain open.
+- [/] Versioned custom APIs: [Phases 1–4, MQTT and owner Sessions controls](custom-apis.md) are implemented; Durable Object transport, per-owner origins and multi-server registration remain open.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
 - [?] Blog books print nested public chapters in authored order with contents and page numbers.

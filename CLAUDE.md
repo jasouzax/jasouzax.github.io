@@ -29,6 +29,8 @@ Shared contracts live under `shared/`; import them directly rather than restorin
 
 ## Repository map
 
+Custom API streaming (2026-11-24): Node children execute native strip-only TypeScript, so do not use parameter properties or enums in their dependency tree. `server/api/streams.ts` owns bounded release-local channels, tickets and connection capabilities; `cloud/gateway/live.ts` adapts signed polling to SSE/WebSocket while rechecking policy. `server/api/mqtt.ts` uses MQTT 5 and starts broker connections only on release activation. `cloud/api/apis.ts` and `desk/server/apis.ts` own Sessions management. New desk strings must be added both to config translations and `engine/tags/desk.tsx`'s serialized text-key list; otherwise browser controls display raw keys. Pass the Worker execution context through router/API dispatch: WebSocket close must waitUntil its origin cleanup, otherwise workerd can cancel the fetch and leave a capability until its TTL. Test closure by observing the actual child connection count, not only the client close event. Run the API suite and the owner Sessions Playwright regression after changes.
+
 ```
 config.json            public settings; shared/config.ts loads and validates them
 content/               owner-managed XML/Markdown/SCSS; root tag determines interpretation

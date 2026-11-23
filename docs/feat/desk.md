@@ -12,7 +12,7 @@
 - [?] Markdown view/edit and unsaved live previews work for uploaded, local and published resources.
 
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
-- [/] Windows menu supports split hierarchy, reversible hiding and comparison drops; persistent desktop groups remain open.
+- [/] Windows menu supports split hierarchy, hiding, comparison drops and persistent browser-local document groups; live-resource desktop snapshots remain open.
 - [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.
 - [?] Per-window volume supports mute, right-click/touch range, muted-playing badges and remote audio gain.
 - [?] Fullscreen video overlays the window head and hides idle controls, preserving keyboard access.

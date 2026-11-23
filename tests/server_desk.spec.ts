@@ -96,6 +96,43 @@ async function sessions(page: Page) {
     return page.locator('.desk_side_page[data-path="server:sessions"]')
 }
 
+test("owner Sessions manages API versions and retains edits through automation updates and failed commands", async ({ page }) => {
+    const calls: { path: string, body: any }[] = []
+    let releases: any[] = [{ id: "counter", version: 1, source: "/home/user/counter.auto.js", current: "a".repeat(64), previous: "b".repeat(64), online: true, transports: ["websocket"] }]
+    let reject = false
+    await page.route("**/api/_/session*", route => route.fulfill({ json: { user: { role: "owner", email: "owner@example.com", name: "Owner" }, csrf: "test-csrf", google_enabled: true } }))
+    await page.route("**/api/_/apis**", async route => {
+        const path = new URL(route.request().url()).pathname
+        if (route.request().method() === "GET") return route.fulfill({ json: { data: releases } })
+        expect(route.request().headers()["x-jazu-csrf"]).toBe("test-csrf")
+        const body = route.request().postDataJSON(); calls.push({ path, body })
+        if (reject) return route.fulfill({ status: 400, json: { error: { message: "Candidate failed; previous release retained" } } })
+        if (path.endsWith("/stop")) releases = []
+        return route.fulfill({ json: { data: { stopped: true } } })
+    })
+    const api = await owner(page), panel = await sessions(page), apis = panel.locator(".server_api_sessions")
+    await expect(apis.locator('[data-api-key="counter/v1"]')).toBeVisible()
+    await expect(apis.locator(".server_api_usage")).toContainText("Cloudflare plan")
+    const input = apis.locator('input[name="source"]')
+    await input.fill("/home/user/new.auto.js")
+    api.send({ t: "auto_status", path: "/run.auto.js", running: false })
+    await expect(input).toHaveValue("/home/user/new.auto.js")
+    await expect(input).toBeFocused()
+    await apis.locator('[data-api-action="rollback"]').click()
+    await expect.poll(() => calls.at(-1)?.path).toBe("/api/_/apis/rollback")
+    await expect(apis).toHaveAttribute("aria-busy", "false")
+    reject = true
+    await apis.getByRole("button", { name: "Deploy API", exact: true }).click()
+    await expect(apis.getByRole("status")).toContainText("previous release retained")
+    await expect(input).toHaveValue("/home/user/new.auto.js")
+    await expect(apis.locator('[data-api-key="counter/v1"]')).toBeVisible()
+    expect(calls.at(-1)?.body).toEqual({ source: "/home/user/new.auto.js" })
+    reject = false
+    await apis.locator('[data-api-action="stop"]').click()
+    await expect(apis.locator(".server_api_release")).toHaveCount(0)
+    await expect(apis).toContainText("No API versions deployed.")
+})
+
 test("Sessions groups scripts and opens sites, scripts and orphan windows in view mode", async ({ page }) => {
     const api = await owner(page), panel = await sessions(page)
     await expect(panel.locator(".server_session_script")).toHaveCount(1)

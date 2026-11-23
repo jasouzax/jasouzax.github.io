@@ -1,6 +1,65 @@
 /** Windows tree, hidden tabs/resources, comparison reparenting and fixed-desk management guard. */
 import { test, expect } from "./desk_fixture.ts"
 
+test("saved desktops restore shared drafts and hidden split windows while new tabs remain temporary", async ({ page }) => {
+    page.on("dialog", dialog => dialog.accept())
+    await page.goto("/desk")
+    const parent = page.locator(".desk_wbox").first()
+    await parent.locator('input[type="file"]').setInputFiles({ name: "draft.txt", mimeType: "text/plain", buffer: Buffer.from("source") })
+    await expect(parent.locator("textarea.desk_wbox_body_text_input")).toHaveValue("source")
+    await parent.locator(".desk_wbox_head_split").click()
+    const child = page.locator(".desk_wbox").nth(1)
+    await child.locator('[data-mode="edit"]').click()
+    await child.locator("textarea.desk_wbox_body_text_input").fill("saved unsaved draft")
+    const show = async () => {
+        const menu = page.locator("#head_menu")
+        if (await menu.getAttribute("open") === null) await menu.locator(":scope > summary").click()
+        const tab = page.locator('.desk_side_tabs_drop[data-path="desk:windows"]')
+        if (await tab.getAttribute("open") === null) await tab.locator(":scope > summary").click()
+    }
+    await show()
+    const panel = page.locator(".desk_windows_menu"), entry = panel.locator('[data-window-id="2"]')
+    await entry.locator(":scope > details > summary").click()
+    await entry.getByRole("button", { name: "Hide window", exact: true }).click()
+    await panel.getByRole("textbox", { name: "Desktop name", exact: true }).fill("Research drafts")
+    await panel.locator('[data-desktop-action="create"]').click()
+    await expect(panel.getByRole("status")).toHaveText("Saved desktop: Research drafts")
+    await page.reload()
+    await expect(page.locator(".desk_wbox")).toHaveCount(2)
+    await expect(page.locator("textarea.desk_wbox_body_text_input").first()).toHaveValue("saved unsaved draft")
+    await expect(page.locator(".desk_wbox").nth(1)).toBeHidden()
+    await show()
+    await expect(panel.locator(".desk_window_entry .desk_window_entry")).toHaveCount(1)
+    const other = await page.context().newPage()
+    try {
+        await other.goto("http://127.0.0.1:8124/desk")
+        await expect(other.locator("#main-content")).not.toHaveAttribute("inert", "")
+        await expect(other.locator(".desk_wbox")).toHaveCount(1)
+        await expect(other.locator(".desk[data-desktop-group]")).toHaveCount(0)
+        await other.locator("#head_menu > summary").click()
+        await other.locator('.desk_side_tabs_drop[data-path="desk:windows"] > summary').click()
+        await other.locator(".desktop_group > details > summary").click()
+        await other.locator('[data-desktop-action="open"]').click()
+        await expect(other.locator(".desk_wbox")).toHaveCount(2)
+        await expect(other.locator("textarea.desk_wbox_body_text_input").first()).toHaveValue("saved unsaved draft")
+        await page.locator("#head_menu > summary").click()
+        await page.locator("textarea.desk_wbox_body_text_input").first().fill("first tab update")
+        await show()
+        await expect(panel.getByRole("status")).toHaveText("Saved desktop: Research drafts")
+        await expect.poll(() => page.evaluate(() => new Promise<string>(resolve => {
+            const opening = indexedDB.open("jazu_desktops", 1)
+            opening.onsuccess = () => { const db = opening.result, read = db.transaction("groups").objectStore("groups").getAll(); read.onsuccess = async () => { const record = read.result[0]; resolve(await record.windows[0].draft.text()); db.close() } }
+        }))).toBe("first tab update")
+        await other.locator("#head_menu > summary").click()
+        await other.locator("textarea.desk_wbox_body_text_input").first().fill("conflicting update")
+        await other.locator("#head_menu > summary").click()
+        await expect(other.locator(".desktop_group_status")).toContainText("changed in another tab")
+        // A conflicting write never replaces the first tab's durable snapshot.
+        await page.reload()
+        await expect(page.locator("textarea.desk_wbox_body_text_input").first()).toHaveValue("first tab update")
+    } finally { await other.close({ runBeforeUnload: false }) }
+})
+
 test("Windows shows split hierarchy and restores hidden windows from its resource map", async ({ page }) => {
     await page.goto('/desk')
     const parent = page.locator('.desk_wbox').first()

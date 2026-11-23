@@ -32,9 +32,10 @@ export type worker_env = Work_Env & Server_Env & {
     REGISTRY?: { get(key: string): Promise<string | null> }
 }
 type fetcher = (request: Request) => Promise<Response>
+export type worker_context = { waitUntil(promise: Promise<unknown>): void }
 // Oversized website assets and Git packs share the static R2 transport, including ranges and conditional reads.
 
-export async function route(request: Request, env: worker_env, upstream: fetcher = fetch): Promise<Response> {
+export async function route(request: Request, env: worker_env, upstream: fetcher = fetch, context?: worker_context): Promise<Response> {
     const url = new URL(request.url)
     let path: string
     try { path = decodeURIComponent(url.pathname) } catch { return api_error("bad_path", "Invalid URL encoding", 400) }
@@ -51,7 +52,7 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
     const host = await host_route(request, env, projects, upstream)
     if (host) return host
     if (/^\/projects\/[^/]+(?:\.git)?\/(?:HEAD|info|objects|git-|_git)/.test(path)) return api_error("not_found", "Use the repository host", 404)
-    if (path === "/api" || path.startsWith("/api/")) return api_route(request, env)
+    if (path === "/api" || path.startsWith("/api/")) return api_route(request, env, context)
     if (!["GET", "HEAD"].includes(request.method)) return api_error("method_not_allowed", "Static routes allow GET and HEAD", 405)
     if (path.startsWith("/assets/media/") || path.startsWith("/assets/wasm/")) {
         const response = await static_object(request, env, path.slice(1))
@@ -72,10 +73,10 @@ export async function route(request: Request, env: worker_env, upstream: fetcher
 }
 
 export default {
-    async fetch(request: Request, env: worker_env): Promise<Response> {
+    async fetch(request: Request, env: worker_env, context?: worker_context): Promise<Response> {
         const path = new URL(request.url).pathname
         const private_response = is_work_path(path) || path === "/api/_/session" || path.startsWith("/api/_/auth/")
-        try { const response = await route(request, env); return response.status === 101 ? response : secure_response(response, private_response) }
+        try { const response = await route(request, env, fetch, context); return response.status === 101 ? response : secure_response(response, private_response) }
         catch { return secure_response(api_error("unavailable", "Service temporarily unavailable", 503), private_response) }
     },
 }

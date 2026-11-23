@@ -4,12 +4,15 @@ import type { Server_Link } from "./link.ts"
 import { Window_Store, window_uri } from "./windows.ts"
 import { Session_Store } from "./sessions_model.ts"
 import type { Window_Info } from "../../shared/protocol/wire.ts"
+import { mount_api_sessions } from "./apis.ts"
 
 export function mount_sessions(link: Server_Link, windows: Window_Store): () => void {
     const aside = state.desk?.querySelector<HTMLElement>(".desk_side")
     const page = aside?.querySelector<HTMLElement>('.desk_side_page[data-path="server:sessions"]')
     if (!aside || !page) return () => {}
     const scripts = new Session_Store()
+    const api_panel = document.createElement("section")
+    const release_apis = mount_api_sessions(api_panel)
     const tabs = [...aside.querySelectorAll<HTMLDetailsElement>(".desk_side_tabs_drop")]
     const sync_tabs = () => {
         const selected = tabs.find(tab => tab.open)?.dataset.path
@@ -81,7 +84,10 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
         }
         nodes.push(...sessions.windows.map(site))
         if (!nodes.length) { const empty = document.createElement("p"); empty.className = "server_sessions_empty"; empty.textContent = text("server_sessions_empty"); nodes.push(empty) }
-        page.replaceChildren(...nodes)
+        // Keep the API form connected: moving it out of the DOM would blur an in-progress path edit.
+        for (const child of [...page.children]) if (child !== api_panel) child.remove()
+        if (api_panel.parentElement !== page) page.append(api_panel)
+        api_panel.before(...nodes)
     }
     const update = (message: { t: string, [key: string]: unknown }) => { scripts.apply(message); draw() }
     const offs = [link.on("auto_state", update), link.on("auto_status", update), link.on("auto_deleted", update), windows.on_change(draw),
@@ -90,6 +96,7 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
     sync_tabs(); draw()
     return () => {
         for (const off of offs) off()
+        release_apis()
         for (const tab of tabs) tab.removeEventListener("toggle", sync_tabs)
         scripts.clear(); page.replaceChildren()
     }
