@@ -7,6 +7,13 @@ import { sha256 } from "../../shared/util.ts"
 import { page_style_text } from "../style/page.tsx"
 import { icon_source } from "../seo/cover.tsx"
 import { configured_resource } from "../load/resources.ts"
+import { book_chapters } from "../tags/print/book.tsx"
+import { select_print } from "../tags/print/model.ts"
+
+function printed_chapters(model: site_model, page: page): page[] {
+    const layout = select_print(model, page)
+    return (layout?.attrs.layout ?? layout?.attrs.name) === "book" ? book_chapters({ model, page, lang: page.lang, expertise: null }) : []
+}
 
 export function serialize_node(node: xml_node): string {
     const children = node.children.map(serialize_node).join("")
@@ -47,7 +54,8 @@ export function page_hash(model: site_model, page: page, shared: string, experti
     const menus = chain.flatMap(item => menu_pages(model, item.path, page.lang).map(entry => `${page_url(model, entry)}|${entry.name}|${entry.icon}|${entry.rank}`))
     const siblings = model.pages.filter(item => item.path === page.path).map(item => item.lang)
     const objects = page.node.children.some(child => child.tag === "expertise") ? model.objects.map(serialize_node).join("|") : ""
-    const parts = [objects, serialize_node(page.node), chain.map(item => item.name).join(">"), menus.join(";"), siblings.join(","), window_sources(model, page), shared, page_style_text(page), expertise_key]
+    const book = printed_chapters(model, page).map(chapter => [chapter.path, serialize_node(chapter.node), window_sources(model, chapter)].join("\u0000")).join("\u0002")
+    const parts = [objects, serialize_node(page.node), book, chain.map(item => item.name).join(">"), menus.join(";"), siblings.join(","), window_sources(model, page), shared, page_style_text(page), expertise_key]
     return sha256(parts.join("\u0001"))
 }
 
@@ -58,6 +66,7 @@ export function dependency_graph(model: site_model): { nodes: string[], edges: [
         const id = `page:${page.lang}:${page.path}`
         for (const crumb of crumb_chain(model, page)) edges.push([`page:${crumb.lang}:${crumb.path}`, id])
         for (const entry of menu_pages(model, page.path, page.lang)) edges.push([`page:${entry.lang}:${entry.path}`, id])
+        for (const chapter of printed_chapters(model, page)) if (chapter !== page) edges.push([`page:${chapter.lang}:${chapter.path}`, id])
     }
     for (const theme of model.themes) nodes.push(`theme:${theme.attrs.name}`)
     return { nodes, edges }

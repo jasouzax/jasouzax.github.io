@@ -10,6 +10,7 @@
 
 - [?] Print SCSS, fonts and assets compile behind print-only media.
 - [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
+- [?] Blog book layout: nested public chapters, language isolation, linked contents, page numbers and chapter-aware build invalidation. Markdown/code/published images print; dynamic executable windows stay on the website.
 
 `[x]` implemented and verified, `[ ]` still to do, `~~struck~~` cancelled or superseded. A checked parent needs all its children checked.
 
