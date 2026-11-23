@@ -505,9 +505,8 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
                 - [?] `timeout_seconds` *(optional)* - Sets timeout requirement before it exits
                 - [?] `continue` *(optional)* - Boolean, if true it continues the pipeline even if the step failed
                 - [?] `credentials` -
-            - [ ] `<menu>`, `<window>`, `<action>` - Children to extend generated desk
-                > **Implementation audit (AI, 2026-11-22):** Pipeline schema accepts only steps; menu/window/action children and their runtime bindings are absent.
-                > TODO
+            - [?] `<menu>`, `<window>`, `<action>` - Children to extend generated desk
+                > **Implementation (AI, 2026-11-23):** Authored menus/windows extend the public project desk; action links appear in a localized per-branch Pipeline menu foot. Pipeline-local window split IDs are rebased after ordinary project windows. UI trees are copied independently, and only direct execution steps enter server policy; commands, arguments and credential declarations never enter generated desk payloads. Inline window data now initializes real runtime documents and split mirrors, with stale-load guards. Root/server types, server/static builds, focused schema/privacy/flow/hook tests and Chrome inline-edit/split/navigation checks pass. Action links retain existing navigation and authorization; they do not grant execution permission.
     - [?] **Event** `<event>` `cmp:/content/event` - A period or moment of experience, education, certification or competition. Generates `/events/{id}`, a timeline entry in the expertise and rows in print modes. Its desk has a menu (sub-events as tree) and a main window explaining the selected one, its files are `{vfs}/srv/events/{id}`.
         > **Alignment review (AI, 2026-11-22):** Removed resume_start/resume_end; dates drive history wording. resume remains solely for license classification. Nested event navigation now lives in engine/tags/event.tsx.
         > Refactor: remove `resume_start` and `resume_end` (the `date` range does it); verify `resume` is still needed.

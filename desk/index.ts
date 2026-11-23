@@ -2,7 +2,7 @@
 // (#head_new) clones the empty window from <template id="desk_window_template">. This file owns the list of windows, their tabs in the
 // header and the layout of the desk (a grid, see arrange()). What a window shows lives in client_desk_view.ts, the files in client_desk_fs.ts.
 
-import { init_view, open_source, render_window, save_window } from "./window/index.ts"
+import { init_view, open_source, load_file, render_window, save_window } from "./window/index.ts"
 import { navigate_window } from "./action/history.ts"
 import { init_fs } from "./fs/opfs.ts"
 import { init_proc } from "./host/proc.ts"
@@ -758,15 +758,20 @@ export function init_desk(): void {
         if (!item) continue
         initial_windows.set(index + 1, item)
         const path = element.dataset.path ?? ""
+        const source = element.dataset.source
         const mode = element.dataset.mode || "view"
         const mime = element.dataset.mime || ""
         item.mode = mode
-        if (parent) item.picks = { own: Boolean(path), mime: Boolean(mime), mode: true }
-        if (path) void open_source(item, path).then(() => {
+        if (parent) item.picks = { own: Boolean(path) || source !== undefined, mime: Boolean(mime), mode: true }
+        const current = () => item.el.isConnected && state.windows.includes(item)
+        const ready = () => {
+            if (!current()) return
             if (mime) item.mime = mime
             item.mode = mode
             render_window(item)
-        })
+        }
+        if (path) void open_source(item, path).then(ready)
+        else if (source !== undefined) void load_file(item, new Blob([source], { type: mime || "text/plain" }), text("new_window"), "", current).then(ready)
         else if (parent) render_window(item)
     }
     // A desk whose windows are all made by the runtime starts blank: it opens with one empty window (the first file opened fills it).

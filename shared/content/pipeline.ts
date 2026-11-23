@@ -67,7 +67,8 @@ export function parse_pipeline(node: xml_node): Project_Pipeline {
         const inherited = { ...step, attrs: { ...step.attrs, phase: step.attrs.phase ?? phase } }
         return [inherited, ...flatten(step.children, inherited.attrs.phase)]
     })
-    const steps = flatten(node.children).map(step => {
+    if (node.children.some(child => !["step", "menu", "window", "action"].includes(child.tag))) throw new Error("pipeline may contain only <step>, <menu>, <window> and <action> elements")
+    const steps = flatten(node.children.filter(child => child.tag === "step")).map(step => {
         if (step.tag !== "step") throw new Error("pipeline may contain only <step> elements")
         const name = step.attrs.name
         const phase = step.attrs.phase ?? "ci"

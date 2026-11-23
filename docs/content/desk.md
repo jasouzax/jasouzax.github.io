@@ -90,7 +90,7 @@ Shows or edits one resource in a tile. Windows declared in content are the desk'
 | `view`, `edit` | Mutually exclusive booleans; View is the default. |
 | `split` | Earlier parent window ID, starting at 1 in authored window order. |
 | `path` | `uri` of the resource. Relative paths resolve from the declaring XML. Empty shows an upload area |
-| `data` | Inline content |
+| `data` | Inline content; becomes a local runtime document as well as the static fallback. `path` takes precedence when both are supplied. |
 | `flow` | `bool`; show the split control |
 | `save` | `bool`; show the save control |
 | `full` | `bool`; hide the head and fill the tile |

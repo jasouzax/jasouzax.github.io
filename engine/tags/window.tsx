@@ -308,6 +308,7 @@ export function render_window(ctx: render_ctx, info: window_info, columns: numbe
                 style={`grid-area: ${1 + 2 * row} / ${from} / ${2 + 2 * row} / ${from + 2 * span - 1}`}
                 data-full={is_true(info.node.attrs.full) ? "" : undefined}
                 data-path={info.node.attrs.path ?? ""}
+                data-source={info.node.attrs.data}
                 data-mode={info.node.attrs.edit === "true" ? "edit" : "view"}
                 data-mime={info.node.attrs.type ?? ""}
                 data-split={info.node.attrs.split}
