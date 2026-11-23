@@ -10,6 +10,7 @@ import { init_connect_folder } from "../fs/personal.ts"
 import { init_pager } from "./pager.ts"
 import { bind_desk } from "../index.ts"
 import { init_print } from "./print.ts"
+import { init_blog_media } from "../blog/player.ts"
 import { begin_loading, finish_loading, boot_css_ready, wait_resources } from "./loading.ts"
 
 type theme_switch_api = {
@@ -61,6 +62,7 @@ init_connect_folder()
 init_pager()
 bind_desk()
 init_print()
+init_blog_media()
 sync_theme_radios()
 
 begin_loading("boot")

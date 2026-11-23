@@ -30,7 +30,17 @@ export function base_name(path: string): string {
 }
 
 export function window_infos(ctx: render_ctx, desk: xml_node): window_info[] {
-    return child_nodes(desk, "window").map((node, index) => {
+    const nodes: xml_node[] = []
+    const visit = (parent: xml_node): void => {
+        for (const child of parent.children) {
+            if (child.tag === "window") nodes.push(child)
+            else if (child.tag === "scene") visit(child)
+        }
+    }
+    visit(desk)
+    return nodes.map((original, index) => {
+        const target = original.attrs.split ? original.parent?.children.filter(child => child.tag === "window")[Number(original.attrs.split) - 1] : undefined
+        const node = target ? { ...original, attrs: { ...original.attrs, split: String(nodes.indexOf(target) + 1) } } : original
         const mime = node.attrs.type ?? (node.attrs.path ? mime_from_name(node.attrs.path) : "")
         const label =
             node.attrs.path && !/^(window|shell|pid):/.test(node.attrs.path)
@@ -246,6 +256,7 @@ export function render_window_body(ctx: render_ctx, info: window_info): html {
     const path = attrs.path ?? ""
     const mime = attrs.type ?? (path ? mime_from_name(path) : "")
     const mode = attrs.edit === "true" ? "edit" : "view"
+    if (path === "server:fastfetch") return <div class="server_public_render" data-server-render=""><p>{t(ctx, "server_offline")}</p></div>
     if (!mime && !path)
         return (
             <>

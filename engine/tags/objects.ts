@@ -40,10 +40,10 @@ export function expand_objects(model: site_model): void {
         }
         const path = `/${object.tag}s/${object.tag === "blog" ? blog_id(object) : id}`
         const info = object_info(object)
-        const children = object.children.filter(node => ["menu", "window"].includes(node.tag))
+        const children = object.children.filter(node => ["menu", "window", "scene"].includes(node.tag))
         if (object.tag === "event") event_children(object, children)
         if (object.tag === "project") project_children(model, object, children)
-        if (!children.some(node => node.tag === "window")) children.push(element("window", object.tag === "project" ? {
+        if (!children.some(node => ["window", "scene"].includes(node.tag))) children.push(element("window", object.tag === "project" ? {
             type: "inode/directory", view: "true", path: `file:///srv/projects/${id}`,
         } : {
             type: "text/markdown", view: "true", data: info || object.attrs.name,

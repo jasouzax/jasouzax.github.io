@@ -10,6 +10,7 @@ import type { Server_Config } from "../config/repositories.ts"
 import { is_active, is_public, repository_path } from "../config/repositories.ts"
 import { pipeline_hook } from "../pipeline/hook.ts"
 import { history_limit } from "../../shared/repo/history.ts"
+import { public_status_route } from "../render/status.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
 export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config }
@@ -56,11 +57,13 @@ function signed_view(incoming: IncomingMessage): Request {
     return new Request(`http://127.0.0.1${incoming.url ?? "/"}`, { method: incoming.method, headers })
 }
 
-function read_response(request: Request, options: personal_options): Response {
+async function read_response(request: Request, options: personal_options): Promise<Response> {
     const url = new URL(request.url)
     const match = /^\/git\/([a-z0-9_-]+)\/(refs|tree|blob|log)$/.exec(url.pathname)
     const runs = /^\/ci\/([a-z0-9_-]+)\/runs$/.exec(url.pathname)
     if (url.pathname === "/health") return Response.json({ status: "ok", generation: 12 })
+    const rendered = await public_status_route(request)
+    if (rendered) return rendered
     if (match && options.config && (match[1] === options.config.site.project || Object.hasOwn(options.config.projects, match[1])) && is_public(options.config, match[1])) return git_read(repository_path(options.config, match[1]), match[2], url)
     if (match && !options.config && Object.hasOwn(options.repositories, match[1])) return git_read(options.repositories[match[1]], match[2], url)
     if (runs && options.config && is_active(options.config, runs[1]) && is_public(options.config, runs[1])) return Response.json({ runs: list_runs(options.config.state_dir, runs[1], 20, url.searchParams.get("branch") ?? undefined) })
@@ -92,7 +95,7 @@ export function personal_server(options: personal_options) {
                 ? pipeline_hook(url.pathname, options.config!)
                 : request.method !== "GET" || !verified
                 ? api_error("unauthorized", "Signed GET request required", 401)
-                : read_response(request, options)
+                : await read_response(request, options)
             outgoing.writeHead(response.status, Object.fromEntries(response.headers))
             outgoing.end(new Uint8Array(await response.arrayBuffer()))
         } catch {

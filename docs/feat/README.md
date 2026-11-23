@@ -13,6 +13,8 @@ The [implementation audit](implementation-audit.md) records validation evidence 
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
 - [?] Blog books print nested public chapters in authored order with contents and page numbers.
+- [?] Nested blog scenes provide fixed reading windows, seekable Canvas previews and 1080p VP9/Opus WebM export with offline audio mixing; see [blog media](blog-media.md).
+- [?] Public server SSR and Durable Object ESR render fresh/cached status into HTML and SPA payloads; see [server rendering](server-rendering.md).
 - [?] Pipeline-authored menus/windows/action links extend project desks without exposing execution policy.
 - [?] Notebook view/edit preserves nbformat-4 metadata, outputs and attachments; Markdown previews follow unsaved edits. Kernel execution remains unimplemented.
 - [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.

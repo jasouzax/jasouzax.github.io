@@ -1,4 +1,4 @@
-<page lang="en" path="/server" name="Server" icon="[desk]" rank="80" noindex="true" info="My personal server: what it is running on, live.">
+<page lang="en" path="/server" name="Server" icon="[desk]" rank="80" info="My personal server: what it is running on, live.">
         <desk name="Server" icon="[desk]" info="The personal server" auto="true">
             <menu name="Files" icon="[folder]" path="file:///">
                 <entry type="Folder" id="fs_top" name="/" info="Root of the file system" open="true">
@@ -29,7 +29,7 @@
         </desk>
     </page>
 
-<page path="/server" lang="ja" name="サーバー" icon="[desk]" rank="80" noindex="true" info="自分用のサーバー：動作中の環境をリアルタイムで表示します。">
+<page path="/server" lang="ja" name="サーバー" icon="[desk]" rank="80" info="自分用のサーバー：動作中の環境をリアルタイムで表示します。">
         <desk name="サーバー" icon="[desk]" info="自分用のサーバー" auto="true">
             <menu name="ファイル" icon="[folder]" path="file:///">
                 <entry type="Folder" id="fs_top" name="/" info="ファイルシステムのルート" open="true">

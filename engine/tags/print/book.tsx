@@ -9,6 +9,7 @@ import type { render_ctx } from "../page/context.tsx"
 import { select_print } from "./model.ts"
 import { parse_notebook, notebook_mime } from "../../../shared/notebook.ts"
 import { notebook_cell_content } from "../../../shared/notebook/render.tsx"
+import { scene_heading } from "../scene.tsx"
 
 function prose(ctx: render_ctx, source: string, title: string, path: string): child {
     const nodes = markdown_nodes(source)
@@ -71,6 +72,8 @@ export function render_book(ctx: render_ctx): child {
     if (!selected || (selected.attrs.layout ?? selected.attrs.name) !== "book") return null
     const chapters = book_chapters(ctx)
     if (!chapters.length) return null
+    const content = (node: xml_node, title: string, depth = 0): child => node.tag === "window" ? window_content(ctx, node, title)
+        : node.tag === "scene" ? [scene_heading(node, depth + 1), ...node.children.map(child => content(child, title, depth + 1))] : null
     return <article class="blog_book" aria-labelledby="book_title">
         <header class="book_cover"><h1 id="book_title">{ctx.page.name}</h1>{ctx.page.info ? <p>{ctx.page.info}</p> : null}</header>
         <nav class="book_contents" aria-label={ui_text(ctx.model, ctx.lang, "book_contents")}>
@@ -82,7 +85,7 @@ export function render_book(ctx: render_ctx): child {
                 {page.node.attrs.date ? <p>{page.node.attrs.date}</p> : null}
                 <p class="book_source"><a href={new URL(localize(ctx.model, ctx.lang, page.path), ctx.model.config.base_url).href}>{ui_text(ctx.model, ctx.lang, "book_source")}</a></p>
             </header>
-            {page.node.children.filter(node => node.tag === "desk").flatMap(desk => desk.children.filter(node => node.tag === "window" && node.attrs.private !== "true").map(node => window_content(ctx, node, page.name)))}
+            {page.node.children.filter(node => node.tag === "desk").flatMap(desk => desk.children.filter(node => node.attrs.private !== "true").map(node => content(node, page.name)))}
         </section>)}
     </article>
 }

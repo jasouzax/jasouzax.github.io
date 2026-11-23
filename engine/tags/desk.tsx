@@ -13,6 +13,7 @@ import { icon } from "./page/context.tsx"
 import { ui_text } from "../load/model.ts"
 import { is_true } from "../../shared/content/schema.ts"
 import { mime_table } from "../../shared/mime.ts"
+import { scene_heading, scene_player, scene_timeline } from "./scene.tsx"
 
 // Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
@@ -213,6 +214,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const sides = child_nodes(desk, "menu")
     const pages = sides.map((side, index) => render_menu(ctx, side, index))
     const windows = window_infos(ctx, desk)
+    const scenes = desk.children.some(child => child.tag === "scene")
     const map_only = !windows.length && sides.some(side => child_nodes(side, "map").length)
     // Match init_desk's initial empty window before the boot skeleton is captured.
     if (!windows.length) windows.push(empty_window_info(ctx))
@@ -225,7 +227,7 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
     const flags = {
         "data-cwd": desk.attrs.cwd,
         "data-auto": is_true(desk.attrs.auto) ? "" : undefined,
-        "data-fixed": is_true(desk.attrs.fixed) ? "" : undefined,
+        "data-fixed": is_true(desk.attrs.fixed) || scenes ? "" : undefined,
         "data-runtime": runtime ? "" : undefined,
         "data-map-initial": map_only ? "" : undefined
     }
@@ -238,11 +240,17 @@ export function render_desk(ctx: render_ctx, desk: xml_node): html {
         </>
     )
     const extra = runtime ? [render_window_template(ctx), render_runtime_data(ctx)] : null
+    let window_index = 0
+    const reading = (node: xml_node, depth = 0): child => {
+        if (node.tag === "window") return render_window(ctx, windows[window_index++], columns, windows.length)
+        if (node.tag === "scene") return [scene_heading(node, depth), ...node.children.map(child => reading(child, depth + 1))]
+        return null
+    }
     return (
         <>
-            <article class={"desk article"} id={"desk"} style={`--desk-initial-columns: ${initial_columns}; --desk-initial-rows: ${initial_rows}`} {...flags}>
+            <article class={"desk article"} id={"desk"} data-blog-scenes={scenes ? "" : undefined} style={`--desk-initial-columns: ${initial_columns}; --desk-initial-rows: ${initial_rows}`} {...flags}>
                 {side}
-                {windows.map((info) => render_window(ctx, info, columns, windows.length))}
+                {scenes ? [scene_player(ctx, scene_timeline(ctx, desk)), ...desk.children.map(node => reading(node))] : windows.map((info) => render_window(ctx, info, columns, windows.length))}
                 {extra}
             </article>
         </>

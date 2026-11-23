@@ -12,7 +12,7 @@ import { blog_id } from "../../tags/blog.tsx"
 export function collect_resources(model: site_model): void {
     const base = resolve(model.content_dir)
     function publish(node: xml_node, value: string, owner: string, window: boolean): string {
-        if (/^(?:https?:|mailto:|im:|data:|window:|pid:|shell:|#)/.test(value) || value.startsWith("/api/")) return value
+        if (/^(?:https?:|mailto:|im:|data:|window:|pid:|shell:|server:|#)/.test(value) || value.startsWith("/api/")) return value
         if (value === "file:///" || value.startsWith("file:///home/user")) return value
         if (model.resources.has(value.replace(/^file:\/\//, ""))) return value
         let source: string
@@ -45,7 +45,7 @@ export function collect_resources(model: site_model): void {
             for (const child of node.children) if (child.tag !== "blog") owned_nodes(child, visit)
         }
         owned_nodes(page.node, node => {
-            for (const key of ["media", "poster", "image", "profile", "cover", "photo"]) {
+            for (const key of ["media", "poster", "image", "profile", "cover", "photo", "audio"]) {
                 if (node.attrs[key]) node.attrs[key] = publish(node, node.attrs[key], owner, false)
             }
             if (node.tag === "window" && page.node.attrs.confidental === "true" && !/^(?:image|audio|video)\//.test(node.attrs.type ?? "")) {

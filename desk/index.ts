@@ -153,7 +153,7 @@ function shown_windows(): desk_window[] {
     if (state.maximized) list = [state.maximized]
     // portrait is one window at a time: the focused one. When the focused window is minimized nothing is shown (like the Windows taskbar),
     // so a tab pressed to minimize the window in view really leaves an empty desk instead of revealing another window.
-    if (portrait.matches) {
+    if (portrait.matches && !state.desk?.hasAttribute("data-blog-scenes")) {
         if (state.focused && list.includes(state.focused)) list = [state.focused]
         else if (state.focused?.minimized && !state.maximized) list = []
         else list = list.slice(0, 1)

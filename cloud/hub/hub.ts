@@ -17,6 +17,7 @@ import { agent_direct_types, agent_message_types, api_body_limit, api_name_patte
 import type { Api_Answer, Api_Info, Public_Status } from "../../shared/protocol/wire.ts"
 import { api_error } from "../security/headers.ts"
 import { Rate_Limit } from "./limits.ts"
+import { Public_Renderer, type Render_Env } from "../render/status.ts"
 
 type Socket = WebSocket & { serializeAttachment(value: unknown): void, deserializeAttachment(): { peer: string, watching: boolean } | null }
 type State = {
@@ -49,8 +50,10 @@ export class Server_Hub {
     readonly #calls = new Map<number, Waiting<Api_Answer | null>>()
     readonly #snapshots = new Map<number, Waiting<Snapshot | null>>()
     readonly #limit = new Rate_Limit({ per_key: 30, total: 300 })
+    readonly #renderer: Public_Renderer
 
-    constructor(private ctx: State, _env: unknown, private deps: Hub_Deps = {}) {
+    constructor(private ctx: State, env: Render_Env, private deps: Hub_Deps = {}) {
+        this.#renderer = new Public_Renderer(ctx.storage, env, fetch, deps.now)
         const Pair = (globalThis as { WebSocketRequestResponsePair?: new (request: string, response: string) => unknown }).WebSocketRequestResponsePair
         if (Pair) this.ctx.setWebSocketAutoResponse(new Pair("ping", "pong"))
     }
@@ -60,6 +63,10 @@ export class Server_Hub {
     async fetch(request: Request): Promise<Response> {
         const path = new URL(request.url).pathname
         const role = request.headers.get("x-jazu-role")
+        if (path === "/render/server" && request.method === "GET" && role === "worker") {
+            const rendered = await this.#renderer.render()
+            return rendered ? Response.json(rendered) : api_error("origin_unavailable", "Public server snapshot unavailable", 503)
+        }
         if (path === "/connect-agent" && role === "agent") return this.#connect_agent()
         if (path === "/connect-owner" && role === "owner") return this.#connect_owner()
         if (path === "/status" && request.method === "GET") return Response.json(await this.#status(), { headers: { "cache-control": "no-store" } })
