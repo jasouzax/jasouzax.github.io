@@ -11,9 +11,11 @@ import { is_active, is_public, repository_path } from "../config/repositories.ts
 import { pipeline_hook } from "../pipeline/hook.ts"
 import { history_limit } from "../../shared/repo/history.ts"
 import { public_status_route } from "../render/status.ts"
+import type { Api_Manager } from "../api/manager.ts"
+import { api_transport } from "../api/http.ts"
 
 // `config` (server.json) enables smart-HTTP push and CI status; without it the node stays the read-only adapter it was.
-export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config }
+export type personal_options = { secret: string, repositories: Record<string, string>, port: number, host?: string, config?: Server_Config, apis?: Api_Manager }
 
 export function git_read(repository: string, action: string, url: URL): Response {
     const ref = url.searchParams.get("ref") ?? "HEAD"
@@ -78,6 +80,10 @@ export function personal_server(options: personal_options) {
         try {
             const request = signed_view(incoming)
             const url = new URL(request.url)
+            if (url.pathname.startsWith("/custom-api/")) {
+                const response = options.apis ? await api_transport(incoming, options.apis, options.secret, seen) : api_error("unavailable", "Custom API service is disabled", 503)
+                outgoing.writeHead(response.status, Object.fromEntries(response.headers)); outgoing.end(new Uint8Array(await response.arrayBuffer())); return
+            }
             if (git_route.test(url.pathname)) {
                 // Smart HTTP carries a streamed body, so it is the one route family that verifies the unsigned-stream mode.
                 if (!options.config || !await verify_origin(request, options.secret, seen, Date.now(), true)) {

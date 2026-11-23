@@ -1,4 +1,5 @@
 .git
+**/.jazu-api-*.sqlite*
 .cache
 .wasmer
 .wrangler
