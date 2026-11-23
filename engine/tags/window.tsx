@@ -1,5 +1,7 @@
 /* Render window chrome and initial document bodies as virtual nodes. */
 import { markdown_nodes } from "../../shared/markdown.ts"
+import { parse_notebook, notebook_mime } from "../../shared/notebook.ts"
+import { notebook_cell_content } from "../../shared/notebook/render.tsx"
 import { window_video } from "./window/video.tsx"
 import { window_svg_edit } from "./window/svg_edit.tsx"
 import { jsx, fragment, type child, type attributes } from "../../shared/vnode/vnode.tsx"
@@ -266,6 +268,12 @@ export function render_window_body(ctx: render_ctx, info: window_info): html {
         )
     if (/^(window|shell|pid):/.test(path)) return note(ctx, "needs_js", path)
     const source = attrs.data ?? read_source(ctx, path)
+    if (mime === notebook_mime && source !== null) {
+        try {
+            const notebook = parse_notebook(source)
+            return <div class="desk_notebook">{notebook.cells.map(cell => <section class="notebook_cell">{notebook_cell_content(cell)}</section>)}</div>
+        } catch { return <div class="desk_notebook"><p>{t(ctx, "note_invalid")}</p><pre class="notebook_source">{source}</pre></div> }
+    }
     const is_text = mime.startsWith("text/") || mime === "application/json"
     if (mode === "edit" && is_text && source !== null) return render_text_body(source)
     if (mode === "view" && mime === "text/markdown" && source !== null)

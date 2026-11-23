@@ -12,6 +12,7 @@
     <style src="desk_volume.scss"/>
     <style src="desk_fullscreen.scss"/>
     <style src="desk_version.scss"/>
+    <style src="desk_note.scss"/>
     <style><![CDATA[
         #head_tray, #theme_background { display: contents; }
         .needs_js { display: none; }

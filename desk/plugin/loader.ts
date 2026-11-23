@@ -12,6 +12,7 @@ export type plugin_host = {
     terminal: (item: desk_window) => HTMLElement | null
     fallback: (item: desk_window) => HTMLElement
     markdown: (item: desk_window, signal: AbortSignal) => HTMLElement
+    notebook: (item: desk_window, signal: AbortSignal) => HTMLElement
     folder: (item: desk_window, signal: AbortSignal) => HTMLElement
     messages: (item: desk_window, signal: AbortSignal) => HTMLElement
     auto_script: (item: desk_window, signal: AbortSignal) => HTMLElement
@@ -107,6 +108,7 @@ function render_host(name: NonNullable<plugin_case["host"]>, { item, host, signa
         case "media": return host.media(item)
         case "shell": return host.terminal(item)
         case "markdown": return host.markdown(item, signal)
+        case "notebook": return host.notebook(item, signal)
         case "folder": return host.folder(item, signal)
         case "messages": return host.messages(item, signal)
         case "auto_script": return host.auto_script(item, signal)

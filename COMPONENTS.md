@@ -714,7 +714,7 @@ tests/      engine/tags/hero.test.ts  engine/routes/robots.test.ts  desk/window/
             - [?] **Text editor** -
         - [?] **Shell** `cmp:/desk/window/shell` -
         - [/] **Notebook** `cmp:/desk/window/note` - Used to view/edit markdown and jupyter
-            > **Implementation audit (AI, 2026-11-22):** Markdown reading works; editable notebooks, Jupyter cell execution and persistence are absent.
+            > **Continuation (AI, 2026-11-23):** Markdown view/edit now works for uploaded/local/published resources and follows unsaved split edits. Structured nbformat-4 notebook editing supports code/Markdown/raw cell sources, insertion/reordering/deletion, undo/redo and explicit stored-output clearing. Unknown metadata, attachments, cell IDs, execution counts and rich-output fields round-trip; untouched saves preserve exact bytes. Notebook windows share the normal save/OPFS destination and mirror flow. Stored HTML/JavaScript stays inert, embedded raster attachments render locally, and remote notebook images are not requested. Static windows and book printing render notebook cells without exposing metadata. Root/server types, static/server builds, focused model/plugin/privacy/print checks and four Chrome save/reload/mirror/recovery regressions pass. Cell execution and Jupyter kernel connections remain unimplemented, so the component stays `[/]`.
         - [?] **Folder** `cmp:/desk/window/folder` -
         - [?] **Page** `cmp:/desk/window/page` - HTML
         - [/] **AutoSite** `cmp:/desk/window/autosite` -

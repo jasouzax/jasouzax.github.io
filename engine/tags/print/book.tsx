@@ -7,6 +7,8 @@ import { localize, ui_text, type page } from "../../load/model.ts"
 import type { xml_node } from "../../../shared/content/xml.ts"
 import type { render_ctx } from "../page/context.tsx"
 import { select_print } from "./model.ts"
+import { parse_notebook, notebook_mime } from "../../../shared/notebook.ts"
+import { notebook_cell_content } from "../../../shared/notebook/render.tsx"
 
 function prose(ctx: render_ctx, source: string, title: string, path: string): child {
     const nodes = markdown_nodes(source)
@@ -45,6 +47,10 @@ function window_content(ctx: render_ctx, node: xml_node, title: string): child {
     const is_text = mime.startsWith("text/") || /^application\/(?:.*json|javascript|.*xml)$/.test(mime)
     const source = is_text ? node.attrs.data ?? resource_text(ctx.model, path) : null
     if (source !== null) {
+        if (mime === notebook_mime) {
+            try { return <div class="book_notebook">{parse_notebook(source).cells.map(cell => <section class="notebook_cell">{notebook_cell_content(cell, 2)}</section>)}</div> }
+            catch { return <pre><code>{source}</code></pre> }
+        }
         return mime === "text/markdown" ? <div class="book_prose">{prose(ctx, source, title, path)}</div> : <pre><code>{source}</code></pre>
     }
     const url = path.replace(/^file:\/\//, "")

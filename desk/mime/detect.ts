@@ -67,6 +67,7 @@ export async function detect_mimes(file: Blob, name: string): Promise<string[]> 
     if (named && sniffed.includes(named)) add(named)
     for (const mime of sniffed) add(mime)
     if (text && svg_like(head)) add("image/svg+xml")
+    if (text && named === "application/x-ipynb+json") add(named)
     if (file.type && file.type !== "application/octet-stream") add(file.type)
     add(named)
     if (text) {

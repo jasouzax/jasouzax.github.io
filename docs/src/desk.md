@@ -31,6 +31,8 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 ## Window bodies and plugins
 
+`desk/window/note.ts` handles live Markdown editing/preview and structured nbformat-4 Jupyter documents. Cells and stored output render through shared data-only adapters, with metadata-preserving edits and normal document saves. HTML/JavaScript outputs stay inert and embedded raster attachments do not require remote requests. Cell execution is not implemented. See [Notebook windows](notebooks.md).
+
 `desk/menu/windows.ts` owns the generated Windows menu, recursive split tree and comparison drop actions. It renders only after a window-state fingerprint changes, disposes listeners with each redraw and cleans up on navigation. `desk/index.ts` owns the separate hidden flag: it hides tabs and desktop tiles, excludes hidden windows from keyboard cycling and keeps resource/process state intact. `desk/plugin/flow.ts` removes stale parent links when a child is reparented. Group persistence is not implemented yet.
 
 `desk/menu/version.ts` recognizes only generated repository Version sources, lazily fetches public `/ID/_/refs` and `/ID/_/log` data without credentials, and disposes requests on navigation. Replies are bounded/validated by `shared/repo/history.ts`. `desk/menu/version/model.ts` owns merge nesting and fixed DAG coordinates. Named refs are resolved to commit hashes before reading history; the server returns topological parent IDs and peeled annotated tag targets. Version maps set `data-map-readonly`, preserving pan/zoom while disabling position changes. Older pages, private Work history and historical file browsing are not implemented.

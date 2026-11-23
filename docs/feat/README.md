@@ -1,6 +1,6 @@
 # Feature status
 
-The [2026-11-22 implementation audit](implementation-audit.md) records this pass, validation evidence and every remaining component gap. In the new entries, `[?]` means implemented and awaiting human acceptance; `[!]` means incomplete or an operator notice. Historical `[x]` marks below are preserved.
+The [implementation audit](implementation-audit.md) records validation evidence and remaining component gaps. `[?]` means implemented and awaiting human acceptance; `[/]` means incomplete; `[!]` is reserved for human-only blockers, as clarified in `COMPONENTS.md`. Historical `[x]` marks below are preserved.
 
 - [?] Dependency bootstrap and self-contained extension packaging (`node src/main.ts inst`, `ext`).
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
@@ -12,9 +12,12 @@ The [2026-11-22 implementation audit](implementation-audit.md) records this pass
 - [?] Short-lived refresh-bound JWT discovery with D1 checks for sensitive actions.
 - [?] Named owner pipeline hooks queue exact Git tips through signed origin transport.
 - [?] Print SCSS, fonts and assets compile behind print-only media.
+- [?] Blog books print nested public chapters in authored order with contents and page numbers.
+- [?] Pipeline-authored menus/windows/action links extend project desks without exposing execution policy.
+- [?] Notebook view/edit preserves nbformat-4 metadata, outputs and attachments; Markdown previews follow unsaved edits. Kernel execution remains unimplemented.
 - [?] Research paper layout: opt-in project printing, ordered nested research, public/language isolation, paper sizes and page numbers.
-- [!] Cloud preflight and generated credentials exist; full Access/Tunnel/write-scope bootstrap is incomplete.
-- [!] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
+- [/] Cloud preflight validates restored credentials and aggregates input problems; full Access/Tunnel/write-scope bootstrap is incomplete.
+- [/] Independent Electron desktop and shared native terminals exist; compositor/native VFS/full IO are incomplete.
 
 Every feature of JAZU, ordered roughly by dependency. This is the single place to see **what is done, what is ongoing and what is next**.
 

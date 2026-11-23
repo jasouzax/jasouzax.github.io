@@ -15,7 +15,7 @@ import { state, text, refresh_tab, window_hooks, focus_window, working_directory
 import { detect_mimes } from "../mime/detect.ts"
 import { prepare_plugins } from "../plugin/loader.ts"
 import { media_body as media_window_body } from "./media.ts"
-import { markdown_body } from "./note.ts"
+import { markdown_body, notebook_body } from "./note.ts"
 import { folder_body } from "./folder.ts"
 import { bind_navigation, sync_navigation } from "../action/history.ts"
 import { desk_drag_type } from "../fs/opfs.ts"
@@ -229,7 +229,7 @@ function mirror_body(item: desk_window, signal: AbortSignal): HTMLElement {
     const body = document.createElement("div")
     body.className = "desk_mirror_body"
     const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body,
-        media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, folder: folder_body,
+        media: media_body, terminal: process_hooks.body, fallback: fallback_body, markdown: markdown_body, notebook: notebook_body, folder: folder_body,
         messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     void prepare_plugins(item, host, signal, true).then(candidates => {
         if (signal.aborted) return
@@ -270,7 +270,7 @@ function body_for(item: desk_window): void {
         sync_save(item)
         return
     }
-    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
+    const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, notebook: notebook_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     set_body(item, fallback_body(item))
     void prepare_plugins(item, host, controller.signal).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return

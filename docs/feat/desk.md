@@ -8,6 +8,9 @@
 
 ## Status
 
+- [?] Structured nbformat-4 notebook view/edit: cells, stored outputs, attachments, reordering, undo/redo, shared split documents and normal persistent saves; kernel execution remains unimplemented.
+- [?] Markdown view/edit and unsaved live previews work for uploaded, local and published resources.
+
 - [?] Fixed desk layouts reuse existing windows and preserve navigation history.
 - [/] Windows menu supports split hierarchy, reversible hiding and comparison drops; persistent desktop groups remain open.
 - [?] Map node placement persists per page/menu, with pointer and Shift+arrow movement.

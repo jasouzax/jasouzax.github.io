@@ -16,6 +16,7 @@ import { mime_table } from "../../shared/mime.ts"
 
 // Words the desk runtime needs in the browser (it builds windows, lists and messages itself). Keys are supplied by the configured language dictionaries.
 const runtime_keys = [
+    "note_loading", "note_stored_outputs", "note_invalid", "note_undo", "note_redo", "note_add_code", "note_add_markdown", "note_add_raw", "note_kind_code", "note_kind_markdown", "note_kind_raw", "note_move_up", "note_move_down", "note_delete", "note_clear_outputs", "note_cell_source",
     "desk_map", "desk_windows", "map_zoom_in", "map_zoom_out", "map_reset",
     "save_destination", "save_overwrite",
     "audio", "mute",
