@@ -15,14 +15,15 @@ export function conversion_body(item: desk_window, signal: AbortSignal): HTMLEle
     const box = document.createElement("div")
     box.className = "desk_preview"; box.setAttribute("role", "status")
     const path = route(converters, parent.mime, item.mime)
-    box.textContent = !source ? "Waiting for parent data…" : !path ? `No conversion route: ${parent.mime} → ${item.mime}` : "Converting…"
+    box.textContent = !source ? "Waiting for parent dataâ€¦" : !path ? `No conversion route: ${parent.mime} â†’ ${item.mime}` : "Convertingâ€¦"
     delete item.el.dataset.converted
     if (!source || !path) return box
     void execute(path, bytes ? new Blob([new Uint8Array(bytes)], { type: parent.mime }) : source, item.conversion ?? {}, signal).then(output => {
         if (signal.aborted) return
         outputs.set(item, { source, bytes, key, output })
         item.file = output
-        item.name = parent.name.replace(/\.[^.]+$/, "") + "." + (path.at(-1)?.extension ?? "bin")
+        const suffix = item.mime === "application/pdf" && item.conversion?.pdf_pages ? "-pages-" + item.conversion.pdf_pages.replace(/[^0-9,-]/g, "") : ""
+        item.name = parent.name.replace(/\.[^.]+$/, "") + suffix + "." + (path.at(-1)?.extension ?? "bin")
         item.mode ||= "view"
         item.el.dataset.converted = path.map(edge => edge.id).join(",")
         render_window(item)

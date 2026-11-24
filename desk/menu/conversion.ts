@@ -1,5 +1,7 @@
 /** Conversion controls follow the selected child; settings persist with desktop groups. */
-import { state, type desk_window } from "../index.ts"
+import { latest_bytes } from "../plugin/flow.ts"
+import { load_pdf_tools } from "../conversion/pdf.ts"
+import { state, new_window, focus_window, type desk_window } from "../index.ts"
 import { set_mime } from "../action/resource.ts"
 import { render_window } from "../window/index.ts"
 import { converters } from "../conversion/index.ts"
@@ -23,7 +25,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         if (next === key && selected === child) return
         key = next; selected = child; panel.replaceChildren()
         if (!child) return
-        const heading = document.createElement("h3"); heading.textContent = `window:${child.parent!.id} → window:${child.id}`
+        const heading = document.createElement("h3"); heading.textContent = `window:${child.parent!.id} â†’ window:${child.id}`
         const form = document.createElement("form"), label = document.createElement("label"), select = document.createElement("select")
         label.textContent = "Output MIME "; select.name = "mime"; select.setAttribute("aria-label", "Output MIME")
         const targets = [...new Set(converters.map(edge => edge.to))].filter(mime => route(converters, child.parent!.mime, mime))
@@ -33,7 +35,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         select.value = child.mime; label.append(select); form.append(label)
         const path = route(converters, child.parent!.mime, child.mime), info = document.createElement("p")
         info.dataset.conversionRoute = ""
-        info.textContent = !child.mime ? "Choose an output format." : path ? [child.parent!.mime, ...path.map(edge => edge.to)].join(" → ") : "No conversion route available."
+        info.textContent = !child.mime ? "Choose an output format." : path ? [child.parent!.mime, ...path.map(edge => edge.to)].join(" â†’ ") : "No conversion route available."
         const fields = new Map(path?.flatMap(edge => edge.fields ?? []).map(field => [field.key, field]) ?? [])
         for (const field of fields.values()) {
             const label = document.createElement("label"), input = document.createElement("input")
@@ -54,6 +56,31 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
             render_window(child)
         })
         form.append(apply); panel.append(heading, info, form)
+        if (child.parent!.mime === "application/pdf" && !desk.hasAttribute("data-fixed")) {
+            const split = document.createElement("button"), status = document.createElement("p")
+            split.type = "button"; split.textContent = "Split into individual pages"; status.setAttribute("role", "status")
+            split.addEventListener("click", async () => {
+                const parent = child.parent!, source = parent.file, bytes = latest_bytes(parent)
+                if (!source) { status.textContent = "Waiting for parent PDF."; return }
+                split.disabled = true
+                try {
+                    const { PDFDocument } = await load_pdf_tools()
+                    const pdf = await PDFDocument.load(bytes ? new Uint8Array(bytes) : await source.arrayBuffer())
+                    const count = pdf.getPageCount()
+                    if (!count || count > 32 || state.windows.length + count - 1 > 64) throw new Error("Split supports up to 32 pages and 64 total windows; extract a smaller range first.")
+                    if (abort.signal.aborted || !state.windows.includes(child) || child.parent !== parent || parent.file !== source || latest_bytes(parent) !== bytes) return
+                    for (let index = 0; index < count; index++) {
+                        const target = index === 0 ? child : new_window(undefined, parent)
+                        if (!target) break
+                        target.conversion = { ...child.conversion, pdf_pages: String(index + 1) }
+                        target.picks.own = false; set_mime(target, "application/pdf")
+                    }
+                    focus_window(child)
+                } catch (error) { status.textContent = String(error) }
+                finally { split.disabled = false }
+            })
+            panel.append(split, status)
+        }
     }
     const queue = () => queueMicrotask(() => { if (!abort.signal.aborted) draw() })
     document.addEventListener("jazu:desk:change", queue, { signal: abort.signal })
