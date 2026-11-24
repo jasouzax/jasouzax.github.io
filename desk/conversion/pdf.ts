@@ -24,12 +24,19 @@ export function page_indices(value: string, count: number): number[] {
 }
 export async function transform_pdf(file: Blob, options: Options, signal: AbortSignal, tools?: Library): Promise<Blob> {
     signal.throwIfAborted()
-    const { PDFDocument } = tools ?? await load_pdf_tools()
+    const { PDFDocument, degrees } = tools ?? await load_pdf_tools()
     const source = await PDFDocument.load(await file.arrayBuffer())
     signal.throwIfAborted()
     const indices = page_indices(options.pdf_pages ?? "", source.getPageCount()), output = await PDFDocument.create()
     if (!indices.length) throw new Error("PDF has no pages")
-    for (const page of await output.copyPages(source, indices)) output.addPage(page)
+    const rotation = Number(options.pdf_rotation || 0)
+    if (!Number.isFinite(rotation) || !Number.isInteger(rotation / 90)) throw new Error("PDF rotation must be a multiple of 90 degrees")
+    const rotate = new Set(page_indices(options.pdf_rotate_pages ?? "", source.getPageCount()))
+    const copied = await output.copyPages(source, indices)
+    for (const [index, page] of copied.entries()) {
+        if (rotate.has(indices[index])) page.setRotation(degrees(((page.getRotation().angle + rotation) % 360 + 360) % 360))
+        output.addPage(page)
+    }
     signal.throwIfAborted()
     const bytes = await output.save()
     signal.throwIfAborted()
@@ -37,6 +44,8 @@ export async function transform_pdf(file: Blob, options: Options, signal: AbortS
 }
 export const pdf_converter: Converter = {
     id: "pdf-pages", from: "application/pdf", to: "application/pdf", extension: "pdf",
-    fields: [{ key: "pdf_pages", label: "Pages in output order (blank = all; e.g. 3,1-2)", value: "" }],
+    fields: [{ key: "pdf_pages", label: "Pages in output order (blank = all; e.g. 3,1-2)", value: "" },
+        { key: "pdf_rotation", label: "Rotation (clockwise degrees)", value: "0", type: "number", step: "90" },
+        { key: "pdf_rotate_pages", label: "Source pages to rotate (blank = all)", value: "" }],
     run: transform_pdf,
 }

@@ -16,3 +16,13 @@ test("PDF extraction produces selected native pages in requested order", async (
     assert.deepEqual(loaded.getPages().map(page => page.getSize()), [{ width: 500, height: 600 }, { width: 100, height: 200 }])
     assert.equal((await tools.PDFDocument.load(await file.arrayBuffer())).getPageCount(), 3)
 })
+
+test("PDF rotation applies to selected source pages and adds to existing rotation", async () => {
+    const source = await tools.PDFDocument.create()
+    source.addPage().setRotation(tools.degrees(90)); source.addPage()
+    const file = new Blob([new Uint8Array(await source.save())])
+    const output = await transform_pdf(file, { pdf_rotation: "90", pdf_rotate_pages: "1" }, new AbortController().signal, tools)
+    const document = await tools.PDFDocument.load(await output.arrayBuffer())
+    assert.deepEqual(document.getPages().map(page => page.getRotation().angle), [180, 0])
+    await assert.rejects(transform_pdf(file, { pdf_rotation: "45" }, new AbortController().signal, tools), /multiple of 90/)
+})
