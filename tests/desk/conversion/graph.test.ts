@@ -15,3 +15,14 @@ test("execution reports the failed step and stops aborted work", async () => {
     const abort = new AbortController(); abort.abort()
     await assert.rejects(execute([bad], new Blob(), {}, abort.signal), /abort/i)
 })
+
+test("cancellation during a stage prevents later stages; mislabeled output is rejected", async () => {
+    const abort = new AbortController()
+    let ran = false
+    const first: Converter = { ...edge("a/a", "b/b"), run: async () => { abort.abort(); return new Blob([], { type: "b/b" }) } }
+    const second: Converter = { ...edge("b/b", "c/c"), run: async () => { ran = true; return new Blob([], { type: "c/c" }) } }
+    await assert.rejects(execute([first, second], new Blob(), {}, abort.signal), /abort/i)
+    assert.equal(ran, false)
+    const wrong: Converter = { ...edge("a/a", "b/b"), run: async () => new Blob([], { type: "image/png" }) }
+    await assert.rejects(execute([wrong], new Blob(), {}, new AbortController().signal), /Expected b\/b, received image\/png/)
+})

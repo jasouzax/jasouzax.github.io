@@ -3,7 +3,6 @@ import { latest_bytes } from "../plugin/flow.ts"
 import { load_pdf_tools } from "../conversion/pdf.ts"
 import { state, new_window, focus_window, type desk_window } from "../index.ts"
 import { set_mime } from "../action/resource.ts"
-import { render_window } from "../window/index.ts"
 import { converters } from "../conversion/index.ts"
 import { route } from "../conversion/graph.ts"
 export function init_conversion_menu(desk: HTMLElement): () => void {
@@ -25,7 +24,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         if (next === key && selected === child) return
         key = next; selected = child; panel.replaceChildren()
         if (!child) return
-        const heading = document.createElement("h3"); heading.textContent = `window:${child.parent!.id} â†’ window:${child.id}`
+        const heading = document.createElement("h3"); heading.textContent = `window:${child.parent!.id} → window:${child.id}`
         const form = document.createElement("form"), label = document.createElement("label"), select = document.createElement("select")
         label.textContent = "Output MIME "; select.name = "mime"; select.setAttribute("aria-label", "Output MIME")
         const targets = [...new Set(converters.map(edge => edge.to))].filter(mime => route(converters, child.parent!.mime, mime))
@@ -35,7 +34,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         select.value = child.mime; label.append(select); form.append(label)
         const path = route(converters, child.parent!.mime, child.mime), info = document.createElement("p")
         info.dataset.conversionRoute = ""
-        info.textContent = !child.mime ? "Choose an output format." : path ? [child.parent!.mime, ...path.map(edge => edge.to)].join(" â†’ ") : "No conversion route available."
+        info.textContent = !child.mime ? "Choose an output format." : path ? [child.parent!.mime, ...path.map(edge => edge.to)].join(" → ") : "No conversion route available."
         const fields = new Map(path?.flatMap(edge => edge.fields ?? []).map(field => [field.key, field]) ?? [])
         for (const field of fields.values()) {
             const label = document.createElement("label"), input = document.createElement("input")
@@ -51,9 +50,9 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         })
         form.addEventListener("submit", event => {
             event.preventDefault()
-            child.conversion = Object.fromEntries([...new FormData(form)].filter(([key]) => key !== "mime").map(([key, value]) => [key, String(value)]))
+            child.conversion = { ...Object.fromEntries([...new FormData(form)].filter(([key]) => key !== "mime").map(([key, value]) => [key, String(value)])), _run: crypto.randomUUID() }
             child.picks.own = false; child.picks.mime = true
-            render_window(child)
+            set_mime(child, child.mime)
         })
         form.append(apply); panel.append(heading, info, form)
         if (child.parent!.mime === "application/pdf" && !desk.hasAttribute("data-fixed")) {

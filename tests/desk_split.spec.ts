@@ -63,7 +63,7 @@ test("own split text resources compare additions and removals and react to sourc
     await page.screenshot({ path: ".cache/desk-browser-results/split-compare.png" })
 })
 
-test("text opens in edit mode; plain view is readonly and other text view unsupported", async ({ page }) => {
+test("text opens in edit mode; plain view is readonly and Markdown renders", async ({ page }) => {
     for (const [name, mime] of [["notes.txt", "text/plain"], ["script.js", "text/javascript"], ["notes.md", "text/markdown"]]) {
         await page.goto("/desk")
     await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "")
@@ -75,7 +75,8 @@ test("text opens in edit mode; plain view is readonly and other text view unsupp
         if (mime === "text/plain") {
             await expect(window.locator("textarea.desk_wbox_body_text_input")).toHaveValue("unsaved draft")
             await expect(window.locator("textarea.desk_wbox_body_text_input")).toHaveAttribute("readonly", "")
-        } else await expect(window.locator(".desk_wbox_body_none")).toContainText("No viewer for")
+        } else if (mime === "text/markdown") await expect(window.locator(".desk_wbox_body_doc")).toHaveText("unsaved draft")
+        else await expect(window.locator(".desk_wbox_body_none")).toContainText("No viewer for")
         await window.locator('[data-mode="edit"]').click()
         await expect(window.locator(".desk_wbox_body_text_input")).toHaveValue("unsaved draft")
     }

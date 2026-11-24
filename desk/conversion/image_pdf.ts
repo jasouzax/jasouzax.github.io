@@ -1,17 +1,20 @@
 import { kernel, start_process, make_sink, kill } from "../kernel/process.ts"
-export async function convert_image(file: Blob, signal: AbortSignal): Promise<Blob> {
+export async function convert_image(file: Blob, signal: AbortSignal, prepared_jpeg = false): Promise<Blob> {
     if (!kernel.hooks) throw new Error("Desk runtime is not ready")
-    const image = await createImageBitmap(file)
     let jpeg: Blob
-    try {
-        if (image.width * image.height > 40_000_000) throw new Error("Image exceeds 40 megapixels")
-        const canvas = document.createElement("canvas")
-        canvas.width = image.width; canvas.height = image.height
-        const context = canvas.getContext("2d")!
-        context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height)
-        context.drawImage(image, 0, 0)
-        jpeg = await new Promise<Blob>((done, fail) => canvas.toBlob(blob => blob ? done(blob) : fail(new Error("Image encoding failed")), "image/jpeg", .95))
-    } finally { image.close() }
+    if (prepared_jpeg && file.type === "image/jpeg") jpeg = file
+    else {
+        const image = await createImageBitmap(file)
+        try {
+            if (image.width * image.height > 40_000_000) throw new Error("Image exceeds 40 megapixels")
+            const canvas = document.createElement("canvas")
+            canvas.width = image.width; canvas.height = image.height
+            const context = canvas.getContext("2d")!
+            context.fillStyle = "white"; context.fillRect(0, 0, canvas.width, canvas.height)
+            context.drawImage(image, 0, 0)
+            jpeg = await new Promise<Blob>((done, fail) => canvas.toBlob(blob => blob ? done(blob) : fail(new Error("Image encoding failed")), "image/jpeg", .95))
+        } finally { image.close() }
+    }
     await kernel.hooks.programs()
     signal.throwIfAborted()
     const fs = kernel.hooks.fs(1000, 1000), dir = `/tmp/image-pdf-${crypto.randomUUID()}`

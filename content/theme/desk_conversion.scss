@@ -1,0 +1,6 @@
+.desk_conversion_menu { padding: .75em; overflow-wrap: anywhere; }
+.desk_conversion_menu form { display: flex; flex-direction: column; gap: .75em; }
+.desk_conversion_menu label { display: flex; flex-direction: column; gap: .25em; min-width: 0; }
+.desk_conversion_menu input, .desk_conversion_menu select { min-width: 0; width: 100%; box-sizing: border-box; }
+.desk_conversion_menu br { display: none; }
+.desk_conversion_menu > button { margin-top: 1em; }

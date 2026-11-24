@@ -45,6 +45,18 @@ Detailed, authoritative notes that live next to the code (read them before chang
 
 `desk_plugins.ts` loads the plugin manifest, picks the first matching plugin/case via `plugin_types.ts`, and asks `desk_view.ts` for the body (`text`, `hex`, `folder`, `media`, `shell`, `markdown`, `default`) or a plugin script's `render`. Plugin scripts can contribute through `host.state.desk` / `host.state.windows`.
 
+## Split conversions
+
+Split a source window, select the child, and open the **Conversion** tab. Choose **Output MIME**, adjust its fields and click **Apply conversion** to rerun. The route appears above the controls. Parent edits automatically regenerate the child; further split descendants receive its new output. The child owns the result, with its own Save destination. Conversion options are included in browser-local desktop groups.
+
+`desk/conversion/graph.ts` discovers the shortest executable MIME route, preferring a direct converter. `desk/conversion/index.ts` catalogs typed converter edges and their option fields; new converters declare source MIME, destination MIME, output extension and an asynchronous Blob transformation. `body.ts` handles source drafts, caching, obsolete-run cancellation and failed-step messages. An unsupported route never relabels source bytes as converted output.
+
+Supported tools:
+
+- Browser-decodable PNG, JPEG, WebP, GIF, BMP, AVIF, SVG and ICO to PNG, JPEG, WebP or PDF. Animated inputs produce a still image. Resize with one dimension to preserve aspect ratio, or both to choose exact dimensions; rotation is in multiples of 90 degrees. JPEG defaults to white behind transparency. Encoding is limited to 40 megapixels and depends on browser format support.
+- PDF to PDF: select pages using `1,3-5`, reverse ranges with `5-3`, repeat pages, reorder them, and rotate all or selected source pages. **Split into individual pages** makes sibling output windows, up to 32 pages and 64 total desk windows. Larger PDFs can first be extracted into a smaller child PDF. Native text/vector page content is retained. Page extraction creates a new document; document-level forms, bookmarks, metadata and signatures are not preserved. The local versioned PDF-LIB module loads only when needed.
+- CSV and TSV to/from JSON arrays of records. CSV↔TSV uses JSON as an intermediate. The first row supplies nonempty unique headers; quoted delimiters, escaped quotes and multiline fields work. Table fields become JSON strings; JSON values become table text (null becomes empty, nested values become JSON text). Malformed rows fail explicitly.
+
 ## <a id="artifacts"></a>Build artifacts (important)
 
 `npm run build` **requires prebuilt WebAssembly artifacts** that are ignored by `.gitignore` (`*.wasm`, `*.tar.bz2`, `*.tar.gz`) and therefore also omitted by `npm run pack` / `codebase.zip`:

@@ -102,7 +102,7 @@ export const uri_handlers: ((item: desk_window, uri: string, current?: () => boo
 export const renders = new WeakMap<desk_window, AbortController>()
 
 function fallback_body(item: desk_window): HTMLElement {
-    if (flow_kind_of(item) === "convert") {
+    if (flow_kind_of(item) === "convert" && !item.file) {
         const note = document.createElement("div")
         note.className = "desk_wbox_body_none"
         note.setAttribute("role", "status")
