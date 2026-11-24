@@ -204,6 +204,8 @@ node src/main.ts server status                       # queue and last runs; `ser
 
 ## Desk Use
 
+For an installation-free browser workspace, visit `/desk`, choose **Open terminal**, and run `tools` to browse available commands. Lua, JavaScript (QuickJS), Scheme, Python, SQLite and image conversion tools work with the same files as the file manager. Save in `/home/user` to keep files across reloads. See the [Desk command guide](docs/src/desk-commands.md) for examples, supported features, limits and build recipes.
+
 Run the desk as a **full desktop**: the machine boots to an X session whose only program is Chromium showing `/desk`, and a terminal window there is a **real shell on the machine**, not the WebAssembly one.
 
 ```

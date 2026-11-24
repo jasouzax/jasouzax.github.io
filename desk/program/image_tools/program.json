@@ -1,0 +1,21 @@
+{
+    "name": "image_tools",
+    "version": "1.0.0-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "imgconvert",
+        "identify",
+        "png2jpg",
+        "jpg2png",
+        "bmp2png",
+        "png2bmp"
+    ],
+    "files": {
+        "wasm": "build/image_tools/image_tools.wasm",
+        "loader": "build/image_tools/image_tools.js"
+    },
+    "sha256": "30aff26c788156f1be6fb7fcbc101088a153cd8cf400f2be455b83b7ccc6b63a",
+    "flags": {
+        "applet": false
+    }
+}

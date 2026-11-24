@@ -65,7 +65,7 @@ test("real additional WASMs run against the shared browser kernel and filesystem
     await page.goto("/desk")
     const registry = await (await page.request.get("/assets/wasm/manifest.json")).json()
     expect(registry.map((image: { id: string }) => image.id)).toEqual(expect.arrayContaining([
-        "busybox", "fastfetch", "htop", "tcc", "jq", "bchunk", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum", "json_flatten", "csv_json", "json2yaml", "ini_env_json"
+        "busybox", "fastfetch", "htop", "tcc", "jq", "bchunk", "caesar", "morse", "optipng", "cwebp", "dwebp", "potrace", "flac", "mkbitmap", "metaflac", "bin2iso", "tree", "pwgen", "lame", "urlencode", "htmlencode", "rot13", "atob", "btoa", "sha384sum", "json_flatten", "csv_json", "json2yaml", "ini_env_json", "lua", "quickjs", "scheme", "sqlite3", "image_tools"
     ]))
     expect(new Set(registry.map((image: { worker: string }) => image.worker)).size).toBe(1)
     for (const image of registry) expect((await page.request.get(image.worker)).headers()["cross-origin-embedder-policy"]).toBe("require-corp")
@@ -126,4 +126,51 @@ test("su changes real process credentials and only home file changes survive rel
     await after.send("whoami; id")
     await expect(after.line("user")).toBeVisible()
     await expect(after.screen).toContainText("uid=1000(user)")
+})
+
+test("additional language, database and image executables share persistent Desk files", async ({ page }) => {
+    test.setTimeout(180000)
+    const failures: string[] = []
+    page.on("pageerror", error => failures.push(error.message))
+    await page.goto("/desk")
+    await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        for (const [name, content] of [
+            ["pixels.ppm", new Uint8Array([...new TextEncoder().encode("P6\n2 1\n255\n"), 255, 0, 0, 0, 255, 0])],
+            ["value.mjs", "export const n = 42;"],
+            ["main.mjs", 'import {n} from "./value.mjs"; writeFile("result.txt", String(n)); print("JS_VALUE_" + n);'],
+        ] as const) {
+            const writer = await (await root.getFileHandle(name, { create: true })).createWritable()
+            await writer.write(content); await writer.close()
+        }
+    })
+    const { screen, send, line } = await terminal(page)
+    await send('qjs main.mjs && lua -e \'local t={20,22}; print("LUA_VALUE_" .. (t[1]+t[2]))\' && scheme -e \'(display "SCHEME_VALUE_") (display (+ 20 22)) (newline)\' && sqlite3 sample.db "create table t(n); insert into t values(42);" && imgconvert --resize 4x2 --rotate 90 pixels.ppm output.png && imgconvert --crop 1x1+1+0 --grayscale pixels.ppm gray.png && echo EXTRA_TOOLS_OK')
+    await expect(line("EXTRA_TOOLS_OK")).toBeVisible({ timeout: 60000 })
+    await expect(screen).toContainText("JS_VALUE_42")
+    await expect(screen).toContainText("LUA_VALUE_42")
+    await expect(screen).toContainText("SCHEME_VALUE_42")
+    expect(await page.evaluate(async () => {
+        const root = await navigator.storage.getDirectory()
+        const bitmap = await createImageBitmap(await (await root.getFileHandle("output.png")).getFile())
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+        const context = canvas.getContext("2d")!
+        context.drawImage(bitmap, 0, 0)
+        const gray = await createImageBitmap(await (await root.getFileHandle("gray.png")).getFile())
+        const result = { width: bitmap.width, height: bitmap.height, first: [...context.getImageData(0, 0, 1, 1).data], last: [...context.getImageData(1, 3, 1, 1).data], gray: [] as number[] }
+        context.drawImage(gray, 0, 0)
+        result.gray = [...context.getImageData(0, 0, 1, 1).data]
+        gray.close()
+        bitmap.close()
+        return result
+    })).toEqual({ width: 2, height: 4, first: [255, 0, 0, 255], last: [0, 255, 0, 255], gray: [149, 149, 149, 255] })
+    await send("printf invalid | imgconvert --format png - broken.png; echo INVALID_IMAGE_STATUS_$?")
+    await expect(line("INVALID_IMAGE_STATUS_1")).toBeVisible()
+    await page.reload()
+    const after = await terminal(page)
+    await after.send('sqlite3 sample.db "select n from t;"; cat result.txt; echo; identify output.png; echo EXTRA_RELOAD_OK')
+    await expect(after.line("EXTRA_RELOAD_OK")).toBeVisible({ timeout: 30000 })
+    await expect(after.line("42")).toBeVisible()
+    await expect(after.screen).toContainText("output.png: 2x4 4 channels")
+    expect(failures).toEqual([])
 })

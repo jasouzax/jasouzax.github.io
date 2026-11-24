@@ -174,3 +174,10 @@ Text windows color code by mime (C, C++, JavaScript, TypeScript, Python, shell, 
 The split demos and lifecycle checks pass in Chromium: empty children, unsaved shared HTML editors with independent scrolling, sandboxed live HTML, readonly plain text and unsupported visitor text views, independent uploaded/folder-selected text comparisons, saving, parent closure, unsupported conversion, actual img2pdf WASM output, PDF canvas pixel checks, multipage navigation/zoom and Japanese labels. The wider desk regressions were checked too; startup waits and cold-WASM timeouts are handled by the shared test fixture. The focused contract/render/filesystem suite passed 31 tests and content validation passed with 37 existing description warnings.
 
 A real deployment from Docker on the Pi published the split prototype to staging; a browser at `https://staging.jasouza.com/desk` uploaded an image, selected the child's PDF MIME, executed img2pdf and verified the rendered PDF pixels. Docker production remains on master; the split feature is committed only to staging.
+
+## Browser command expansion
+
+- [?] Upstream Lua, QuickJS and TinyScheme runtimes share the shell filesystem and pipes.
+- [?] Upstream SQLite shell supports persistent database files, SQL input, JSON, FTS5 and R-tree (sequential access; no WAL).
+- [?] Image CLI converts PNG/JPEG/BMP/TGA with cropping, resizing, rotation, flipping and grayscale; command catalog includes language and image tools.
+- [?] Pinned source builds and integrity manifests; see [command guide](../src/desk-commands.md).

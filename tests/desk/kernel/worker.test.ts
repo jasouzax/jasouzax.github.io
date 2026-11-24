@@ -124,7 +124,11 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
     await register_program("rust_suite", ["rustc", "rust-runner", "cargo"])
     await register_program("jvm_suite", ["java", "javac"])
     await register_program("perl_suite", ["perl"])
-    await register_program("lang_suite", ["lua", "lisp", "basic"])
+    await register_program("lang_suite", ["lisp", "basic"])
+    for (const name of ["lua", "quickjs", "scheme", "sqlite3", "image_tools"]) {
+        const manifest = JSON.parse(readFileSync(resolve(`desk/program/${name}/program.json`), "utf8"))
+        await register_program(name, manifest.commands)
+    }
     kernel.hooks = { programs: async () => registered_programs, fs: () => fs }
     t.after(() => {
         reset_kernel()
@@ -139,6 +143,51 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         clearTimeout(timer)
         return { stdout, stderr, code }
     }
+    await t.test("TinyScheme runs recursive functions, standard-library maps and shared files", async () => {
+        const result = await run(`scheme -e '(define (fact n) (if (= n 0) 1 (* n (fact (- n 1))))) (display (fact 6)) (newline) (display (map (lambda (n) (* n 2)) (quote (1 2 3)))) (newline)'; printf '(display (+ 20 22)) (newline)\\n' > /tmp/test.scm; tinyscheme /tmp/test.scm`)
+        assert.deepEqual(result, { stdout: "720\n(2 4 6)\n42\n", stderr: "", code: 0 })
+        assert.deepEqual(await run("printf '(display (+ 20 22)) (newline)\\n' | scheme -"), { stdout: "42\n", stderr: "", code: 0 })
+        assert.equal((await run("scheme -e '(missing-function 1)'")).code, 1)
+    })
+    await t.test("upstream Lua supports functions, tables, modules, stdin and shared files", async () => {
+        const result = await run(`lua -e 'local t={1,2,3}; local function sum(t) local s=0; for _,v in ipairs(t) do s=s+v end; return s end; local f=assert(io.open("/tmp/lua-result", "w")); f:write(tostring(sum(t))); f:close()'; cat /tmp/lua-result; echo; printf 'print(6 * 7)\\n' | lua -`)
+        assert.deepEqual(result, { stdout: "6\n42\n", stderr: "", code: 0 })
+        assert.equal((await run("lua -e 'this is invalid lua'")).code, 1)
+    })
+    await t.test("QuickJS evaluates real JavaScript, local ES modules, promises and shared files", async () => {
+        const result = await run(`printf 'export const n = 42;\\n' > /tmp/value.mjs; printf 'import {n} from "./value.mjs"; writeFile("/tmp/js-result", String(n)); Promise.resolve(n).then(print);\\n' > /tmp/main.mjs; qjs /tmp/main.mjs; cat /tmp/js-result; echo; printf 'console.log([1,2,3].map(x=>x*2).join(","))\\n' | js -`)
+        assert.deepEqual(result, { stdout: "42\n42\n2,4,6\n", stderr: "", code: 0 })
+        assert.equal((await run("qjs -e 'throw new Error(\"expected\")'")).code, 1)
+        assert.equal((await run("qjs -e 'Promise.reject(new Error(\"expected async failure\"))'")).code, 1)
+        assert.equal((await run("qjs -e 'Promise.reject(1).catch(() => {})'")).code, 0)
+        assert.equal((await run("qjs /tmp/missing.js")).code, 1)
+        assert.equal((await run("qjs -e")).code, 2)
+    })
+    await t.test("SQLite persists database bytes between processes and supports JSON and SQL input pipes", async () => {
+        const create = await run(`sqlite3 /home/user/test.db 'create table t(n integer); insert into t values(21),(21);'; sqlite3 /home/user/test.db 'select sum(n) from t;'; printf 'select 21+21;\\n' | sqlite3; sqlite3 :memory: 'select json_array(42);'`)
+        assert.equal(create.code, 0, create.stderr)
+        assert.equal(create.stdout, "42\n42\n[42]\n")
+        assert.equal(new TextDecoder().decode(files.get("/home/user/test.db")!.slice(0, 15)), "SQLite format 3")
+        assert.notEqual((await run("sqlite3 :memory: 'select from broken;'")).code, 0)
+    })
+    await t.test("image tools transform real binary images through files and pipes", async () => {
+        // 2x1 red and green RGB pixels; stb supports binary PPM input.
+        files.set("/tmp/colors.ppm", new Uint8Array([...new TextEncoder().encode("P6\n2 1\n255\n"), 255, 0, 0, 0, 255, 0]))
+        const result = await run("imgconvert /tmp/colors.ppm /tmp/colors.png; identify /tmp/colors.png; imgconvert --resize 4x2 --rotate 90 --grayscale /tmp/colors.png /tmp/rotated.png; identify /tmp/rotated.png; cat /tmp/colors.png | png2bmp - - | bmp2png - /tmp/roundtrip.png; identify /tmp/roundtrip.png; png2jpg /tmp/colors.png /tmp/colors.jpg; jpg2png /tmp/colors.jpg /tmp/jpg.png")
+        assert.equal(result.code, 0, result.stderr)
+        assert.equal(result.stderr, "")
+        assert.match(result.stdout, /colors.png: 2x1 4 channels/)
+        assert.match(result.stdout, /rotated.png: 2x4 4 channels/)
+        assert.match(result.stdout, /roundtrip.png: 2x1 4 channels/)
+        assert.deepEqual([...files.get("/tmp/colors.png")!.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+        assert.deepEqual([...files.get("/tmp/colors.jpg")!.slice(0, 2)], [255, 216])
+        assert.equal((await run("imgconvert --crop 9x9+0+0 /tmp/colors.png /tmp/bad.png")).code, 2)
+        assert.equal((await run("imgconvert --resize 99999x99999 /tmp/colors.png /tmp/bad.png")).code, 2)
+        assert.equal((await run("printf garbage | imgconvert --format png - /tmp/bad.png")).code, 1)
+        assert.equal(files.has("/tmp/bad.png"), false)
+        assert.match((await run("tools search Images")).stdout, /imgconvert/)
+        assert.match((await run("tools search Languages")).stdout, /qjs/)
+    })
     await t.test("uses compiled shell expansion, functions, redirects and utilities", async () => {
         const result = await run("v=world; f() { echo hello-$v; }; f > /tmp/greeting; cat /tmp/greeting; touch /tmp/new; rm /tmp/new")
         assert.deepEqual(result, { stdout: "hello-world\n", stderr: "", code: 0 })

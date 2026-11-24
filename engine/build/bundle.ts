@@ -140,6 +140,8 @@ export async function bundle_runtime(root: string, files: output_files, mode: st
         const lic_path = existsSync(join(pkg_dir, `${name}-LICENSE`)) ? join(pkg_dir, `${name}-LICENSE`) : join(pkg_dir, "LICENSE")
         files.set(`assets/wasm/${name}-LICENSE`, readFileSync(lic_path))
         files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(pkg_dir, `${name}-source.${extension}`)))
+        const port = join(pkg_dir, `${name}-port.tar.gz`)
+        if (existsSync(port)) files.set(`assets/wasm/${name}-port.tar.gz`, readFileSync(port))
         let runtime: string | undefined
         if (program.runtime) {
             const compiled = await esbuild_build({ entryPoints: [join(root, program.runtime)], bundle: true, write: false, format: "esm", minify: mode === "production", external: ["node:*", "ws", "@wasmer/sdk"], logLevel: "silent" })

@@ -21,7 +21,8 @@ const custom_packages = [
     "encoding_suite", "xml_suite", "yq", "csv_suite", "pdf_suite",
     "postscript_suite", "doc_suite", "image_suite", "audio_suite",
     "disk_archive_suite", "linux_suite", "exec_suite", "gcc", "make",
-    "python_suite", "rust_suite", "jvm_suite", "perl_suite", "lang_suite"
+    "python_suite", "rust_suite", "jvm_suite", "perl_suite", "lang_suite",
+    "lua", "quickjs", "scheme", "sqlite3", "image_tools"
 ]
 
 export function build_packages(options: { check_only?: boolean } = {}): void {

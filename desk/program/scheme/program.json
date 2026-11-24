@@ -1,0 +1,19 @@
+{
+    "name": "scheme",
+    "version": "1.42-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "scheme",
+        "tinyscheme"
+    ],
+    "files": {
+        "wasm": "build/scheme/scheme.wasm",
+        "loader": "build/scheme/scheme.js"
+    },
+    "sha256": "8aec8b95d1c9aef600f819084ea1e615ed8e54d2f0d691ad3a26381d7739dc44",
+    "flags": {
+        "applet": false
+    },
+    "source_url": "https://downloads.sourceforge.net/project/tinyscheme/tinyscheme/tinyscheme-1.42/tinyscheme-1.42.tar.gz",
+    "source_sha256": "17b0b1bffd22f3d49d5833e22a120b339039d2cfda0b46d6fc51dd2f01b407ad"
+}

@@ -2,6 +2,8 @@
 
 The `/desk` workspace runs real GNU/Linux programs in the browser without a VM: a browser kernel, a shared filesystem, and C programs compiled to WebAssembly. Back to [site developer guide](README.md). Authoring: [../content/desk.md](../content/desk.md). Status: [../feat/desk.md](../feat/desk.md), [../feat/plugins.md](../feat/plugins.md).
 
+For executable examples, supported languages, image commands, SQLite and reproducible builds, see the [Desk command guide](desk-commands.md).
+
 Detailed, authoritative notes that live next to the code (read them before changing the shell or ports):
 
 - [`src/desk/README.md`](../../src/desk/README.md) — BusyBox ash port, runtime boundary, rebuilding, current limits, verification.
