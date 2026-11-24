@@ -1,3 +1,4 @@
+import { conversion_body } from "../conversion/body.ts"
 import { text_layout_body } from "./text.ts"
 import { sync_save, save_window } from "../action/save.ts"
 export { sync_save, save_window } from "../action/save.ts"
@@ -253,6 +254,12 @@ function body_for(item: desk_window): void {
     release_url(item)
     const controller = new AbortController()
     renders.set(item, controller)
+    const converting = flow_kind_of(item) === "convert"
+    if (converting) {
+        const pending = conversion_body(item, controller.signal)
+        if (pending) { set_body(item, pending); sync_save(item); return }
+        item.commit = async () => item.file
+    }
     const is_folder = () => !item.error && item.mime === "inode/directory" && item.mode === "view"
     const fallback = (target: desk_window) => !target.error && target.mime === "inode/directory" && target.mode === "view"
         ? folder_body(target, controller.signal) : fallback_body(target)
@@ -272,7 +279,7 @@ function body_for(item: desk_window): void {
     }
     const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, notebook: notebook_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     set_body(item, fallback_body(item))
-    void prepare_plugins(item, host, controller.signal).then(candidates => {
+    void prepare_plugins(item, host, controller.signal, converting).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
         for (const { context, module } of candidates) {
             try {
