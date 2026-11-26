@@ -8522,7 +8522,7 @@ body:has(#motion_pause:checked) {
     }
 }
 .server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }
-.server_api_sessions {
+:is(.server_api_sessions, .server_api_controls) {
     padding: .75rem 1rem; border-block-start: 1px solid var(--edge);
     h3, h4 { margin-block: .25rem .5rem; }
     form { display: flex; flex-wrap: wrap; gap: .5rem; }

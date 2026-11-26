@@ -28,7 +28,7 @@ export function render_side_head(ctx: render_ctx, desk: xml_node): html {
             <header class={"desk_side_head"}>
                 {glyph(ctx, desk.attrs.icon, "desk_side_icon")}
                 <h2 class={"desk_side_name"}>{desk.attrs.name ?? ""}</h2>
-                <button type="button" class="desk_side_mode needs_js" aria-pressed="false" hidden>{ui_text(ctx.model, ctx.lang, "desk_map")}</button>
+                <button type="button" class="desk_side_mode needs_js" aria-pressed="false" aria-label={ui_text(ctx.model, ctx.lang, "desk_map")} title={ui_text(ctx.model, ctx.lang, "desk_map")} disabled><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M14 3H3v18h18V10M12 12L21 3M15 3h6v6" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
                 <p class={"desk_side_info"}>{desk.attrs.info ?? ""}</p>
                 <nav class={"desk_side_tabs"}>
                     <ul class={"desk_side_tabs_ul"}>{tabs}</ul>

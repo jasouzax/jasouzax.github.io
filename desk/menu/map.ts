@@ -189,7 +189,7 @@ export function init_map(desk: HTMLElement): () => void {
         viewport.hidden = !show
         button!.setAttribute("aria-pressed", String(show))
         const label = text(show ? "desk_windows" : "desk_map")
-        if (button!.textContent !== label) button!.textContent = label
+        button!.title = label; button!.setAttribute("aria-label", label)
         arrange()
         render()
     }
@@ -209,7 +209,7 @@ export function init_map(desk: HTMLElement): () => void {
             view = (map && views.get(map)) || { x: 0, y: 0, scale: 1 }
             transform()
         }
-        button!.hidden = !map
+        button!.hidden = false; button!.disabled = !map
         viewport.toggleAttribute("data-map-readonly", Boolean(map?.hasAttribute("data-map-readonly")))
         mode(desk.dataset.displayMode === "map")
     }

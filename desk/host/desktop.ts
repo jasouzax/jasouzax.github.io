@@ -90,7 +90,7 @@ async function apply_desktop(): Promise<void> {
     if (epoch !== generation || !local_desk()) { const undo = restore; restore = null; await undo?.(); return }
     const desk = document.querySelector<HTMLElement>(".desk[data-runtime]")
     if (desk) desk.dataset.cwd = info.home
-    if (!panel?.isConnected) { panel = native_panel(); document.querySelector('.desk_side_page[data-path="file:///"]')?.prepend(panel) }
+    if (!panel?.isConnected) { panel = native_panel(); document.querySelector('[data-options-for="file:///"]')?.append(panel) }
 }
 
 function sync_desktop(): Promise<void> {

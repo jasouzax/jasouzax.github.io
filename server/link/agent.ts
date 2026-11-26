@@ -113,6 +113,7 @@ export class Agent {
             case "auto_state": return this.#send_state(peer)
             case "auto_start": return void this.#o.runner.start(String(message.path)).catch(error => this.#o.link.send({ t: "auto_error", path: String(message.path), message: String(error) }, peer))
             case "auto_stop": return void this.#o.runner.stop(String(message.path)).catch(error => this.#o.link.send({ t: "auto_error", path: String(message.path), message: String(error) }, peer))
+            case "auto_restart": return void this.#o.runner.stop(String(message.path)).then(() => this.#o.runner.start(String(message.path))).catch(error => this.#o.link.send({ t: "auto_error", path: String(message.path), message: String(error) }, peer))
             case "auto_delete": return void this.#o.runner.remove(String(message.path)).catch(error => this.#o.link.send({ t: "auto_error", path: String(message.path), message: String(error) }, peer))
             case "auto_logs": return void this.#o.link.send({ t: "auto_logs", path: String(message.path), entries: this.#o.runner.logs(String(message.path)) }, peer)
             case "auto_clear_logs": return this.#o.runner.clear_logs(String(message.path))

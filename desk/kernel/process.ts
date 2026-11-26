@@ -67,6 +67,7 @@ export function stream_of(text: string): text_stream {
 // ---- processes --------------------------------------------------------------------------------------------------------------------
 
 export type proc = {
+    filesystem?: fs_api
     uid: number
     gid: number
     pid: number
@@ -97,7 +98,7 @@ export type proc = {
 
 export type kernel_hooks = {
     // the programs of the shell runtime (loaded the first time a process is made)
-    programs: () => Promise<Record<string, program>>
+    programs: (argv?: string[]) => Promise<Record<string, program>>
     fs: (uid?: number, gid?: number) => fs_api
 }
 
@@ -201,8 +202,9 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
     changed()
     parent?.children.add(pid)
     const aborted = new Promise<number>(done => item.abort.signal.addEventListener("abort", () => done(item.code ?? interrupted_code())))
+    item.filesystem = parent?.filesystem?.for_user?.(item.uid) ?? hooks.fs(item.uid, item.gid)
     const api: proc_api = {
-        pid, ppid: item.ppid, uid: item.uid, gid: item.gid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: hooks.fs(item.uid, item.gid), interactive: item.interactive,
+        pid, ppid: item.ppid, uid: item.uid, gid: item.gid, argv, cwd: item.cwd, env: item.env, stdin: item.stdin, stdout: item.stdout, stderr: item.stderr, fs: item.filesystem, interactive: item.interactive,
         wasm: options.wasm,
         signal: item.abort.signal,
         on_interrupt: handler => { item.interrupt.push(handler) },
@@ -224,7 +226,7 @@ export function start_process(argv: string[], options: Partial<spawn_options> & 
     Object.defineProperty(api, "resize", { get: () => item.resize, set: value => { item.resize = value; if (item.terminal_size) value?.(...item.terminal_size) } })
     const run = (async (): Promise<number> => {
         try {
-            const programs = await hooks.programs()
+            const programs = await hooks.programs(argv)
             api.commands = Object.keys(programs).sort()
             const main = programs[argv[0]]
             if (!main) {

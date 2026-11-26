@@ -1,3 +1,4 @@
+import { mount_options } from "./options.ts"
 /** Conversion controls follow the selected child; settings persist with desktop groups. */
 import { latest_bytes } from "../plugin/flow.ts"
 import { load_pdf_tools } from "../conversion/pdf.ts"
@@ -15,6 +16,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
     const panel = document.createElement("div")
     panel.className = "desk_side_page desk_conversion_menu"; panel.dataset.path = "desk:conversion"; panel.hidden = true
     side.append(panel)
+    const options = document.createElement("div"), release_options = mount_options(panel, options)
     let selected: desk_window | null = null, key = ""
     const draw = () => {
         const item = state.focused, child = item?.parent ? item : null
@@ -22,7 +24,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
         if (!child && toggle.open) { toggle.open = false; (tabs.querySelector("details") as HTMLDetailsElement | null)?.setAttribute("open", "") }
         const next = JSON.stringify([child?.id, child?.parent?.mime, child?.mime, child?.conversion])
         if (next === key && selected === child) return
-        key = next; selected = child; panel.replaceChildren()
+        key = next; selected = child; options.replaceChildren()
         if (!child) return
         const heading = document.createElement("h3"); heading.textContent = `window:${child.parent!.id} → window:${child.id}`
         const form = document.createElement("form"), label = document.createElement("label"), select = document.createElement("select")
@@ -54,7 +56,7 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
             child.picks.own = false; child.picks.mime = true
             set_mime(child, child.mime)
         })
-        form.append(apply); panel.append(heading, info, form)
+        form.append(apply); options.append(heading, info, form)
         if (child.parent!.mime === "application/pdf" && !desk.hasAttribute("data-fixed")) {
             const split = document.createElement("button"), status = document.createElement("p")
             split.type = "button"; split.textContent = "Split into individual pages"; status.setAttribute("role", "status")
@@ -78,11 +80,11 @@ export function init_conversion_menu(desk: HTMLElement): () => void {
                 } catch (error) { status.textContent = String(error) }
                 finally { split.disabled = false }
             })
-            panel.append(split, status)
+            options.append(split, status)
         }
     }
     const queue = () => queueMicrotask(() => { if (!abort.signal.aborted) draw() })
     document.addEventListener("jazu:desk:change", queue, { signal: abort.signal })
     draw()
-    return () => { abort.abort(); panel.remove(); tab.remove() }
+    return () => { abort.abort(); release_options(); panel.remove(); tab.remove() }
 }

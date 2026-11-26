@@ -1,3 +1,4 @@
+import { selected_compute } from "../menu/computes.ts"
 import { conversion_body } from "../conversion/body.ts"
 import { text_layout_body } from "./text.ts"
 import { sync_save, save_window } from "../action/save.ts"
@@ -94,7 +95,7 @@ export const process_hooks = {
 // /server always selects the Pi PTY; the ordinary desk can prefer the device bridge.
 let local_terminal_uri = "pid:"
 export const terminal_hooks = {
-    get uri(): string { return is_server_page(location.pathname) ? "server:sh" : local_terminal_uri },
+    get uri(): string { const compute = selected_compute(); return compute === "personal-server" ? "server:sh" : compute === "vfs" ? local_terminal_uri : "pid:" },
     set uri(value: string) { local_terminal_uri = value },
 }
 

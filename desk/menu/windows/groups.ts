@@ -1,3 +1,4 @@
+import { option_button, option_group } from "../options.ts"
 /* Explicitly saved, browser-local desktop groups. Temporary desks never write snapshots. */
 import { state, text, close_window, new_window, working_directory } from "../../index.ts"
 import { is_dirty } from "../../plugin/flow.ts"
@@ -12,12 +13,13 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, class_name = "",
 }
 type Active = { id: string, name: string, revision: number, signature: string, conflicted: boolean }
 class Unsupported_Desktop extends Error {}
-export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windows: HTMLElement): () => void {
+export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windows: HTMLElement, options: HTMLElement): () => void {
     const abort = new AbortController(), signal = abort.signal, original_cwd = working_directory()
     const key = `jazu_desktop:${location.pathname}`
     const tools = element("form", "desktop_group_tools"), input = element("input"), status = element("p", "desktop_group_status", text("desktop_temporary")), groups = element("div", "desktop_group_list")
     status.setAttribute("role", "status"); input.maxLength = 80; input.name = "desktop_name"; input.setAttribute("aria-label", text("desktop_name")); input.placeholder = text("desktop_name")
-    tools.append(input); panel.prepend(tools, status, groups)
+    const actions = option_group("Desktop"), actions_row = actions.querySelector<HTMLElement>(".desk_option_buttons")!
+    tools.append(input, actions); options.append(tools, status); panel.prepend(groups)
     let active: Active | null = null, records: Saved_Desktop[] = [], busy = false, suspended = false, touched = false, timer = 0
     let writing: Promise<void> = Promise.resolve(), drawing = new AbortController(), channel: BroadcastChannel | undefined
     const controls: HTMLButtonElement[] = []
@@ -26,8 +28,8 @@ export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windo
     const fail = (error: unknown) => { if (live()) status.textContent = text(error instanceof Desktop_Conflict ? "desktop_conflict" : error instanceof Unsupported_Desktop ? "desktop_unsupported" : (error as DOMException)?.name === "ConstraintError" ? "desktop_exists" : "desktop_storage_error") }
     const announce = () => { try { channel?.postMessage("changed") } catch { /* other tabs can refresh explicitly */ } }
     const button = (parent: HTMLElement, label: string, action: string, run: () => void, event_signal = signal): HTMLButtonElement => {
-        const node = element("button", "", label); node.type = "button"; node.dataset.desktopAction = action
-        node.addEventListener("click", run, { signal: event_signal }); parent.append(node); return node
+        const node = option_button(label, ({ save: "save", leave: "delete", refresh: "refresh", create: "window", open: "view", delete: "delete" } as Record<string, string>)[action] || "window"); node.dataset.desktopAction = action
+        node.addEventListener("click", run, { signal: event_signal }); (parent === tools ? actions_row : parent).append(node); return node
     }
     const enabled = () => {
         controls.forEach(node => node.disabled = busy)
@@ -42,7 +44,8 @@ export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windo
         if (windows.parentElement !== panel) panel.insertBefore(windows, panel.querySelector(":scope > .desk_map"))
         groups.replaceChildren(...records.map(record => {
             const article = element("article", "desk_side_item desktop_group"), box = element("details", "desk_side_item_box"), head = element("summary", "desk_side_item_head")
-            article.dataset.desktopId = record.id; article.dataset.kind = "post"; box.open = record.id === active?.id
+            article.toggleAttribute("data-desktop-selected", options.dataset.desktopSelection === record.id); article.dataset.desktopId = record.id; article.dataset.kind = "post"; box.open = record.id === active?.id
+            head.toggleAttribute("data-selected", options.dataset.desktopSelection === record.id)
             head.append(element("h3", "desk_side_item_name", record.name))
             const actions = element("div", "desk_side_item_tool")
             button(actions, text("desktop_open"), "open", () => perform(() => open(record.id)), drawing.signal)
@@ -54,11 +57,19 @@ export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windo
                 if (active?.id === record.id) { active = null; remember(null); delete desk.dataset.desktopGroup; status.textContent = text("desktop_temporary") }
                 announce(); await refresh()
             }), drawing.signal)
+            head.addEventListener("click", event => {
+                event.preventDefault()
+                for (const node of groups.querySelectorAll("[data-desktop-selected]")) node.removeAttribute("data-desktop-selected")
+                article.setAttribute("data-desktop-selected", ""); options.dataset.desktopSelection = record.id
+                perform(() => open(record.id))
+            }, { signal: drawing.signal })
+            // Delete remains callable by the unified strip; no per-entry toolbar is rendered.
+            actions.hidden = true
             box.append(head, actions)
             if (record.id === active?.id) box.append(windows)
             article.append(box); return article
         }))
-        enabled()
+        enabled(); options.dispatchEvent(new Event("change"))
         if (focused?.isConnected && panel.contains(focused)) focused.focus({ preventScroll: true })
     }
     const refresh = async () => { const next = await list_desktops(); if (live()) { records = next; paint() } }
@@ -107,6 +118,7 @@ export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windo
         } finally { suspended = false }
     }
     const create = button(tools, text("desktop_create"), "create", () => perform(async () => {
+        if (!input.value.trim()) input.value = prompt(text("desktop_name"), "Desktop") || ""
         if (!valid_desktop_name(input.value)) { status.textContent = text("desktop_invalid_name"); return }
         let snapshot: Desktop_Snapshot
         try { snapshot = capture_desktop() } catch { status.textContent = text("desktop_unsupported"); return }
@@ -117,9 +129,10 @@ export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windo
         if (!live()) return
         writing = Promise.resolve()
         active = { id: record.id, name: record.name, revision: record.revision, signature, conflicted: false }
-        desk.dataset.desktopGroup = record.id; remember(record.id); input.value = ""
+        desk.dataset.desktopGroup = record.id; options.dataset.desktopSelection = record.id; remember(record.id); input.value = ""
         status.textContent = text("desktop_saved").replace("{name}", name); announce(); await refresh()
     }))
+    create.hidden = true
     const save = button(tools, text("desktop_save"), "save", () => perform(flush))
     const leave = button(tools, text("desktop_leave"), "leave", () => perform(async () => {
         await flush(); active = null; remember(null); delete desk.dataset.desktopGroup; suspended = true

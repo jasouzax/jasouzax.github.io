@@ -68,7 +68,9 @@ function fixture() {
             assert.equal(challenge, flow.url.searchParams.get("code_challenge"))
             return Response.json({ id_token, ...grant })
         } })
-        assert.equal(response.headers.get("location"), "/work")
+        assert.equal(response.headers.get("location"), null)
+        assert.equal(response.status, 200)
+        assert.match(await response.clone().text(), /BroadcastChannel/)
         assert.equal(secure_response(response).headers.getSetCookie().length, 2)
         const cookie = cookie_part(response, "__Host-jazu_session")
         assert.ok(cookie)
@@ -94,14 +96,14 @@ test("Google callbacks are browser-bound, one-use, and expose useful safe config
         assert.equal(private_callback.headers.get("cache-control"), "no-store")
         const path = `/api/_/auth/google/callback?state=${flow.url.searchParams.get("state")}&code=code`
         const invalid = await auth_route(f.request(path), f.env)
-        assert.equal(invalid.headers.get("location"), "/work?auth_error=invalid_state")
+        assert.match(await invalid.text(), /"error":"invalid_state"/)
         assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_flows").get() as any).n, 1)
         const failed = await auth_route(f.request(path, flow.cookie), f.env, { fetch: async () => Response.json({ error: "invalid_client" }, { status: 401 }) })
-        assert.equal(failed.headers.get("location"), "/work?auth_error=client_configuration")
-        assert.equal((await auth_route(f.request(path, flow.cookie), f.env)).headers.get("location"), "/work?auth_error=invalid_state")
+        assert.match(await failed.text(), /"error":"client_configuration"/)
+        assert.match(await (await auth_route(f.request(path, flow.cookie), f.env)).text(), /"error":"invalid_state"/)
         assert.equal((f.db.prepare("SELECT count(*) AS n FROM auth_sessions").get() as any).n, 0)
         const cancel = await f.start()
-        assert.equal((await auth_route(f.request(`/api/_/auth/google/callback?state=${cancel.url.searchParams.get("state")}&error=access_denied`, cancel.cookie), f.env)).headers.get("location"), "/work?auth_error=cancelled")
+        assert.match(await (await auth_route(f.request(`/api/_/auth/google/callback?state=${cancel.url.searchParams.get("state")}&error=access_denied`, cancel.cookie), f.env)).text(), /"error":"cancelled"/)
     } finally { f.db.close() }
 })
 
@@ -110,7 +112,7 @@ test("admin identity is pinned; OAuth project ownership alone gives no admin rol
     try {
         const admin = await f.login("jason@jasouza.com", "google-owner")
         assert.equal(admin.session.user.role, "owner")
-        assert.equal((await auth_route(admin.callback, f.env)).headers.get("location"), "/work?auth_error=invalid_state")
+        assert.match(await (await auth_route(admin.callback, f.env)).text(), /"error":"invalid_state"/)
         const project_owner = await f.login("jasouzax@gmail.com", "google-project-owner")
         assert.equal(project_owner.session.user.role, "client")
         const different_subject = await f.login("jason@jasouza.com", "another-subject")
@@ -219,5 +221,20 @@ test("account deletion rolls back every change if the transaction fails", async 
         await assert.rejects(auth_route(f.request("/api/_/auth/account/delete", client.cookie, {}, { "x-jazu-csrf": client.session.csrf, "x-jazu-confirm-delete": "account" }), f.env))
         assert.equal((f.db.prepare("SELECT revoked FROM work_rooms WHERE id = ?").get(room) as any).revoked, 0)
         assert.equal((await (await auth_route(f.request("/api/_/session", client.cookie), f.env)).json() as any).user.email, "client@example.com")
+    } finally { f.db.close() }
+})
+
+test("Drive filesystem permission is requested only by its explicit consent flow", async () => {
+    const f = fixture()
+    try {
+        const response = await auth_route(f.request("/api/_/auth/google/start?filesystem=1"), f.env)
+        const query = new URL(response.headers.get("location")!).searchParams
+        assert.ok(query.get("scope")!.split(" ").includes("https://www.googleapis.com/auth/drive"))
+        assert.equal(query.get("prompt"), "consent select_account")
+        const client = await f.login("drive@example.com", "drive-files", { access_token: "folder-token", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive" })
+        const access = await auth_route(f.request("/api/_/auth/drive?filesystem=1", client.cookie, {}, { "x-jazu-csrf": client.session.csrf }), f.env)
+        assert.deepEqual(await access.json(), { access_token: "folder-token" })
+        const private_only = await f.login("keys@example.com", "private-only", { access_token: "key-token", expires_in: 3600, scope: "https://www.googleapis.com/auth/drive.appdata" })
+        assert.equal((await auth_route(f.request("/api/_/auth/drive?filesystem=1", private_only.cookie, {}, { "x-jazu-csrf": private_only.session.csrf }), f.env)).status, 403)
     } finally { f.db.close() }
 })

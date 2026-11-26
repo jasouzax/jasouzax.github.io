@@ -51,8 +51,13 @@ export function valid_csrf(request: Request, session: Auth_Session): boolean {
     return request.headers.get("origin") === new URL(request.url).origin && request.headers.get("x-jazu-csrf") === session.csrf && request.headers.get("x-jazu-work") === "1"
 }
 
-function redirect_work(error?: string): Response {
-    return new Response(null, { status: 303, headers: { location: `/work${error ? `?auth_error=${error}` : ""}`, "cache-control": "no-store", "referrer-policy": "no-referrer", "set-cookie": cookie(flow_cookie, "", 0) } })
+function finish_sign_in(error?: string): Response {
+    const nonce = random()
+    // This page carries no credentials. The original tab re-reads its HttpOnly session.
+    const result = JSON.stringify({ type: "jazu:oauth", error: error || "" })
+    const message = error ? "Sign-in was not completed. Return to the original window and try again." : "Signed in. You can close this window."
+    const body = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Google sign-in</title><body><p>${message}</p><script nonce="${nonce}">const result=${result};try{window.opener?.postMessage(result,location.origin)}catch{}try{const channel=new BroadcastChannel("jazu:oauth");channel.postMessage(result);channel.close()}catch{}if(!result.error)window.close();</script></body></html>`
+    return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer", "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; frame-ancestors 'none'; base-uri 'none'`, "cross-origin-opener-policy": "same-origin-allow-popups", "set-cookie": cookie(flow_cookie, "", 0) } })
 }
 
 export async function verify_google_token(token: string, client: string, nonce: string, keys: JWTVerifyGetKey = google_keys): Promise<Identity> {
@@ -116,7 +121,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
     if (url.pathname === "/api/_/auth/drive" && request.method === "POST") {
         const session = await read_session(request, env)
         if (!session || !valid_csrf(request, session)) return api_error("forbidden", "Sign in before opening your key storage", 403)
-        try { return reply({ access_token: await google_access(env, read_cookie(request, session_cookie), dependencies.fetch) }) }
+        try { return reply({ access_token: await google_access(env, read_cookie(request, session_cookie), dependencies.fetch, url.searchParams.get("filesystem") === "1") }) }
         catch { return api_error("drive_consent_required", "Sign in again and allow private app data storage in Google Drive", 403) }
     }
     if (url.pathname === "/api/_/auth/profile" && request.method === "POST") {
@@ -144,32 +149,36 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         await env.DB.prepare("INSERT INTO auth_flows (state_hash, browser_hash, nonce, verifier, expires_at) VALUES (?, ?, ?, ?, ?)").bind(await auth_hash(state), await auth_hash(browser), nonce, verifier, Date.now() + 600000).run()
         const challenge = encode_key(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))))
         const query = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri, response_type: "code", scope: "openid email profile https://www.googleapis.com/auth/drive.appdata", state, nonce, code_challenge: challenge, code_challenge_method: "S256", prompt: "select_account", access_type: "offline" })
+        if (url.searchParams.get("filesystem") === "1") {
+            query.set("scope", query.get("scope") + " https://www.googleapis.com/auth/drive")
+            query.set("prompt", "consent select_account"); query.set("include_granted_scopes", "true")
+        }
         if (url.searchParams.get("drive") === "1") query.set("prompt", "consent select_account")
         return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${query}`, "set-cookie": cookie(flow_cookie, browser, 600), "cache-control": "no-store", "referrer-policy": "no-referrer" } })
     }
     if (url.pathname !== callback_path) return api_error("not_found", "Unknown authentication route", 404)
     const state = url.searchParams.get("state") ?? "", browser = read_cookie(request, flow_cookie)
-    if (!/^[A-Za-z0-9_-]{43}$/.test(state) || !browser) return redirect_work("invalid_state")
+    if (!/^[A-Za-z0-9_-]{43}$/.test(state) || !browser) return finish_sign_in("invalid_state")
     const flow = await env.DB.prepare("DELETE FROM auth_flows WHERE state_hash = ? AND browser_hash = ? AND expires_at > ? RETURNING nonce, verifier").bind(await auth_hash(state), await auth_hash(browser), Date.now()).first<{ nonce: string, verifier: string }>()
-    if (!flow) return redirect_work("invalid_state")
-    if (url.searchParams.has("error")) return redirect_work(url.searchParams.get("error") === "access_denied" ? "cancelled" : "provider_error")
+    if (!flow) return finish_sign_in("invalid_state")
+    if (url.searchParams.has("error")) return finish_sign_in(url.searchParams.get("error") === "access_denied" ? "cancelled" : "provider_error")
     const code = url.searchParams.get("code") ?? ""
-    if (!code || code.length > 4096) return redirect_work("invalid_response")
+    if (!code || code.length > 4096) return finish_sign_in("invalid_response")
     let identity: Identity
     let id_token: string
     let token_result: Record<string, unknown>
     try {
         // Workers only supports manual/follow. Never forward the code or secret to a redirect target.
         const response = await (dependencies.fetch ?? fetch)("https://oauth2.googleapis.com/token", { method: "POST", redirect: "manual", signal: AbortSignal.timeout(10000), headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri, grant_type: "authorization_code", code_verifier: flow.verifier }) })
-        if (response.status >= 300 && response.status < 400) return redirect_work("token_exchange")
+        if (response.status >= 300 && response.status < 400) return finish_sign_in("token_exchange")
         const result = await response.json() as { id_token?: string, error?: string }
-        if (!response.ok || !result.id_token) return redirect_work(result.error === "invalid_client" ? "client_configuration" : "token_exchange")
+        if (!response.ok || !result.id_token) return finish_sign_in(result.error === "invalid_client" ? "client_configuration" : "token_exchange")
         id_token = result.id_token
         token_result = result
-    } catch { return redirect_work("token_exchange_network") }
+    } catch { return finish_sign_in("token_exchange_network") }
     try {
         identity = await verify_google_token(id_token, env.GOOGLE_CLIENT_ID, flow.nonce, dependencies.keys)
-    } catch { return redirect_work("identity_verification") }
+    } catch { return finish_sign_in("identity_verification") }
     const now = Date.now()
     await env.DB.prepare("INSERT INTO auth_users (subject, email, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(subject) DO UPDATE SET email = excluded.email, name = excluded.name").bind(identity.subject, identity.email, identity.name, now).run()
     if (identity.picture) await env.DB.prepare("INSERT OR REPLACE INTO auth_profiles (subject, picture) VALUES (?, ?)").bind(identity.subject, identity.picture).run()
@@ -182,7 +191,7 @@ export async function auth_route(request: Request, env: Work_Env, dependencies: 
         await env.DB.prepare("DELETE FROM auth_google_grants WHERE session_hash = ?").bind(await auth_hash(previous)).run()
         await env.DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?").bind(await auth_hash(previous)).run()
     }
-    const response = redirect_work()
+    const response = finish_sign_in()
     response.headers.append("set-cookie", cookie(session_cookie, token, month / 1000))
     if (env.AUTH_JWT_SECRET) {
         const session = await read_session(new Request(request.url, { headers: { cookie: `${session_cookie}=${token}` } }), env)

@@ -6,7 +6,7 @@ import { createHash, randomBytes } from "node:crypto"
 test("Google button requests the code flow with the exact backend callback", async ({ page }) => {
     let authorization = ""
     // Intercept the first request in the redirect chain, before a synthetic client can reach Google.
-    await page.route("**/api/_/auth/google/start", async route => {
+    await page.context().route("**/api/_/auth/google/start", async route => {
         const response = await route.fetch({ maxRedirects: 0 })
         expect(response.status()).toBe(302)
         authorization = response.headers().location
@@ -17,6 +17,7 @@ test("Google button requests the code flow with the exact backend callback", asy
     await expect(page.locator("#main-content")).not.toHaveAttribute("inert", "", { timeout: 30000 })
     await page.getByRole("button", { name: "Sign in with Google", exact: true }).click()
     await expect.poll(() => authorization).not.toBe("")
+    await expect(page).toHaveURL(/\/work$/)
     const url = new URL(authorization)
     expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:8787/api/_/auth/google/callback")
     expect(url.searchParams.get("response_type")).toBe("code")

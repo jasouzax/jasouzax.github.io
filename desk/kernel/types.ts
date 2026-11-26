@@ -17,6 +17,7 @@ export type stat_info = { kind: "file" | "dir", size: number, writable: boolean,
 
 // The file system a process sees: one tree with the desk's files, plus /bin and /proc made by the kernel. Paths are absolute.
 export type fs_api = {
+    for_user?: (uid: number) => fs_api
     stat(path: string): Promise<stat_info | null>
     list(path: string): Promise<{ name: string, kind: "file" | "dir" }[]>
     read(path: string): Promise<string>

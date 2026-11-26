@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { fs_node } from "../../../desk/fs/opfs.ts"
-import { can_read, can_create, can_move, check_permissions } from "../../../desk/fs/permissions.ts"
+import { recursive_target, can_read, can_create, can_move, check_permissions } from "../../../desk/fs/permissions.ts"
 
 function folder(parent: fs_node | null, writable = false): fs_node {
     return { name: "folder", path: parent ? `${parent.path}/folder` : "/", kind: "dir", parent, writable, children: [], info: "", handle: null }
@@ -49,4 +49,15 @@ test("a file read failure disables reading its content without blocking creation
     assert.equal(can_read(file), false)
     assert.equal(can_read(dir), false)
     assert.equal(can_create(dir), true)
+})
+
+test("peer aliases cannot copy directories into themselves or re-export the network", () => {
+    const handle = { kind: "directory", name: "shared" }
+    const root = { path: "/", kind: "dir", parent: null, handle: {} } as unknown as fs_node
+    const source = { path: "/net/peer/shared", kind: "dir", parent: root, handle: { native_handle: handle } } as unknown as fs_node
+    const parent = { path: "/shared", kind: "dir", parent: root, handle } as unknown as fs_node
+    const target = { path: "/shared/child", kind: "dir", parent, handle: {} } as unknown as fs_node
+    assert.equal(recursive_target(source, target), true)
+    assert.equal(recursive_target({ ...source, path: "/net" }, root), true)
+    assert.equal(recursive_target(source, root), false)
 })

@@ -38,7 +38,7 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
             const state = new URL(start.headers.get("location")!).searchParams.get("state")
             const cookie = start.headers.get("set-cookie")!.split(";")[0]
             const callback = await runtime.dispatchFetch(`https://staging.example.com/api/_/auth/google/callback?state=${state}&code=synthetic-code`, { redirect: "manual", headers: { cookie } })
-            assert.equal(callback.headers.get("location"), "/work?auth_error=token_exchange")
+            assert.match(await callback.clone().text(), /"error":"token_exchange"/)
         }
         assert.equal(calls, 2, "redirects must never receive the authorization code or client secret")
         assert.equal((await db.prepare("SELECT count(*) AS n FROM auth_sessions").first<{ n: number }>())!.n, 0)
@@ -47,7 +47,7 @@ test("edge callback exchanges tokens, verifies identity, sets a session and refu
         const authorize = new URL(start.headers.get("location")!)
         id_token = await new SignJWT({ email: "jason@jasouza.com", email_verified: true, nonce: authorize.searchParams.get("nonce"), name: "Owner" }).setProtectedHeader({ alg: "RS256", kid: jwk.kid }).setIssuer("https://accounts.google.com").setAudience("test.apps.googleusercontent.com").setSubject("synthetic-owner").setIssuedAt().setExpirationTime("5m").sign(keys.privateKey)
         const callback = await runtime.dispatchFetch(`https://staging.example.com/api/_/auth/google/callback?state=${authorize.searchParams.get("state")}&code=synthetic-code`, { redirect: "manual", headers: { cookie: start.headers.get("set-cookie")!.split(";")[0] } })
-        assert.equal(callback.headers.get("location"), "/work")
+        assert.equal(callback.headers.get("location"), null)
         const cookie = callback.headers.getSetCookie().find(value => value.startsWith("__Host-jazu_session="))!.split(";")[0]
         const session = await runtime.dispatchFetch("https://staging.example.com/api/_/session", { headers: { cookie } })
         assert.deepEqual((await session.json() as any).user, { email: "jason@jasouza.com", name: "Owner", picture: "", role: "owner" })

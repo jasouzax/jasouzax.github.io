@@ -1,3 +1,4 @@
+import { selected_compute } from "../menu/computes.ts"
 // Process windows use xterm's VT parser and raw input. The kernel owns PIDs;
 // the lazy registry supplies compiled programs and their shared filesystem.
 
@@ -112,7 +113,7 @@ function new_server_shell(): proc {
 
 async function open_pid(item: desk_window, uri: string): Promise<boolean> {
     const terminal_request = /^(?:server:sh|host:|pid:(?:\/\/(?:sh|host))?)$/i.test(uri.trim())
-    if (uri.trim().toLowerCase() === server_shell_uri || (is_server_page(location.pathname) && terminal_request)) {
+    if (uri.trim().toLowerCase() === server_shell_uri || (selected_compute() === "personal-server" && terminal_request)) {
         attach(item, new_server_shell().pid)
         return true
     }
@@ -131,8 +132,7 @@ async function open_pid(item: desk_window, uri: string): Promise<boolean> {
         fail_window(item, uri, `${text("process_gone")} ${match[1]}`)
         return true
     }
-    if (is_server_page(location.pathname) && found.argv[0] !== "server_sh") attach(item, new_server_shell().pid)
-    else attach(item, found.pid)
+    attach(item, found.pid)
     return true
 }
 
@@ -217,8 +217,8 @@ function terminal_body(item: desk_window): HTMLElement {
 
 export function init_proc(): void {
     init_native_desktop()
-    const programs = async () => {
-        if (is_server_page(location.pathname)) return server_programs
+    const programs = async (argv?: string[]) => {
+        if (argv?.[0] === "server_sh") return server_programs
         const programs = await load_runtime()
         const names = Object.keys(programs).sort()
         if (names.join("\0") !== program_names.join("\0")) {
@@ -245,9 +245,6 @@ export function init_proc(): void {
     }
     // a process shown in a window that is still there keeps running when the page changes; leaving the desk page ends them
     document.addEventListener("jazu:page", () => {
-        if (is_server_page(location.pathname)) {
-            for (const item of kernel.table.values()) if (item.argv[0] !== "server_sh") kill(item.pid, 129)
-        }
         if (!document.querySelector(".desk[data-runtime]")) {
             for (const item of kernel.table.values()) if (item.running) kill(item.pid, 129)
             kernel.table.clear()

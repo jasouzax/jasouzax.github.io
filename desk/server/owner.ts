@@ -1,3 +1,4 @@
+import { register_compute } from "../menu/computes.ts"
 /*
  * The /server desk for the signed-in owner: the Pi's real file system replaces the desk's root while the agent is online.
  *
@@ -11,7 +12,7 @@
  * Limits
  *   One socket per tab. While the agent is away the root keeps the Pi's tree and operations fail with a readable error until it returns.
  */
-import { filesystem_initialized, swap_root, load_children, fs_root, redraw, remote_root_active } from "../fs/opfs.ts"
+import { filesystem_initialized, load_children, fs_root, redraw, remote_root_active } from "../fs/opfs.ts"
 import type { dir_handle } from "../fs/opfs.ts"
 import { load_status, note_snapshot, server } from "./desk.ts"
 import { is_server_page } from "./text.ts"
@@ -23,7 +24,7 @@ import { mount_sessions } from "./sessions.ts"
 // The Chromium windows of the Pi (scripts' windows and standalone sites), filled while the owner's link is up
 export const owner_windows = new Window_Store()
 let link: Server_Link | null = null
-let restore: (() => Promise<void>) | null = null
+let restore: (() => void) | null = null
 let starting = false
 let release_sessions: (() => void) | null = null
 const listeners = new Set<(link: Server_Link | null) => void>()
@@ -40,7 +41,7 @@ function announce(): void { for (const listener of [...listeners]) listener(link
 async function on_link_state(current: Server_Link): Promise<void> {
     if (current !== link || !current.connected || !current.online) return
     if (!restore) {
-        restore = await swap_root(remote_directory(current, "/") as dir_handle, true).catch(() => null)
+        restore = register_compute("personal-server", "Personal Server", remote_directory(current, "/") as dir_handle)
         if (current !== link) { await restore?.(); restore = null; return }
         current.send({ t: "fastfetch" })
         current.send({ t: "auto_state" })
@@ -83,15 +84,16 @@ export async function stop_owner(): Promise<void> {
     if (current) announce()
 }
 
-async function sync_owner(): Promise<void> {
+async function sync_owner(force = false): Promise<void> {
     if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) { await stop_owner(); return }
-    await load_status()
+    await load_status(force)
     if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) { await stop_owner(); return }
     if (server.mode === "owner") await start_owner()
     else await stop_owner()
 }
 
 export function init_server_owner(): void {
+    document.addEventListener("jazu:auth", () => { void sync_owner(true) })
     document.addEventListener("jazu:fs:init", () => { void sync_owner() })
     document.addEventListener("jazu:page", () => { if (!is_server_page(location.pathname) || !document.querySelector(".desk[data-runtime]")) void stop_owner() }, { capture: true })
     window.addEventListener("pagehide", () => { link?.close() })

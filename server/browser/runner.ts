@@ -73,6 +73,7 @@ export class Script_Runner extends EventEmitter {
     readonly #runs = new Map<string, Run>();
     readonly #loading = new Map<string, symbol>();
     readonly #retries = new Map<string, NodeJS.Timeout>();
+    readonly #retry_at = new Map<string, number>();
     readonly #attempts = new Map<string, number>();
     #shutting_down = false;
     readonly #logs = new Map<string, Log_Entry[]>();
@@ -106,10 +107,11 @@ export class Script_Runner extends EventEmitter {
     }
 
     // ---------- Control ----------
-    #state(script_path: string): { autostart?: boolean, restarting?: boolean } {
-        if (!this.#options.autostart) return {};
+    #state(script_path: string): { autostart?: boolean, restarting?: boolean, started_at?: number, restart_at?: number } {
+        const timing = { started_at: this.#runs.get(script_path)?.started_at, restart_at: this.#retry_at.get(script_path) };
+        if (!this.#options.autostart) return timing;
         const autostart = this.#options.autostart.has(script_path);
-        return { autostart, restarting: autostart && !this.is_running(script_path) };
+        return { ...timing, autostart, restarting: autostart && !this.is_running(script_path) };
     }
 
     #status(script_path: string): void {
@@ -157,6 +159,7 @@ export class Script_Runner extends EventEmitter {
     #cancel_retry(script_path: string): void {
         clearTimeout(this.#retries.get(script_path));
         this.#retries.delete(script_path);
+        this.#retry_at.delete(script_path);
         this.#loading.delete(script_path);
     }
 
@@ -168,10 +171,12 @@ export class Script_Runner extends EventEmitter {
         this.#log(script_path, 'system', `Restarting in ${delay} ms`);
         const timer = setTimeout(() => {
             this.#retries.delete(script_path);
+            this.#retry_at.delete(script_path);
             void this.#launch(script_path);
         }, delay);
         timer.unref();
         this.#retries.set(script_path, timer);
+        this.#retry_at.set(script_path, Date.now() + delay);
     }
 
     async stop(script_path: string): Promise<void> {
