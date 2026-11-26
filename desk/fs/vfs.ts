@@ -129,6 +129,7 @@ export function make_fs(programs: () => string[], uid = 1000, root = fs_root()):
     const resolve = (path: string) => resolve_at_root(path, root)
     const writable = (node: fs_node | null) => writable_dir(node, uid)
     const api: fs_api = {
+        scope: root || undefined,
         for_user: uid => make_fs(programs, uid, root),
         async chown(path, new_uid, gid) {
             if (uid !== 0) throw new Error("EACCES")

@@ -31,10 +31,14 @@ export async function check_permissions(nodes: fs_node[]): Promise<void> {
         const handle = node.handle as { queryPermission?: (options: { mode: string }) => Promise<string>, getFile?: () => Promise<unknown> } | null
         try {
             if (handle?.queryPermission) {
-                node.readable = await handle.queryPermission({ mode: "read" }) === "granted"
-                node.write_allowed = await handle.queryPermission({ mode: "readwrite" }) === "granted"
+                const readable = await handle.queryPermission({ mode: "read" }) === "granted"
+                const writable = await handle.queryPermission({ mode: "readwrite" }) === "granted"
+                if (node.handle !== handle) return
+                node.readable = readable
+                node.write_allowed = writable
             }
         } catch {
+            if (node.handle !== handle) return
             node.readable = false
             node.write_allowed = false
         }
@@ -55,4 +59,20 @@ export function recursive_target(source: fs_node, target: fs_node): boolean {
     }
     for (let parent: fs_node | null = target; parent; parent = parent.parent) if (source.handle && identity(parent) === identity(source)) return true
     return false
+}
+
+export async function check_directory_target(source: fs_node, target: fs_node): Promise<void> {
+    if (source.kind !== "dir") return
+    if (recursive_target(source, target)) throw new DOMException("Cannot place a directory inside itself", "InvalidModificationError")
+    const unwrap = (handle: unknown): any => {
+        const seen = new Set<unknown>()
+        while (handle && !seen.has(handle) && (handle as { native_handle?: unknown }).native_handle) { seen.add(handle); handle = (handle as { native_handle: unknown }).native_handle }
+        return handle
+    }
+    const from = unwrap(source.handle), to = unwrap(target.handle)
+    // OPFS computers have independent roots underneath one browser storage directory.
+    if (from?.resolve && to?.resolve) {
+        const relative = await from.resolve(to)
+        if (relative !== null) throw new DOMException("Cannot place a directory inside itself", "InvalidModificationError")
+    }
 }

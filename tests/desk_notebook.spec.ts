@@ -25,6 +25,8 @@ async function save_as(page: Page, window: Locator, name: string) {
     await dialog.locator('input[name="filename"]').fill(name)
     await dialog.getByRole("button", { name: "Save", exact: true }).click()
     await expect(dialog).toHaveCount(0)
+    await expect(window.locator(".desk_wbox_head_save")).toBeEnabled()
+    await expect(window.locator(".desk_wbox_head_save")).not.toHaveClass(/is_dirty/)
 }
 async function stored(page: Page, name: string) {
     return page.evaluate(async name => JSON.parse(await (await (await (await navigator.storage.getDirectory()).getFileHandle(name)).getFile()).text()), name)
