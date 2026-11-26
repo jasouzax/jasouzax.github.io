@@ -21,6 +21,9 @@
 <plugin id="auto_site" name="Automation site" version="1.0.0">
     <case view edit mime="application/auto-site" host="auto_site" />
 </plugin>
+<plugin id="markdown" name="Authored documents" version="1.0.0">
+    <case file view mime="text/markdown" url="file:///srv/*" host="markdown" />
+</plugin>
 <plugin id="notebook" name="Notebook" version="1.0.0">
     <case file view edit mime="text/markdown,application/x-ipynb+json" host="notebook" />
 </plugin>
@@ -34,9 +37,6 @@
 </plugin>
 <plugin id="html" name="HTML preview" version="1.0.0">
     <case file view mime="text/html" host="html" />
-</plugin>
-<plugin id="markdown" name="Authored documents" version="1.0.0">
-    <case file view mime="text/markdown" url="file:///srv/*" host="markdown" />
 </plugin>
 <plugin id="media" name="Media" version="1.0.0">
     <case file view mime="application/pdf,image/*,audio/*,video/*" host="media" />

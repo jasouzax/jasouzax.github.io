@@ -1,4 +1,7 @@
 /* Server_Hub with fake sockets: relaying and peer injection, endpoint privacy, gateway answers/timeouts/limits, one-minute snapshot, picture routing. */
+import { Api_Registry, serve_http } from "../../../server/api/prototype.ts"
+import { Script_Runner } from "../../../server/browser/runner.ts"
+import { route } from "../../../cloud/router/index.ts"
 import { test, mock } from "node:test"
 import assert from "node:assert/strict"
 import { Server_Hub, snapshot_max_age } from "../../../cloud/hub/hub.ts"
@@ -168,4 +171,44 @@ test("snapshot: fetched once per minute for any number of visitors, kept for the
     advance(10 * snapshot_max_age)
     const offline = await status()
     assert.deepEqual([offline.online, offline.snapshot.text, offline.stale], [false, "OS: Pi 2", true])
+})
+
+
+test("public automation script answers through the website router and agent hub", async () => {
+    const { hub, connect } = setup(), apis = new Api_Registry()
+    const agent = await connect("agent")
+    const publish = () => hub.webSocketMessage(agent.socket as any, JSON.stringify({ t: "api_set", apis: apis.list() }))
+    const send = agent.socket.send.bind(agent.socket)
+    agent.socket.send = data => {
+        send(data)
+        if (typeof data !== "string") return
+        const message = JSON.parse(data)
+        if (message.t === "api_req") void serve_http(apis, message).then(answer => hub.webSocketMessage(agent.socket as any, JSON.stringify({ t: "api_res", ...answer })))
+    }
+    const runner = new Script_Runner({
+        read_source: async () => "const api = new API('test', {public: true}); api.get('', () => ({msg:'Hello World'})); await new Promise(()=>{});",
+        web_class: class { static pages = []; static keep_alive = false } as any,
+        apis, root: process.cwd(), catch_stray: false,
+    })
+    const env = { DOMAIN: "example.com", PAGES_ORIGIN: "https://pages.example.net", SERVER_HUB: { idFromName: () => "main", get: () => ({ fetch: (request: Request) => hub.fetch(request) }) } }
+    const request = (path: string, method = "GET") => route(new Request(`https://example.com${path}`, { method }), env)
+    try {
+        await runner.start("/test.auto.js")
+        await flush(); await publish()
+        for (const path of ["/api/test", "/api/test/"]) {
+            const response = await request(path)
+            assert.equal(response.status, 200)
+            assert.deepEqual(await response.json(), { msg: "Hello World" })
+            assert.equal(response.headers.get("content-security-policy"), "sandbox")
+        }
+        assert.equal(await (await request("/api/test", "HEAD")).text(), "")
+        assert.equal((await request("/api/test/unknown")).status, 404)
+        assert.equal((await request("/api/unknown")).status, 404)
+        const private_api = apis.create({ script_id: "private", script_name: () => "private", run: task => task(), report() {}, closed() {} }, "private")
+        private_api.get("", () => "secret")
+        await publish()
+        assert.equal((await request("/api/private")).status, 404)
+        await runner.stop("/test.auto.js"); await publish()
+        assert.equal((await request("/api/test")).status, 404)
+    } finally { await runner.stop("/test.auto.js") }
 })

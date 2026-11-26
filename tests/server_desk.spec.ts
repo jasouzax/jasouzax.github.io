@@ -299,6 +299,9 @@ test("Sessions use standard side items with icons and persistent script actions"
     await options.getByRole('button', { name: 'Start', exact: true }).click()
     await expect(script).toHaveAttribute('data-running', 'true')
     expect(api.messages.some(message => message.t === 'auto_start' && message.path === '/run.auto.js')).toBe(true)
+    const before_restart = api.messages.length
+    await options.getByRole('button', { name: 'Restart', exact: true }).click()
+    await expect.poll(() => api.messages.slice(before_restart).filter(message => ['auto_stop', 'auto_start'].includes(message.t)).map(message => message.t)).toEqual(['auto_stop', 'auto_start'])
     await options.getByRole('button', { name: 'Clear', exact: true }).click()
     expect(api.messages.some(message => message.t === 'auto_clear_logs' && message.path === '/run.auto.js')).toBe(true)
     const standalone = panel.locator('.server_session_site').filter({ has: page.locator('[data-session-uri="server:window:2"]') })

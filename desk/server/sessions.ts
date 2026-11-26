@@ -1,3 +1,4 @@
+import { restart_session } from "./sessions/control.ts"
 import { select_compute } from "../menu/computes.ts"
 import { mount_options, option_group, option_button } from "../menu/options.ts"
 import { session_description } from "./sessions_model.ts"
@@ -14,6 +15,12 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
     const page = aside?.querySelector<HTMLElement>('.desk_side_page[data-path="server:sessions"]')
     if (!aside || !page) return () => {}
     const scripts = new Session_Store()
+    const control_abort = new AbortController(), restarting = new Set<string>()
+    const restart_script = (path: string) => {
+        if (restarting.has(path)) return
+        restarting.add(path)
+        void restart_session(link, path, control_abort.signal).catch(error => { notice.textContent = error.message }).finally(() => restarting.delete(path))
+    }
     const api_panel = document.createElement("section")
     const options = document.createElement("div"), notice = document.createElement("p"), row_tools = document.createElement("div"), api_tools = document.createElement("div")
     row_tools.className = "desk_files_buttons"; api_tools.className = "server_api_controls"
@@ -120,7 +127,7 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
             const active = script.running || script.autostart
             const { entry, box } = row(script.path.split("/").pop() || script.path, `file://${script.path}`, "application/auto-javascript", [
                 action(active ? "stop" : "start", text(active ? "server_script_stop" : "server_script_start"), active ? "pause" : "view", () => link.send({ t: active ? "auto_stop" : "auto_start", path: script.path })),
-                action("restart", "Restart", "refresh", () => link.send({ t: "auto_restart", path: script.path })),
+                action("restart", "Restart", "refresh", () => restart_script(script.path)),
                 action("window", text("server_script_new_window"), "window", () => link.send({ t: "window_create", script: script.path })),
                 action("clear", text("server_script_clear"), "refresh", () => link.send({ t: "auto_clear_logs", path: script.path })),
                 action("delete", text("files_delete"), "delete", () => link.send({ t: "auto_delete", path: script.path })),
@@ -152,7 +159,7 @@ export function mount_sessions(link: Server_Link, windows: Window_Store): () => 
     sync_tabs(); draw()
     return () => {
         for (const off of offs) off()
-        clearInterval(ticker); document.removeEventListener("jazu:desk:change", focus_changed); release_options(); release_apis()
+        control_abort.abort(); clearInterval(ticker); document.removeEventListener("jazu:desk:change", focus_changed); release_options(); release_apis()
         for (const tab of tabs) tab.removeEventListener("toggle", sync_tabs)
         scripts.clear(); page.replaceChildren()
     }

@@ -7,7 +7,7 @@ import { Worker } from "node:worker_threads"
 import { build } from "esbuild"
 import { register_wasm, registered_programs } from "../../../desk/kernel/wasm_host.ts"
 import type { worker_factory } from "../../../desk/kernel/wasm_host.ts"
-import { kernel, reset_kernel, start_process, make_sink, kill } from "../../../desk/kernel/process.ts"
+import { kernel, reset_kernel, start_process, make_sink, make_stream, interrupt, kill } from "../../../desk/kernel/process.ts"
 import { cleanup_llvm } from "../../../desk/program/gcc/service.ts"
 import type { fs_api } from "../../../desk/kernel/types.ts"
 
@@ -251,6 +251,31 @@ test("compiled BusyBox shares binary files, forks shells and connects real pipes
         const result = await run("sleep 1 && echo awake")
         assert.deepEqual(result, { stdout: "awake\n", stderr: "", code: 0 })
         assert.ok(performance.now() - before >= 900)
+    })
+    await t.test("interrupt wakes a sleeping interactive shell and preserves it", { timeout: 15000 }, async () => {
+        const stdin = make_stream()
+        let stdout = ""
+        const shell = start_process(["sh"], { root: true, interactive: true, cwd: "/home/user", env: { PATH: "/bin", HOME: "/home/user" }, stdin, stdout: make_sink(text => { stdout += text }) })
+        const until = async (ready: () => boolean) => {
+            const deadline = Date.now() + 10000
+            while (!ready()) { assert.ok(Date.now() < deadline, stdout); await new Promise(resolve => setTimeout(resolve, 20)) }
+        }
+        try {
+            stdin.write("sleep 30\n")
+            await until(() => stdout.includes("sleep 30"))
+            await new Promise(resolve => setTimeout(resolve, 200))
+            interrupt(shell)
+            stdin.write("echo INTERRUPTED_OK\n")
+            await until(() => /\nINTERRUPTED_OK\r?\n/.test(stdout))
+            assert.equal(shell.running, true)
+            stdin.write("sleep 30\n")
+            await until(() => [...kernel.table.values()].some(p => p.ppid === shell.pid && p.argv[0] === "sleep"))
+            await new Promise(resolve => setTimeout(resolve, 500))
+            interrupt(shell)
+            stdin.write("echo SECOND_INTERRUPT_OK\n")
+            await until(() => /\nSECOND_INTERRUPT_OK\r?\n/.test(stdout))
+            assert.equal(shell.running, true)
+        } finally { kill(shell.pid) }
     })
     await t.test("concurrent appenders share kernel file offsets without losing bytes", async () => {
         const result = await run("touch /tmp/append; (for i in 1 2 3 4 5; do printf A >> /tmp/append; done) & (for i in 1 2 3 4 5; do printf B >> /tmp/append; done) & wait; wc -c < /tmp/append")

@@ -10,7 +10,7 @@ import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handl
 import { resolve as resolve_node } from "./vfs.ts"
 import { memory_directory, named_directory, type memory_handle } from "./memory.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "../window/folder/files.ts"
-import { can_browse, can_read, can_create, can_move, check_permissions, recursive_target } from "./permissions.ts"
+import { can_browse, can_read, can_create, can_move, check_permissions, recursive_target, check_directory_target } from "./permissions.ts"
 import { selection_click, type file_selection } from "../window/folder/selection.ts"
 import { local_file_path } from "./paths.ts"
 import { sync_navigation, remap_navigation } from "../action/history.ts"
@@ -1035,6 +1035,7 @@ async function copy_node(node: fs_node, parent: dir_handle, name: string): Promi
 
 async function paste_entries(dir: fs_node): Promise<void> {
     if (!can_create(dir) || !clipboard.length) return note(text("files_unsupported"))
+    for (const source of clipboard) await check_directory_target(source, dir)
     if (clipboard.some(node => recursive_target(node, dir) || (node.kind === "dir" && same_filesystem(node, dir) && (dir.path === node.path || dir.path.startsWith(`${node.path}/`))))) return note(text("files_unsupported"))
     await load_children(dir)
     const occupied = new Set((dir.children ?? []).map(node => node.name))
@@ -1244,6 +1245,7 @@ function run_action(action: string, node: fs_node | null): void {
 let dragged: fs_node[] = []
 
 async function move_entry(node: fs_node, dir: fs_node, name = node.name): Promise<void> {
+    await check_directory_target(node, dir)
     const from = node.parent
     if (!from) return
     if (dir.children === null) await load_children(dir)

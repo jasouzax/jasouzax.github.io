@@ -1,3 +1,4 @@
+import { browser_home_directory } from "./storage.ts"
 import type { dir_handle, file_handle } from "./opfs.ts"
 import { available_name } from "../window/folder/files.ts"
 
@@ -35,7 +36,7 @@ export function home_directory(): Promise<home_mount> {
             // Never replace a disconnected folder with an old private-storage copy.
             return { handle, connected: true, writable }
         }
-        return { handle: await navigator.storage.getDirectory(), connected: false, writable: true }
+        return { handle: await browser_home_directory(), connected: false, writable: true }
     })().catch(error => { mounted = null; throw error })
 }
 
@@ -67,7 +68,7 @@ export async function connect_home(target: dir_handle): Promise<{ persistent: bo
         const same = !!await source.isSameEntry?.(target)
         const names = new Map<string, string>()
         if (!same) {
-            if (await source.resolve?.(target) || await (target as native_directory).resolve?.(source)) throw new Error("Choose a folder outside the current home folder")
+            if (await source.resolve?.(target) || await (target as native_directory).resolve?.((source.native_handle || source) as dir_handle)) throw new Error("Choose a folder outside the current home folder")
             const occupied = new Set<string>(), entries: (file_handle | dir_handle)[] = []
             for await (const entry of target.values()) occupied.add(entry.name)
             for await (const entry of source.values()) entries.push(entry)
@@ -96,7 +97,7 @@ export async function disconnect_home(): Promise<void> {
     if (connecting) throw new Error("A folder connection is already in progress")
     connecting = true
     try {
-        const handle = await navigator.storage.getDirectory()
+        const handle = await browser_home_directory()
         await record(null)
         mounted = Promise.resolve({ handle, connected: false, writable: true })
         await Promise.all([...home_listeners].map(listener => listener({ names: new Map() })))

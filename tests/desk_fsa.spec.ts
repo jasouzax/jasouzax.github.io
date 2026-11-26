@@ -3,14 +3,23 @@ const expect = base_expect.configure({ timeout: 15000 })
 
 // Use native handles in a separate storage bucket so reads, writes, serialization,
 // and restoration exercise the browser API without automating an OS picker.
-async function picker(page: Page) {
-    await page.addInitScript(() => {
+async function picker(page: Page, settings: { delayed?: boolean, fail_transfer?: boolean } = {}) {
+    await page.addInitScript((settings) => {
         Object.defineProperty(FileSystemFileHandle.prototype, "move", { configurable: true, value: async () => { throw new DOMException("Native moves unavailable", "NotSupportedError") } })
-        Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: async (options: unknown) => {
+        const choose = async (options?: unknown) => {
             ;(window as any).picker_options = options
             return (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
-        } })
-    })
+        }
+        Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: settings.delayed ? (options: unknown) => new Promise(resolve => { (window as any).finish_picker = async () => resolve(await choose(options)) }) : choose })
+        if (settings.fail_transfer) {
+            const get_file = FileSystemDirectoryHandle.prototype.getFileHandle; let copies = 0
+            FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+                const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
+                if (options?.create && await this.isSameEntry(chosen) && ++copies === 2) throw new DOMException("Transfer failed", "NotAllowedError")
+                return get_file.call(this, name, options)
+            }
+        }
+    }, settings)
 }
 async function connect(page: Page) {
     await page.locator("#head_account > summary").click()
@@ -200,7 +209,7 @@ test("revoked connection permissions disconnect without restoring transferred pr
     await open(page.locator(".desk_wbox").first(), "/home/user")
     await expect(page.locator('.desk_folder_tile[data-path="/home/user/stale.txt"]')).toHaveCount(0)
     await page.locator("#head_menu > summary").click()
-    for (const name of ["New file", "New folder", "Upload"]) await expect(page.locator(".desk_files_bar").getByRole("button", { name, exact: true })).toBeEnabled()
+    for (const name of ["File", "Folder", "Upload"]) await expect(page.locator(".desk_files_bar").getByRole("button", { name, exact: true })).toBeEnabled()
     await page.reload()
     await page.locator("#head_account > summary").click()
     await expect(page.getByRole("button", { name: "Connect to Folder", exact: true })).toBeEnabled()
@@ -295,13 +304,7 @@ test("a new tab can authorize its saved folder without picking or copying it aga
 })
 
 test("connecting shows progress and transferred files cannot return after deletion and reconnecting", async ({ page }) => {
-    await picker(page)
-    await page.addInitScript(() => {
-        const choose = (window as any).showDirectoryPicker
-        ;(window as any).showDirectoryPicker = () => new Promise(resolve => {
-            ;(window as any).finish_picker = async () => resolve(await choose())
-        })
-    })
+    await picker(page, { delayed: true })
     await page.goto("/")
     await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory()
@@ -346,16 +349,7 @@ test("connecting shows progress and transferred files cannot return after deleti
 })
 
 test("a failed transfer keeps all OPFS originals and restores the connect label", async ({ page }) => {
-    await picker(page)
-    await page.addInitScript(() => {
-        const get_file = FileSystemDirectoryHandle.prototype.getFileHandle
-        let copies = 0
-        FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
-            const chosen = await (await (navigator as any).storageBuckets.open("connected-home")).getDirectory()
-            if (options?.create && await this.isSameEntry(chosen) && ++copies === 2) throw new DOMException("Transfer failed", "NotAllowedError")
-            return get_file.call(this, name, options)
-        }
-    })
+    await picker(page, { fail_transfer: true })
     await page.goto("/")
     await page.evaluate(async () => {
         const root = await navigator.storage.getDirectory()

@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { fs_node } from "../../../desk/fs/opfs.ts"
-import { recursive_target, can_read, can_create, can_move, check_permissions } from "../../../desk/fs/permissions.ts"
+import { check_directory_target, recursive_target, can_read, can_create, can_move, check_permissions } from "../../../desk/fs/permissions.ts"
 
 function folder(parent: fs_node | null, writable = false): fs_node {
     return { name: "folder", path: parent ? `${parent.path}/folder` : "/", kind: "dir", parent, writable, children: [], info: "", handle: null }
@@ -60,4 +60,27 @@ test("peer aliases cannot copy directories into themselves or re-export the netw
     assert.equal(recursive_target(source, target), true)
     assert.equal(recursive_target({ ...source, path: "/net" }, root), true)
     assert.equal(recursive_target(source, root), false)
+})
+
+test("native containment checks reject persistent compute roots nested in the source storage", async () => {
+    const target_handle = { resolve: async () => null }
+    const source = folder(null, true), target = folder(null, true)
+    source.path = "/home/user"; source.handle = { resolve: async (other: unknown) => other === target_handle ? [".computes", "id"] : null }
+    target.handle = { native_handle: target_handle }
+    await assert.rejects(check_directory_target(source, target), /inside itself/)
+    target.handle = { getDirectoryHandle: async () => {} }
+    await check_directory_target(source, target)
+})
+
+test("permission results from a replaced folder cannot disable its new mount", async () => {
+    let finish!: (value: string) => void
+    const pending = new Promise<string>(resolve => { finish = resolve })
+    const node = folder(null, true)
+    node.handle = { queryPermission: () => pending }
+    const checking = check_permissions([node])
+    node.handle = {}; node.readable = true; node.write_allowed = true
+    finish("denied")
+    await checking
+    assert.equal(node.readable, true)
+    assert.equal(node.write_allowed, true)
 })

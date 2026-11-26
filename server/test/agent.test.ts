@@ -246,3 +246,17 @@ test("site windows open and close by key, and a dropped link clears watching and
     assert.equal(shells.length, 1)
     assert.deepEqual(windows.calls.filter(call => call[0] === "watch").at(-1), ["watch", null, 0, false])
 })
+
+
+test("restarting a session waits for shutdown and starts a fresh run with timing metadata", async () => {
+    const path = "/restart.auto.js", { runner, agent, sent } = setup({ files: { [path]: "setInterval(() => {}, 100000)" } })
+    try {
+        await runner.start(path)
+        const first = runner.list()[0].started_at!
+        agent.handle({ t: "auto_restart", path, peer: "owner" })
+        await wait_for(() => runner.logs(path).filter(entry => entry.text === "Started").length === 2)
+        assert.equal(runner.is_running(path), true)
+        assert.ok(runner.list()[0].started_at! >= first)
+        assert.ok(sent.some(item => item.message.t === "auto_status" && item.message.running && typeof item.message.started_at === "number"))
+    } finally { await runner.stop_all() }
+})

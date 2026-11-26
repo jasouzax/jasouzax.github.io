@@ -82,3 +82,17 @@ On `/server`, open Sessions and use Custom APIs. Enter an absolute `.auto.js` pa
 The fixed BFF is GET `/api/_/apis`, POST `/api/_/apis/deploy` with `{source}`, and POST `/api/_/apis/rollback|stop` with `{id,version}`. It never sends cookies/bearers to the origin and cannot execute arbitrary supervisor commands. Multi-server selection, Durable Object transport and per-owner API origins are still pending.
 
 Verification uses real Node child processes, real SQLite, the actual HTTP listener, a bundled workerd Worker and synthetic secrets. It covers version isolation, shared durable state, crash restart, failed replacement, rollback, HMAC replay rejection, gateway cookie/header isolation, operator CLI status, live token revocation, scopes, route ordering, schemas and timeouts. The running production service and cloud state were not changed. See [APISERVER.md](../../APISERVER.md) for policy and remaining phases.
+
+## APIs published by automation scripts
+
+Scripts run as `application/auto-javascript` in the personal-server browser agent use the named API interface:
+
+```js
+const api = new API('test', { public: true });
+api.get('', () => ({ msg: 'Hello World' }));
+await new Promise(() => {});
+```
+
+While this script is running and the agent is connected, `GET /api/test` returns `{"msg":"Hello World"}`. The root path also accepts a trailing slash. Named APIs default to private; without `public: true`, only the authenticated site owner can call them. Stopping the script removes its published routes. Unknown and inaccessible private APIs both return 404; a known API with an offline agent returns 503. The hub applies its existing public request limits and the gateway filters response headers and sandboxes HTML.
+
+These routes use the browser agent's existing API registry and relay. `/api/{id}/v{n}` retains precedence and continues to use the separate versioned Node API platform above. Deploy the updated website Worker to activate named automation routing; pushing Git branches does not itself replace an already running Worker or server image.

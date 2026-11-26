@@ -84,6 +84,7 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
     const children = new Map<number, { done: Promise<number>, code?: number }>()
     const controller = new AbortController()
     let interrupt_read: (() => void) | null = null
+    let interrupt_sleep: (() => void) | null = null
     const tty: terminal = { cols: 80, rows: 24, pending: new Uint8Array(), line: "", decoder: new TextDecoder(), termios: { c_iflag: 0x500, c_oflag: 5, c_cflag: 0xbf, c_lflag: 0x8a3b, c_cc: [3,28,127,21,4,0,1,0,17,19,26] } }
     const own = (id: number) => { owned.set(id, (owned.get(id) ?? 0) + 1); return id }
     const retain = (id: number) => { get(id).refs++; own(id); return id }
@@ -97,6 +98,7 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
         if (/^(?:.*\/)?(?:sh|ash)$/.test(p.argv[0])) {
             if (active_control) Atomics.store(active_control, 2, 1)
             interrupt_read?.()
+            interrupt_sleep?.()
         } else p.kill(p.pid, 130)
     })
 
@@ -184,6 +186,9 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
         })
     }
     async function dispatch(op: string, a: any): Promise<any> {
+        // A command may still be resolving/loading when Ctrl+C arrives. Do not
+        // start or wait for its foreground child after the shell was interrupted.
+        if (active_control && Atomics.load(active_control, 2) && ["fork", "spawn", "wait", "sleep"].includes(op)) throw new Error("EINTR")
         switch (op) {
             case "identity": return { uid: p.uid ?? 1000, gid: p.gid ?? 1000 }
             case "account": {
@@ -309,7 +314,21 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
             case "chdir": p.cwd = norm(a.path); return 0
             case "termios": if (a.value) terminal_state.termios = a.value; return terminal_state.termios
             case "winsize": return [terminal_state.rows, terminal_state.cols]
-            case "sleep": await new Promise<void>(resolve => { const timer = setTimeout(resolve, Math.min(a.ms, 2147483647)); controller.signal.addEventListener("abort", () => { clearTimeout(timer); resolve() }, { once: true }) }); return 0
+            case "sleep": {
+                await new Promise<void>((resolve, reject) => {
+                    const finish = (interrupted = false) => {
+                        clearTimeout(timer)
+                        controller.signal.removeEventListener("abort", abort)
+                        interrupt_sleep = null
+                        if (interrupted) reject(new Error("EINTR")); else resolve()
+                    }
+                    const abort = () => finish()
+                    const timer = setTimeout(finish, Math.min(a.ms, 2147483647))
+                    interrupt_sleep = () => finish(true)
+                    controller.signal.addEventListener("abort", abort, { once: true })
+                })
+                return 0
+            }
             case "pipe": {
                 const queue: byte_queue = { chunks: [], readers: [], writers: 1, size: 0 }
                 return [own(allocate({ path: "pipe", flags: 0, offset: 0, kind: "pipe_read", queue })), own(allocate({ path: "pipe", flags: 1, offset: 0, kind: "pipe_write", queue }))]
@@ -473,6 +492,9 @@ export async function run_wasm(p: proc_api, initial: wasm_image, factory: worker
         const launch = async (image: wasm_image, argv: string[], env: Record<string, string>, snapshot?: fork_state) => {
             const module = await compiled(image)
             if (stopped) return
+            // exec replaces the worker/control buffer. Preserve an interrupt
+            // received while its replacement image was still loading.
+            if (active_control && Atomics.load(active_control, 2)) { finish(130); return }
             const worker = factory(image.worker)
             active = worker
             const shared = new SharedArrayBuffer(rpc_capacity)
