@@ -1,4 +1,4 @@
-/* Dispatch fixed system APIs and versioned custom APIs. The unversioned browser prototype has no public alias. */
+/* Dispatch fixed system APIs, versioned custom APIs and published automation APIs. */
 import { api_error } from "../security/headers.ts"
 import { work_route } from "../api/work.ts"
 import { session_route } from "../api/session.ts"
@@ -7,7 +7,7 @@ import { auth_route } from "../api/auth.ts"
 import { realtime_route } from "../room/room.ts"
 import { push_route } from "../api/push.ts"
 import { projects_route } from "../api/projects.ts"
-import { server_route } from "../api/server.ts"
+import { gateway_route, gateway_target, server_route } from "../api/server.ts"
 import type { worker_env, worker_context } from "./index.ts"
 import { custom_api_route, versioned_target } from "../gateway.ts"
 import { apis_route } from "../api/apis.ts"
@@ -24,5 +24,7 @@ export async function api_route(request: Request, env: worker_env, context?: wor
     if (path === "/api/_/health") return health_route(request, env)
     if (path === "/api/_/work" || path.startsWith("/api/_/work/")) return work_route(request, env)
     if (versioned_target(path)) return custom_api_route(request, env, fetch, context)
+    const automation = gateway_target(path)
+    if (automation) return gateway_route(request, env, automation.name, automation.rest)
     return api_error("not_implemented", "This API is not enabled; no client data is accepted", 501)
 }

@@ -20,7 +20,7 @@ JSON Schema draft-07 validation uses strict Ajv, without implicit coercion or pr
 
 `version` is an integer 1..9999. Optional `deprecated: 'YYYY-MM-DD'` adds Deprecation and Sunset headers. At most 256 routes are allowed per version. JSON bodies/results are bounded to 512 KiB, handlers to 30 seconds and pending IPC calls to 32 per process. A parent watchdog kills unresponsive child processes and retains autostart intent. Ordinary crashes retry with capped backoff. An OS-backed SQLite lock prevents competing supervisors from sharing one state directory and releases automatically when the controller dies.
 
-Deployment and operator commands are in [the custom API guide](docs/src/custom-apis.md). The old Electron VM prototype remains an internal automation compatibility surface, but its unversioned public gateway is retired without aliases.
+Deployment and operator commands are in [the custom API guide](docs/src/custom-apis.md). Automation scripts also expose named APIs at `/api/{name}` through the authenticated agent hub. Public access requires `{ public: true }`; private APIs are visible only to the site owner. Versioned paths `/api/{id}/v{n}` continue to use this separate Node API platform and take routing precedence.
 
 ## Jobs and hooks
 
