@@ -19,6 +19,7 @@ import { scene_heading, scene_player, scene_timeline } from "./scene.tsx"
 const runtime_keys = [
     "note_loading", "note_stored_outputs", "note_invalid", "note_undo", "note_redo", "note_add_code", "note_add_markdown", "note_add_raw", "note_kind_code", "note_kind_markdown", "note_kind_raw", "note_move_up", "note_move_down", "note_delete", "note_clear_outputs", "note_cell_source",
     "desk_map", "desk_windows", "map_zoom_in", "map_zoom_out", "map_reset",
+    "desktop_name", "desktop_create", "desktop_save", "desktop_leave", "desktop_open", "desktop_delete", "desktop_refresh", "desktop_temporary", "desktop_saved", "desktop_saving", "desktop_invalid_name", "desktop_exists", "desktop_storage_error", "desktop_conflict", "desktop_unsupported", "desktop_replace_confirm", "desktop_delete_confirm",
     "save_destination", "save_overwrite",
     "audio", "mute",
     "version_ref", "version_parents", "version_loading", "version_empty", "version_unavailable", "version_commits",
@@ -71,6 +72,8 @@ const runtime_keys = [
     "window_audio",
     "window_actions",
     "server_sessions_empty",
+    "server_api_title", "server_api_source", "server_api_deploy", "server_api_refresh", "server_api_rollback", "server_api_stop", "server_api_empty", "server_api_pending", "server_api_done", "server_api_error",
+    "server_api_usage",
     "previous",
     "forward",
     "folder_navigation",
@@ -187,7 +190,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh", "audio", "mute"]
+    const names = ["save", "compute", "disk", "file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh", "audio", "mute"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 

@@ -44,3 +44,15 @@ export async function check_permissions(nodes: fs_node[]): Promise<void> {
         }
     }))
 }
+
+// Aliases in /net can refer to the same directory through different filesystem roots.
+export function recursive_target(source: fs_node, target: fs_node): boolean {
+    if (source.kind !== "dir") return false
+    if (source.path === "/" || source.path === "/net") return true
+    const identity = (node: fs_node): unknown => {
+        const handle = node.handle as { native_handle?: unknown } | null
+        return handle?.native_handle || handle
+    }
+    for (let parent: fs_node | null = target; parent; parent = parent.parent) if (source.handle && identity(parent) === identity(source)) return true
+    return false
+}

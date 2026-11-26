@@ -1,0 +1,19 @@
+{
+    "name": "quickjs",
+    "version": "2025-09-13-jazu.1",
+    "extension": "tar.xz",
+    "commands": [
+        "qjs",
+        "js"
+    ],
+    "files": {
+        "wasm": "build/quickjs/quickjs.wasm",
+        "loader": "build/quickjs/quickjs.js"
+    },
+    "sha256": "7710c42544b4c7e5eeb893e0e6be6c12156ae54c2a400dd47b431f9c244df172",
+    "flags": {
+        "applet": false
+    },
+    "source_url": "https://bellard.org/quickjs/quickjs-2025-09-13-2.tar.xz",
+    "source_sha256": "996c6b5018fc955ad4d06426d0e9cb713685a00c825aa5c0418bd53f7df8b0b4"
+}

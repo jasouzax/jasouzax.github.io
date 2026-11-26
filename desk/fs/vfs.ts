@@ -8,10 +8,12 @@ import { list_procs, kernel } from "../kernel/process.ts"
 import { proc_record } from "../kernel/procfs.ts"
 
 type kind = "file" | "dir"
-let compiler_headers: Promise<void> | null = null
-function ensure_compiler_headers(): Promise<void> {
-    return compiler_headers ??= (async () => {
-        const root = fs_root()?.handle as dir_handle | null
+const compiler_headers = new WeakMap<fs_node, Promise<void>>()
+function ensure_compiler_headers(node = fs_root()): Promise<void> {
+    if (!node) return Promise.reject(new Error("ENOENT"))
+    const existing = compiler_headers.get(node); if (existing) return existing
+    const pending = (async () => {
+        const root = node.handle as dir_handle | null
         if (!root) throw new Error("ENOENT")
         // Existing system directories are not resurrected if root removed them.
         const usr = await root.getDirectoryHandle("usr")
@@ -39,7 +41,8 @@ function ensure_compiler_headers(): Promise<void> {
                 await u_writer.write(payload); await u_writer.close()
             }
         }
-    })().catch(error => { compiler_headers = null; throw error })
+    })().catch(error => { compiler_headers.delete(node); throw error })
+    compiler_headers.set(node, pending); return pending
 }
 
 function norm(path: string): string {
@@ -52,12 +55,12 @@ function norm(path: string): string {
     return "/" + parts.join("/")
 }
 
-export async function resolve(path: string): Promise<fs_node | null> {
+async function resolve_at_root(path: string, root?: fs_node | null): Promise<fs_node | null> {
     await filesystem_initialized()
     // WASM pathname lookup checks each parent before reaching the header itself.
     const clean = norm(path)
-    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc") || clean === "/usr/include" || clean.startsWith("/usr/include/")) try { await ensure_compiler_headers() } catch (error) { console.error("Compiler headers unavailable", error); return null }
-    let node = fs_root()
+    if (clean === "/usr/lib" || clean.startsWith("/usr/lib/") || clean.startsWith("/usr/lib/tcc") || clean === "/usr/include" || clean.startsWith("/usr/include/")) try { await ensure_compiler_headers(root || fs_root()) } catch (error) { console.error("Compiler headers unavailable", error); return null }
+    let node = root || fs_root()
     if (!node) return null
     for (const part of norm(path).split("/").filter(Boolean)) {
         if (node.kind !== "dir") return null
@@ -68,6 +71,8 @@ export async function resolve(path: string): Promise<fs_node | null> {
     }
     return node
 }
+
+export const resolve = resolve_at_root
 
 async function list_node(node: fs_node): Promise<fs_node[]> {
     if (node.children === null) await load_children(node)
@@ -120,9 +125,11 @@ function virtual_stat(path: string, programs: string[]): stat_info | null {
     return null
 }
 
-export function make_fs(programs: () => string[], uid = 1000): fs_api {
+export function make_fs(programs: () => string[], uid = 1000, root = fs_root()): fs_api {
+    const resolve = (path: string) => resolve_at_root(path, root)
     const writable = (node: fs_node | null) => writable_dir(node, uid)
     const api: fs_api = {
+        for_user: uid => make_fs(programs, uid, root),
         async chown(path, new_uid, gid) {
             if (uid !== 0) throw new Error("EACCES")
             const node = await resolve(path)

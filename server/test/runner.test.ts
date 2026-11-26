@@ -59,7 +59,8 @@ test("a timer makes the script a service until it is stopped; stop wakes sleeper
     await runner.start("/svc.auto.js")
     await settle(40)
     assert.equal(runner.is_running("/svc.auto.js"), true)
-    assert.deepEqual(runner.list(), [{ path: "/svc.auto.js", running: true, windows: 1 }])
+    assert.deepEqual(runner.list().map(({ started_at, restart_at, ...entry }) => entry), [{ path: "/svc.auto.js", running: true, windows: 1 }])
+    assert.ok(runner.list()[0].started_at! <= Date.now())
     assert.ok(texts(runner, "/svc.auto.js").includes("log:tick"))
     await runner.stop("/svc.auto.js")
     assert.equal(runner.is_running("/svc.auto.js"), false)
@@ -102,7 +103,7 @@ test("logs are capped, clearable, and open_window adds a blank window without ru
     assert.ok(events.some(event => event[0] === "logs_cleared"))
     assert.equal(runner.open_window("/w.auto.js"), true)
     assert.equal(runner.open_window("/w.txt"), false)
-    assert.deepEqual(runner.list().find(item => item.path === "/w.auto.js"), { path: "/w.auto.js", running: false, windows: 1 })
+    assert.deepEqual(runner.list().map(({ started_at, restart_at, ...entry }) => entry).find(item => item.path === "/w.auto.js"), { path: "/w.auto.js", running: false, windows: 1 })
 })
 
 test("deleting a session stops its APIs and windows and forgets logs without deleting source", async () => {

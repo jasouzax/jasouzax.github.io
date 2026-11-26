@@ -3,7 +3,7 @@ import { state, text } from "../index.ts"
 import { mime_matches, is_mime } from "../mime/detect.ts"
 import { flow_kind_of, forget_edits } from "../plugin/flow.ts"
 import { head_part } from "../window/head.ts"
-import { render_window } from "../window/index.ts"
+import { render_window, process_hooks } from "../window/index.ts"
 
 export function mime_icon(mime: string): string {
     return state.data?.mimes.find(info => info.mime === mime)?.icon ?? state.data?.file_icon ?? ""
@@ -61,6 +61,7 @@ export function fill_mime_list(item: desk_window, query: string = ""): void {
 export function set_mime(item: desk_window, mime: string): void {
     if (item.parent) item.picks.mime = true
     if (flow_kind_of(item) === "convert") {
+        process_hooks.release(item); item.pid = null; item.error = ""
         item.file = null; item.path = item.name = ""; item.save = null
         forget_edits(item)
     }

@@ -61,6 +61,7 @@
         "location": "map-marker",
         "briefcase": "briefcase",
         "desk": "monitor",
+        "compute": "monitor",
         "work": "handshake",
         "project": "application-brackets-outline",
         "blog": "newspaper",

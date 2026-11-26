@@ -1,3 +1,4 @@
+import { option_group, mount_options } from "../menu/options.ts"
 // The Files side of a file-system desk. The server renders a Linux root of empty folders (the markup in desk.xml); this reads that markup into a
 // small tree, draws it again with its own state (open folders, the selected item) and opens files in windows.
 // /home/user will be backed by the browser's private file system (OPFS) and folders the visitor picks by the File System Access API (see below).
@@ -9,7 +10,7 @@ import { load_file, load_folder, open_source, head_part, upload_hooks, uri_handl
 import { resolve as resolve_node } from "./vfs.ts"
 import { memory_directory, named_directory, type memory_handle } from "./memory.ts"
 import { available_name, rename_pattern, zip_blob, type zip_entry } from "../window/folder/files.ts"
-import { can_browse, can_read, can_create, can_move, check_permissions } from "./permissions.ts"
+import { can_browse, can_read, can_create, can_move, check_permissions, recursive_target } from "./permissions.ts"
 import { selection_click, type file_selection } from "../window/folder/selection.ts"
 import { local_file_path } from "./paths.ts"
 import { sync_navigation, remap_navigation } from "../action/history.ts"
@@ -48,6 +49,7 @@ type tree_state = file_selection & {
 
 let tree: tree_state | null = null
 let shared_root: fs_node | null = null
+let browser_root: fs_node | null = null
 let hidden_mode = false
 export function hiding_dotfiles(): boolean { return hidden_mode }
 export function visible_entries(nodes: fs_node[]): fs_node[] { return hidden_mode ? nodes.filter(node => !node.name.startsWith(".")) : nodes }
@@ -95,6 +97,28 @@ export async function swap_root(handle: dir_handle, writable: boolean, signal?: 
         redraw()
         document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/" } }))
     }
+}
+
+/** Switch the selected computer without mutating the other computer's nodes or handles. */
+export async function select_filesystem(root: fs_node, virtual = false): Promise<void> {
+    await filesystem_ready
+    if (root.children === null || root.readable === false) await load_children(root)
+    if (root.readable === false) throw new Error("Unable to read the filesystem root")
+    const home = root.children?.find(node => node.name === "home")
+    if (home && home.children === null) await load_children(home)
+    clear_form()
+    if (tree?.message) tree.message.textContent = ""
+    shared_root = root; remote_active = !virtual
+    if (tree) {
+        tree.root = root; tree.open = new Set(["/", "/home", "/home/user"])
+        tree.selected = find_node("/home/user", root) || root
+        tree.selection = new Set([tree.selected.path]); tree.anchor = tree.selected.path; tree.range_base = null; tree.draft = null
+    }
+    redraw()
+    document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/", compute: true } }))
+}
+export function filesystem_node(handle: dir_handle, writable = true): fs_node {
+    return { name: "/", path: "/", kind: "dir", info: "", parent: null, children: null, handle, writable }
 }
 
 export function replace_directory(node: fs_node, handle: dir_handle, writable: boolean): void {
@@ -241,20 +265,6 @@ async function start_create(kind: "file" | "dir"): Promise<void> {
     redraw()
 }
 
-// The tools of the selected item sit under its row: rename, copy, download and delete work on that item, so they live with it
-// (the bar at the bottom only makes new things: a file, a folder, an upload).
-function make_item_tools(node: fs_node): HTMLElement {
-    const tools = document.createElement("div")
-    tools.className = "desk_side_item_tool"
-    tools.setAttribute("role", "toolbar")
-    tools.setAttribute("aria-label", `${text("files_toolbar")}: ${node.name}`)
-    tools.append(button("rename", text("files_rename"), "rename"))
-    tools.append(button("copy", text("files_copy"), "copy"))
-    tools.append(button("cut", text("files_cut"), "cut"))
-    tools.append(button("download", text("files_download"), "download"))
-    tools.append(button("delete", text("files_delete"), "delete"))
-    return tools
-}
 
 function render_node(node: fs_node, current: tree_state): HTMLElement {
     const article = document.createElement("article")
@@ -285,7 +295,7 @@ function render_node(node: fs_node, current: tree_state): HTMLElement {
         info.textContent = node.info
         box.append(info)
     }
-    if (current.selected === node && current.tools_visible && node.parent) box.append(make_item_tools(node))
+
     if (node.kind === "dir") {
         const list = document.createElement("ul")
         list.className = "desk_side_item_sub"
@@ -472,11 +482,6 @@ function select(node: fs_node | null, selection: Set<string>, tools_visible = tr
     const article = [...tree.page.querySelectorAll<HTMLElement>(".desk_side_item")].find(item => item.dataset.path === node.path)
     article?.querySelector(":scope > details > summary")?.setAttribute("data-focused", "")
     const box = article?.querySelector<HTMLDetailsElement>(":scope > details")
-    if (box && node.parent && tools_visible) {
-        const tools = make_item_tools(node)
-        box.insertBefore(tools, box.querySelector(":scope > ul"))
-        if (node.kind === "file") box.open = true
-    }
     sync_buttons()
     void refresh_permissions()
 }
@@ -590,7 +595,12 @@ function make_bar(): HTMLElement {
     message.setAttribute("role", "status")
     const buttons = document.createElement("div")
     buttons.className = "desk_files_buttons"
-    buttons.append(button("new_file", text("files_new_file"), "file_new"), button("new_folder", text("files_new_folder"), "folder_new"), button("paste", text("files_paste"), "paste"), button("upload", text("files_upload"), "upload"))
+    buttons.append(
+        option_group("Clip", button("paste", text("files_paste"), "paste"), button("copy", text("files_copy"), "copy"), button("cut", text("files_cut"), "cut"), button("delete", text("files_delete"), "delete")),
+        option_group("New", button("new_file", text("files_file"), "file_new"), button("new_folder", text("files_folder"), "folder_new")),
+        option_group("Disk", button("upload", text("files_upload"), "upload"), button("download", text("files_download"), "download")),
+        option_group("", button("rename", text("files_rename"), "rename")),
+    )
     bar.append(message, buttons)
     if (tree) tree.message = message
     return bar
@@ -600,7 +610,7 @@ function action_disabled(action: string, node: fs_node | null): boolean {
     if (["new_file", "new_folder", "upload", "paste"].includes(action)) {
         const dir = create_target()
         if (!can_create(dir)) return true
-        return action === "paste" && (!clipboard.length || clipboard.some(source => !can_read(source) || (clipboard_mode === "cut" && !can_move(source)) || (source.kind === "dir" && (source.path === "/" || dir!.path === source.path || dir!.path.startsWith(`${source.path}/`)))))
+        return action === "paste" && (!clipboard.length || clipboard.some(source => !can_read(source) || (clipboard_mode === "cut" && !can_move(source)) || (recursive_target(source, dir!) || (source.kind === "dir" && same_filesystem(source, dir!) && (dir!.path === source.path || dir!.path.startsWith(`${source.path}/`))))))
     }
     if (!node) return true
     const nodes = selected_nodes(node)
@@ -967,8 +977,11 @@ function selected_nodes(node: fs_node): fs_node[] {
 }
 
 // A selected parent already includes its selected descendants for recursive actions.
+function root_of(node: fs_node): fs_node { while (node.parent) node = node.parent; return node }
+function same_filesystem(a: fs_node, b: fs_node): boolean { return root_of(a) === root_of(b) }
+
 function topmost(nodes: fs_node[]): fs_node[] {
-    return nodes.filter(node => !nodes.some(parent => parent !== node && (parent.path === "/" || node.path.startsWith(`${parent.path}/`))))
+    return nodes.filter(node => !nodes.some(parent => parent !== node && same_filesystem(parent, node) && (parent.path === "/" || node.path.startsWith(`${parent.path}/`))))
 }
 
 async function rename_entries(nodes: fs_node[], pattern: string): Promise<void> {
@@ -1022,12 +1035,12 @@ async function copy_node(node: fs_node, parent: dir_handle, name: string): Promi
 
 async function paste_entries(dir: fs_node): Promise<void> {
     if (!can_create(dir) || !clipboard.length) return note(text("files_unsupported"))
-    if (clipboard.some(node => node.kind === "dir" && (dir.path === node.path || node.path === "/" || dir.path.startsWith(`${node.path}/`)))) return note(text("files_unsupported"))
+    if (clipboard.some(node => recursive_target(node, dir) || (node.kind === "dir" && same_filesystem(node, dir) && (dir.path === node.path || dir.path.startsWith(`${node.path}/`))))) return note(text("files_unsupported"))
     await load_children(dir)
     const occupied = new Set((dir.children ?? []).map(node => node.name))
     const paths: string[] = []
     for (const node of [...clipboard]) {
-        if (clipboard_mode === "cut" && node.parent?.path === dir.path) {
+        if (clipboard_mode === "cut" && node.parent === dir) {
             paths.push(node.path)
             clipboard = clipboard.filter(item => item !== node)
             continue
@@ -1095,7 +1108,7 @@ export function folder_action_enabled(action: folder_action, dir: fs_node, nodes
     if (["new_file", "new_folder", "upload", "paste"].includes(action)) {
         if (!can_create(dir)) return false
         if (action !== "paste") return true
-        return clipboard.length > 0 && clipboard.every(source => can_read(source) && (clipboard_mode !== "cut" || can_move(source)) && !(source.kind === "dir" && (source.path === "/" || dir.path === source.path || dir.path.startsWith(`${source.path}/`))))
+        return clipboard.length > 0 && clipboard.every(source => can_read(source) && (clipboard_mode !== "cut" || can_move(source)) && !(recursive_target(source, dir) || (source.kind === "dir" && same_filesystem(source, dir) && (dir.path === source.path || dir.path.startsWith(`${source.path}/`)))))
     }
     if (!nodes.length) return false
     if (action === "rename" || action === "delete") return nodes.every(node => node.mount || can_move(node))
@@ -1138,7 +1151,7 @@ export function dragged_entries(): fs_node[] { return dragged }
 export function end_entry_drag(): void { dragged = [] }
 
 export function can_drop_entries(dir: fs_node, nodes: fs_node[]): boolean {
-    return can_create(dir) && nodes.length > 0 && nodes.every(node => can_move(node) && can_read(node) && node.path !== dir.path && !dir.path.startsWith(`${node.path}/`)) && nodes.some(node => node.parent?.path !== dir.path)
+    return can_create(dir) && nodes.length > 0 && nodes.every(node => can_move(node) && can_read(node) && !recursive_target(node, dir) && node.path !== dir.path && !dir.path.startsWith(`${node.path}/`)) && nodes.some(node => node.parent?.path !== dir.path)
 }
 
 export async function move_folder_entries(dir: fs_node, paths: string[]): Promise<void> {
@@ -1154,7 +1167,7 @@ export async function move_folder_entries(dir: fs_node, paths: string[]): Promis
     await load_children(dir)
     const occupied = new Set((dir.children ?? []).map(node => node.name))
     for (const node of roots) {
-        if (node.parent?.path === dir.path) continue
+        if (node.parent === dir) continue
         const name = available_name(node.name, occupied)
         await move_entry(node, dir, name)
         occupied.add(name)
@@ -1181,6 +1194,11 @@ function run_action(action: string, node: fs_node | null): void {
         if (!store || !can_create(store)) return note(text("files_unsupported"))
         clear_form()
         pick_files(store)
+        return
+    }
+    if (action === "paste" && !node) {
+        const dir = create_target()
+        if (dir) void paste_entries(dir).catch(error => note((error as Error).message))
         return
     }
     if (!node) return note(text("files_no_selection"))
@@ -1354,7 +1372,7 @@ home_listeners.add(async ({ names }) => {
         const [name, ...rest] = path.slice("/home/user/".length).split("/")
         return `file:///home/user/${names.get(name) ?? name}${rest.length ? "/" + rest.join("/") : ""}`
     }
-    filesystem_ready = filesystem_ready.then(() => mount_opfs(shared_root!))
+    filesystem_ready = filesystem_ready.then(() => mount_opfs(browser_root!))
     await filesystem_ready
     clipboard = []
     if (tree) {
@@ -1384,7 +1402,7 @@ home_listeners.add(async ({ names }) => {
 
 // A file brought in from outside the tree (dropped on a window) is written to /tmp; the answer is its path in the tree.
 async function store_upload(file: File): Promise<string | null> {
-    const dir = tmp_node
+    const dir = remote_active ? find_node("/tmp") : tmp_node
     const handle = dir?.handle as dir_handle | null | undefined
     if (!dir || !handle || !valid_name(file.name)) return null
     try {
@@ -1423,18 +1441,33 @@ export function init_fs(desk: HTMLElement): void {
             return true
         })
     }
-    const page = desk.querySelector<HTMLElement>('.desk_side_page[data-path="file:///"]')
-    const root_box = page?.querySelector(":scope > .desk_side_item")
-    if (!page || !root_box) {
-        tree = null
-        return
+    let page = desk.querySelector<HTMLElement>('.desk_side_page[data-path="file:///"]')
+    if (!page) {
+        const side = desk.querySelector<HTMLElement>(".desk_side"), tabs = side?.querySelector(".desk_side_tabs_ul")
+        if (!side || !tabs) { tree = null; return }
+        const li = document.createElement("li"), tab = document.createElement("details"), summary = document.createElement("summary"), mark = document.createElement("span")
+        tab.className = "desk_side_tabs_drop"; tab.name = "desk_side_tab"; tab.dataset.path = "file:///"
+        mark.className = "desk_menu_tab_icon"; mark.textContent = state.data?.folder_icon || ""
+        mark.setAttribute("aria-hidden", "true"); summary.append(mark, "Files"); tab.append(summary); li.append(tab); tabs.append(li)
+        page = document.createElement("div"); page.className = "desk_side_page"; page.dataset.path = "file:///"; page.setAttribute("role", "feed"); side.append(page)
     }
-    const root = shared_root ?? read_markup(root_box, null)
+    const root_box = page.querySelector(":scope > .desk_side_item")
+    const root = shared_root ?? (root_box ? read_markup(root_box, null) : filesystem_node(memory_directory("/"), false))
+    if (!shared_root && !root_box) {
+        root.children = []
+        const add = (parent: fs_node, name: string): fs_node => {
+            const child: fs_node = { name, path: `${parent.path === "/" ? "" : parent.path}/${name}`, kind: "dir", info: "", parent, children: [], handle: null, writable: false }
+            parent.children!.push(child); return child
+        }
+        for (const name of ["bin", "boot", "dev", "etc", "home", "lib", "media", "mnt", "opt", "proc", "root", "run", "sbin", "srv", "sys", "tmp", "usr", "var"]) { const child = add(root, name); if (name === "home") add(child, "user") }
+        root.handle = null
+    }
     shared_root = root
+    browser_root ??= root
     const cwd = working_directory()
     // Desks share their filesystem across page swaps; add a project's directory when arriving from another desk.
     let initial = root
-    for (const name of cwd.split("/").filter(Boolean)) {
+    for (const name of (remote_active ? [] : cwd.split("/").filter(Boolean))) {
         let child = initial.children?.find(node => node.name === name)
         if (!child) {
             child = { name, path: `${initial.path === "/" ? "" : initial.path}/${name}`, kind: "dir", info: "", parent: initial, children: [], handle: null, writable: false }
@@ -1447,7 +1480,7 @@ export function init_fs(desk: HTMLElement): void {
     for (let node: fs_node | null = initial; node; node = node.parent) open.add(node.path)
     tree = { root, page, open, selected: initial, selection: new Set([initial.path]), anchor: initial.path, range_base: null, tools_visible: true, message: null, draft: null }
     upload_hooks.store = store_upload
-    filesystem_ready = (root.handle ? (async () => {
+    filesystem_ready = remote_active ? Promise.resolve() : (root.handle ? (async () => {
         let parent = root
         for (const name of cwd.split("/").filter(Boolean)) {
             const child = parent.children!.find(node => node.name === name)!
@@ -1460,13 +1493,12 @@ export function init_fs(desk: HTMLElement): void {
     })() : seed_system(root)).then(() => mount_opfs(root))
     void mount_executables(executable_names)
     redraw()
-    void filesystem_ready.then(() => restore_mounts(root))
+    void filesystem_ready.then(() => { if (!remote_active) return restore_mounts(root) })
     document.dispatchEvent(new Event("jazu:fs:init"))
     // the bar sits under the tree, in the panel itself, so it stays in view while the tree scrolls
-    const side = page.closest(".desk_side")
     const bar = make_bar()
     bar.addEventListener("click", on_bar_click)
-    side?.append(bar)
+    mount_options(page, bar)
     sync_buttons()
     void refresh_permissions()
     if (!page.dataset.bound) {

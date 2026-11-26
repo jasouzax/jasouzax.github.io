@@ -29,7 +29,7 @@ export async function api_transport(incoming: IncomingMessage, manager: Api_Mana
             return manifest ? Response.json(manifest, { headers: { "cache-control": "no-store" } }) : fail("not_found", "API unavailable", 404)
         }
         if (client === "api-admin") {
-            if (path === "/custom-api/_/status") return Response.json([...manager.releases].map(([key, release]) => ({ ...release, key, online: manager.active.has(key) })))
+            if (path === "/custom-api/_/status") return Response.json([...manager.releases].map(([key, release]) => ({ ...release, key, online: manager.active.has(key), transports: [...new Set(manager.active.get(key)?.manifest?.routes.flatMap(route => route.transport && route.transport !== "ticket" ? [route.transport] : []) ?? [])] })))
             if (path === "/custom-api/_/deploy" && typeof body.source === "string") return Response.json(await manager.deploy(body.source))
             if (valid_subdomain_id(body.id) && Number.isInteger(body.version) && body.version > 0 && body.version <= 9999) {
                 if (path === "/custom-api/_/rollback") return Response.json(await manager.rollback(body.id, body.version))

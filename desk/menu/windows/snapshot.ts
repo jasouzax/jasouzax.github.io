@@ -10,7 +10,7 @@ import { validate_snapshot, type Desktop_Snapshot } from "./model.ts"
 const identities = new WeakMap<object, number>(); let next_identity = 0
 function identity(value: object | null): number { if (!value) return 0; if (!identities.has(value)) identities.set(value, ++next_identity); return identities.get(value)! }
 export function desktop_signature(): string {
-    return JSON.stringify([working_directory(), capture_layout(), state.windows.map(item => [item.id, item.parent?.id, item.name, item.mime, item.path, item.icon, item.mode, item.picks, item.pid, item.error, item.hidden, item.minimized, identity(item.file), identity(latest_bytes(item)), is_dirty(item), item.dirty, window_audio_enabled(item), window_volume(item)])])
+    return JSON.stringify([working_directory(), capture_layout(), state.windows.map(item => [item.id, item.parent?.id, item.name, item.mime, item.path, item.icon, item.mode, item.picks, item.conversion, item.pid, item.error, item.hidden, item.minimized, identity(item.file), identity(latest_bytes(item)), is_dirty(item), item.dirty, window_audio_enabled(item), window_volume(item)])])
 }
 export function capture_desktop(): Desktop_Snapshot {
     if (remote_root_active() || is_server_page(location.pathname) || /(?:^|\/)work(?:\/|$)/.test(location.pathname)) throw new Error("Live desktops are not supported")
@@ -19,7 +19,7 @@ export function capture_desktop(): Desktop_Snapshot {
         const root = document_of(item), dirty = is_dirty(item) || item.dirty, bytes = latest_bytes(item)
         const draft = dirty && root === item && bytes ? new Blob([new Uint8Array(bytes)], { type: item.mime }) : null
         const path = /^(?:blob|data):/.test(item.path) ? "" : item.path
-        return { id: item.id, parent: item.parent?.id ?? null, name: item.name, mime: item.mime, mode: item.mode, path, icon: item.icon, file: item.file, draft, dirty, hidden: Boolean(item.hidden), minimized: item.minimized, picks: { ...item.picks }, audio: { enabled: window_audio_enabled(item), volume: window_volume(item) } }
+        return { id: item.id, parent: item.parent?.id ?? null, name: item.name, mime: item.mime, mode: item.mode, path, icon: item.icon, file: item.file, draft, dirty, hidden: Boolean(item.hidden), minimized: item.minimized, picks: { ...item.picks }, conversion: item.conversion ? { ...item.conversion } : undefined, audio: { enabled: window_audio_enabled(item), volume: window_volume(item) } }
     }) }
     validate_snapshot(snapshot)
     return snapshot
@@ -38,7 +38,7 @@ export async function restore_desktop(snapshot: Desktop_Snapshot, drafts: Map<nu
     for (const saved of snapshot.windows) {
         const item = new_window()
         if (!item) throw new Error("Cannot restore desktop window")
-        Object.assign(item, { name: saved.name, mime: saved.mime, mode: saved.mode, path: saved.path, icon: saved.icon, file: saved.file, save: null, dirty: saved.dirty, minimized: saved.minimized, hidden: saved.hidden, candidates: saved.mime ? [saved.mime] : [], picks: { ...saved.picks } })
+        Object.assign(item, { name: saved.name, mime: saved.mime, mode: saved.mode, path: saved.path, icon: saved.icon, file: saved.file, save: null, dirty: saved.dirty, minimized: saved.minimized, hidden: saved.hidden, candidates: saved.mime ? [saved.mime] : [], picks: { ...saved.picks }, conversion: saved.conversion ? { ...saved.conversion } : undefined })
         windows.set(saved.id, item)
     }
     for (const saved of snapshot.windows) if (saved.parent) adopt(windows.get(saved.parent)!, windows.get(saved.id)!)

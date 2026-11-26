@@ -1,11 +1,12 @@
 /* Versioned custom API routing only. The personal server remains authoritative for access, tokens, limits and schemas. */
-import type { worker_env } from "./router/index.ts"
+import type { worker_env, worker_context } from "./router/index.ts"
 import { read_session, valid_csrf } from "./api/auth.ts"
 import { api_error, sign_origin } from "./security/headers.ts"
 import { add_access_headers } from "./repo/front.ts"
 import { api_header, api_limit, api_transport_limit, api_methods, type Api_Call, type Api_Manifest, type Api_Result } from "../shared/api/types.ts"
 import { valid_subdomain_id } from "../shared/content/ids.ts"
 import { match_route, route_segments } from "../shared/api/routes.ts"
+import { live_response } from "./gateway/live.ts"
 type Fetcher = (request: Request) => Promise<Response>
 const manifests = new Map<string, { value: Api_Manifest, expires: number }>()
 export function versioned_target(path: string): { id: string, version: number, path: string } | null {
@@ -31,7 +32,7 @@ async function origin_call(env: worker_env, path: string, body: unknown, upstrea
     add_access_headers(headers, env); headers.set("content-type", "application/json")
     return upstream(new Request(target, { method: "POST", body: text, headers, redirect: "manual", signal: AbortSignal.timeout(35000) }))
 }
-export async function custom_api_route(request: Request, env: worker_env, upstream: Fetcher = fetch): Promise<Response> {
+export async function custom_api_route(request: Request, env: worker_env, upstream: Fetcher = fetch, context?: worker_context): Promise<Response> {
     const url = new URL(request.url), target = versioned_target(url.pathname)
     if (!target) return api_error("not_found", "Unknown versioned API", 404)
     if (!env.PERSONAL_ORIGIN || !env.ORIGIN_HMAC_SECRET) return api_error("api_offline", "Custom API origin is unavailable", 503)
@@ -55,15 +56,33 @@ export async function custom_api_route(request: Request, env: worker_env, upstre
         const routes = manifest.routes.filter(route => match_route(route_segments(route.path, true), segments))
         if (!routes.length) return api_error("not_found", "API route unavailable", 404)
         const declared = routes.find(route => route.method === request.method) ?? (request.method === "HEAD" ? routes.find(route => route.method === "GET") : undefined) ?? routes[0]
+        const websocket = request.headers.get("upgrade")?.toLowerCase() === "websocket"
+        if (declared.transport && declared.transport !== "ticket") {
+            if (request.method !== "GET") return api_error("method_not_allowed", "Streams require GET", 405)
+            if (websocket !== (declared.transport === "websocket")) return api_error("invalid_transport", "Use the declared SSE or WebSocket transport", 400)
+            if (websocket && (request.headers.has("origin") && request.headers.get("origin") !== url.origin || !url.searchParams.has("ticket") && !request.headers.has("authorization"))) return api_error("forbidden", "Browser WebSockets require a same-origin single-use stream ticket", 403)
+        } else if (websocket) return api_error("invalid_transport", "Not a WebSocket endpoint", 400)
         const query: Api_Call["query"] = Object.create(null)
         for (const [name, value] of url.searchParams) { const old = query[name]; query[name] = old === undefined ? value : Array.isArray(old) ? [...old, value] : [old, value] }
         const headers: Record<string, string> = {}
-        for (const name of new Set(["authorization", "content-type", "accept", "idempotency-key", ...(declared.headers ?? [])])) if (request.headers.has(name)) { const value = request.headers.get(name)!; if (value.length > 2048) return api_error("invalid_request", "API header exceeds the transport limit", 400); headers[name] = value }
+        for (const name of new Set(["authorization", "content-type", "accept", "idempotency-key", "last-event-id", ...(declared.headers ?? [])])) if (request.headers.has(name)) { const value = request.headers.get(name)!; if (value.length > 2048) return api_error("invalid_request", "API header exceeds the transport limit", 400); headers[name] = value }
         const call: Api_Call = { method: request.method, path: target.path, query, headers, ...(declared.raw ? { raw_body: body.raw ?? "" } : { body: body.value }), actor: { owner: session?.role === "owner" && !session.passkey_pending, ...(session ? { subject: session.subject } : {}) }, ip: request.headers.get("cf-connecting-ip") ?? "anonymous", request_id: crypto.randomUUID() }
         if (new TextEncoder().encode(JSON.stringify(call)).length > api_transport_limit) return api_error("body_too_large", "API call exceeds the transport limit", 413)
         const response = await origin_call(env, `/custom-api/${target.id}/v${target.version}`, call, upstream)
         if (response.status !== 200) return api_error("api_offline", "API origin rejected the request", 503)
         const result = await response.json() as Api_Result
+        if (result.stream && result.status === 200) {
+            if (result.stream.transport !== declared.transport || !/^[A-Za-z0-9_-]{43}$/.test(result.stream.id) || !/^[a-f0-9]{24}:\d{1,16}$/.test(result.stream.cursor)) throw new Error("Invalid stream descriptor")
+            return live_response(request, call, result.stream, async next => {
+                const response = await origin_call(env, `/custom-api/${target.id}/v${target.version}`, next, upstream)
+                if (response.status !== 200) throw new Error("Stream origin unavailable")
+                return await response.json() as Api_Result
+            }, async () => {
+                if (!call.actor.owner) return true
+                const current = await read_session(request, env)
+                return !!current && current.role === "owner" && !current.passkey_pending && current.subject === call.actor.subject
+            }, result.headers, task => context?.waitUntil(task))
+        }
         if (!Number.isInteger(result.status) || result.status < 200 || result.status > 599 || JSON.stringify(result.body).length > api_limit) throw new Error("Invalid API response envelope")
         const output = new Headers({ "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-security-policy": "sandbox; default-src 'none'; frame-ancestors 'none'", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" })
         for (const [name, value] of Object.entries(result.headers ?? {})) if (/^(x-[a-z0-9-]+|etag|last-modified|location|retry-after|deprecation|sunset)$/i.test(name) && !/^(x-content-type-options|x-frame-options)$/i.test(name)) output.set(name, value)

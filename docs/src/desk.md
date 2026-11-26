@@ -2,6 +2,8 @@
 
 The `/desk` workspace runs real GNU/Linux programs in the browser without a VM: a browser kernel, a shared filesystem, and C programs compiled to WebAssembly. Back to [site developer guide](README.md). Authoring: [../content/desk.md](../content/desk.md). Status: [../feat/desk.md](../feat/desk.md), [../feat/plugins.md](../feat/plugins.md).
 
+For executable examples, supported languages, image commands, SQLite and reproducible builds, see the [Desk command guide](desk-commands.md).
+
 Detailed, authoritative notes that live next to the code (read them before changing the shell or ports):
 
 - [`src/desk/README.md`](../../src/desk/README.md) — BusyBox ash port, runtime boundary, rebuilding, current limits, verification.
@@ -44,6 +46,18 @@ Detailed, authoritative notes that live next to the code (read them before chang
 `desk/menu/map/positions.ts` validates browser-local placement records. Entry resource paths/IDs keep file-node placement stable across redraws. `desk/action/volume.ts` shares mute/level between media and remote audio; `desk/server/audio.ts` applies level through its GainNode. Optional `Window_Info.audible` comes from Electron audio-state events, so remote muted playback can still show a badge. Nested asynchronous body updates and `jazu:window-state` refresh control availability. `desk/action/fullscreen.ts` owns native fullscreen and video inactivity; `controls.ts` disposes both controllers on close/navigation.
 
 `desk_plugins.ts` loads the plugin manifest, picks the first matching plugin/case via `plugin_types.ts`, and asks `desk_view.ts` for the body (`text`, `hex`, `folder`, `media`, `shell`, `markdown`, `default`) or a plugin script's `render`. Plugin scripts can contribute through `host.state.desk` / `host.state.windows`.
+
+## Split conversions
+
+Split a source window, select the child, and open the **Conversion** tab. Choose **Output MIME**, adjust its fields and click **Apply conversion** to rerun. The route appears above the controls. Parent edits automatically regenerate the child; further split descendants receive its new output. The child owns the result, with its own Save destination. Conversion options are included in browser-local desktop groups.
+
+`desk/conversion/graph.ts` discovers the shortest executable MIME route, preferring a direct converter. `desk/conversion/index.ts` catalogs typed converter edges and their option fields; new converters declare source MIME, destination MIME, output extension and an asynchronous Blob transformation. `body.ts` handles source drafts, caching, obsolete-run cancellation and failed-step messages. An unsupported route never relabels source bytes as converted output.
+
+Supported tools:
+
+- Browser-decodable PNG, JPEG, WebP, GIF, BMP, AVIF, SVG and ICO to PNG, JPEG, WebP or PDF. Animated inputs produce a still image. Resize with one dimension to preserve aspect ratio, or both to choose exact dimensions; rotation is in multiples of 90 degrees. JPEG defaults to white behind transparency. Encoding is limited to 40 megapixels and depends on browser format support.
+- PDF to PDF: select pages using `1,3-5`, reverse ranges with `5-3`, repeat pages, reorder them, and rotate all or selected source pages. **Split into individual pages** makes sibling output windows, up to 32 pages and 64 total desk windows. Larger PDFs can first be extracted into a smaller child PDF. Native text/vector page content is retained. Page extraction creates a new document; document-level forms, bookmarks, metadata and signatures are not preserved. The local versioned PDF-LIB module loads only when needed.
+- CSV and TSV to/from JSON arrays of records. CSV↔TSV uses JSON as an intermediate. The first row supplies nonempty unique headers; quoted delimiters, escaped quotes and multiline fields work. Table fields become JSON strings; JSON values become table text (null becomes empty, nested values become JSON text). Malformed rows fail explicitly.
 
 ## <a id="artifacts"></a>Build artifacts (important)
 
@@ -96,3 +110,19 @@ npm run test:desk:browser     # isolation, lazy loading, terminal, shared FS, ca
 `desk_view.ts` publishes text/hex edits and subscribes editors to shared bytes while retaining selection and scroll. Saves capture their source and write callback and clear dirty state only for the saved revision. `desk_compare.ts` uses bounded jsdiff line comparison. `desk_preview.ts` provides sandboxed HTML and cancellable image conversion through the page's existing kernel and binary VFS. `desk_pdf.ts` dynamically imports the locally published PDF.js runtime, owns its worker/document/render lifecycle, and releases it on window replacement. `build.ts` publishes versioned PDF.js assets plus a revalidated manifest; no PDF code is bundled into the normal page runtime.
 
 Checks: `tests/desk/plugin/flow.test.ts`, `tests/desk/plugin/compare.test.ts`, `tests/engine/tags/plugin.test.ts` and `tests/desk_split.spec.ts` cover shared drafts, save races, detach/close, flow selection, line changes, empty children, mode rules, sandboxed live HTML, actual img2pdf output and PDF canvas pixels.
+
+## Menu options and computes
+
+Each menu has one options strip directly below its head. File actions are grouped into Clip, New, Disk and Rename; selection changes availability without moving the file rows. Windows has New Window/Desktop, Delete and Show/Hide, with saved-desktop controls in the same strip. Sessions has New Script/Site and selected-session Start/Stop, Clear, Restart and Delete. Script states carry server start/retry timestamps; both the entry and log view update elapsed time/countdowns. Conversion and version settings also live outside the entries feed. Map always uses the northeast-arrow icon and is disabled for menus without a map.
+
+Computes is present on every desk, including converters and fixed desks. Select `{vfs}`, create a temporary WASM computer, or connect another filesystem. Files follows that selection. WASM computers have separate directory trees and share peer filesystem access through `/net/{compute id}`. A peer's network is not re-exported, keeping recursive enumeration finite. Copy/paste and dropping files onto a compute transfer data through the existing handle adapters. Terminals and their child processes retain their original filesystem when another compute is selected. New computers and these extra mounts last for the current browser page lifetime; the original VFS home retains its existing OPFS persistence.
+
+Filesystem opens a source chooser: Shared folder requests a fresh browser directory grant without moving or replacing the existing home; Google Drive accepts a folder URL or ID. Drive explicitly requests filesystem consent, independently of normal login's private key-storage permission. Reads/writes use Drive v3 with pagination and in-memory access tokens; duplicate names are reported rather than guessed, delete moves entries to trash, and Google Workspace documents are exported as PDF for reading. Enable Drive API and configure the optional Drive scope in the OAuth application's consent settings before using this integration. See [Google Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth) and [Drive file operations](https://developers.google.com/workspace/drive/api/reference/rest/v3). Live provider consent remains an interactive acceptance check.
+
+On the owner-authenticated server desk, the existing configured Personal Server is another compute; it does not automatically replace `{vfs}`. Selecting it routes new terminals to the personal server; selecting a WASM compute routes them to the browser runtime. The current backend exposes one configured personal-server connection; this menu does not provision additional servers. Removing a filesystem entry disconnects it from the menu and never erases its source folder.
+
+Google sign-in opens a popup synchronously from the user's click. The callback sets the existing secure session cookies and sends a credential-free completion signal through same-origin messaging/BroadcastChannel. The original page refreshes its session and UI without navigation or losing its windows. BroadcastChannel also handles opener separation caused by cross-origin isolation. A blocked popup reports a retryable error; no login fallback navigates the original page.
+
+Verification for the 2026-11-27 menu/compute change: root types, static build, server build and content validation pass (71 pages, 39 existing authoring warnings). The focused suite passes 21 checks, the isolated WASM suite passes 49, and the server suite passes 72 with one unavailable-PTY skip. All 33 distinct focused browser scenarios pass across the final runs, including actual WASM execution after switching computes, fresh shared-folder selection without changing private home data, popup opener isolation, saved desktop conflicts, server actions and version maps.
+
+The broader desk suite is not claimed fully green: its docking test attempts manual movement on `/desk`, whose existing `auto` layout rejects that operation; its authored-document test expects the Markdown host while the existing Notebook case precedes that host for `text/markdown`. The initially observed preview-cache classification failure passed on rerun. These checks were recorded without changing those separate behaviors. Live Google/Drive consent still needs interactive acceptance; the provider API and cryptographic flows were verified with fixtures/local Worker execution.

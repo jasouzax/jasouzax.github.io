@@ -11,10 +11,13 @@ import { Api_Jobs } from "./jobs.ts"
 import { Api_Idempotency } from "./idempotency.ts"
 import { Api_Client } from "./client.ts"
 import { Api_Webhooks } from "./webhook.ts"
+import { Api_Channel, Api_Streams, Api_Stream_Output, type Api_Socket } from "./streams.ts"
+import { api_openapi, api_typed_client } from "./spec.ts"
+import { Api_Mqtt, type Mqtt_Options } from "./mqtt.ts"
 
 export type Api_Context = { body: unknown, raw_body?: string, params: Record<string, string>, query: Api_Call["query"], headers: Api_Call["headers"], actor: Api_Call["actor"], ip: string, request_id: string, signal: AbortSignal }
 type Handler = (context: Api_Context) => unknown | Promise<unknown>
-type Route = { method: Api_Method, path: string, segments: string[], options: Route_Config, handler: Handler, verify?: (context: Api_Context) => boolean | Promise<boolean>, checks: Partial<Record<"body" | "params" | "query" | "response", ValidateFunction>> }
+type Route = { method: Api_Method, path: string, segments: string[], options: Route_Config, handler: Handler, transport?: "sse" | "websocket" | "ticket", verify?: (context: Api_Context) => boolean | Promise<boolean>, checks: Partial<Record<"body" | "params" | "query" | "response", ValidateFunction>> }
 export function validate_config(config: Api_Config): void {
     if (!config || !valid_subdomain_id(config.id) || !Number.isSafeInteger(config.version) || config.version < 1 || config.version > 9999) throw new Error("API requires a valid id and integer version 1..9999")
     if (config.access !== undefined && !["owner", "public", "token"].includes(config.access)) throw new Error("Invalid API access")
@@ -34,6 +37,26 @@ export class Runtime_API {
     readonly jobs: Api_Jobs
     readonly requests: Api_Idempotency
     readonly webhook: Api_Webhooks
+    readonly streams: Api_Streams
+    readonly pubsub = {
+        publish: (topic: string, data: unknown) => this.channel(topic).emit(data),
+        subscribe: (topic: string, listener: (data: unknown) => void) => this.channel(topic).subscribe(listener),
+        channel: (topic: string) => this.channel(topic),
+        mqtt: (options: Mqtt_Options) => {
+            if (this.bridges.size >= 4) throw new Error("An API may use at most four MQTT bridges")
+            if (this.activated) throw new Error("Register MQTT bridges during script initialization")
+            for (const topic of options.topics) this.channel(topic)
+            const bridge = new Api_Mqtt(options, name => this.secret(name), (topic, value) => this.pubsub.publish(topic, value), message => this.log("info", message))
+            this.bridges.add(bridge); return bridge
+        }
+    }
+    private bridges = new Set<Api_Mqtt>()
+    private activated = false
+    get logs(): Api_Channel { return this.channel("_logs") }
+    log(level: "debug" | "info" | "warn" | "error", message: string): void {
+        if (!["debug", "info", "warn", "error"].includes(level) || typeof message !== "string") throw new Error("Invalid log entry")
+        this.logs.emit({ time: Date.now(), level, message: message.slice(0, 4096) }, "log")
+    }
     constructor(config: Api_Config, directory: string) {
         validate_config(config)
         this.config = config
@@ -43,16 +66,43 @@ export class Runtime_API {
         const run_id = crypto.randomUUID()
         this.jobs = new Api_Jobs(this.store, config.version, run_id); this.requests = new Api_Idempotency(this.store, config.version, run_id)
         this.webhook = new Api_Webhooks(this.requests)
+        this.streams = new Api_Streams()
+        this.channel("_logs")
     }
     secret(name: string): string { if (!this.config.secrets?.includes(name) || !process.env[name]) throw new Error(`Secret ${name} is unavailable`); return process.env[name]! }
     static open(id: string, version: number, options: ConstructorParameters<typeof Api_Client>[2]): Api_Client { return new Api_Client(id, version, options) }
     reply(value: unknown, status = 200, headers: Record<string, string> = {}): Api_Output { return new Api_Output(value, status, headers) }
+    private response_headers(): Record<string, string> { return { "cache-control": "no-store", ...(this.config.deprecated ? { deprecation: `@${Date.parse(this.config.deprecated) / 1000}`, sunset: new Date(this.config.deprecated).toUTCString() } : {}) } }
     fail(code: string, message: string, status = 400): never { throw new Api_Error(code, message, status) }
     job(name: string, handler: Parameters<Api_Jobs["register"]>[1]): ReturnType<Api_Jobs["register"]> { return this.jobs.register(name, handler) }
-    activate(): void { this.requests.activate(); this.jobs.activate() }
-    close(): void { this.jobs.close(); this.store.close() }
+    activate(): void { this.requests.activate(); this.jobs.activate(); this.activated = true; for (const bridge of this.bridges) bridge.activate() }
+    close(): void { for (const bridge of this.bridges) bridge.close(); this.streams.close(); this.jobs.close(); this.store.close() }
     seal(): void { Object.freeze(this.routes) }
-    manifest(): Api_Manifest { return { id: this.config.id, version: this.config.version, access: this.config.access ?? "owner", ...(this.config.deprecated ? { deprecated: this.config.deprecated } : {}), routes: this.routes.map(({ method, path, options }) => ({ method, path, ...(options.headers ? { headers: options.headers } : {}), ...(options.raw ? { raw: true } : {}) })) } }
+    manifest(): Api_Manifest { return { id: this.config.id, version: this.config.version, access: this.config.access ?? "owner", ...(this.config.deprecated ? { deprecated: this.config.deprecated } : {}), routes: this.routes.map(({ method, path, options, transport }) => ({ method, path, ...(options.headers ? { headers: options.headers } : {}), ...(options.raw ? { raw: true } : {}), ...(transport ? { transport } : {}) })) } }
+    channel(name: string): Api_Channel { return this.streams.channel(name) }
+    openapi(): Record<string, unknown> { return api_openapi(this.config, this.routes) }
+    client(): string { return api_typed_client(this.config, this.routes) }
+    stream(path: string, options: Route_Config | Handler, handler?: Handler): this { return this.live_route("sse", path, options, handler) }
+    socket(path: string, options: Route_Config | ((context: Api_Context, socket: Api_Socket) => unknown), handler?: (context: Api_Context, socket: Api_Socket) => unknown): this {
+        const config = typeof options === "function" ? {} : options, run = typeof options === "function" ? options : handler
+        if (!run) throw new Error("Socket handler required")
+        return this.live_route("websocket", path, config, async context => { const { output, socket } = this.streams.socket(); await run(context, socket); return output })
+    }
+    private live_route(transport: "sse" | "websocket", path: string, options: Route_Config | Handler, handler?: Handler): this {
+        const config = typeof options === "function" ? {} : options, run = typeof options === "function" ? options : handler
+        if (!run || config.idempotent || config.raw || config.body || config.response) throw new Error("Streams require a handler and cannot use body, response, raw or idempotent options")
+        this.get(path, config, async context => {
+            const value = await run(context)
+            if (value instanceof Api_Stream_Output) return value
+            if (!(value instanceof Api_Channel)) throw new Error("Stream handler must return an API channel")
+            return new Api_Stream_Output(value, transport)
+        })
+        this.routes.find(route => route.method === "GET" && route.path === path)!.transport = transport
+        // POST to the same path mints a short-lived, single-use capability for browser EventSource/WebSocket.
+        this.post(path, config, () => null)
+        this.routes.find(route => route.method === "POST" && route.path === path)!.transport = "ticket"
+        return this
+    }
     route(method: Api_Method, path: string, options: Route_Config | Handler, handler?: Handler): this {
         if (!api_methods.includes(method)) throw new Error("Unsupported API method")
         const segments = route_segments(path, true), config = typeof options === "function" ? {} : options, run = typeof options === "function" ? options : handler
@@ -84,6 +134,7 @@ export class Runtime_API {
         const fail = (code: string, message: string, status: number) => result = api_failure(code, message, status, call.request_id)
         let status = 500
         try {
+            call = this.streams.prepare(call)
             validate_config(this.config)
             const bearer = /^Bearer ([^\s]{1,2048})$/i.exec(call.headers.authorization ?? "")?.[1]
             const hash = bearer ? createHash("sha256").update(bearer).digest("hex") : ""
@@ -94,8 +145,9 @@ export class Runtime_API {
             const method = call.method === "HEAD" && !this.routes.some(route => route.method === "HEAD" && match_route(route.segments, segments)) ? "GET" : call.method
             const route = this.routes.find(route => route.method === method && match_route(route.segments, segments))
             if (!route) { status = this.routes.some(route => match_route(route.segments, segments)) ? 405 : 404; return fail(status === 405 ? "method_not_allowed" : "not_found", "API route unavailable", status) }
+            if (call.stream && !["sse", "websocket"].includes(route.transport ?? "")) { status = 404; return fail("not_found", "Stream unavailable", status) }
             if (!call.actor.owner && route.options.scopes?.some(scope => !token?.scopes.includes(scope))) { status = 403; return fail("insufficient_scope", "Required service-token scope is missing", status) }
-            if (!call.actor.owner && !token?.unlimited && this.config.rate) {
+            if (!call.actor.owner && !token?.unlimited && this.config.rate && (!call.stream || call.stream.action === "send")) {
                 const now = Date.now(), identity = token ? hash : call.ip || "anonymous", previous = this.buckets.get(identity)
                 for (const [key, bucket] of this.buckets) if (bucket.expires <= now) this.buckets.delete(key)
                 const bucket = previous && previous.expires > now ? previous : { count: 0, expires: now + this.config.rate.seconds * 1000 }
@@ -105,6 +157,14 @@ export class Runtime_API {
             const body = call.raw_body !== undefined ? JSON.parse(call.raw_body) : call.body
             const context: Api_Context = { body, ...(call.raw_body === undefined ? {} : { raw_body: call.raw_body }), query: call.query, params: match_route(route.segments, segments)!, headers: Object.fromEntries(Object.entries(call.headers).filter(([name]) => !["authorization", "cookie"].includes(name))), actor: call.actor, ip: call.ip, request_id: call.request_id, signal: AbortSignal.timeout(this.config.timeout_ms ?? 30000) }
             for (const key of ["body", "query", "params"] as const) if (route.checks[key] && !route.checks[key]!(context[key])) { status = 400; return fail("invalid_request", `${key} does not match the declared schema`, status) }
+            if (call.stream || route.transport === "ticket") {
+                let timer: ReturnType<typeof setTimeout> | undefined
+                let value: unknown
+                try { value = call.stream ? await Promise.race([this.streams.command(call), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("handler_timeout")), this.config.timeout_ms ?? 30000) })]) : this.streams.ticket(call) }
+                finally { clearTimeout(timer) }
+                status = 200
+                return result = { status, headers: this.response_headers(), body: { data: value, meta: { request_id: call.request_id } } }
+            }
             if (route.verify) {
                 let verified = false
                 try { verified = await route.verify({ ...context, headers: { ...context.headers, ...(call.headers.authorization ? { authorization: call.headers.authorization } : {}) } }) === true } catch { /* A verifier failure denies the hook. */ }
@@ -120,6 +180,10 @@ export class Runtime_API {
             let value: unknown
             try { value = await Promise.race([Promise.resolve().then(() => route.handler(context)), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("handler_timeout")), this.config.timeout_ms ?? 30000) })]) }
             finally { clearTimeout(timer) }
+            if (value instanceof Api_Stream_Output) {
+                status = 200
+                return result = { status, headers: this.response_headers(), body: null, stream: this.streams.open(value, call) }
+            }
             const output = value instanceof Api_Output ? value : null
             if (output) value = output.value
             value ??= null
@@ -136,6 +200,6 @@ export class Runtime_API {
             if (error instanceof Api_Error) { status = error.status; return fail(error.code, error.message, status) }
             status = (error as Error).message === "handler_timeout" || (error as Error).name === "TimeoutError" ? 504 : error instanceof URIError || error instanceof SyntaxError || /API path/.test((error as Error).message) ? 400 : 500
             return fail(status === 504 ? "timeout" : status === 400 ? "bad_path" : "internal", status === 504 ? "API handler timed out" : status === 400 ? "Invalid API path" : "API handler failed", status)
-        } finally { if (request_key && result) this.requests.finish(request_key, result); this.store.audit("request", { request_id: call.request_id, method: call.method, path: call.path, status }) }
+        } finally { if (request_key && result) this.requests.finish(request_key, result); if (!call.stream || call.stream.action === "send" || status >= 400) this.store.audit("request", { request_id: call.request_id, method: call.method, path: call.path, status }) }
     }
 }

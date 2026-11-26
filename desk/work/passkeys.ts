@@ -1,3 +1,4 @@
+import { google_sign_in } from "./sign.ts"
 /* Optional passkey settings and explicit verification; credentials never enter local/session storage. */
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
 import { get_auth } from "./sign.ts"
@@ -30,7 +31,7 @@ export function open_passkeys(): void {
     const supported = typeof PublicKeyCredential !== "undefined" && window.isSecureContext
     const explain = document.createElement("p")
     explain.textContent = "Passkeys are optional. Once added, they protect account deletion and owner access on new sessions. Keep a second passkey as a backup."
-    const sign_in = document.createElement("a"); sign_in.href = "/api/_/auth/google/start"; sign_in.textContent = "Sign in with Google again"
+    const sign_in = document.createElement("a"); sign_in.href = "/api/_/auth/google/start"; sign_in.addEventListener("click", event => { event.preventDefault(); google_sign_in() }); sign_in.textContent = "Sign in with Google again"
     const button = (label: string, action: () => Promise<void>, parent: HTMLElement = dialog) => {
         const node = document.createElement("button"); node.type = "button"; node.textContent = label
         node.addEventListener("click", () => { node.disabled = true; status.textContent = ""; void action().catch(error => { status.textContent = error.name === "NotAllowedError" ? "Passkey request cancelled" : error.message }).finally(() => { node.disabled = false }) }); parent.append(node); return node

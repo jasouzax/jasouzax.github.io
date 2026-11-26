@@ -8522,6 +8522,17 @@ body:has(#motion_pause:checked) {
     }
 }
 .server_sessions_empty { padding: .5em 1em; color: var(--text-dim); }
+:is(.server_api_sessions, .server_api_controls) {
+    padding: .75rem 1rem; border-block-start: 1px solid var(--edge);
+    h3, h4 { margin-block: .25rem .5rem; }
+    form { display: flex; flex-wrap: wrap; gap: .5rem; }
+    label { display: flex; flex-direction: column; gap: .25rem; flex: 1 1 100%; min-width: 0; }
+    input { width: 100%; min-width: 0; box-sizing: border-box; }
+    button, input { padding: .4rem .5rem; font: inherit; }
+    p { overflow-wrap: anywhere; margin-block: .5rem; }
+    .server_api_release { padding-block: .5rem; border-block-start: 1px solid var(--edge); }
+    .server_api_release button + button { margin-inline-start: .5rem; }
+}
 
 .desk_wbox_head_actions {
     margin-inline-start: .25rem;

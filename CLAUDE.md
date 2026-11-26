@@ -29,6 +29,8 @@ Shared contracts live under `shared/`; import them directly rather than restorin
 
 ## Repository map
 
+Custom API streaming (2026-11-24): Node children execute native strip-only TypeScript, so do not use parameter properties or enums in their dependency tree. `server/api/streams.ts` owns bounded release-local channels, tickets and connection capabilities; `cloud/gateway/live.ts` adapts signed polling to SSE/WebSocket while rechecking policy. `server/api/mqtt.ts` uses MQTT 5 and starts broker connections only on release activation. `cloud/api/apis.ts` and `desk/server/apis.ts` own Sessions management. New desk strings must be added both to config translations and `engine/tags/desk.tsx`'s serialized text-key list; otherwise browser controls display raw keys. Pass the Worker execution context through router/API dispatch: WebSocket close must waitUntil its origin cleanup, otherwise workerd can cancel the fetch and leave a capability until its TTL. Test closure by observing the actual child connection count, not only the client close event. Run the API suite and the owner Sessions Playwright regression after changes.
+
 ```
 config.json            public settings; shared/config.ts loads and validates them
 content/               owner-managed XML/Markdown/SCSS; root tag determines interpretation
@@ -99,6 +101,8 @@ dist/ .cache/ .wrangler/ generated, ignored
 - Generated/ignored: `dist/ .cache/ .wrangler/ .env* *.tfstate terraform.tfvars *.wasm *.tar.* test-results/`.
 
 ## Notes & tips (read, and extend)
+
+- **Desk executable builds (2026-11-25):** `desk/program/<name>/program.json` is auto-discovered by `engine/build/bundle.ts`; each image uses the shared `desk/kernel/worker.ts`. Artifacts live in ignored `build/<name>/`, not the former `src/desk/*/artifacts` paths. With Emscripten 4.0.20 activated, `python3 desk/program/common/build_extra.py` rebuilds Lua, QuickJS, TinyScheme, SQLite, image tools and the command catalog from verified sources. Remove overlapping command names from older manifests when replacing an evaluator. TinyScheme's own `strlwr` conflicts with Emscripten's declaration; disable its private implementation with `USE_STRLWR=0`. See `docs/src/desk-commands.md` for capabilities and limits.
 
 - **Blog scenes and public rendering (2026-11-23):** `shared/blog/timeline.ts` owns pure scene timing; `engine/tags/scene.tsx` publishes media projections and `desk/blog/` owns preview/export. Encode script JSON's `<`, `>` and `&` as Unicode escapes so HTML and SPA serialization agree. Scene split IDs are sibling-local and must be rebased for the flat runtime. Test video output by demuxing actual WebCodecs downloads, including an Opus track. Chromium's SVG Blob ImageBitmap decoder can fail: rasterize with an Image and Canvas before creating the bitmap. `cloud/render/` uses the existing Server_Hub storage to cache signed origin templates/data. Workerd returns zero for Date.now outside request context; runtime test clocks must read it inside a request. Root WASM tests can hit a V8 loader crash in a combined run; the isolated 44-test worker run passes. Linux tests ran in an isolated container under `/tmp/jazu-scene-validation-20261123` (removed afterward); install dev dependencies explicitly because the server image sets production mode. The Pi's local workerd emulator fails its 48-bit TCMalloc address placement; run actual edge-runtime verification locally instead of changing the live host's kernel settings.
 

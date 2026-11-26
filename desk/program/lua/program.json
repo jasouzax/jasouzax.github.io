@@ -1,0 +1,19 @@
+{
+    "name": "lua",
+    "version": "5.4.8-jazu.1",
+    "extension": "tar.gz",
+    "commands": [
+        "lua",
+        "lua5.4"
+    ],
+    "files": {
+        "wasm": "build/lua/lua.wasm",
+        "loader": "build/lua/lua.js"
+    },
+    "sha256": "318689fe4480905ab1413a4877facb8d26f8686ca813521452acadc2b93c3239",
+    "flags": {
+        "applet": false
+    },
+    "source_url": "https://www.lua.org/ftp/lua-5.4.8.tar.gz",
+    "source_sha256": "4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae"
+}

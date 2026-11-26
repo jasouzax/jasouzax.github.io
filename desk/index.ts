@@ -1,3 +1,5 @@
+import { init_menu_options } from "./menu/options.ts"
+import { init_computes_menu } from "./menu/computes.ts"
 // The /desk runtime: the windows of a file-system desk. A desk marked data-runtime starts with no window; "New window" in the window menu
 // (#head_new) clones the empty window from <template id="desk_window_template">. This file owns the list of windows, their tabs in the
 // header and the layout of the desk (a grid, see arrange()). What a window shows lives in client_desk_view.ts, the files in client_desk_fs.ts.
@@ -12,6 +14,8 @@ import { adopt, release_links } from "./plugin/flow.ts"
 import { no_picks, type Child_Picks } from "./plugin/rules.ts"
 import { init_map, show_windows } from "./menu/map.ts"
 import { init_versions } from "./menu/version.ts"
+import { init_conversion_menu } from "./menu/conversion.ts"
+import type { Options } from "./conversion/graph.ts"
 import { init_windows_menu } from "./menu/windows.ts"
 import type { Desktop_Layout } from "./menu/windows/model.ts"
 
@@ -53,6 +57,7 @@ export type desk_window = {
     // until the user gives it a resource of its own
     parent: desk_window | null
     // what the user picked in a child (a type, a mode, a resource): that decides the flow with the parent (desk_flow_rules.ts)
+    conversion?: Options
     picks: Child_Picks
 }
 
@@ -90,8 +95,11 @@ export function restore_layout(layout: Desktop_Layout, windows: Map<number, desk
     arrange()
 }
 let cancel_drag: (() => void) | null = null
+let dispose_options: (() => void) | null = null
+let dispose_computes: (() => void) | null = null
 let dispose_map: (() => void) | null = null
 let dispose_versions: (() => void) | null = null
+let dispose_conversion_menu: (() => void) | null = null
 let dispose_windows_menu: (() => void) | null = null
 
 const portrait = matchMedia("(orientation: portrait)")
@@ -382,6 +390,9 @@ export const window_hooks = {
 }
 
 function dispose(): void {
+    dispose_options?.(); dispose_options = null
+    dispose_computes?.(); dispose_computes = null
+    dispose_conversion_menu?.(); dispose_conversion_menu = null
     dispose_windows_menu?.()
     dispose_windows_menu = null
     dispose_versions?.()
@@ -789,9 +800,12 @@ export function init_desk(): void {
     // A desk whose windows are all made by the runtime starts blank: it opens with one empty window (the first file opened fills it).
     if (state.windows.length === 0) new_window()
     arrange()
+    dispose_computes = init_computes_menu(desk)
     dispose_map = init_map(desk)
     dispose_versions = init_versions(desk)
     dispose_windows_menu = init_windows_menu(desk)
+    dispose_conversion_menu = init_conversion_menu(desk)
+    dispose_options = init_menu_options(desk)
 }
 
 let bound = false

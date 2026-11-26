@@ -3,6 +3,7 @@ export type Desktop_Layout = { rows: number[][], columns: number[], heights: num
 export type Saved_Window = {
     id: number, parent: number | null, name: string, mime: string, mode: string, icon: string, path: string,
     file: Blob | null, draft: Blob | null, dirty: boolean, hidden: boolean, minimized: boolean,
+    conversion?: Record<string, string>,
     picks: { own: boolean, mime: boolean, mode: boolean }, audio: { enabled: boolean, volume: number },
 }
 export type Desktop_Snapshot = { windows: Saved_Window[], layout: Desktop_Layout, cwd: string }
@@ -34,6 +35,7 @@ export function validate_snapshot(value: unknown): asserts value is Desktop_Snap
         if (item.mime === "inode/directory" && !/^file:\/\/\//.test(item.path)) throw new Error("Invalid desktop folder")
         for (const key of ["dirty", "hidden", "minimized"]) if (typeof item[key] !== "boolean") throw new Error("Invalid desktop visibility")
         if (!object(item.picks) || ["own", "mime", "mode"].some(key => typeof item.picks[key] !== "boolean") || !object(item.audio) || typeof item.audio.enabled !== "boolean" || !Number.isFinite(item.audio.volume) || item.audio.volume < 0 || item.audio.volume > 1) throw new Error("Invalid desktop preferences")
+        if (item.conversion !== undefined && (!object(item.conversion) || Object.keys(item.conversion).length > 32 || Object.entries(item.conversion).some(([key, value]) => key.length > 100 || typeof value !== "string" || value.length > 4096))) throw new Error("Invalid conversion settings")
         ids.add(item.id); parents.set(item.id, item.parent)
     }
     for (const id of ids) {

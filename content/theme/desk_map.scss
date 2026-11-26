@@ -26,3 +26,34 @@
 @media (orientation: portrait) {
     .desk_map_view { grid-area: 1 / 1; min-height: calc(100dvh - 5em); }
 }
+
+// Shared options geometry for every desk theme.
+.desk_menu_options {
+    flex: 0 0 auto; min-width: 0; min-height: 4.5rem; max-width: 100%; overflow-x: auto;
+    border-block: 1px solid var(--line, currentColor); background: var(--panel);
+    direction: ltr;
+    &.desk_files_bar { min-width: 0; position: static; }
+    .desk_files_buttons { display: flex; width: max-content; }
+    .desk_option_group { display: flex; flex-direction: column; flex: 0 0 auto; padding: .25rem .4rem; border-inline-end: 1px solid var(--line, currentColor); }
+    .desk_option_caption { display: block; font-size: .75rem; line-height: 1.4; opacity: .7; }
+    .desk_option_buttons { display: flex; align-items: stretch; gap: .2rem; }
+    .desk_option_buttons > button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; flex: 0 0 auto; padding: .4rem .6rem; white-space: nowrap; line-height: 1.2; }
+    .desk_files_icon { font-size: 1.75rem; margin: 0; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    form { display: flex; gap: .3rem; padding: .3rem; }
+    p { margin: 0; padding-inline: .5rem; }
+}
+.desk_menu_options[hidden] { display: none !important; }
+.desk_side_mode svg { display: block; }
+
+.desk dialog form { display: flex; flex-direction: column; gap: .75rem; min-width: min(24rem, 70vw); }
+
+// Window entry descriptions occupy their own row after the two-line heading.
+.desk_window_entry > .desk_side_item_box {
+    grid-template: 2.5em auto auto / 1em 1em auto;
+    > .desk_side_item_head { grid-area: 1 / 1 / 2 / 4; }
+    > .desk_side_item_info { grid-area: 2 / 2 / 3 / 4; margin: 0; }
+    > .desk_side_item_sub { grid-area: 3 / 2 / 4 / 4; }
+}
+
+.server_api_release[data-selected] { outline: 1px solid var(--accent, currentColor); outline-offset: -1px; }

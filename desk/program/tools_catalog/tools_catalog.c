@@ -17,6 +17,26 @@ typedef struct {
 } tool_item_t;
 
 static const tool_item_t catalog[] = {
+    {"qjs", "Languages", "QuickJS JavaScript: qjs -e 'print(6 * 7)' or qjs script.mjs"},
+    {"js", "Languages", "Alias for qjs; ECMAScript engine with local modules and file IO"},
+    {"lua", "Languages", "Upstream Lua 5.4: lua -e 'print(6 * 7)' or lua script.lua"},
+    {"lua5.4", "Languages", "Alias for upstream Lua 5.4"},
+    {"scheme", "Languages", "TinyScheme with standard library: scheme -e '(display (+ 20 22))'"},
+    {"tinyscheme", "Languages", "Alias for the upstream TinyScheme interpreter"},
+    {"python3", "Languages", "Python via Pyodide: python3 -c 'print(6 * 7)'"},
+    {"lisp", "Languages", "Compact custom Lisp evaluator (subset of the language)"},
+    {"basic", "Languages", "Compact custom BASIC evaluator (subset of the language)"},
+    {"sqlite3", "Data", "SQLite database shell with JSON, FTS5 and R-tree; sqlite3 data.db"},
+    {"imgconvert", "Images", "Convert PNG/JPEG/BMP/TGA; resize, crop, rotate, flip and grayscale (--help)"},
+    {"identify", "Images", "Read image dimensions and channel count: identify image.png"},
+    {"png2jpg", "Images", "Convert an image to JPEG: png2jpg input.png output.jpg"},
+    {"jpg2png", "Images", "Convert an image to PNG: jpg2png input.jpg output.png"},
+    {"bmp2png", "Images", "Convert an image to PNG: bmp2png input.bmp output.png"},
+    {"png2bmp", "Images", "Convert an image to BMP: png2bmp input.png output.bmp"},
+    {"cwebp", "Images", "Encode images as WebP"},
+    {"dwebp", "Images", "Decode WebP images"},
+    {"optipng", "Images", "Optimize PNG files losslessly"},
+    {"potrace", "Images", "Trace bitmaps into vector artwork"},
     /* Group 1 */
     {"urlencode", "Encoding", "Percent-encodes URL query strings and path components"},
     {"urldecode", "Encoding", "Decodes percent-encoded URLs"},

@@ -1,3 +1,4 @@
+import { session_description } from "./sessions_model.ts"
 /*
  * The "view" of an application/auto-javascript file: the script's log, and Start / Stop under it (Browsite's script view, as a desk window body).
  *
@@ -32,6 +33,7 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
     const store = new Log_Store()
     let running = false
     let autostart = false
+    let started_at: number | undefined, restart_at: number | undefined
     let restarting = false
     let errors_only = false
 
@@ -82,7 +84,7 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
     }
     const draw_state = (): void => {
         root.dataset.running = String(running)
-        state.textContent = restarting ? text("server_script_restarting") : running ? text("server_script_running") : text("server_script_stopped")
+        state.textContent = session_description({ running, restarting, started_at, restart_at })
         toggle.textContent = (running || autostart) ? text("server_script_stop") : text("server_script_start")
         toggle.disabled = !link.connected || !link.online
         draw_windows()
@@ -124,9 +126,9 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
         link.on("auto_logs", message => { if (message.path === path) { store.set(path, message.entries as Log_Entry[]); redraw_all() } }),
         link.on("auto_log", message => { if (message.path === path) append(message.entry as Log_Entry) }),
         link.on("auto_logs_cleared", message => { if (message.path === path) { store.clear(path); redraw_all() } }),
-        link.on("auto_status", message => { if (message.path === path) { running = Boolean(message.running); autostart = Boolean(message.autostart); restarting = Boolean(message.restarting); draw_state() } }),
+        link.on("auto_status", message => { if (message.path === path) { running = Boolean(message.running); autostart = Boolean(message.autostart); restarting = Boolean(message.restarting); started_at = message.started_at as number | undefined; restart_at = message.restart_at as number | undefined; draw_state() } }),
         link.on("auto_deleted", message => { if (message.path === path) { running = autostart = restarting = false; store.clear(path); redraw_all(); draw_state() } }),
-        link.on("auto_state", message => { const script = (message.scripts as { path: string, running: boolean, autostart?: boolean, restarting?: boolean }[]).find(script => script.path === path); running = Boolean(script?.running); autostart = Boolean(script?.autostart); restarting = Boolean(script?.restarting); draw_state() }),
+        link.on("auto_state", message => { const script = (message.scripts as { path: string, running: boolean, autostart?: boolean, restarting?: boolean, started_at?: number, restart_at?: number }[]).find(script => script.path === path); running = Boolean(script?.running); autostart = Boolean(script?.autostart); restarting = Boolean(script?.restarting); started_at = script?.started_at; restart_at = script?.restart_at; draw_state() }),
         link.on("auto_error", message => {
             if (message.path === path) append({ id: -Date.now(), time: Date.now(), level: "error", text: String(message.message ?? "") })
         }),
@@ -137,6 +139,8 @@ export function auto_script_body(item: desk_window, signal: AbortSignal, fallbac
 
     draw_state()
     redraw_all()
+    const timer = window.setInterval(draw_state, 1000)
+    signal.addEventListener("abort", () => clearInterval(timer), { once: true })
     link.send({ t: "auto_state" })
     link.send({ t: "auto_logs", path })
     return root

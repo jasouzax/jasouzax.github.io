@@ -1,0 +1,8 @@
+.desk_menu_options[data-options-for="desk:conversion"] { padding: .75em; overflow-wrap: anywhere; }
+.desk_menu_options[data-options-for="desk:conversion"] form { display: flex; flex-direction: column; gap: .75em; }
+.desk_menu_options[data-options-for="desk:conversion"] label { display: flex; flex-direction: column; gap: .25em; min-width: 0; }
+.desk_menu_options[data-options-for="desk:conversion"] input, .desk_menu_options[data-options-for="desk:conversion"] select { min-width: 0; width: 100%; box-sizing: border-box; }
+.desk_menu_options[data-options-for="desk:conversion"] br { display: none; }
+.desk_menu_options[data-options-for="desk:conversion"] > button { margin-top: 1em; }
+
+.desk_menu_options[data-options-for="desk:conversion"] { max-height: 55vh; overflow: auto; box-sizing: border-box; }

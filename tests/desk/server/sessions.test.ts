@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { Session_Store } from "../../../desk/server/sessions_model.ts"
+import { Session_Store, session_description } from "../../../desk/server/sessions_model.ts"
 import type { Window_Info } from "../../../shared/protocol/wire.ts"
 
 const win = (id: number, script: string): Window_Info => ({ id, script, title: "", url: "about:blank", icon: "", width: 800, height: 600, devtools: null })
@@ -35,4 +35,11 @@ test("sessions retain desired-running and pending-restart state across snapshots
     assert.equal(store.list([]).scripts[0].restarting, false)
     store.apply({ t: "auto_status", path: "/a.auto.js", running: false, autostart: false, restarting: false })
     assert.equal(store.list([]).scripts[0].autostart, false)
+})
+
+test("script descriptions use the server start and retry timestamps", () => {
+    assert.equal(session_description({ running: true, started_at: 1000 }, 3662000), "Running 1h 1m 1s")
+    assert.equal(session_description({ running: false, restarting: true, restart_at: 3500 }, 1000), "Restarting in 3s")
+    assert.equal(session_description({ running: false, restarting: true, restart_at: 3500 }, 5000), "Restarting in 0s")
+    assert.equal(session_description({ running: false }), "Stopped")
 })

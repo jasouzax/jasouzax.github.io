@@ -1,3 +1,4 @@
+import { mount_options } from "./options.ts"
 /** Public repository Version menus: bounded history, merge groups, refs and immutable commit maps.
  * Requests omit credentials; offline/error states retain the last visible snapshot without inventing history.
  */
@@ -86,6 +87,7 @@ async function read_json(url: URL, signal: AbortSignal): Promise<unknown> {
 
 export function init_versions(desk: HTMLElement): () => void {
     const abort = new AbortController(), signal = abort.signal
+    const releases: (() => void)[] = []
     const requests = new Set<AbortController>()
     for (const panel of desk.querySelectorAll<HTMLElement>(".desk_side_page[data-version-url]")) {
         const url = new URL(panel.dataset.versionUrl!)
@@ -96,7 +98,8 @@ export function init_versions(desk: HTMLElement): () => void {
         const refresh = element("button", "", text("folder_refresh")); refresh.type = "button"
         const status = element("p", "version_status"); status.setAttribute("role", "status")
         tools.append(label, refresh)
-        panel.append(status, list, tools)
+        panel.append(list)
+        tools.append(status); releases.push(mount_options(panel, tools))
         let refs: History_Ref[] = [], serial = 0, started = false, loaded_ref = ""
         let request: AbortController | null = null
         const load = async (with_refs: boolean) => {
@@ -124,7 +127,7 @@ export function init_versions(desk: HTMLElement): () => void {
                 for (const ref of refs) { const id = ref.commit ?? ref.hash; labels.set(id, [...(labels.get(id) ?? []), ref.name.replace(/^refs\//, "")]) }
                 list.replaceChildren(...history_tree(commits).map(item => entry(item, labels)))
                 panel.querySelector(":scope > .desk_map")?.remove()
-                tools.before(map_markup(commits, refs, url.href))
+                list.after(map_markup(commits, refs, url.href))
                 loaded_ref = select.value
                 status.textContent = commits.length ? `${commits.length}/${history_limit} ${text("version_commits")}` : text("version_empty")
             } catch {
@@ -155,5 +158,5 @@ export function init_versions(desk: HTMLElement): () => void {
         }, { signal })
         activate()
     }
-    return () => { abort.abort(); for (const request of requests) request.abort() }
+    return () => { releases.forEach(release => release()); abort.abort(); for (const request of requests) request.abort() }
 }

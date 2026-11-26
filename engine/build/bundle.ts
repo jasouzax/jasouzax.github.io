@@ -140,6 +140,8 @@ export async function bundle_runtime(root: string, files: output_files, mode: st
         const lic_path = existsSync(join(pkg_dir, `${name}-LICENSE`)) ? join(pkg_dir, `${name}-LICENSE`) : join(pkg_dir, "LICENSE")
         files.set(`assets/wasm/${name}-LICENSE`, readFileSync(lic_path))
         files.set(`assets/wasm/${name}-source.${extension}`, readFileSync(join(pkg_dir, `${name}-source.${extension}`)))
+        const port = join(pkg_dir, `${name}-port.tar.gz`)
+        if (existsSync(port)) files.set(`assets/wasm/${name}-port.tar.gz`, readFileSync(port))
         let runtime: string | undefined
         if (program.runtime) {
             const compiled = await esbuild_build({ entryPoints: [join(root, program.runtime)], bundle: true, write: false, format: "esm", minify: mode === "production", external: ["node:*", "ws", "@wasmer/sdk"], logLevel: "silent" })
@@ -185,6 +187,13 @@ export async function bundle_runtime(root: string, files: output_files, mode: st
         }
     }
     files.set("assets/wasm/manifest.json", JSON.stringify(images))
+    // PDF editing is lazy and versioned independently of the desk shell.
+    const tools_root = dirname(fileURLToPath(import.meta.resolve("pdf-lib/package.json")))
+    const tools_version = JSON.parse(readFileSync(join(tools_root, "package.json"), "utf8")).version
+    const tools_path = `assets/pdf-tools/${tools_version}/pdf-lib.mjs`
+    files.set(tools_path, readFileSync(join(tools_root, "dist/pdf-lib.esm.min.js")))
+    files.set(`assets/pdf-tools/${tools_version}/LICENSE`, readFileSync(join(tools_root, "LICENSE.md")))
+    files.set("assets/pdf-tools.json", JSON.stringify({ module: "/" + tools_path }))
     // PDF.js stays out of the page bundle and is fetched only when a PDF is opened.
     const pdf_root = dirname(fileURLToPath(import.meta.resolve("pdfjs-dist/package.json")))
     const pdf_version = JSON.parse(readFileSync(join(pdf_root, "package.json"), "utf8")).version

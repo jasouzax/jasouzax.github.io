@@ -1,3 +1,5 @@
+import { selected_compute } from "../menu/computes.ts"
+import { conversion_body } from "../conversion/body.ts"
 import { text_layout_body } from "./text.ts"
 import { sync_save, save_window } from "../action/save.ts"
 export { sync_save, save_window } from "../action/save.ts"
@@ -93,7 +95,7 @@ export const process_hooks = {
 // /server always selects the Pi PTY; the ordinary desk can prefer the device bridge.
 let local_terminal_uri = "pid:"
 export const terminal_hooks = {
-    get uri(): string { return is_server_page(location.pathname) ? "server:sh" : local_terminal_uri },
+    get uri(): string { const compute = selected_compute(); return compute === "personal-server" ? "server:sh" : compute === "vfs" ? local_terminal_uri : "pid:" },
     set uri(value: string) { local_terminal_uri = value },
 }
 
@@ -101,7 +103,7 @@ export const uri_handlers: ((item: desk_window, uri: string, current?: () => boo
 export const renders = new WeakMap<desk_window, AbortController>()
 
 function fallback_body(item: desk_window): HTMLElement {
-    if (flow_kind_of(item) === "convert") {
+    if (flow_kind_of(item) === "convert" && !item.file) {
         const note = document.createElement("div")
         note.className = "desk_wbox_body_none"
         note.setAttribute("role", "status")
@@ -253,6 +255,12 @@ function body_for(item: desk_window): void {
     release_url(item)
     const controller = new AbortController()
     renders.set(item, controller)
+    const converting = flow_kind_of(item) === "convert"
+    if (converting) {
+        const pending = conversion_body(item, controller.signal)
+        if (pending) { set_body(item, pending); sync_save(item); return }
+        item.commit = async () => item.file
+    }
     const is_folder = () => !item.error && item.mime === "inode/directory" && item.mode === "view"
     const fallback = (target: desk_window) => !target.error && target.mime === "inode/directory" && target.mode === "view"
         ? folder_body(target, controller.signal) : fallback_body(target)
@@ -272,7 +280,7 @@ function body_for(item: desk_window): void {
     }
     const host = { html: html_body, image_pdf: image_pdf_body, mirror: mirror_body, editor: text_layout_body, media: media_body, terminal: process_hooks.body, fallback, markdown: markdown_body, notebook: notebook_body, folder: folder_body, messages: message_body, auto_script: script_body, auto_site: site_body, state, text, render_window, save_window, register_map_resources }
     set_body(item, fallback_body(item))
-    void prepare_plugins(item, host, controller.signal).then(candidates => {
+    void prepare_plugins(item, host, controller.signal, converting).then(candidates => {
         if (controller.signal.aborted || !item.el.isConnected) return
         for (const { context, module } of candidates) {
             try {
