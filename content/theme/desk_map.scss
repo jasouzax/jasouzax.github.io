@@ -29,13 +29,17 @@
 
 // Shared options geometry for every desk theme.
 .desk_menu_options {
+    display: flex; align-items: stretch;
     order: 1; flex: 0 0 auto; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden;
     scrollbar-width: none; -ms-overflow-style: none;
     &::-webkit-scrollbar { display: none; }
     border-block-start: 1px solid var(--line, currentColor); background: var(--panel);
     direction: ltr;
     &.desk_files_bar { min-width: 0; position: static; }
-    .desk_files_buttons { display: flex; width: max-content; }
+    .desk_files_buttons { display: flex; flex: 0 0 auto; width: max-content; }
+    > :is(.server_api_controls, .desk_desktop_controls),
+    form:is(.server_api_form, .desktop_group_tools) { display: contents; }
+    .desk_files_buttons:not(:last-child) { border-inline-end: 1px solid var(--line, currentColor); }
     .desk_option_group { display: flex; flex-direction: column; flex: 0 0 auto; }
     .desk_option_group + .desk_option_group { border-inline-start: 1px solid var(--line, currentColor); }
     .desk_option_caption {
@@ -51,10 +55,15 @@
         box-sizing: border-box; padding: 0 .5em; font-size: inherit; white-space: nowrap; line-height: 1em;
         &:not(:last-child) { box-shadow: inset -1px 0 0 var(--line, currentColor); }
     }
+    .desk_option_buttons > [hidden] { display: none !important; }
+    .desk_option_buttons > input {
+        box-sizing: border-box; flex: 0 0 auto; width: 14em; min-width: 0;
+        height: calc(2em + 4px); padding: 0 .5em; font: inherit;
+    }
     .desk_files_icon { font-size: inherit; line-height: 1em; margin: 0; }
     button:disabled { opacity: .4; cursor: not-allowed; }
     form { display: flex; gap: .3rem; padding: .3rem; }
-    p { margin: 0; padding-inline: .5rem; }
+    p { align-self: center; flex: 0 0 auto; max-width: 20em; margin: 0; padding-inline: .5rem; }
     p:empty { display: none; }
 }
 .desk_menu_options[hidden] { display: none !important; }

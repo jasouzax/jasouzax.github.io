@@ -16,10 +16,11 @@ class Unsupported_Desktop extends Error {}
 export function init_desktop_groups(desk: HTMLElement, panel: HTMLElement, windows: HTMLElement, options: HTMLElement): () => void {
     const abort = new AbortController(), signal = abort.signal, original_cwd = working_directory()
     const key = `jazu_desktop:${location.pathname}`
-    const tools = element("form", "desktop_group_tools"), input = element("input"), status = element("p", "desktop_group_status", text("desktop_temporary")), groups = element("div", "desktop_group_list")
+    const tools = element("form", "desktop_group_tools"), input = element("input"), status = element("p", "desktop_group_status"), groups = element("div", "desktop_group_list")
     status.setAttribute("role", "status"); input.maxLength = 80; input.name = "desktop_name"; input.setAttribute("aria-label", text("desktop_name")); input.placeholder = text("desktop_name")
     const actions = option_group("Desktop"), actions_row = actions.querySelector<HTMLElement>(".desk_option_buttons")!
-    tools.append(input, actions); options.append(tools, status); panel.prepend(groups)
+    input.title = text("desktop_temporary")
+    tools.append(option_group(text("desktop_name"), input), actions); options.append(tools, status); panel.prepend(groups)
     let active: Active | null = null, records: Saved_Desktop[] = [], busy = false, suspended = false, touched = false, timer = 0
     let writing: Promise<void> = Promise.resolve(), drawing = new AbortController(), channel: BroadcastChannel | undefined
     const controls: HTMLButtonElement[] = []

@@ -121,6 +121,31 @@ test("owner Sessions manages API versions and retains edits through automation u
     await expect(apis.locator('[data-api-key="counter/v1"]')).toBeVisible()
     await expect(apis.locator(".server_api_usage")).toContainText("Cloudflare plan")
     const options = page.locator('[data-options-for="server:sessions"]')
+    await page.emulateMedia({ colorScheme: "dark" })
+    // Every menu stays one compact scrolling strip, including its secondary forms.
+    for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+        await page.setViewportSize(viewport)
+        for (const path of ["desk:windows", "desk:computes", "server:sessions"]) {
+            await page.locator(`.desk_side_tabs_drop[data-path="${path}"] > summary`).click()
+            const bar = page.locator(`[data-options-for="${path}"]`)
+            await expect(bar).toBeVisible()
+            const layout = await bar.evaluate(bar => {
+                const buttons = [...bar.querySelectorAll<HTMLElement>('.desk_option_buttons > button:not([hidden])')]
+                const tops = buttons.map(button => button.getBoundingClientRect().top)
+                const side = bar.closest(".desk_side")!
+                return { height: bar.getBoundingClientRect().height, spread: Math.max(...tops) - Math.min(...tops),
+                    bottom: side.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom,
+                    scrollbar: getComputedStyle(bar).scrollbarWidth, overflow: bar.scrollWidth > bar.clientWidth }
+            })
+            expect(layout.height).toBeLessThan(65)
+            expect(layout.spread).toBeLessThan(2)
+            expect(Math.abs(layout.bottom)).toBeLessThan(2)
+            expect(layout.scrollbar).toBe("none")
+            if (path !== "desk:computes") expect(layout.overflow).toBe(true)
+            await page.locator(".desk_side").screenshot({ path: `.cache/toolbar-${path.split(":")[1]}-${viewport.width}.png` })
+        }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 })
     const input = options.locator('input[name="source"]')
     await input.fill("/home/user/new.auto.js")
     api.send({ t: "auto_status", path: "/run.auto.js", running: false })

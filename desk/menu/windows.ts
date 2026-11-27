@@ -43,6 +43,7 @@ export function init_windows_menu(desk: HTMLElement): () => void {
     let selected_window = state.focused?.id
     const selected_item = () => state.windows.find(item => item.id === selected_window) || state.focused
     const options = element("div"), row = element("div", "desk_files_buttons"), desktop_tools = element("div")
+    desktop_tools.className = "desk_desktop_controls"
     const create = option_button("Window", "window", () => { selected_window = new_window()?.id })
     const desktop = option_button("Desktop", "window", () => desktop_tools.querySelector<HTMLButtonElement>('[data-desktop-action="create"]')?.click())
     const remove = option_button(text("files_delete"), "delete", () => {

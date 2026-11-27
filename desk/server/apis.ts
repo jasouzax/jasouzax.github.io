@@ -8,14 +8,14 @@ export function mount_api_sessions(root: HTMLElement, controls: HTMLElement = ro
     let disposed = false, busy = false, revision = 0
     let releases: Release[] = [], selected = ""
     root.className = "server_api_sessions"
-    const heading = document.createElement("h3"); heading.textContent = text("server_api_title")
     const notice = document.createElement("p"); notice.setAttribute("role", "status"); notice.setAttribute("aria-live", "polite")
-    const form = document.createElement("form"), label = document.createElement("label"), source = document.createElement("input")
+    const form = document.createElement("form"), source = document.createElement("input")
+    form.className = "server_api_form"
     source.type = "text"; source.required = true; source.maxLength = 2048; source.name = "source"; source.placeholder = "/home/user/counter.auto.js"
     source.autocomplete = "off"; source.spellcheck = false
-    label.append(text("server_api_source"), source)
-    const deploy = document.createElement("button"); deploy.type = "submit"; deploy.textContent = text("server_api_deploy")
-    const refresh = document.createElement("button"); refresh.type = "button"; refresh.textContent = text("server_api_refresh")
+    source.setAttribute("aria-label", text("server_api_source"))
+    const deploy = option_button(text("server_api_deploy"), "upload"); deploy.type = "submit"
+    const refresh = option_button(text("server_api_refresh"), "refresh")
     const list = document.createElement("div"); list.className = "server_api_releases"
     const rollback = option_button(text("server_api_rollback"), "refresh", () => command("rollback"))
     const stop = option_button(text("server_api_stop"), "pause", () => command("stop"))
@@ -29,7 +29,8 @@ export function mount_api_sessions(root: HTMLElement, controls: HTMLElement = ro
         const release = releases.find(item => `${item.id}/v${item.version}` === selected)
         if (release) void mutate(action, { id: release.id, version: release.version })
     }
-    form.append(label, deploy, refresh); controls.append(heading, form, option_group("API", rollback, stop), notice); root.append(list)
+    form.append(option_group("API", deploy, refresh, rollback, stop), option_group(text("server_api_source"), source))
+    controls.append(form, notice); root.append(list)
     const set_busy = (value: boolean) => { busy = value; root.setAttribute("aria-busy", String(value)); for (const button of [...root.querySelectorAll<HTMLButtonElement>("button"), ...controls.querySelectorAll<HTMLButtonElement>("button")]) button.disabled = value; sync_selection() }
     const request = async (action = "", body?: unknown) => {
         const auth = body === undefined ? null : await get_auth(true)

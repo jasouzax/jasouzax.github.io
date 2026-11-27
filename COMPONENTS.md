@@ -53,6 +53,8 @@ Agents may update checkbox statuses and blockquote notes. Changes to any other t
 
 > **Toolbar appearance correction (human request, 2026-11-27):** Place the shared options strip at the bottom of the menu, superseding the earlier below-head placement. Match desk menu tabs for button height and font/icon size, retain horizontal scrolling with hidden scrollbars, and use centered uppercase low-opacity group captions with rules on both sides. Preserve dividers between buttons within each group.
 
+> **Toolbar secondary controls correction (AI, 2026-11-27):** Sessions API deployment and Windows saved-desktop fields/actions now participate in the same compact horizontal options strip instead of stacking full forms beneath it. Computes follows the same shared flex layout. Hidden internal actions remain hidden, and initial desktop guidance is available on the name field without adding a permanent footer paragraph.
+
 ## Codebase Layout
 **Rule 1, the path is the component:** `cmp:/{root}/{a}/{b}` lives at `{codebase}/{root}/{a}/{b}.ts` (or `.tsx` when it produces markup). If you know the component you know the file, if you know the file you know the component.
 **Rule 2, start from what you see:** from `{codebase}/content` you look for the tag name (`engine/tags/{tag}.tsx`), from `{codebase}/dist` you look for the output path (`engine/routes/{path}.tsx`), from the running desktop you look for the window, action or menu name (`desk/window|action|menu/{name}.ts`), from an API URL you look for the id (`cloud/api/{id}.ts` for `/api/_/{id}`, the server's `api/` for `/api/{id}`).
