@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync, statSync, existsSync, lstatSync } from "node:fs"
+import { readdirSync, statSync, existsSync, lstatSync } from "node:fs"
 import { join, relative } from "node:path"
 import type { xml_node } from "../../shared/content/xml.ts"
-import { parse_xml, where_of, walk_nodes } from "../../shared/content/xml.ts"
+import { where_of, walk_nodes } from "../../shared/content/xml.ts"
 import { validate_roots, is_true } from "../../shared/content/schema.ts"
 import type { diagnostics } from "../../shared/diag.ts"
 import { report_error, report_warning } from "../../shared/diag.ts"
@@ -14,6 +14,7 @@ import { expand_objects } from "../tags/objects.ts"
 import { collect_resources } from "./resources/collect.ts"
 import { configured_resource } from "./resources.ts"
 import { project_declarations } from "../../shared/content/pipeline.ts"
+import { Source_Manifest } from "./manifest.ts"
 
 export type page = {
     path: string
@@ -42,6 +43,7 @@ export type site_model = {
     now: number
     build_date: Date
     mode: "production" | "development"
+    sources?: Source_Manifest
 }
 
 function list_xml(dir: string): string[] {
@@ -84,14 +86,15 @@ function make_page(node: xml_node, root: string): page {
     }
 }
 
-export function load_site(root: string, config: site_config, diag: diagnostics, build_date: Date, mode: "production" | "development" = "production"): site_model {
+export function load_site(root: string, config: site_config, diag: diagnostics, build_date: Date, mode: "production" | "development" = "production", force_parse = false): site_model {
     const content_dir = join(root, "content")
     const model: site_model = {
         config, root, content_dir, pages: [], themes: [], objects: [], prints: [], plugins: [], resources: new Map(), diag, build_date, mode, now: year_fraction(build_date),
         icons: { start: "E000", icons: icon_map(config.icons) },
     }
+    const sources = model.sources = new Source_Manifest(root, force_parse)
     for (const file of source_files(content_dir)) {
-        const roots = parse_xml(readFileSync(file, "utf8"), file)
+        const roots = sources.xml(file)
         validate_roots(roots, diag)
         for (const node of roots) {
             walk_nodes(node, child => {
@@ -107,6 +110,7 @@ export function load_site(root: string, config: site_config, diag: diagnostics, 
             if (node.tag === "plugin") model.plugins.push(node)
         }
     }
+    sources.save()
     try { project_declarations(model.objects) } catch (error) { report_error(diag, "project catalog", (error as Error).message) }
     for (const name of ["signature", "icon", "favicon"] as const) {
         if (config.resources[name] && !configured_resource(model, name)) report_warning(diag, "config.json", `resources.${name}: missing or unsafe content resource ${config.resources[name]}`)

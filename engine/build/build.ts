@@ -100,7 +100,7 @@ export async function build_site(options: build_options): Promise<build_result> 
         config.base_url = url.origin
     }
     const diag = new_diagnostics()
-    const model = load_site(options.root, config, diag, options.build_date, options.mode)
+    const model = load_site(options.root, config, diag, options.build_date, options.mode, options.force)
     synthesize(model)
     const files: output_files = new Map()
     files.set("projects/git.json", JSON.stringify([...new Set(model.objects.filter(node => node.tag === "project" && (node.attrs.repo || node.children.some(child => child.tag === "pipeline"))).map(node => node.attrs.id))]))
@@ -129,12 +129,13 @@ export async function build_site(options: build_options): Promise<build_result> 
     const cache = load_cache(options.root)
     const next_cache: Record<string, string> = {}
     const skipped_outputs = new Map<string, string | Uint8Array>()
-    const shared = shared_hash(model, inline_css + JSON.stringify(manifest) + JSON.stringify(runtime) + JSON.stringify([...page_styles.values()]) + options.build_date.toISOString().slice(0, 10))
+    const shared = shared_hash(model, inline_css + JSON.stringify(manifest) + JSON.stringify(runtime) + options.build_date.toISOString().slice(0, 10))
     let skipped = 0
     for (const page of model.pages) {
         const expertise = expertise_by_lang.get(page.lang) ?? null
         const key = `page:${page.lang}:${page.path}`
-        const hash = page_hash(model, page, shared, data_scss)
+        const expertise_key = expertise ? JSON.stringify({ ...expertise, stack_defs: [...expertise.stack_defs] }) : ""
+        const hash = page_hash(model, page, shared, expertise_key, JSON.stringify(page_styles.get(page) ?? []))
         const url = page_url(model, page)
         const html_name = output_name(url, "html")
         const names = [html_name, ...(config.render.spa_json && url !== "/404" ? [json_name(url)] : [])]
@@ -176,6 +177,7 @@ export async function build_site(options: build_options): Promise<build_result> 
         await cover_files(model, theme_colors, files)
     }
     for (const [url, source] of model.resources) files.set(url.slice(1), readFileSync(source))
+    model.sources?.save()
     if (options.only_check) return { model, diag, written: [], skipped, pages: model.pages.length }
     const expertise_media = new Set([...expertise_by_lang.values()].flatMap(data => data?.entries.flatMap(entry => [entry.media, entry.poster]) ?? []))
     await pwa_files(options.root, files, skipped_outputs, config, expertise_media)

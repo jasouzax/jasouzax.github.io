@@ -21,7 +21,7 @@
   - [x] `watch` serializes rebuilds and reports that engine changes need a restart
   - [x] Dry-run deployment staging
   - [ ] `new`, `theme`, `font`, `--only` and `graph --format`
-- [ ] Timestamp/manifest/`HEAD` incremental source parsing and repository revisions (2.3). Today `.cache/hashes.json` stores page/output hashes instead
+- [/] Timestamp/manifest/`HEAD` incremental source parsing and repository revisions (2.3). `.cache/sources.json` reuses detached XML trees/source digests, checks Git changes and prunes removed paths; live per-project repository snapshots remain open.
 - [ ] Isolate filesystem/process IO behind runtime adapters (engine stays Node-only for now)
 
 ## Contract
