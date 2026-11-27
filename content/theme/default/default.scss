@@ -3,6 +3,7 @@
 @use "sass:string";
 @use "jazu:api" as *;
 @use "../slide_skills.scss";
+@use "../preferences.scss";
 
 // =====================================================================
 // THEME TOKENS: "Clean Sci-fi" (the default theme)
@@ -8506,6 +8507,8 @@ body:has(#motion_pause:checked) {
 .desk_pdf_controls button { padding: .2em .4em; }
 .desk_pdf_viewport { flex: 1; min-height: 0; overflow: auto; padding: 1em; background: #555; }
 .desk_pdf_viewport canvas { display: block; margin: auto; background: white; }
+
+@include preferences.preferences;
 
 .desk_wbox:fullscreen { display: flex; flex-direction: column; background: var(--panel); padding: 0; }
 .desk_wbox:fullscreen > :not(.desk_wbox_head) { flex: 1 1 auto; min-height: 0; }

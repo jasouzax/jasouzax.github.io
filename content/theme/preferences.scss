@@ -1,0 +1,49 @@
+// Shared preference overrides are included after each theme's paint rules.
+@mixin preferences {
+    @media (prefers-reduced-motion: reduce), (forced-colors: active) {
+        *, *::before, *::after {
+            animation-duration: .001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0s !important;
+            scroll-behavior: auto !important;
+        }
+    }
+    @media (prefers-reduced-transparency: reduce) {
+        :root[data-theme] { --surface: var(--panel); --surface-strong: var(--panel); }
+        .desk_wbox { --win-body: var(--panel); }
+        *, *::before, *::after { backdrop-filter: none !important; }
+        body::after { display: none; }
+    }
+    @media (prefers-contrast: more) {
+        :root[data-theme] { --text-dim: var(--text); --edge: var(--text); --line: var(--text); --line-soft: var(--text); --surface: var(--panel); --surface-strong: var(--panel); }
+        *, *::before, *::after { text-shadow: none !important; }
+    }
+    @media (prefers-contrast: less) {
+        // Soften decoration while retaining the theme's readable text and focus colors.
+        :root[data-theme] { --edge: color-mix(in srgb, var(--text) 30%, var(--panel)); --line-soft: var(--edge); --shadow: none; --glow: none; }
+        *, *::before, *::after { text-shadow: none !important; box-shadow: none !important; }
+        body::after { display: none; }
+    }
+    @media (forced-colors: active) {
+        :root[data-theme] {
+            --bg: Canvas; --panel: Canvas; --panel-2: Canvas;
+            --surface: Canvas; --surface-strong: Canvas;
+            --text: CanvasText; --text-dim: CanvasText;
+            --edge: CanvasText; --line: CanvasText; --line-soft: CanvasText;
+            --accent: LinkText; --accent-2: LinkText; --focus: Highlight;
+            --solid: Highlight; --on-solid: HighlightText;
+            --shadow: none; --glow: none;
+        }
+        #theme_background, .memory_bg, .background_entity, .foreground_entity, body::after { display: none !important; }
+        *, *::before, *::after { text-shadow: none !important; box-shadow: none !important; backdrop-filter: none !important; background-image: none !important; }
+        :is(h1, h2, h3, .landing_name, .landing_role_text, .desk_files_icon) { -webkit-text-fill-color: currentColor !important; background-image: none !important; }
+        :is(button, input, textarea, select, summary) { color: ButtonText !important; background-color: ButtonFace !important; border-color: ButtonText; -webkit-text-fill-color: currentColor !important; font-family: Jasouza, system-ui, sans-serif !important; }
+        a { color: LinkText !important; }
+        .desk_wbox_head :is(button, summary, label), .desk_menu_tab_icon, .desk_files_icon { font-family: Jasouza, ui-monospace, monospace !important; }
+        #head_window .list_drop_icon { opacity: 1 !important; }
+        .desk_wbox_body_empty_actions button { font-family: system-ui, sans-serif !important; }
+        :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px; }
+        :is(button, input, textarea, select):disabled { color: GrayText !important; opacity: 1; }
+        ::selection { color: HighlightText; background: Highlight; }
+    }
+}

@@ -14,6 +14,7 @@
 - [x] Inline shared geometry and mode-aware shimmer; load named themes without blocking first paint, with readable no-JavaScript and failure fallbacks (1.9)
 - [x] Diagonal SPA wipes through skeletons, preserve the signature node, isolate named skins with rollback on a failed theme change
 - [x] Default and Memory themes exist
+- [?] Both themes respond live to light/dark, reduced motion, higher/lower contrast, reduced transparency and forced colors; `tests/media_preferences.spec.ts` checks the matrix, focus and restoration. Physical assistive-technology/WCAG acceptance remains open.
 - [x] Port monochrome/COLRv0 fonts to TypeScript with native Node compression (2.6)
   - [x] Independently decode TTF, WOFF, WOFF2, COLR and CPAL; verify BMP/astral mappings, metrics and reproducibility
 - [x] Remove obsolete Python icon assembly scripts; keep all authored outlines in theme XML
@@ -23,6 +24,8 @@
 - [ ] Further themes: Frutiger Aero, Punk, later vaporwave, inkblot, art nouveau
 
 ## Contract
+
+Media preferences share `content/theme/preferences.scss`, included after each skin's rules. The overrides preserve text/focus colors when lowering decorative contrast, remove glass under reduced transparency, and use system colors/controls under forced colors. Decorative background images disappear in forced colors; Material glyph controls retain their icon font. Both background scripts stop continuous motion in forced colors as well as reduced motion. The inline loading skeleton has matching motion, transparency and forced-color fallbacks. Run `npx playwright test --config tests/preferences_browser.config.ts` after a build to check live changes for both skins.
 
 *This is the target contract; a described capability is not a claim that it has shipped. The status list above is authoritative.*
 

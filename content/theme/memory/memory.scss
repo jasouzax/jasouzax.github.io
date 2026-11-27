@@ -18,6 +18,7 @@
 @use "sass:string";
 @use "jazu:api" as *;
 @use "../slide_skills.scss";
+@use "../preferences.scss";
 .list_drop_separator { border-top: 1px solid var(--line); margin: .25em .5em; }
 .list_drop_status { max-width: 24em; padding: .5em .75em; white-space: normal; font-size: .8em; }
 .list_drop button:disabled { opacity: .4; cursor: default; }
@@ -3217,3 +3218,5 @@
 .desk_message_body { border-radius: .25em .25em .25em 0; box-shadow: 1px 1px 0 color-mix(in srgb, currentColor 20%, transparent); }
 .desk_message_self .desk_message_body { border-radius: .25em .25em 0 .25em; }
 .desk_messages_composer textarea { border-radius: .2em; }
+
+@include preferences.preferences;

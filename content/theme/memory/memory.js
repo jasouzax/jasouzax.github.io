@@ -91,7 +91,7 @@ const S = {
   hover: null, note: 0, noteOverride: -1, lastMove: 0, pv: { x: 0, y: 0 },
 };
 let stillV = false;
-const refreshStill = () => { stillV = matchMedia('(prefers-reduced-motion: reduce)').matches || !!document.getElementById('motion_pause')?.checked; };
+const refreshStill = () => { stillV = matchMedia('(prefers-reduced-motion: reduce)').matches || matchMedia('(forced-colors: active)').matches || !!document.getElementById('motion_pause')?.checked; };
 const still = () => stillV;
 
 /* =====================================================================
@@ -1879,6 +1879,7 @@ function enable() {
   document.addEventListener('change', e => { if (e.target.name === 'theme_state') setTimeout(retheme, 0); if (e.target.id === 'motion_pause') { refreshStill(); sync(); } }, o);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme, o);
   matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => { refreshStill(); sync(); }, o);
+  matchMedia('(forced-colors: active)').addEventListener('change', () => { refreshStill(); sync(); }, o);
   const token = S.gen = (S.gen || 0) + 1;
   gpuStart(token).then(ok => {
     if (!S.on || S.gen !== token) { if (ok) gpuStop(); return; }

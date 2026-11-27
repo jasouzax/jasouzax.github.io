@@ -30,6 +30,8 @@ export const skeleton_css = `
 @keyframes skeleton_shine { to { transform: translateX(110%); } }
 @keyframes skeleton_enter { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { #loading_overlay, .loading_shapes::after { animation: none; } #loading_overlay::before { transition: none; } }
+@media (forced-colors: active) { :root { --loading-ink: CanvasText; --loading-bg: Canvas; } .loading_placeholder { background: Canvas; border-color: CanvasText; } #loading_overlay, .loading_shapes::after { animation: none; } }
+@media (prefers-reduced-transparency: reduce) { .loading_placeholder { opacity: 1; } }
 :root:has(#motion_pause:checked) .loading_shapes::after { animation: none; }
 :root[data-spa-transition] #head_signature { view-transition-name: spa-signature; }
 :root[data-spa-transition] #theme_background { view-transition-name: spa-background; }

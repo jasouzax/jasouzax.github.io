@@ -355,11 +355,13 @@ gl_FragColor = vec4(mix(valley_color, globe_glow(dither_color(strength, CONTOUR_
         if (!this.gl) { this.container?.classList.add('fallback'); return; }
         this.dark_query = matchMedia('(prefers-color-scheme: dark)');
         const reduce_query = matchMedia('(prefers-reduced-motion: reduce)');
+        const forced_query = matchMedia('(forced-colors: active)');
         const pause_input = document.getElementById('motion_pause');
         this.motion_query = {
-            get matches() { return reduce_query.matches || Boolean(pause_input?.checked); },
+            get matches() { return reduce_query.matches || forced_query.matches || Boolean(pause_input?.checked); },
             addEventListener: (type, handler, options) => {
                 reduce_query.addEventListener(type, handler, options);
+                forced_query.addEventListener(type, handler, options);
                 pause_input?.addEventListener(type, handler, options);
             },
         };
