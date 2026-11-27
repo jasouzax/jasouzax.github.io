@@ -1,5 +1,9 @@
 # Feature status
 
+- [?] Account homes alias browser files or an explicitly selected Drive folder, with account-bound handles and terminal identity; [storage behavior](../src/desk.md).
+- [?] Both themes honor live motion, color, contrast, transparency and forced-color preferences; [verification](themes.md).
+- [/] Source manifests reuse XML trees/digests with Git revision invalidation and page-specific style/expertise dependencies; per-project repository snapshots and selective shared compilation remain open.
+
 - [?] Custom API SSE/WebSocket streams, resume cursors, single-use tickets, pub/sub, OpenAPI/TypeScript clients and scoped log streams; [status and limits](custom-apis.md).
 - [?] Owner Sessions controls deploy, roll back and stop Node API versions through an owner/CSRF-protected BFF.
 - [/] Custom API live layer: MQTT 5 bridge is implemented; Durable Object transport, per-owner origins and multi-server registration remain development work.
@@ -79,7 +83,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] No stale outputs or SPA payloads after deletes, renames and visibility changes
   - [x] Cache invalidation covers generator, body, resource, date and source changes
   - [x] Command surface: `build`, `check`, `serve`, `watch`, `clean`, `icons`, `graph`, `pack`, `deploy`, `node`
-  - [ ] Timestamp/manifest/`HEAD` incremental source parsing and repository revisions (2.3). Today `.cache/hashes.json` stores page/output hashes instead
+  - [/] Timestamp/manifest/`HEAD` incremental source parsing and repository revisions (2.3). Source parsing/digest reuse and Git invalidation are implemented; live per-project snapshots remain open.
   - [ ] Isolate filesystem/process IO behind runtime adapters (engine stays Node-only for now)
 
 ## Pages and heroes
@@ -180,7 +184,7 @@ Every feature of JAZU, ordered roughly by dependency. This is the single place t
   - [x] `/tmp` in memory only
   - [x] `/bin`, `/proc`, `/dev` provided by the kernel
   - [ ] Mount public `/srv` resources consistently in the browser VFS and desk window loading (3.7)
-  - [ ] Google Drive visitor storage, in-memory tokens and conflict copies (3.8)
+  - [/] Google Drive visitor storage and account homes use in-memory tokens; automatic conflict-copy reconciliation remains open (3.8).
 
 ## Cloud (Pages, Worker, API)
 
