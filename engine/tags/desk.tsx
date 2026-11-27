@@ -127,6 +127,7 @@ const runtime_keys = [
     "files_failed",
     "files_unsupported",
     "files_username",
+    "compute_home", "compute_personal_home", "compute_browser_home", "compute_home_connected", "compute_home_disconnected",
     "files_cannot_edit",
     "bytes",
     "text_saved",
@@ -190,7 +191,7 @@ function render_window_template(ctx: render_ctx): child {
 
 // Glyphs of the Files tools (the bar and the item tools), by name.
 function action_icons(ctx: render_ctx): Record<string, string> {
-    const names = ["save", "compute", "disk", "file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh", "audio", "mute"]
+    const names = ["save", "home", "compute", "disk", "file_new", "folder_new", "upload", "rename", "copy", "cut", "paste", "download", "delete", "view", "pause", "window", "refresh", "audio", "mute"]
     return Object.fromEntries(names.map((name) => [name, icon(ctx, `[${name}]`)]))
 }
 

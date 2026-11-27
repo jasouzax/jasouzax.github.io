@@ -6,6 +6,9 @@ export type Auth_State = { user: { email: string, name: string, picture?: string
 let current: Auth_State | null = null
 let pending: Promise<Auth_State> | null = null
 let revision = 0
+function broadcast_identity(): void {
+    try { const channel = new BroadcastChannel("jazu:identity"); channel.postMessage("refresh"); channel.close() } catch {}
+}
 
 export function get_auth(refresh = false): Promise<Auth_State> {
     if (refresh) { pending = null; revision++ }
@@ -41,6 +44,7 @@ export async function sign_out(): Promise<void> {
         if (!response.ok) throw new Error("Could not sign out; please try again")
     }
     clear_identity(auth.google_enabled)
+    broadcast_identity()
 }
 
 async function delete_account(): Promise<void> {
@@ -50,6 +54,7 @@ async function delete_account(): Promise<void> {
     const response = await fetch("/api/_/auth/account/delete", { method: "POST", credentials: "same-origin", headers: { "x-jazu-work": "1", "x-jazu-csrf": auth.csrf, "x-jazu-confirm-delete": "account" }, signal: AbortSignal.timeout(15000) })
     if (!response.ok) throw new Error("Could not delete the account; please try again")
     clear_identity(auth.google_enabled)
+    broadcast_identity()
 }
 
 let login_window: Window | null = null
@@ -87,6 +92,7 @@ export function init_sign(): void {
         if (event.origin === location.origin && event.source === login_window) completed(event.data)
     })
     try { const channel = new BroadcastChannel("jazu:oauth"); channel.onmessage = event => completed(event.data) } catch {}
+    try { const channel = new BroadcastChannel("jazu:identity"); channel.onmessage = () => { void refresh_identity().catch(() => {}) } } catch {}
     // Retire the former unverified, browser-only profile cache.
     try { localStorage.removeItem("jazu_user"); sessionStorage.removeItem("jazu_nonce") } catch {}
     void get_auth().then(auth => {

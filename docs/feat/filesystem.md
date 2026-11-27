@@ -14,7 +14,8 @@
 - [x] `/tmp` in memory only
 - [x] `/bin`, `/proc`, `/dev` provided by the kernel
 - [ ] Mount public `/srv` resources consistently in the browser VFS and desk window loading (3.7)
-- [ ] Google Drive visitor storage, in-memory tokens and conflict copies (3.8)
+- [/] Google Drive visitor storage and account homes use in-memory tokens; automatic conflict-copy reconciliation remains open (3.8).
+- [?] Account homes alias browser files until a Drive folder is selected; account changes revoke retained account handles and writers. Google consent remains interactive acceptance.
 
 ## Contract
 
@@ -31,7 +32,7 @@
 | `/home/user` | The visitor's own: browser file system, or a folder picked with the File System Access API, or mirrored to their Google Drive; the work repository is `/home/user/{id}` | yes | persistent, private to the visitor |
 | `/srv/blogs/{id}` | Published blog files, read-only HTTP mount, lazy | in-memory overlay | vanishes on refresh |
 | `/srv/events/{id}` | Published event files, same | in-memory overlay | vanishes on refresh |
-| `/srv/repo/{id}` | The project's repository on the owner's server (through the API) | contributors only; others get an in-memory overlay | server for contributors |
+| `/srv/projects/{id}` | The project's repository on the owner's server (through the API) | contributors only; others get an in-memory overlay | server for contributors |
 | `/bin`, `/usr` | Stubs and data, one per plugin | persistent overlay | local |
 | `/tmp` | Memory | yes | none |
 | `/proc`, `/dev` | Kernel (`null`, `zero`, `random`, `tty`, process table) | | |

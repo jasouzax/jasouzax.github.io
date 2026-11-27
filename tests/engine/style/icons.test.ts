@@ -14,7 +14,7 @@ import { json_ascii_pua } from "../../../shared/util.ts"
 test("Material tokens survive JSON and every theme provides their real generated glyphs", async () => {
     const config = await load_config(process.cwd())
     assert.deepEqual(config.icons, material_icons)
-    assert.equal(Object.keys(material_icons).length, 95)
+    assert.equal(Object.keys(material_icons).length, 96)
     const icons = Object.values(material_icons).map(hex => Number.parseInt(hex, 16))
     const text = String.fromCodePoint(...icons)
     assert.equal(JSON.parse(json_ascii_pua(JSON.stringify(text))), text)

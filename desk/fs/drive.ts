@@ -9,9 +9,13 @@ export async function drive_directory(folder_id: string): Promise<dir_handle> {
     const authorize = async () => {
         const auth = await get_auth()
         if (!auth.user) throw new Error("Sign in with Google to connect Drive")
+        if (email && auth.user.email !== email) throw new Error("Sign in with Google to reconnect Drive")
+        email = auth.user.email
         const response = await fetch("/api/_/auth/drive?filesystem=1", { method: "POST", credentials: "same-origin", headers: { "x-jazu-work": "1", "x-jazu-csrf": auth.csrf } })
         if (!response.ok) throw new Error("drive_consent_required")
-        email = auth.user.email; access = (await response.json()).access_token
+        const token = (await response.json()).access_token
+        if ((await get_auth()).user?.email !== email) throw new Error("The signed-in account changed")
+        access = token
     }
     const request = async (path: string, init: RequestInit = {}): Promise<Response> => {
         if ((await get_auth()).user?.email !== email) throw new Error("Sign in with Google to reconnect Drive")

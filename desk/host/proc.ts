@@ -1,4 +1,6 @@
 import { selected_compute } from "../menu/computes.ts"
+import { account_identity } from "../fs/account.ts"
+import { filesystem_initialized } from "../fs/opfs.ts"
 // Process windows use xterm's VT parser and raw input. The kernel owns PIDs;
 // the lazy registry supplies compiled programs and their shared filesystem.
 
@@ -94,7 +96,9 @@ function detach(item: desk_window): void {
 function new_shell(): proc {
     const stdin = make_stream()
     kernel.terminals.add(stdin)
-    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd: working_directory(), env: { HOME: "/home/user", USER: "user", LOGNAME: "user", HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: "\\[\\033[1;32m\\]user@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ " }, interactive: true })
+    const account = selected_compute() === "vfs" ? account_identity() : { name: "user", home: "/home/user" }
+    const cwd = working_directory() === "/home/user" ? account.home : working_directory()
+    return start_process(["sh", "-i", "+m"], { root: true, stdin, cwd, env: { HOME: account.home, USER: account.name, LOGNAME: account.name, HOSTNAME: "jasouza", PATH: "/bin", SHELL: "/bin/sh", TERM: "xterm-256color", PS1: `\\[\\033[1;32m\\]${account.name}@jasouza\\[\\033[0m\\]:\\[\\033[1;34m\\]$PWD\\[\\033[0m\\]$ ` }, interactive: true })
 }
 
 // a real shell on the device through the extension bridge; the process only relays bytes, the shell itself runs on the machine
@@ -124,6 +128,7 @@ async function open_pid(item: desk_window, uri: string): Promise<boolean> {
     const match = /^pid:(\d*)$/i.exec(uri.trim()) ?? (uri.trim() === "pid://sh" ? [uri, ""] : null)
     if (!match) return false
     if (match[1] === "") {
+        await filesystem_initialized()
         attach(item, new_shell().pid)
         return true
     }

@@ -15,6 +15,7 @@ import { selection_click, type file_selection } from "../window/folder/selection
 import { local_file_path } from "./paths.ts"
 import { sync_navigation, remap_navigation } from "../action/history.ts"
 import { home_directory, home_listeners } from "./home.ts"
+import { resolve_account_home, invalidate_account_home, account_identity } from "./account.ts"
 
 export type fs_node = {
     name: string
@@ -62,6 +63,7 @@ export function toggle_hidden(): void {
 // Uploads stay in a memory directory until explicitly saved into /home/user.
 const temporary_files = memory_directory("tmp")
 let home_node: fs_node | null = null
+let account_node: fs_node | null = null
 let filesystem_ready: Promise<void> = Promise.resolve()
 export function filesystem_initialized(): Promise<void> { return filesystem_ready }
 
@@ -1364,6 +1366,55 @@ async function mount_opfs(root: fs_node): Promise<void> {
         user.children = []
         redraw()
     }
+    await mount_account_home(root)
+}
+
+async function mount_account_home(root: fs_node): Promise<void> {
+    const home = find_node("/home", root)
+    if (!home) return
+    const mount = await resolve_account_home()
+    // A stale async result must not remove a newer account's mount.
+    if (mount === undefined) return
+    if (!mount && account_node === null) return
+    if (account_node) {
+        const previous = account_node
+        home.children = (home.children ?? []).filter(child => child !== previous)
+        await (home.handle as dir_handle).removeEntry(previous.name, { recursive: true })
+        account_node = null
+    }
+    if (mount) {
+        const { identity, handle, writable } = mount
+        if (home.children?.some(child => child.name === identity.name)) throw new Error("Account home conflicts with an existing folder")
+        account_node = { name: identity.name, path: identity.home, kind: "dir", info: identity.email, parent: home, children: null, handle, writable }
+        ;(home.handle as memory_handle).mount(identity.name, handle)
+        ;(home.children ??= []).push(account_node)
+    }
+    const etc = find_node("/etc", root)?.handle as dir_handle | null
+    if (etc) {
+        const account = account_identity()
+        for (const [name, lines] of Object.entries({
+            passwd: [`root::0:0:Administrator:/root:/bin/sh`, ...(account.email ? [`${account.name}::1000:1000:Signed-in user:${account.home}:/bin/sh`] : []), `user::1000:1000:Browser user:/home/user:/bin/sh`],
+            group: [`root:x:0:`, ...(account.email ? [`${account.name}:x:1000:`] : []), `user:x:1000:`],
+        })) {
+            const file = await etc.getFileHandle(name, { create: true })
+            const existing = (await (await file.getFile()).text()).split("\n").filter(line => line && !["root", "user"].includes(line.split(":")[0]) && !line.includes(":1000:1000:Signed-in user:") && !(name === "group" && /:x:1000:$/.test(line)))
+            const writer = await file.createWritable!(); await writer.write([...lines, ...existing, ""].join("\n")); await writer.close()
+        }
+    }
+}
+
+function refresh_account_home(revoke = true): void {
+    invalidate_account_home(revoke)
+    filesystem_ready = filesystem_ready.catch(() => {}).then(async () => {
+        if (browser_root) await mount_account_home(browser_root)
+        redraw()
+        document.dispatchEvent(new CustomEvent("jazu:fs:changed", { detail: { path: "/home" } }))
+    })
+}
+if (typeof document !== "undefined") {
+    document.addEventListener("jazu:auth", () => refresh_account_home(false))
+    document.addEventListener("jazu:account-home", () => refresh_account_home())
+    if (typeof window !== "undefined") window.addEventListener("storage", event => { if (event.key?.startsWith("jazu:account-home:")) refresh_account_home() })
 }
 
 home_listeners.add(async ({ names }) => {

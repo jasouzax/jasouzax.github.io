@@ -1,5 +1,6 @@
 import { saved_computes, save_compute, forget_compute, computer_directory, delete_computer_files, type Saved_Compute } from "./computes/store.ts"
 import { get_auth } from "../work/sign.ts"
+import { set_account_home } from "../fs/account.ts"
 import { kernel, kill } from "../kernel/process.ts"
 import { drive_directory } from "../fs/drive.ts"
 import { google_sign_in } from "../work/sign.ts"
@@ -138,6 +139,18 @@ export function init_computes_menu(desk: HTMLElement): () => void {
         }
     })
     const filesystem = option_button("Filesystem", "disk", () => dialog.showModal())
+    const personal_home = option_button(text("compute_personal_home"), "home", () => {
+        const compute = computes.get(picked)
+        if (compute?.saved?.kind !== "drive") return
+        void (async () => {
+            if ((await get_auth()).user?.email !== compute.saved!.email) throw new Error(`Sign in as ${compute.saved!.email} to use this Drive folder`)
+            await set_account_home(compute.saved!.folder!)
+            notice.textContent = text("compute_home_connected")
+        })().catch(report)
+    })
+    const browser_home = option_button(text("compute_browser_home"), "home", () => {
+        void set_account_home(null).then(() => { notice.textContent = text("compute_home_disconnected") }).catch(report)
+    })
     const remove = option_button(text("files_delete"), "delete", () => {
         const compute = computes.get(picked)
         if (!compute?.removable || !confirm(compute.kind === "wasm" ? `Delete ${compute.name} and its saved files?` : `Disconnect ${compute.name} from Computes?`)) return
@@ -151,12 +164,13 @@ export function init_computes_menu(desk: HTMLElement): () => void {
             computes.delete(compute.id); picked = selected; network(); draw()
         })().catch(report)
     })
-    row.append(option_group("New", create, filesystem), option_group("", remove)); bar.append(row, notice)
+    row.append(option_group("New", create, filesystem), option_group("", remove), option_group(text("compute_home"), personal_home, browser_home)); bar.append(row, notice)
     create.disabled = filesystem.disabled = true
     const release = mount_options(panel, bar)
     const draw = () => {
         if (signal.aborted) return
         remove.disabled = !computes.get(picked)?.removable
+        personal_home.disabled = computes.get(picked)?.saved?.kind !== "drive"
         panel.replaceChildren(...[...computes.values()].map(compute => {
             const entry = document.createElement("article"), box = document.createElement("details"), head = document.createElement("summary"), title = document.createElement("h3"), mark = document.createElement("span")
             entry.className = "desk_side_item"; entry.dataset.computeId = compute.id; box.className = "desk_side_item_box"; head.className = "desk_side_item_head"
